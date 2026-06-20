@@ -882,6 +882,23 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
   background-size: cover; background-position: center;
 }
 .phone-home::before { content: none; }
+/* A user wallpaper can be any image — light, busy, low-contrast — which buries
+   the app labels and greeting (they're tuned for the dark default). Layer a dark
+   scrim over the wallpaper (stronger at top/bottom where text sits) and brighten
+   the home-screen text so it stays legible over ANY photo. Scoped to
+   .has-wallpaper so the default home screen is untouched. */
+.phone-home.has-wallpaper {
+  background-image:
+    linear-gradient(180deg, rgba(14, 10, 18, 0.66) 0%, rgba(14, 10, 18, 0.42) 32%, rgba(14, 10, 18, 0.5) 70%, rgba(14, 10, 18, 0.72) 100%),
+    var(--phone-wallpaper, none);
+}
+.phone-home.has-wallpaper .ph-greeting-eyebrow { color: rgba(255, 255, 255, 0.82); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6); }
+.phone-home.has-wallpaper .ph-greeting-title { color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65); }
+.phone-home.has-wallpaper .ph-app-label {
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7), 0 0 2px rgba(0, 0, 0, 0.5);
+}
+.phone-home.has-wallpaper .ph-hint { color: rgba(255, 255, 255, 0.85); text-shadow: 0 1px 5px rgba(0, 0, 0, 0.6); }
 .nav-badge {
   margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 999px; background: var(--ember); color: #2a0d10;

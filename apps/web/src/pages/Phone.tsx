@@ -61,7 +61,7 @@ function deriveBattery(stamina: number | undefined, staminaMax: number | undefin
 }
 
 export function Phone() {
-  const { worldState, activeWorldId, activeWorld, dayTick } = useAppData();
+  const { worldState, activeWorldId, activeWorld, dayTick, theme } = useAppData();
   const [app, setApp] = useState<AppId>('home');
   const [inbox, setInbox] = useState({ unreadTexts: 0, unreadEmails: 0, feedUnread: 0, landlordUnread: 0 });
 
@@ -142,7 +142,7 @@ export function Phone() {
         <div className="phone-screen">
           {app === 'home' ? (
             <>
-              <div className="phone-home">
+              <div className={`phone-home${theme.wallpaper ? ' has-wallpaper' : ''}`}>
                 <div className="ph-home">
                   <div className="ph-greeting">
                     <div className="ph-greeting-eyebrow">{phaseLabel} · the almanac of the heart</div>
