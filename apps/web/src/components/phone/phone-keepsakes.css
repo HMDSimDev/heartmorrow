@@ -1,0 +1,309 @@
+/* ===========================================================================
+   Phone keepsakes — Moments scrapbook + Endings gallery.
+   Co-located bespoke styling on top of Nocturne v2. Prefixes: .mom- / .end-
+   Built for the ~410px phone device frame: compact, mobile-first.
+   =========================================================================== */
+
+/* --- Moments: a scrapbook bound on the desk ----------------------------- */
+.mom-shell { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; }
+
+/* Selector bar, dressed as a ledger tab */
+.mom-pick {
+  padding: 11px 13px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+  position: relative;
+}
+/* The cover plate must never be squeezed by a long timeline — only the reel
+   scrolls. (Without this, flex-shrink crushed the portrait + name.) */
+.mom-cover { flex-shrink: 0; }
+.mom-cover-text { min-width: 0; flex: 1; }
+.mom-name { word-break: break-word; }
+.mom-pick .kicker { margin-bottom: 6px; }
+.mom-pick select { width: 100%; }
+
+/* SIGNATURE: the scrapbook cover plate — a taped polaroid of the character. */
+.mom-cover {
+  position: relative;
+  margin: 14px 13px 4px;
+  padding: 14px 14px 16px;
+  background:
+    linear-gradient(180deg, rgba(232, 138, 166, 0.08), rgba(230, 177, 94, 0.05)),
+    var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm), var(--rim);
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  overflow: hidden;
+}
+/* warm corner brackets so it reads as a framed feature */
+.mom-cover::before,
+.mom-cover::after {
+  content: '';
+  position: absolute;
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--brass-dim);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.mom-cover::before { top: 7px; left: 7px; border-right: none; border-bottom: none; }
+.mom-cover::after { bottom: 7px; right: 7px; border-left: none; border-top: none; }
+
+/* the polaroid that holds the portrait */
+.mom-snap {
+  flex-shrink: 0;
+  background: var(--vellum);
+  padding: 5px 5px 13px;
+  border-radius: 3px;
+  box-shadow: 0 4px 12px rgba(4, 6, 16, 0.45);
+  transform: rotate(-3deg);
+  position: relative;
+}
+.mom-snap .portrait { border-radius: 2px; }
+/* a strip of tape across the top of the snap */
+.mom-snap::before {
+  content: '';
+  position: absolute;
+  top: -7px; left: 50%;
+  width: 34px; height: 14px;
+  transform: translateX(-50%) rotate(4deg);
+  background: rgba(230, 177, 94, 0.32);
+  border: 1px solid rgba(230, 177, 94, 0.22);
+  border-radius: 1px;
+}
+
+.mom-cover-text { min-width: 0; }
+.mom-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.18rem;
+  line-height: 1.15;
+  color: var(--text);
+}
+.mom-since {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.mom-count {
+  display: inline-block;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--brass);
+  background: rgba(230, 177, 94, 0.1);
+  border: 1px solid rgba(230, 177, 94, 0.22);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+/* The timeline of moments — clean cards with a kind-colored left edge. */
+.mom-reel {
+  padding: 16px 13px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* A moment card. The colored left edge marks its kind. */
+.mom-clip {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--brass);
+  box-shadow: var(--shadow-sm);
+}
+/* kind-tinted left edge: romance rose, strain ember, memory moon, brass default */
+.mom-clip.kind-milestone,
+.mom-clip.kind-status { border-left-color: var(--rose); }
+.mom-clip.kind-jealousy,
+.mom-clip.kind-walkout { border-left-color: var(--ember); }
+.mom-clip.kind-memory { border-left-color: var(--moon); }
+
+/* Each card carries its own little taped polaroid — the character wearing the
+   expression that fits the moment (set in MomentsApp). Alternating tilt + the
+   tape strip give the reel a hand-pasted scrapbook feel. */
+.mom-clip-snap {
+  position: relative;
+  flex-shrink: 0;
+  width: 50px;
+  background: var(--vellum);
+  padding: 3px 3px 8px;
+  border-radius: 3px;
+  box-shadow: 0 3px 9px rgba(4, 6, 16, 0.42);
+  transform: rotate(-2.5deg);
+}
+.mom-clip:nth-child(even) .mom-clip-snap { transform: rotate(2.5deg); }
+.mom-clip-snap .portrait { width: 100%; border-radius: 2px; }
+/* a half-strip of tape pinning the top corner */
+.mom-clip-snap::before {
+  content: '';
+  position: absolute;
+  top: -5px; left: 50%;
+  width: 26px; height: 11px;
+  transform: translateX(-50%) rotate(3deg);
+  background: rgba(230, 177, 94, 0.3);
+  border: 1px solid rgba(230, 177, 94, 0.2);
+  border-radius: 1px;
+}
+/* the kind glyph as a wax-seal stamp pinned to the photo's corner */
+.mom-clip-stamp {
+  position: absolute;
+  bottom: -7px; right: -7px;
+  width: 22px; height: 22px;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+/* wrap guards so a long unbroken token (URL, run-on name) can't clip the card */
+.mom-title { font-family: var(--font-display); font-weight: 600; font-size: 0.98rem; line-height: 1.25; color: var(--text); overflow-wrap: anywhere; word-break: break-word; }
+.mom-body { color: var(--text-dim); font-size: 0.84rem; margin-top: 4px; line-height: 1.5; overflow-wrap: anywhere; word-break: break-word; }
+.mom-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+}
+.mom-when::before { content: '✦'; color: var(--brass-dim); font-size: 0.6rem; }
+
+/* --- Endings: a treasured book of epilogues, on vellum ------------------ */
+.end-shell {
+  padding: 14px 13px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* SIGNATURE: a brass-engraved gallery plate above the keepsakes. */
+.end-plate {
+  position: relative;
+  text-align: center;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.end-plate .kicker { color: var(--brass); justify-content: center; }
+.end-plate-title {
+  margin: 5px 0 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.22rem;
+  color: var(--text);
+}
+.end-plate-rule {
+  margin-top: 9px;
+  font-family: var(--font-display);
+  color: var(--brass-dim);
+  font-size: 0.8rem;
+  letter-spacing: 0.5em;
+}
+
+/* The keepsake card: a small bound page on warm vellum. */
+.end-keepsake {
+  position: relative;
+  background:
+    linear-gradient(176deg, var(--vellum), var(--vellum-2));
+  color: var(--ink-on-vellum);
+  border: 1px solid #cdbf99;
+  border-radius: var(--radius);
+  padding: 18px 16px 16px;
+  box-shadow: var(--shadow), 0 0 0 4px rgba(205, 191, 153, 0.18);
+}
+/* a faint inner deckle frame so it reads as a printed plate */
+.end-keepsake::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(140, 122, 78, 0.28);
+  border-radius: calc(var(--radius) - 5px);
+  pointer-events: none;
+}
+/* the trophy sits as a wax-seal medallion, pinned top-right */
+.end-seal {
+  position: absolute;
+  top: 12px; right: 13px;
+  width: 30px; height: 30px;
+  display: grid;
+  place-items: center;
+  font-size: 0.95rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #f0e6c9, #c9b577);
+  border: 1px solid #b89a52;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.6), 0 2px 5px rgba(70, 60, 38, 0.4);
+}
+
+.end-head {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-right: 30px; /* clear the seal */
+}
+.end-head .portrait { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55); }
+/* let the caption column shrink so a long name wraps instead of overflowing the
+   vellum card (the portrait wrapper is already flex:0 0 auto). */
+.end-head > div:last-child { min-width: 0; }
+.end-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.08rem;
+  line-height: 1.2;
+  color: var(--ink-on-vellum);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.end-by {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-on-vellum-dim);
+}
+/* an engraved divider between caption and prose */
+.end-thread {
+  height: 1px;
+  margin: 0 2px 11px;
+  background: linear-gradient(90deg, transparent, rgba(140, 122, 78, 0.5), transparent);
+}
+.end-prose {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--font-display);
+  font-size: 0.93rem;
+  line-height: 1.62;
+  color: #463c26;
+  font-variation-settings: 'SOFT' 30;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+/* dropped first letter to make each epilogue feel like a storybook page */
+.end-prose::first-letter {
+  font-size: 1.7em;
+  font-weight: 600;
+  line-height: 1;
+  color: #6b5526;
+}

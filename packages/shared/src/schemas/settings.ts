@@ -1,0 +1,151 @@
+import { z } from 'zod';
+
+/**
+ * LLM provider settings. These configure how the SERVER talks to an
+ * OpenAI-API-compatible endpoint. The browser never reads or uses these to
+ * call the model directly — it only edits them via the server's settings API.
+ */
+
+export const StructuredOutputModeSchema = z.enum([
+  'json_schema', // response_format: { type: 'json_schema', json_schema: {...} }
+  'json_object', // response_format: { type: 'json_object' } + schema described in prompt
+  'prompt_only', // no response_format; schema described in prompt only
+]);
+export type StructuredOutputMode = z.infer<typeof StructuredOutputModeSchema>;
+
+export const EndpointModeSchema = z.enum([
+  'chat_completions', // POST {baseUrl}/chat/completions  (implemented)
+  'responses', // POST {baseUrl}/responses  (reserved — adapter interface left open)
+]);
+export type EndpointMode = z.infer<typeof EndpointModeSchema>;
+
+export const LlmSettingsSchema = z.object({
+  baseUrl: z
+    .string()
+    .url('Base URL must be a valid URL, e.g. http://localhost:1234/v1')
+    .default('http://localhost:1234/v1'),
+  apiKey: z.string().default(''),
+  model: z.string().min(1, 'Model name is required').default('local-model'),
+  /**
+   * Optional vision-capable model used for image-based generation (e.g. building a
+   * character template from a portrait). Reuses the same baseUrl + apiKey. When
+   * blank, image calls fall back to `model` — so a single multimodal model needs
+   * no extra config, while text-only setups can point this at a separate VLM.
+   */
+  visionModel: z.string().default(''),
+  temperature: z.number().min(0).max(2).default(0.8),
+  maxTokens: z.number().int().positive().max(32_000).default(2048),
+  structuredMode: StructuredOutputModeSchema.default('json_schema'),
+  /**
+   * When true AND structuredMode is 'json_schema', skip dumping the JSON schema
+   * text into the prompt. In json_schema mode the server's grammar ALREADY enforces
+   * the shape, so the in-prompt copy is redundant token bloat — skipping it shrinks
+   * the prompt (faster prefill) without weakening conformance. NO effect in
+   * json_object/prompt_only modes (there the schema text is the only thing that
+   * describes the required shape, so it is always kept). Off by default. Exposed as
+   * a toggle so it can be A/B tested against generation latency.
+   */
+  omitSchemaInPrompt: z.boolean().default(false),
+  endpointMode: EndpointModeSchema.default('chat_completions'),
+  maxRetries: z.number().int().min(0).max(10).default(3),
+  /**
+   * When true, the SERVER permits mature/explicit content in date dialogue —
+   * but ONLY once the relationship is advanced enough (see `intimacyAllowed`);
+   * propositioning a stranger/acquaintance still triggers a walkout. OFF by
+   * default; the UI gates enabling behind an age + content acknowledgment.
+   */
+  nsfwEnabled: z.boolean().default(false),
+  /**
+   * Live date dynamics cadence: how often the per-turn rapport judge runs during
+   * a date. 'every' judges each message (most responsive, an extra small model
+   * call per turn); 'periodic' judges less often to keep replies snappy.
+   */
+  rapportCadence: z.enum(['every', 'periodic']).default('every'),
+  /**
+   * Opt-in to dark tragic outcomes (a character's self-harm as the consequence of
+   * sustained, severe mistreatment). Requires `nsfwEnabled` to even be toggleable.
+   * OFF by default; when off, the entire mechanic has zero footprint. Gated in the
+   * UI behind an explicit content-warning acknowledgment with crisis resources.
+   */
+  tragicOutcomesEnabled: z.boolean().default(false),
+});
+export type LlmSettings = z.infer<typeof LlmSettingsSchema>;
+
+/** Partial update for the settings PATCH endpoint. */
+export const LlmSettingsUpdateSchema = LlmSettingsSchema.partial();
+export type LlmSettingsUpdate = z.infer<typeof LlmSettingsUpdateSchema>;
+
+export const DEFAULT_LLM_SETTINGS: LlmSettings = LlmSettingsSchema.parse({});
+
+/** Result of a health-check / test-prompt request from the Settings UI. */
+export const LlmHealthResultSchema = z.object({
+  ok: z.boolean(),
+  message: z.string(),
+  /** Round-trip latency in ms for the test call, if it completed. */
+  latencyMs: z.number().optional(),
+  /** Echoed sample of the model's reply text, when available. */
+  sample: z.string().optional(),
+  /** Models reported by /v1/models, when the endpoint supports listing. */
+  models: z.array(z.string()).optional(),
+});
+export type LlmHealthResult = z.infer<typeof LlmHealthResultSchema>;
+
+// --- Prompt size estimator (Debug page) -------------------------------------
+
+/** Request body for the prompt-size estimator. */
+export const PromptEstimateRequestSchema = z.object({
+  /** Character whose real data is used to assemble the prompts. Null → the server
+   *  picks a representative one (the first character it can find). */
+  characterId: z.string().nullable().default(null),
+  /** When true, each assembled prompt is sent to the model (max_tokens: 1) so the
+   *  reported token count is the model's EXACT `usage.prompt_tokens`. When false (or
+   *  if the endpoint can't be reached) counts fall back to a chars/4 estimate. */
+  live: z.boolean().default(true),
+  /** When true, pad the conversation/text history to the runtime caps with
+   *  representative filler so the numbers reflect a near-worst-case full window
+   *  rather than whatever short transcript happens to exist today. */
+  simulateFull: z.boolean().default(false),
+});
+export type PromptEstimateRequest = z.infer<typeof PromptEstimateRequestSchema>;
+
+/** One measured interaction (a real assembled prompt for, e.g., a date reply). */
+export const PromptEstimateSchema = z.object({
+  /** Stable key for the interaction (e.g. 'dating_dialogue'). */
+  key: z.string(),
+  /** Human label shown in the UI. */
+  label: z.string(),
+  /** One-line description of when this prompt is sent. */
+  description: z.string(),
+  /** Number of chat messages in the assembled request. */
+  messageCount: z.number().int(),
+  /** Total characters of text across all messages (image payloads excluded). */
+  chars: z.number().int(),
+  /** Prompt token count: the model's exact `usage.prompt_tokens` when measured
+   *  live, otherwise a chars/4 estimate. */
+  promptTokens: z.number().int(),
+  /** How `promptTokens` was derived. */
+  method: z.enum(['exact', 'estimated']),
+  /** Output token budget this interaction reserves (settings.maxTokens, or a
+   *  per-task override). Prompt + this is what must fit the context window. */
+  maxResponseTokens: z.number().int(),
+  /** Optional per-row note (e.g. a live-measurement failure that fell back). */
+  note: z.string().optional(),
+});
+export type PromptEstimate = z.infer<typeof PromptEstimateSchema>;
+
+/** Full estimator response: the measured interactions plus the context they were built in. */
+export const PromptEstimateResultSchema = z.object({
+  /** The model the counts were measured against. */
+  model: z.string(),
+  /** The character whose data was used, if any. */
+  characterId: z.string().nullable(),
+  characterName: z.string().nullable(),
+  /** True when counts are the model's exact usage; false when they are estimates. */
+  live: z.boolean(),
+  /** Whether the history was padded to the runtime caps (worst-case). */
+  simulateFull: z.boolean(),
+  estimates: z.array(PromptEstimateSchema),
+  /** Set when a live run couldn't reach the endpoint and fell back to estimates. */
+  error: z.string().optional(),
+});
+export type PromptEstimateResult = z.infer<typeof PromptEstimateResultSchema>;

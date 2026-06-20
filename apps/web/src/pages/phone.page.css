@@ -1,0 +1,288 @@
+/* Phone OS shell + home screen — page-scoped (prefix .ph-) */
+
+/* --- Status bar: mono HUD, time/day left, signal/battery right --- */
+.ph-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  font-family: var(--font-mono);
+}
+.ph-status-left {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.ph-status-time {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.ph-status-phase {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--brass);
+  white-space: nowrap;
+}
+.ph-status-right {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+.ph-signal {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+}
+.ph-signal i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--text);
+  display: block;
+}
+.ph-signal i:nth-child(1) { height: 4px; }
+.ph-signal i:nth-child(2) { height: 6px; }
+.ph-signal i:nth-child(3) { height: 8px; }
+.ph-signal i:nth-child(4) { height: 11px; background: var(--text-mute); }
+.ph-batt {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ph-batt-body {
+  width: 22px;
+  height: 11px;
+  border: 1.5px solid var(--text-dim);
+  border-radius: 3px;
+  padding: 1.5px;
+  display: flex;
+}
+.ph-batt-fill {
+  flex: 0 0 78%;
+  border-radius: 1px;
+  background: var(--sage);
+}
+.ph-batt-cap {
+  width: 2px;
+  height: 5px;
+  border-radius: 0 1px 1px 0;
+  background: var(--text-dim);
+}
+.ph-batt-pct {
+  font-size: 0.62rem;
+  color: var(--text-dim);
+}
+
+/* --- Home screen layout --- */
+.ph-home {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.ph-greeting {
+  margin: 2px 4px 18px;
+}
+.ph-greeting-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--text-mute);
+}
+.ph-greeting-title {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  line-height: 1.05;
+  color: var(--text);
+}
+.ph-greeting-title .ph-amp {
+  color: var(--brass);
+  font-style: italic;
+}
+
+/* --- App grid: bold, varied icon tiles --- */
+.ph-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px 8px;
+}
+@media (max-width: 380px) {
+  .ph-grid { grid-template-columns: repeat(3, 1fr); }
+}
+/* Tablet mode: wider device → roomier grid + larger icons + a bigger header. */
+@media (min-width: 1200px) {
+  .ph-grid { grid-template-columns: repeat(6, 1fr); gap: 28px 16px; }
+  .ph-app-icon { width: 66px; height: 66px; }
+  .ph-app-tile { font-size: 1.95rem; border-radius: 19px; }
+  .ph-app-label { font-size: 0.74rem; }
+  .ph-greeting { margin: 6px 6px 24px; }
+  .ph-greeting-title { font-size: 2rem; }
+  .ph-dock { margin: 20px 22px 0; padding: 12px; }
+  .ph-dock .ph-app-icon { width: 56px; height: 56px; }
+  .ph-home { padding-bottom: 4px; }
+}
+
+.ph-app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  transition: transform 0.12s ease;
+}
+.ph-app:active { transform: scale(0.92); }
+.ph-app:focus-visible { outline: none; }
+.ph-app:focus-visible .ph-app-tile {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* Icon wrapper: the positioning context for the badge, NOT clipped — so the
+   unread badge can sit outside the (overflow-hidden) tile without being cut. */
+.ph-app-icon {
+  position: relative;
+  width: 56px;
+  height: 56px;
+}
+.ph-app-tile {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  font-size: 1.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(155deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+/* subtle top sheen */
+.ph-app-tile::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 42%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
+  pointer-events: none;
+}
+/* colored corner accent wash, set per category */
+.ph-app-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 90% at 100% 100%, var(--ph-tint, transparent) 0%, transparent 55%);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.ph-app:hover .ph-app-tile {
+  border-color: var(--border-bright);
+  box-shadow: var(--shadow-sm), 0 0 14px -2px var(--ph-tint, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.ph-app-glyph { position: relative; z-index: 1; }
+
+/* category tints */
+.ph-app.is-brass { --ph-tint: rgba(230, 177, 94, 0.55); }
+.ph-app.is-rose  { --ph-tint: rgba(224, 137, 160, 0.55); }
+.ph-app.is-moon  { --ph-tint: rgba(140, 170, 224, 0.55); }
+.ph-app.is-sage  { --ph-tint: rgba(140, 198, 158, 0.5); }
+
+.ph-app-label {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  letter-spacing: 0.01em;
+}
+
+.ph-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ember);
+  color: #2a0d10;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(224, 122, 130, 0.6);
+  z-index: 2;
+}
+
+/* --- footer hint --- */
+.ph-hint {
+  margin-top: auto;
+  padding-top: 22px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--text-mute);
+}
+
+/* --- Dock: priority apps pinned above the home indicator --- */
+.ph-dock {
+  flex-shrink: 0;
+  margin: 14px 14px 0;
+  padding: 10px;
+  display: flex;
+  justify-content: space-around;
+  gap: 6px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.18));
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--rim), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+/* Dock apps keep their names (smaller), like the grid. */
+.ph-dock .ph-app-label { font-size: 0.6rem; }
+.ph-dock .ph-app-icon { width: 48px; height: 48px; }
+.ph-dock .ph-app-tile { font-size: 1.35rem; }
+
+/* --- Home button: a clear, tappable home control (was a gesture pill) --- */
+.ph-homebtn {
+  flex-shrink: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ph-homebtn::before {
+  content: '';
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  border: 2px solid var(--text-mute);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+  box-shadow: var(--rim);
+  transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+.ph-homebtn:hover::before { border-color: var(--brass); box-shadow: 0 0 12px -2px var(--brass); }
+.ph-homebtn:active::before { transform: scale(0.88); }
+.ph-homebtn:focus-visible { outline: none; }
+.ph-homebtn:focus-visible::before { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(230, 177, 94, 0.45); }

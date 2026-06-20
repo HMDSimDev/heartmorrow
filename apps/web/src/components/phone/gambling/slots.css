@@ -1,0 +1,144 @@
+/* slots.css — Lucky Sevens reels. Classes prefixed .slot- ; Nocturne tokens. */
+
+.slot-machine {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.slot-window {
+  position: relative;
+  width: fit-content;
+  margin: 4px auto 0;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--ink), #05070f);
+  box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(230, 177, 94, 0.35), 0 0 22px rgba(230, 177, 94, 0.1);
+  transition: box-shadow 0.3s;
+}
+.slot-window.win {
+  box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--brass), 0 0 30px rgba(230, 177, 94, 0.45);
+}
+
+.slot-reels {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.slot-reel {
+  position: relative;
+  width: 58px;
+  height: 180px; /* three rows — only the centre line (payline) pays */
+  overflow: hidden;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #11152b, #0a0d1d);
+  box-shadow: inset 0 6px 10px rgba(0, 0, 0, 0.6), inset 0 -6px 10px rgba(0, 0, 0, 0.6);
+}
+/* Fade the off-payline rows so the centre symbol reads as the live line. */
+.slot-reel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(5, 7, 15, 0.82) 0%,
+    rgba(5, 7, 15, 0.12) 26%,
+    transparent 40%,
+    transparent 60%,
+    rgba(5, 7, 15, 0.12) 74%,
+    rgba(5, 7, 15, 0.82) 100%
+  );
+}
+
+.slot-reel-strip {
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+
+.slot-cell {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 60px;
+}
+
+.slot-sym {
+  font-size: 1.9rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+/* The lucky seven is rendered as a glyph "7" — give it brass casino styling. */
+.slot-sym.sym-seven {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--brass);
+  text-shadow: 0 0 12px rgba(230, 177, 94, 0.6);
+}
+
+/* Brass payline across the center window. */
+.slot-payline {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-1px);
+  background: linear-gradient(90deg, transparent, rgba(232, 138, 166, 0.7), rgba(230, 177, 94, 0.9), rgba(232, 138, 166, 0.7), transparent);
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(230, 177, 94, 0.5);
+}
+
+/* ── Paytable ─────────────────────────────────────────────────────────────── */
+.slot-paytable {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+}
+.slot-payrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-mute);
+  transition: background 0.2s, color 0.2s;
+}
+.slot-paysyms {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.slot-paysyms .slot-sym {
+  font-size: 1rem;
+  filter: none;
+}
+.slot-pay-any {
+  font-family: var(--font-body);
+  font-size: 0.62rem;
+  color: var(--text-mute);
+  margin-left: 3px;
+}
+.slot-paymult {
+  color: var(--text-dim);
+  font-weight: 700;
+}
+.slot-payrow.hit {
+  background: linear-gradient(90deg, rgba(230, 177, 94, 0.18), transparent);
+  color: var(--brass);
+}
+.slot-payrow.hit .slot-paymult { color: var(--brass); }
+
+@media (prefers-reduced-motion: reduce) {
+  .slot-reel-strip { transition: transform 0.3s linear !important; }
+}

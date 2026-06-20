@@ -1,0 +1,348 @@
+/* Phone — Faces (in-world social feed parody). Page-prefixed: .fcs-*
+   A lamplit Nocturne take on a Facebook-style timeline: a compose box up top,
+   then newest-first cards with reactions and threaded NPC comments. Lives in the
+   ~410px device frame, so everything stays compact. Narrative-only — nothing
+   here ever changes relationship stats. */
+
+/* --- Brand appbar ----------------------------------------------------- */
+.fcs-bar {
+  position: relative;
+  justify-content: flex-start;
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  box-shadow: 0 1px 0 var(--border-bright), 0 6px 14px -10px rgba(0, 0, 0, 0.7);
+}
+.fcs-bar::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  right: 15px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--moon), transparent);
+  opacity: 0.45;
+}
+.fcs-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+.fcs-brand-mark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  color: var(--moon);
+}
+.fcs-brand-tag {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* --- Scroll region + compose ----------------------------------------- */
+.fcs-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fcs-compose {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  padding: 10px 11px 9px;
+  box-shadow: var(--shadow-sm);
+}
+.fcs-compose-input {
+  width: 100%;
+  resize: none;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.fcs-compose-input:focus { outline: none; }
+.fcs-compose-input::placeholder { color: var(--text-mute); }
+.fcs-compose-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+  padding-top: 7px;
+  border-top: 1px solid var(--border-soft);
+}
+.fcs-post-btn { min-width: 70px; }
+
+/* --- Feed + cards ----------------------------------------------------- */
+.fcs-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fcs-card {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  padding: 11px 12px 10px;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+/* A subtle left edge tints the card by post kind. */
+.fcs-card.fcs-tone-rose { box-shadow: inset 3px 0 0 var(--rose), var(--shadow-sm); }
+.fcs-card.fcs-tone-moon { box-shadow: inset 3px 0 0 var(--moon), var(--shadow-sm); }
+.fcs-card.fcs-tone-brass { box-shadow: inset 3px 0 0 var(--brass), var(--shadow-sm); }
+.fcs-card.fcs-tone-sage { box-shadow: inset 3px 0 0 var(--sage), var(--shadow-sm); }
+
+.fcs-card-head {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.fcs-ava {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+}
+.fcs-ava .portrait {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-sm);
+}
+.fcs-head-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fcs-author {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.94rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fcs-sub {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.fcs-kind {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  border: 1px solid transparent;
+}
+.fcs-kind-rose { color: var(--rose); border-color: rgba(232, 138, 166, 0.4); }
+.fcs-kind-moon { color: var(--moon); border-color: rgba(157, 184, 222, 0.4); }
+.fcs-kind-brass { color: var(--brass); border-color: var(--brass-dim); }
+.fcs-kind-sage { color: var(--sage); border-color: rgba(143, 207, 159, 0.4); }
+
+.fcs-body {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* Long unbroken tokens (URLs, run-on handles) break mid-token at ≤320px. */
+  overflow-wrap: anywhere;
+}
+.fcs-mood {
+  margin-top: 4px;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--text-mute);
+}
+
+/* --- Reaction summary + bar ------------------------------------------ */
+.fcs-react-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+  font-size: 0.72rem;
+  color: var(--text-mute);
+}
+.fcs-react-glyphs { display: inline-flex; }
+.fcs-react-glyph {
+  font-size: 0.82rem;
+  line-height: 1;
+  margin-left: -3px;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.4));
+}
+.fcs-react-glyph:first-child { margin-left: 0; }
+.fcs-react-names {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fcs-react-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.fcs-react {
+  flex: 1;
+  padding: 5px 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 8px);
+  background: none;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(0.5);
+  opacity: 0.7;
+  transition: transform 0.1s ease, opacity 0.12s ease, filter 0.12s ease, background 0.12s ease;
+}
+.fcs-react:hover:not(:disabled) {
+  opacity: 1;
+  filter: grayscale(0);
+  background: var(--panel-2);
+  transform: translateY(-1px);
+}
+.fcs-react:disabled { cursor: default; }
+.fcs-react.is-on {
+  opacity: 1;
+  filter: grayscale(0);
+  background: rgba(157, 184, 222, 0.12);
+  border-color: var(--moon);
+  box-shadow: 0 0 10px rgba(157, 184, 222, 0.25);
+}
+
+/* --- Comments --------------------------------------------------------- */
+.fcs-comments {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.fcs-comment { display: flex; gap: 7px; align-items: flex-start; }
+.fcs-comment-ava {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+}
+.fcs-comment-ava .portrait {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border);
+}
+.fcs-comment-bubble {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+  padding: 6px 10px;
+}
+.fcs-comment-name {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.fcs-comment-body {
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--text);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.fcs-comment-tone {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.fcs-comment-compose {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 1px;
+}
+.fcs-comment-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+.fcs-comment-input:focus {
+  outline: none;
+  border-color: var(--moon);
+  box-shadow: 0 0 0 2px rgba(157, 184, 222, 0.16);
+}
+.fcs-comment-send {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+/* --- Empty / standby states ------------------------------------------ */
+/* Icon slot replacing the emoji glyph in empty state. */
+.fcs-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  color: var(--moon);
+}
+
+.fcs-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 36px 28px;
+  text-align: center;
+}
+.fcs-empty-glyph {
+  font-size: 2rem;
+  filter: grayscale(0.2);
+  opacity: 0.85;
+}
+.fcs-empty-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.fcs-empty p { color: var(--text-mute); font-size: 0.84rem; margin: 0; line-height: 1.5; }

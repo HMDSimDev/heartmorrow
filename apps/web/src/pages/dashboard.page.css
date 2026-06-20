@@ -1,0 +1,221 @@
+/* ===========================================================================
+   Dashboard — "the lamplit almanac, opened." Bold framed hero centerpiece,
+   a real game HUD status console, character plates, and menu cards.
+   All classes prefixed .dash- to avoid collisions with the shared system.
+   =========================================================================== */
+
+/* --- Signature: the framed hero centerpiece ----------------------------- */
+.dash-hero {
+  --cut: 22px;
+  overflow: hidden;
+  max-width: 900px;
+}
+/* The hero fill gets the lamplit bloom + a faint paper grain on top of the
+   framed panel's own background. ::before is the framed fill; we layer onto it. */
+.dash-hero::before {
+  background:
+    radial-gradient(460px 260px at 86% -28%, rgba(230, 177, 94, 0.26), transparent 70%),
+    radial-gradient(380px 260px at 4% 132%, rgba(232, 138, 166, 0.2), transparent 70%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+.dash-hero-grain {
+  position: absolute; inset: 1.5px; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(rgba(243, 236, 221, 0.5) 0.8px, transparent 0.9px);
+  background-size: 26px 26px; opacity: 0.05;
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+}
+.dash-hero-inner {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 10px 8px 6px;
+}
+.dash-hero-eyebrow {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--brass);
+}
+.dash-hero-eyebrow::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, rgba(230, 177, 94, 0.5), transparent);
+}
+.dash-hero-title {
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(1.5rem, 7vw, 2.7rem); line-height: 1.04;
+  letter-spacing: -0.015em; margin: 0;
+}
+.dash-hero-name { color: var(--brass); }
+.dash-hero-line {
+  margin: 0; max-width: 52ch;
+  font-family: var(--font-display); font-style: italic;
+  font-variation-settings: 'SOFT' 50; font-size: 1.04rem;
+  color: var(--text-dim); line-height: 1.55;
+}
+.dash-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+/* --- Status console — a HUD readout of the world clock ------------------- */
+.dash-hud {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px 16px;
+  box-shadow: inset 0 0 26px rgba(230, 177, 94, 0.05), var(--shadow-sm), var(--rim);
+}
+.dash-hud-strip {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.dash-hud-strip .dash-hud-label {
+  font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--text-mute);
+}
+.dash-hud-strip .dash-hud-rule {
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+.dash-hud-cells {
+  display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px 22px;
+}
+.dash-cell {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.dash-cell-k {
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-mute);
+}
+.dash-cell-v {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 0.96rem; color: var(--text); line-height: 1.1;
+}
+.dash-cell-v .dash-icon { font-size: 1.05rem; filter: drop-shadow(0 0 6px rgba(230, 177, 94, 0.35)); }
+.dash-cell-v .dash-num { font-family: var(--font-mono); font-weight: 600; letter-spacing: 0.02em; }
+.dash-cell.world .dash-cell-v { font-family: var(--font-display); font-weight: 600; font-size: 1.08rem; }
+.dash-cell-sub { font-size: 0.74rem; color: var(--text-mute); }
+
+/* a slim vertical brass divider between cells (drawn before each cell after the first) */
+.dash-cell + .dash-cell { position: relative; padding-left: 22px; }
+.dash-cell + .dash-cell::before {
+  content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 1px;
+  background: linear-gradient(180deg, transparent, var(--border-bright), transparent);
+}
+
+/* Energy gauge — shared EnergyPips (.epip) with a mono count. */
+.dash-energy { gap: 4px; }
+.dash-energy .epip { width: 10px; height: 10px; }
+.dash-energy-count { font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-mute); }
+
+.dash-hud-money {
+  margin-left: auto; align-self: center;
+}
+
+/* --- "People in your life" — character plates --------------------------- */
+.dash-people { display: flex; flex-direction: column; gap: 12px; }
+.dash-people-row {
+  display: flex; gap: 12px; overflow-x: auto;
+  padding: 4px 2px 10px; scroll-snap-type: x proximity;
+}
+.dash-people-more {
+  margin: -2px 2px 0; font-size: 0.82rem;
+}
+.dash-people-more a { color: var(--brass); font-weight: 560; }
+.dash-plate {
+  flex: 0 0 auto; width: 102px; scroll-snap-align: start;
+  display: flex; flex-direction: column;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft); border-radius: var(--radius);
+  padding: 8px 8px 9px; box-shadow: var(--shadow-sm), var(--rim);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.dash-plate:hover {
+  transform: translateY(-4px); border-color: var(--border-bright);
+  box-shadow: var(--shadow), 0 0 22px rgba(230, 177, 94, 0.1);
+}
+.dash-plate .portrait { width: 100%; }
+.dash-plate-foot {
+  display: flex; align-items: center; gap: 6px; margin-top: 8px;
+}
+.dash-plate-tick {
+  width: 5px; height: 5px; border-radius: 1px; transform: rotate(45deg);
+  background: var(--brass); box-shadow: 0 0 6px rgba(230, 177, 94, 0.6); flex-shrink: 0;
+}
+.dash-plate-name {
+  font-family: var(--font-display); font-weight: 560; font-size: 0.84rem;
+  color: var(--text); min-width: 0;
+}
+.dash-plate-add {
+  flex: 0 0 auto; width: 102px; scroll-snap-align: start;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  border: 1px dashed var(--border); border-radius: var(--radius);
+  background: var(--ink-2); color: var(--text-mute);
+  cursor: pointer; transition: border-color 0.15s ease, color 0.15s ease;
+  min-height: 160px;
+  /* In creator mode the add tile trails up to 15 fixed plates in the scroll
+     strip — pin it to the strip start so it stays reachable without scrolling.
+     (--ink-2 background keeps the underlapped plates from showing through.) */
+  position: sticky; left: 0; z-index: 1;
+}
+.dash-plate-add .dash-plate-add-mark { font-size: 1.7rem; line-height: 1; }
+.dash-plate-add span:last-child {
+  font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase;
+}
+.dash-plate-add:hover { border-color: var(--brass); color: var(--brass); }
+
+/* --- Quick-launch menu cards -------------------------------------------- */
+.dash-menu { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); }
+
+@media (min-width: 1900px) {
+  .dash-menu { grid-template-columns: repeat(4, minmax(236px, 1fr)); }
+  /* On ultrawide the 900px cap strands the hero flush-left while everything
+     below goes full-bleed — widen it to roughly match the content column. */
+  .dash-hero { max-width: 1200px; }
+}
+.dash-tile {
+  position: relative; overflow: hidden;
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 16px 16px 17px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft); border-radius: var(--radius);
+  box-shadow: var(--shadow-sm), var(--rim);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+/* a brass spine on the leading edge — the "menu item" cue */
+.dash-tile::before {
+  content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--brass), var(--brass-dim));
+  opacity: 0.55; transition: opacity 0.2s ease, box-shadow 0.2s ease;
+}
+.dash-tile:hover {
+  transform: translateY(-3px); border-color: var(--border-bright);
+  box-shadow: var(--shadow);
+}
+.dash-tile:hover::before { opacity: 1; box-shadow: 0 0 14px rgba(230, 177, 94, 0.5); }
+.dash-tile-glyph {
+  flex-shrink: 0; width: 46px; height: 46px; border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+  background: linear-gradient(150deg, var(--panel-3), var(--panel));
+  border: 1px solid var(--border);
+  box-shadow: inset 0 0 0 1px rgba(230, 177, 94, 0.12), inset 0 0 14px rgba(230, 177, 94, 0.06);
+}
+.dash-tile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dash-tile-title { font-family: var(--font-display); font-weight: 600; font-size: 1.04rem; color: var(--text); }
+.dash-tile-desc { font-size: 0.8rem; color: var(--text-mute); line-height: 1.4; }
+.dash-tile-go {
+  margin-left: auto; align-self: center; flex-shrink: 0;
+  font-family: var(--font-mono); color: var(--text-mute);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.dash-tile:hover .dash-tile-go { transform: translateX(3px); color: var(--brass); }
+
+@media (max-width: 600px) {
+  .dash-hud-cells { gap: 8px 12px; }
+  .dash-cell + .dash-cell { padding-left: 12px; }
+  .dash-hud-money { margin-left: 0; }
+}
+
+@media (max-width: 480px) {
+  .dash-cell + .dash-cell::before { display: none; }
+  .dash-cell + .dash-cell { padding-left: 0; border-left: none; }
+}

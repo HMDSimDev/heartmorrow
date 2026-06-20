@@ -1,0 +1,544 @@
+/* =============================================================================
+   phone-market.css — DSim Stock Market phone app.
+   "Almanac ledger" character: brass-railed tickers, mono price readouts,
+   sage/ember sentiment tints, and a clean compact board for a ~410px frame.
+   All classes prefixed .mkt- to avoid collisions with shared styles.
+   ============================================================================= */
+
+/* ── Outer scroll shell (sits below PhoneAppBar inside .phone-app) ────────── */
+.mkt-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Cash strip ───────────────────────────────────────────────────────────── */
+.mkt-purse-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  border: 1px solid rgba(230, 177, 94, 0.32);
+  box-shadow: inset 0 0 16px rgba(230, 177, 94, 0.07), var(--rim);
+}
+
+.mkt-purse-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.mkt-purse-coin {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--brass);
+  letter-spacing: 0.02em;
+}
+
+/* ── Tab bar ──────────────────────────────────────────────────────────────── */
+.mkt-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 3px;
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+
+.mkt-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+
+.mkt-tab:hover { color: var(--text-dim); }
+
+.mkt-tab.active {
+  background: var(--panel-2);
+  color: var(--brass);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Eyebrow dividers ─────────────────────────────────────────────────────── */
+.mkt-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  margin: 6px 0 2px;
+}
+
+.mkt-eyebrow::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+
+/* ── Market board ─────────────────────────────────────────────────────────── */
+.mkt-board {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Wrap so the delete button can float outside the card */
+.mkt-row-wrap {
+  position: relative;
+}
+
+/* Company card: a ledger row with a ticker-plate head */
+.mkt-row.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: var(--shadow-sm), var(--rim);
+  transition: border-color 0.15s;
+}
+
+.mkt-row.card:hover { border-color: var(--border-bright); }
+
+/* Ticker line: a mono HUD strip */
+.mkt-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mkt-ticker-block {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mkt-ticker {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 0.92rem;
+  letter-spacing: 0.05em;
+  color: var(--brass);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mkt-sector-tag {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mkt-price-block {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.mkt-price {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.mkt-pct {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+}
+
+/* Sentiment colors — never hardcoded; use token-mapped values */
+.mkt-up   { color: var(--sage); }
+.mkt-down { color: var(--ember); }
+
+.mkt-company-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  color: var(--text-dim);
+}
+
+.mkt-desc {
+  margin: 0;
+  font-size: 0.77rem;
+  color: var(--text-mute);
+  line-height: 1.45;
+}
+
+/* Dividend + held-shares meta strip */
+.mkt-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 2px 0;
+}
+
+.mkt-dividend {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--brass-dim, var(--brass));
+  letter-spacing: 0.04em;
+}
+
+.mkt-held {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  color: var(--moon);
+  letter-spacing: 0.04em;
+}
+
+/* Trade controls: buy/sell side-by-side */
+.mkt-trade-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.mkt-trade-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mkt-qty-input {
+  width: 56px;
+  min-height: 44px;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  text-align: center;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--ink-2);
+  color: var(--text);
+}
+
+.mkt-trade-row .btn.sm {
+  min-height: 44px;
+  padding: 10px 13px;
+}
+
+/* Delete button overlay (creator only) */
+.mkt-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.mkt-row-wrap:hover .mkt-delete-btn { opacity: 1; }
+
+@media (hover: none) {
+  .mkt-delete-btn { opacity: 1; }
+}
+
+/* ── News ─────────────────────────────────────────────────────────────────── */
+.mkt-news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mkt-news-card {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--border-bright);
+  background: var(--panel-2);
+  transition: border-color 0.14s;
+}
+
+.mkt-news-card.mkt-sentiment-up {
+  border-left-color: var(--sage);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--sage) 6%, transparent), var(--panel-2));
+}
+
+.mkt-news-card.mkt-sentiment-down {
+  border-left-color: var(--ember);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ember) 6%, transparent), var(--panel-2));
+}
+
+.mkt-news-card.mkt-sentiment-flat {
+  border-left-color: var(--text-mute);
+}
+
+.mkt-news-ticker {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  margin-bottom: 3px;
+}
+
+.mkt-news-headline {
+  font-weight: 600;
+  font-size: 0.84rem;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+.mkt-news-body {
+  margin: 4px 0 0;
+  font-size: 0.76rem;
+  color: var(--text-mute);
+  line-height: 1.4;
+}
+
+/* ── Portfolio ────────────────────────────────────────────────────────────── */
+.mkt-portfolio-summary.framed {
+  display: flex;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.mkt-port-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 10px;
+}
+
+.mkt-port-stat + .mkt-port-stat {
+  border-left: 1px solid var(--border-soft);
+}
+
+.mkt-port-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.mkt-port-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--brass);
+}
+
+/* Position rows */
+.mkt-positions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mkt-pos-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+
+.mkt-pos-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.mkt-pos-shares {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  letter-spacing: 0.04em;
+}
+
+.mkt-pos-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text);
+  margin-left: auto;
+}
+
+.mkt-pos-detail {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.mkt-pos-basis {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-mute);
+}
+
+.mkt-pos-pnl {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.76rem;
+  margin-left: auto;
+}
+
+/* ── Creator workshop ─────────────────────────────────────────────────────── */
+.mkt-creator.framed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mkt-creator-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Generator sub-panel */
+.mkt-gen.stack {
+  padding: 12px;
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+
+.mkt-gen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+/* Divider between generate controls and draft list */
+.mkt-gen-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 2px;
+  color: var(--brass);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mkt-gen-divider::before,
+.mkt-gen-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+
+.mkt-gen-divider::before {
+  background: linear-gradient(90deg, transparent, var(--border-bright));
+}
+
+/* Draft cards */
+.mkt-drafts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mkt-draft {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--brass);
+  background: var(--panel);
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.mkt-draft.dropped {
+  opacity: 0.45;
+  border-left-color: var(--text-mute);
+}
+
+.mkt-draft-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mkt-draft-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.mkt-money-pill {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.86rem;
+  color: var(--brass);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ink-2);
+  border: 1px solid rgba(230, 177, 94, 0.3);
+}
+
+/* Manual create form */
+.mkt-new-form.stack {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}

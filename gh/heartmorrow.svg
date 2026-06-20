@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 460" role="img">
+
+  <defs>
+    <linearGradient id="hm-inkBackdrop" x1="0" y1="0" x2="1320" y2="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#070911"/>
+      <stop offset="0.45" stop-color="#101331"/>
+      <stop offset="1" stop-color="#05060D"/>
+    </linearGradient>
+
+    <radialGradient id="hm-lampGlow" cx="30%" cy="43%" r="62%">
+      <stop offset="0" stop-color="#E8B86E" stop-opacity="0.34"/>
+      <stop offset="0.32" stop-color="#D86B8B" stop-opacity="0.14"/>
+      <stop offset="0.72" stop-color="#101331" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#070911" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="hm-brassStroke" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF0B6"/>
+      <stop offset="0.18" stop-color="#E8B86E"/>
+      <stop offset="0.47" stop-color="#8C6431"/>
+      <stop offset="0.76" stop-color="#F2D48D"/>
+      <stop offset="1" stop-color="#7A552B"/>
+    </linearGradient>
+
+    <radialGradient id="hm-plateGlow" cx="50%" cy="44%" r="58%">
+      <stop offset="0" stop-color="#D86B8B" stop-opacity="0.22"/>
+      <stop offset="0.42" stop-color="#E8B86E" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#0D1026" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="hm-heartFill" x1="112" y1="70" x2="400" y2="390" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F0A9B8"/>
+      <stop offset="0.28" stop-color="#D86B8B"/>
+      <stop offset="0.68" stop-color="#A94367"/>
+      <stop offset="1" stop-color="#4A1D3A"/>
+    </linearGradient>
+
+    <linearGradient id="hm-heartEdge" x1="104" y1="84" x2="410" y2="372" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF0B6"/>
+      <stop offset="0.34" stop-color="#E8B86E"/>
+      <stop offset="0.70" stop-color="#9A6A35"/>
+      <stop offset="1" stop-color="#F2D48D"/>
+    </linearGradient>
+
+    <linearGradient id="hm-wordmarkFill" x1="454" y1="0" x2="1190" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF2C7"/>
+      <stop offset="0.36" stop-color="#F2D48D"/>
+      <stop offset="0.58" stop-color="#F5DEE6"/>
+      <stop offset="0.78" stop-color="#CFE6FA"/>
+      <stop offset="1" stop-color="#E6C784"/>
+    </linearGradient>
+
+    <pattern id="hm-wallpaper" width="42" height="42" patternUnits="userSpaceOnUse">
+      <rect width="42" height="42" fill="none"/>
+      <path d="M21 4 L24 21 L21 38 L18 21 Z" fill="#E8B86E" opacity="0.045"/>
+      <circle cx="21" cy="21" r="1.25" fill="#BFD8EF" opacity="0.11"/>
+      <path d="M0 21 H7 M35 21 H42 M21 0 V7 M21 35 V42" stroke="#DAB66A" stroke-width="0.7" opacity="0.08"/>
+    </pattern>
+
+    <filter id="hm-softBrassGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="blur"/>
+      <feFlood flood-color="#E8B86E" flood-opacity="0.36" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="hm-roseGlow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12" result="blur"/>
+      <feFlood flood-color="#D86B8B" flood-opacity="0.28" result="color"/>
+      <feComposite in="color" in2="blur" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="hm-deepShadow" x="-15%" y="-18%" width="130%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14" result="shadowBlur"/>
+      <feOffset in="shadowBlur" dx="0" dy="16" result="shadowOffset"/>
+      <feFlood flood-color="#000000" flood-opacity="0.40" result="shadowColor"/>
+      <feComposite in="shadowColor" in2="shadowOffset" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <clipPath id="hm-plateClip">
+      <path d="M96 24 H416 L488 96 V416 L416 488 H96 L24 416 V96 Z"/>
+    </clipPath>
+
+    <clipPath id="hm-heartClip">
+      <path d="M256 384 C178 315 86 259 86 164 C86 101 130 62 183 62 C214 62 238 79 256 109 C274 79 298 62 329 62 C382 62 426 101 426 164 C426 259 334 315 256 384 Z"/>
+    </clipPath>
+
+    <style>
+      .display {
+        font-family: Fraunces, 'Noto Serif Display', 'Noto Serif', Georgia, 'Times New Roman', serif;
+        font-weight: 700;
+        letter-spacing: -2.5px;
+      }
+      .hairline {
+        stroke: #DAB66A;
+        stroke-width: 1.1;
+        opacity: 0.58;
+        vector-effect: non-scaling-stroke;
+      }
+      .brass-line {
+        fill: none;
+        stroke: url(#hm-brassStroke);
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .engrave {
+        fill: none;
+        stroke: #2B1425;
+        stroke-linecap: round;
+        opacity: 0.42;
+      }
+    </style>
+  </defs>
+  <g id="heartmorrow-nocturne-almanac-logo">
+    <path d="M40 30 H1280 L1300 50 V410 L1280 430 H40 L20 410 V50 Z" fill="url(#hm-inkBackdrop)"/>
+    <path d="M40 30 H1280 L1300 50 V410 L1280 430 H40 L20 410 V50 Z" fill="url(#hm-lampGlow)"/>
+    <path d="M40 30 H1280 L1300 50 V410 L1280 430 H40 L20 410 V50 Z" fill="url(#hm-wallpaper)" opacity="0.88"/>
+    <path d="M40 30 H1280 L1300 50 V410 L1280 430 H40 L20 410 V50 Z" fill="none" stroke="url(#hm-brassStroke)" stroke-width="2.6" opacity="0.88"/>
+    <path d="M56 46 H1264 L1284 66 V394 L1264 414 H56 L36 394 V66 Z" fill="none" stroke="#DAB66A" stroke-width="0.9" opacity="0.32"/>
+
+    <g id="corner-brackets" filter="url(#hm-softBrassGlow)">
+      <path d="M62 58 H126 V48 M62 58 V122 H52" fill="none" stroke="url(#hm-brassStroke)" stroke-width="3.5" stroke-linecap="square" opacity="0.95"/>
+      <path d="M1258 58 H1194 V48 M1258 58 V122 H1268" fill="none" stroke="url(#hm-brassStroke)" stroke-width="3.5" stroke-linecap="square" opacity="0.95"/>
+      <path d="M62 402 H126 V412 M62 402 V338 H52" fill="none" stroke="url(#hm-brassStroke)" stroke-width="3.5" stroke-linecap="square" opacity="0.95"/>
+      <path d="M1258 402 H1194 V412 M1258 402 V338 H1268" fill="none" stroke="url(#hm-brassStroke)" stroke-width="3.5" stroke-linecap="square" opacity="0.95"/>
+    </g>
+
+    <g transform="translate(69 54) scale(0.688)">
+
+  
+  <g id="hm-almanac-heart-emblem" filter="url(#hm-deepShadow)">
+    <path d="M96 24 H416 L488 96 V416 L416 488 H96 L24 416 V96 Z" fill="#0D1026" stroke="url(#hm-brassStroke)" stroke-width="5.2"/>
+    <path d="M96 24 H416 L488 96 V416 L416 488 H96 L24 416 V96 Z" fill="url(#hm-plateGlow)"/>
+    <path d="M96 24 H416 L488 96 V416 L416 488 H96 L24 416 V96 Z" fill="url(#hm-wallpaper)" clip-path="url(#hm-plateClip)" opacity="0.95"/>
+
+    <path d="M122 52 H390 L460 122 V390 L390 460 H122 L52 390 V122 Z" fill="none" stroke="#DAB66A" stroke-width="1.4" opacity="0.35"/>
+    <path class="hairline" d="M86 256 H426" opacity="0.20"/>
+    <path class="hairline" d="M256 86 V426" opacity="0.16"/>
+
+    <g id="hm-almanac-heart" transform="translate(0 33)" filter="url(#hm-roseGlow)">
+      <path d="M256 384 C178 315 86 259 86 164 C86 101 130 62 183 62 C214 62 238 79 256 109 C274 79 298 62 329 62 C382 62 426 101 426 164 C426 259 334 315 256 384 Z" fill="url(#hm-heartFill)" stroke="url(#hm-heartEdge)" stroke-width="7.2"/>
+      <path d="M256 361 C188 300 110 248 110 166 C110 117 143 86 184 86 C215 86 239 107 256 137 C273 107 297 86 328 86 C369 86 402 117 402 166 C402 248 324 300 256 361 Z" fill="none" stroke="#FFF0B6" stroke-width="2.1" opacity="0.70"/>
+      <g clip-path="url(#hm-heartClip)">
+</g>
+
+
+    </g>
+
+
+    <g id="hm-diamond-pips" filter="url(#hm-softBrassGlow)">
+      <path d="M256 22 L269 35 L256 48 L243 35 Z" fill="#D86B8B" opacity="0.96"/>
+      <path d="M256 464 L269 477 L256 490 L243 477 Z" fill="#E8B86E" opacity="0.96"/>
+      <path d="M55 256 L66 267 L55 278 L44 267 Z" fill="#BFD8EF" opacity="0.70"/>
+      <path d="M457 256 L468 267 L457 278 L446 267 Z" fill="#93B986" opacity="0.70"/>
+    </g>
+  </g>
+    </g>
+
+    <g id="wordmark-lockup" transform="translate(470 105)">
+      <g id="top-rule" filter="url(#hm-softBrassGlow)">
+        <path class="hairline" d="M0 0 H684"/>
+        <path d="M330 -9 L340 1 L330 11 L320 1 Z" fill="#E8B86E" opacity="0.96"/>
+        <path d="M356 -7 L364 1 L356 9 L348 1 Z" fill="#D86B8B" opacity="0.86"/>
+      </g>
+
+      <text class="display" x="0" y="146" font-size="110" font-family="Fraunces, 'Noto Serif Display', 'Noto Serif', Georgia, 'Times New Roman', serif" font-weight="700" fill="url(#hm-wordmarkFill)" filter="url(#hm-softBrassGlow)">Heartmorrow</text>
+
+      <g id="bottom-rule" transform="translate(0 210)" filter="url(#hm-softBrassGlow)">
+        <path class="hairline" d="M0 0 H684"/>
+        <path d="M342 -10 L352 0 L342 10 L332 0 Z" fill="#D86B8B" opacity="0.94"/>
+        <path d="M302 -5 H326 M358 -5 H382" stroke="#DAB66A" stroke-width="1.8" stroke-linecap="round" opacity="0.76"/>
+      </g>
+
+      <g id="quiet-atmosphere" opacity="0.34">
+        <path d="M640 8 C665 -4 693 5 704 31 C726 30 742 43 746 62 C751 88 729 102 688 102 H620 C592 102 573 90 573 67 C573 44 590 31 613 32 C619 20 628 13 640 8 Z" fill="#BFD8EF" opacity="0.13"/>
+        <path d="M626 246 C674 231 733 239 780 267" fill="none" stroke="#BFD8EF" stroke-width="1.05" opacity="0.32"/>
+        <path d="M706 34 C696 38 691 50 695 61 C699 74 713 80 725 75 C719 88 701 92 689 82 C675 71 675 49 689 38 C694 34 700 32 706 34 Z" fill="#BFD8EF" opacity="0.11"/>
+      </g>
+    </g>
+  </g>
+</svg>

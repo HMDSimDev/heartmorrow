@@ -1,0 +1,165 @@
+/* ===========================================================================
+   Settings — "the control desk." The main page is genuinely technical (the
+   local model connection), so it reads like a well-kept instrument panel:
+   tidy framed sections, a mono-labelled console for the connection, and a
+   live status readout. The phone Settings app is a polished settings list
+   with gem-like accent swatches.
+
+   Prefixes: .set- (main page), .pset- (phone app). Nothing here redefines a
+   shared class name.
+   =========================================================================== */
+
+/* --- Main page: section scaffolding -------------------------------------- */
+.set-page { gap: 18px; max-width: 860px; margin-inline: auto; }
+/* On very large monitors give the technical settings (form rows + console)
+   a touch more room; kept modest so line length stays readable. */
+@media (min-width: 1900px) { .set-page { max-width: 1040px; } }
+
+/* A labelled section block. Quieter than .card so the one framed console
+   below carries the boldness. */
+.set-section { position: relative; }
+.set-section > .section-head { margin-bottom: 14px; }
+.set-section .set-lede { margin: 0 0 14px; max-width: 70ch; font-size: 0.9rem; }
+
+/* Mode + adult-content toggles as a tidy choice row. */
+.set-choice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.set-status-line {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin: 12px 0 0;
+}
+
+/* --- Signature: the Connection console ----------------------------------- */
+/* Built on .framed (the chamfered double-edged panel). A mono header strip
+   with a "live" telemetry dot sells the instrument-panel feel. */
+.set-console { --cut: 20px; }
+.set-console-head {
+  display: flex; align-items: center; gap: 12px;
+  padding-bottom: 12px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.set-console-head .set-console-title {
+  font-family: var(--font-display); font-weight: 600; font-size: 1.18rem;
+}
+.set-console-head .set-console-sub {
+  font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--brass); margin-bottom: 3px;
+}
+.set-console-dot {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-mute);
+}
+.set-console-dot::before {
+  content: ''; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--brass); box-shadow: 0 0 9px rgba(230, 177, 94, 0.7);
+}
+
+/* The two console columns: Connection (left) and Generation (right).
+   The grid and its divider rail share one 720px boundary so the separator
+   always appears the moment the columns go side-by-side (previously the rail
+   was tied to 860px, leaving a 720–859px band with two columns but no rail). */
+.set-console-grid { display: grid; gap: 22px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .set-console-grid { grid-template-columns: 1fr 1fr; } }
+.set-console-col { display: flex; flex-direction: column; }
+.set-console-col + .set-console-col {
+  /* a faint divider rail between the two halves on wide screens */
+  position: relative;
+}
+@media (min-width: 720px) {
+  .set-console-col + .set-console-col {
+    padding-left: 22px;
+    border-left: 1px solid var(--border-soft);
+  }
+}
+.set-col-label {
+  font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--moon);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+}
+.set-col-label::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+
+/* The console's action footer + health readout. */
+.set-console-foot {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-top: 4px; padding-top: 16px; border-top: 1px solid var(--border);
+}
+
+/* --- Phone Settings app -------------------------------------------------- */
+.pset-list { display: flex; flex-direction: column; gap: 16px; }
+
+.pset-group { display: flex; flex-direction: column; gap: 9px; }
+.pset-group-head {
+  font-family: var(--font-mono); font-size: 0.64rem; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--brass);
+  display: flex; align-items: center; gap: 8px; padding: 0 2px;
+}
+.pset-group-head::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+
+/* A rounded "settings list" panel that holds the controls for a group. */
+.pset-panel {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft); border-radius: var(--radius);
+  padding: 13px; box-shadow: var(--shadow-sm), var(--rim);
+}
+
+/* Accent swatches — little gem chips you tap to re-tint your romance accent. */
+.pset-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 140px)); justify-content: start; gap: 9px; }
+.pset-swatch {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer; padding: 4px 2px;
+  color: var(--text-dim); font: inherit;
+}
+.pset-gem {
+  width: 38px; height: 38px; border-radius: 12px;
+  border: 1px solid var(--border-bright);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 0.12s ease, box-shadow 0.2s ease;
+}
+.pset-swatch:hover .pset-gem { transform: translateY(-2px); }
+.pset-swatch:active { transform: scale(0.96); }
+.pset-swatch.active .pset-gem {
+  box-shadow: 0 0 0 2px var(--brass), 0 0 14px rgba(230, 177, 94, 0.5);
+}
+.pset-swatch-name { font-size: 0.68rem; text-align: center; line-height: 1.2; }
+.pset-swatch.active .pset-swatch-name { color: var(--text); font-weight: 700; }
+
+.pset-custom {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-soft);
+  font-size: 0.84rem; color: var(--text-dim);
+}
+.pset-custom input[type="color"] {
+  width: 44px; height: 30px; padding: 0; border-radius: var(--radius-sm);
+  cursor: pointer; flex: none;
+}
+
+/* Wallpaper row with a small live preview tile. */
+.pset-wall { display: flex; align-items: center; gap: 12px; }
+.pset-wall-prev {
+  width: 46px; height: 46px; border-radius: var(--radius-sm); flex: none;
+  border: 1px solid var(--border); background: var(--ink-2);
+  background-size: cover; background-position: center;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; color: var(--text-mute);
+}
+.pset-wall-actions { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; }
+
+.pset-hint { font-size: 0.78rem; color: var(--text-mute); margin: 0; line-height: 1.45; }
+
+/* Danger zone — visibly cordoned off. */
+.pset-danger {
+  border: 1px solid rgba(224, 122, 130, 0.4);
+  border-radius: var(--radius);
+  background: rgba(224, 122, 130, 0.06);
+  padding: 13px;
+}
+.pset-danger .pset-group-head { color: var(--ember); }
+.pset-danger .pset-group-head::after {
+  background: linear-gradient(90deg, rgba(224, 122, 130, 0.5), transparent);
+}

@@ -1,0 +1,113 @@
+/* ===========================================================================
+   AssetPicker — Nocturne-framed thumbnail grid.
+   Chamfered framed thumbnails, brass selected-ring, tidy empty state.
+   =========================================================================== */
+
+.ap-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+/* Each thumbnail tile */
+.ap-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-soft);
+  background: var(--ink-2);
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+.ap-thumb:hover {
+  border-color: var(--border-bright);
+}
+
+/* Brass selected ring */
+.ap-thumb.ap-selected {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brass) 30%, transparent);
+}
+
+/* Checkmark overlay for the selected tile */
+.ap-thumb.ap-selected::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--brass) 15%, transparent);
+  pointer-events: none;
+}
+.ap-thumb.ap-selected .ap-check {
+  display: flex;
+}
+
+.ap-check {
+  display: none;
+  position: absolute;
+  bottom: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--brass);
+  color: var(--ink-1);
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 1;
+}
+
+/* The "None" tile */
+.ap-none-tile {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+/* Portrait image inside tile */
+.ap-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Upload strip below the grid */
+.ap-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.ap-upload-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* Error below upload */
+.ap-error {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--bad);
+  margin-top: 6px;
+}
+
+/* Empty state when no assets at all */
+.ap-empty {
+  padding: 20px 0 8px;
+  text-align: center;
+}

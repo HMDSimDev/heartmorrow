@@ -1,0 +1,497 @@
+/* World selector + new-world onboarding — the deliberate "which world?" landing.
+   Full-bleed, lamplit, centered. Uses the shared Nocturne tokens + .framed panel. */
+
+.wsel {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  padding: clamp(28px, 6vh, 72px) clamp(18px, 5vw, 64px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+}
+
+/* A soft pool of lamplight behind the whole selector. */
+.wsel-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 0%, color-mix(in oklab, var(--brass) 16%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 12% 88%, color-mix(in oklab, var(--rose) 12%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 88% 82%, color-mix(in oklab, var(--moon) 10%, transparent), transparent 70%);
+}
+
+.wsel > *:not(.wsel-atmosphere) {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  /* Let the content column widen on ultrawide so the grid adds columns instead of stranding huge gutters. */
+  max-width: min(1480px, 92vw);
+}
+
+.wsel-head {
+  text-align: center;
+}
+.wsel-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  line-height: 1.04;
+  margin: 6px 0 10px;
+  /* This route renders outside .app, so nothing clips X — break user-entered titles. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.wsel-sub {
+  color: var(--text-dim);
+  max-width: 60ch;
+  margin: 0 auto;
+}
+
+.wsel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(310px, 100%), 1fr));
+  gap: 20px;
+}
+
+/* --- world card --- */
+.wsel-card {
+  display: flex;
+  flex-direction: column;
+  padding: 22px 22px 18px;
+  min-height: 260px;
+}
+.wsel-card.is-active {
+  outline: 1.5px solid color-mix(in oklab, var(--brass) 60%, transparent);
+  outline-offset: 3px;
+}
+.wsel-current {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--brass);
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+.wsel-card-body {
+  flex: 1;
+}
+.wsel-card-name {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  margin: 0;
+  /* User-entered world name — break an unbroken token rather than push the card past its track. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.wsel-card-tone {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: color-mix(in oklab, var(--rose) 80%, var(--text));
+  font-size: 0.95rem;
+  margin-top: 2px;
+}
+.wsel-card-summary {
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  margin: 12px 0 16px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wsel-card-loading {
+  min-height: 80px;
+}
+
+.wsel-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+.wsel-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.wsel-stat-k {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.wsel-stat-v {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+.wsel-phase {
+  font-size: 1rem;
+}
+.wsel-unread {
+  color: var(--brass);
+}
+.wsel-stat-sub {
+  font-size: 0.72rem;
+  color: var(--text-mute);
+}
+
+.wsel-cast {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 4px;
+}
+.wsel-cast-plate {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-left: -8px;
+  border: 1.5px solid var(--panel);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--brass) 40%, transparent);
+  background: var(--panel-2);
+}
+.wsel-cast-plate:first-child {
+  margin-left: 0;
+}
+.wsel-cast-plate .portrait {
+  width: 100%;
+  height: 100%;
+}
+.wsel-cast-more {
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.wsel-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* --- "new world" tile --- */
+.wsel-new {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 260px;
+  border: 1.5px dashed color-mix(in oklab, var(--brass) 45%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--panel) 55%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s, transform 0.18s;
+}
+.wsel-new:hover {
+  border-color: var(--brass);
+  background: color-mix(in oklab, var(--brass) 8%, var(--panel));
+  transform: translateY(-2px);
+}
+.wsel-new-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--brass);
+  background: color-mix(in oklab, var(--brass) 14%, transparent);
+  margin-bottom: 4px;
+}
+.wsel-new-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+}
+.wsel-new-sub {
+  color: var(--text-mute);
+  font-size: 0.82rem;
+}
+
+.wsel-empty-note {
+  color: var(--text-dim);
+  text-align: center;
+}
+
+/* --- onboarding --- */
+.wonb-panel {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 26px 26px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.wonb .wsel-head {
+  margin-bottom: 0;
+}
+.wonb-steps {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.wonb-pip {
+  width: 30px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+}
+.wonb-pip.on {
+  background: var(--brass);
+}
+.wonb-flavor {
+  color: var(--text-dim);
+  margin: 0 0 8px;
+  font-size: 0.96rem;
+}
+.wonb-actions {
+  margin-top: 16px;
+}
+
+/* Short / landscape viewports: trim the generous vertical rhythm and keep the
+   Continue/actions row pinned to the bottom of the panel so it never falls below the fold. */
+@media (max-height: 620px) {
+  .wsel {
+    padding-top: clamp(14px, 3vh, 28px);
+    padding-bottom: clamp(14px, 3vh, 28px);
+    gap: 16px;
+  }
+  .wonb-panel {
+    padding-top: 18px;
+    padding-bottom: 16px;
+  }
+  .wonb-actions {
+    position: sticky;
+    bottom: 0;
+    margin-top: 12px;
+    padding-top: 10px;
+    /* Fade the scrolling content into the pinned action row. */
+    background: linear-gradient(to top, var(--panel) 70%, transparent);
+  }
+}
+.wonb-cast-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 10px;
+}
+.wonb-cast-head .trail {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in oklab, var(--brass) 40%, transparent), transparent);
+}
+.wonb-cast {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+.wonb-cast-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+}
+.wonb-cast-card .portrait {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--brass) 40%, transparent);
+}
+.wonb-cast-name {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  max-width: 100%;
+}
+.wonb-cast-desc {
+  font-size: 0.74rem;
+  color: var(--text-mute);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wonb-blank {
+  color: var(--text-dim);
+  background: color-mix(in oklab, var(--panel-2) 60%, transparent);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+.wonb-blank p {
+  margin: 0;
+}
+
+/* step 1 — blank vs clone-from-save */
+.wonb-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+@media (max-width: 480px) {
+  .wonb-mode { grid-template-columns: 1fr; }
+}
+.wonb-mode-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--panel) 55%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.16s, background 0.16s;
+}
+.wonb-mode-opt:hover {
+  border-color: color-mix(in oklab, var(--brass) 55%, var(--border));
+}
+.wonb-mode-opt.on {
+  border-color: var(--brass);
+  background: color-mix(in oklab, var(--brass) 10%, var(--panel));
+}
+.wonb-mode-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+}
+.wonb-mode-sub {
+  font-size: 0.78rem;
+  color: var(--text-mute);
+}
+
+/* step 1 — source-world picker (clone mode) */
+.wonb-sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.wonb-source {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--panel) 55%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.16s, background 0.16s;
+}
+.wonb-source:hover {
+  border-color: color-mix(in oklab, var(--brass) 55%, var(--border));
+}
+.wonb-source.on {
+  border-color: var(--brass);
+  background: color-mix(in oklab, var(--brass) 10%, var(--panel));
+}
+.wonb-source-name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+.wonb-source-sum {
+  font-size: 0.76rem;
+  color: var(--text-mute);
+}
+
+/* step 3 — import people */
+.wonb-import {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wonb-import-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.wonb-import-plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 6px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--panel) 50%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.16s, background 0.16s, transform 0.16s;
+}
+.wonb-import-plate:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--brass) 55%, var(--border));
+}
+.wonb-import-plate.on {
+  border-color: var(--brass);
+  background: color-mix(in oklab, var(--brass) 12%, var(--panel));
+}
+.wonb-import-plate .portrait {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--brass) 35%, transparent);
+}
+.wonb-import-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink);
+  background: var(--brass);
+}
+
+/* step 4 — how to play */
+.wonb-howto {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.wonb-howto li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  color: var(--text);
+  font-size: 0.92rem;
+}
+.wonb-howto-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--brass);
+  background: color-mix(in oklab, var(--brass) 12%, transparent);
+  margin-top: 1px;
+}

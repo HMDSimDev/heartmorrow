@@ -1,0 +1,558 @@
+/* ===========================================================================
+   Creator tools — CharacterEditor / WorldEditor / Debug.
+   Clarity-first: one framed "workbench" masthead per page, consistent
+   section heads inside calm cards, dense forms. Prefix: .creator-
+   =========================================================================== */
+
+/* --- Signature: the workbench header bar --------------------------------- */
+.creator-head {
+  --cut: 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+/* Grow to fill the header row so the title + blurb use the available width
+   (actions stay pinned right via space-between) instead of collapsing into a
+   narrow stacked column on wide screens. */
+.creator-head .creator-head-titles { min-width: 0; flex: 1; }
+.creator-head h1 {
+  margin: 4px 0 6px;
+  font-family: var(--font-display);
+}
+.creator-head p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.creator-head .creator-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 560px) {
+  .creator-head .creator-head-actions { width: 100%; }
+}
+
+/* A small mono breadcrumb / mode chip line under the kicker. */
+.creator-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.creator-tool-tag {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* --- Section heads inside cards ------------------------------------------ */
+/* Reuse the shared .section-head, but give a tighter creator variant that
+   carries a mono index label on the left. */
+.creator-sec {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.creator-sec .creator-sec-titles { display: flex; flex-direction: column; gap: 1px; }
+.creator-sec h2,
+.creator-sec h3 { margin: 0; }
+.creator-sec .trail {
+  flex: 1;
+  height: 1px;
+  min-width: 24px;
+  align-self: center;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+.creator-sec .trail::after {
+  content: '\2726';
+  float: right;
+  color: var(--brass);
+  font-size: 0.7rem;
+  transform: translateY(-0.55em);
+}
+/* Actions can ride on the section head. */
+.creator-sec .creator-sec-action { align-self: center; }
+
+.creator-index {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--brass);
+  border: 1px solid var(--border-bright);
+  border-radius: 6px;
+  padding: 2px 7px;
+  align-self: center;
+  white-space: nowrap;
+  background: var(--ink-2);
+}
+
+/* --- Sub-cards (locations, expression rows) ----------------------------- */
+.creator-subcard {
+  border: 1px solid var(--border-soft);
+  border-left: 2px solid var(--border-bright);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  padding: 14px;
+  margin-bottom: 10px;
+}
+
+/* --- Inline help blurb --------------------------------------------------- */
+.creator-note {
+  margin: 0 0 14px;
+  font-size: 0.82rem;
+  color: var(--text-mute);
+  line-height: 1.5;
+}
+.creator-note code {
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  color: var(--brass);
+  background: var(--ink-2);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+/* --- Generate-from-portrait (vision) ----------------------------------- */
+.ce-image-gen {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ce-image-gen .creator-note {
+  margin: 0;
+}
+
+/* --- Content-flag toggle list ------------------------------------------- */
+.creator-flags { display: grid; gap: 10px; margin: 6px 0 4px; }
+.creator-flag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+}
+.creator-flag input { width: auto; margin: 0; flex: none; }
+
+/* --- Prompt / data callout ---------------------------------------------- */
+.creator-callout {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.creator-callout .creator-callout-mark {
+  color: var(--moon);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  flex: none;
+}
+
+/* --- Mono readout line (char counts, event meta) ------------------------ */
+.creator-readout-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+/* --- Event log rows ----------------------------------------------------- */
+.creator-event-type {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+.creator-event-time {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+
+/* --- Data action buttons (export/import) -------------------------------- */
+.creator-data-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ===========================================================================
+   CharacterEditor — tab/rail layout (.ce-*)
+   =========================================================================== */
+
+/* Outer shell: the whole page column */
+.ce-layout { display: flex; flex-direction: column; gap: 16px; }
+
+/* Two-column canvas: portrait rail + form */
+.ce-canvas {
+  display: grid;
+  /* Let the portrait rail give back a little width in the tight 860–1099px band
+     instead of forcing a hard 200px track and crushing the form column. */
+  grid-template-columns: minmax(160px, 200px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 800px) {
+  .ce-canvas { grid-template-columns: 1fr; }
+  .ce-rail { display: block; position: static; }
+  .ce-portrait-img { width: 64px; height: 64px; }
+  .ce-portrait-bars { display: none; }
+}
+
+/* The shared `.grid.cols-2` switches to two columns at a 720px *viewport*, which
+   ignores the desktop sidebar (~256px) + this 200px portrait rail. In the
+   860–1099px band that leaves the form column too narrow to split sanely
+   (~148px columns), so keep one column inside .ce-main until there's real room
+   for two. Restoring at 1100px clears the sidebar + rail overhead. */
+/* Ancestor .ce-canvas raises specificity above the shared 720px `.grid.cols-2`
+   media rule so this single-column override wins regardless of stylesheet
+   load order. */
+.ce-canvas .ce-main .grid.cols-2 { grid-template-columns: 1fr; }
+@media (min-width: 1100px) {
+  .ce-canvas .ce-main .grid.cols-2 { grid-template-columns: 1fr 1fr; }
+}
+
+/* Sticky portrait side rail. 80px clears the mobile topbar while it's present. */
+.ce-rail { position: sticky; top: 80px; }
+/* At desktop (≥860px) the mobile topbar is hidden, so the 80px offset just
+   leaves a dead gap — drop the rail to the desktop content padding instead. */
+@media (min-width: 860px) {
+  .ce-rail { top: 34px; }
+}
+
+.ce-portrait-plate {
+  --cut: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  text-align: center;
+}
+
+.ce-portrait-img {
+  width: 120px;
+  height: 120px;
+  font-size: 2rem;
+}
+
+.ce-portrait-name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.ce-portrait-placeholder { color: var(--text-mute); }
+
+.ce-portrait-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  letter-spacing: 0.04em;
+}
+
+.ce-portrait-bars { width: 100%; }
+
+/* Tab nav strip */
+.ce-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.ce-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: color 0.12s, border-color 0.12s;
+  margin-bottom: -1px;
+}
+.ce-tab:hover { color: var(--text); }
+.ce-tab.ce-tab-active {
+  color: var(--brass);
+  border-bottom-color: var(--brass);
+}
+
+@media (max-width: 640px) {
+  .ce-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .ce-tabs::-webkit-scrollbar { display: none; }
+  .ce-tab { white-space: nowrap; }
+}
+
+/* Panel — one per tab; hidden panels are removed from layout but remain in the
+   DOM so form state is never destroyed. The compound selector keeps specificity
+   above `.stack` (which also sets `display`), so `display: none` always wins
+   regardless of stylesheet injection order. */
+.ce-panel { display: block; }
+.ce-panel.ce-panel-hidden {
+  display: none;
+}
+
+/* Memory composer: an input (.flex-fill wrapping a Field) + an Importance
+   select + an Add button share one .row. On very narrow screens (≤400px) the
+   three crowd the line and the input shrinks to nothing — let the input claim a
+   full line and keep the select + button on the next, at their natural width.
+   Scoped via :has(.field) so only this composer matches, not the other .row
+   instances in .ce-main (e.g. expression rows whose .flex-fill is bare text). */
+@media (max-width: 400px) {
+  .ce-main .row > .flex-fill:has(.field) { flex: 1 1 100%; }
+  .ce-main .row > .flex-fill:has(.field) ~ .field,
+  .ce-main .row > .flex-fill:has(.field) ~ .btn { flex: 0 0 auto; }
+}
+
+/* End captions under a 0..100 range slider (e.g. Guardedness). */
+.ce-range-ends {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+/* Connection link row */
+.ce-link-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+/* Ex-canonization checkbox + explanation block */
+.ce-excanoize-label {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: 14px;
+  cursor: pointer;
+}
+.ce-excanoize-label input { margin-top: 3px; flex: none; }
+.ce-excanoize-body { margin: 0; }
+
+/* Employed checkbox row */
+.ce-employed-toggle {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+/* Workdays button cluster */
+.ce-workdays { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Prompt preview collapsible */
+.ce-prompt-details { margin-top: 4px; }
+.ce-prompt-details[open] .ce-prompt-summary { margin-bottom: 10px; }
+.ce-prompt-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+.ce-prompt-summary::-webkit-details-marker { display: none; }
+.ce-prompt-pre { overflow-x: auto; }
+
+/* ===========================================================================
+   WorldEditor — sidebar layout (.we-*)
+   =========================================================================== */
+
+.we-layout { display: flex; flex-direction: column; gap: 16px; }
+
+/* Two-column: sidebar list + detail */
+.we-canvas {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 760px) {
+  .we-canvas { grid-template-columns: 1fr; }
+}
+
+/* World list sidebar */
+.we-sidebar {
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: var(--ink-2);
+  padding: 12px 0;
+  position: sticky;
+  top: 80px;
+}
+/* Mirror the portrait rail: at desktop (≥860px) the mobile topbar is gone, so
+   the 80px sticky offset leaves a ~20px dead gap — drop to the content padding.
+   Below that the 80px keeps the list clear of the still-present topbar. */
+@media (min-width: 860px) {
+  .we-sidebar { top: 34px; }
+}
+@media (max-width: 760px) {
+  .we-sidebar { position: static; }
+  .ce-rail { position: static; }
+}
+
+.we-sidebar-header {
+  padding: 0 14px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+}
+
+.we-sidebar-empty { padding: 10px 14px; margin: 0; }
+
+.we-world-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.we-world-item {
+  width: 100%;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+  border-left: 2px solid transparent;
+}
+.we-world-item:hover { background: var(--ink-3); color: var(--text); }
+.we-world-item.we-world-item-active {
+  background: var(--ink-3);
+  color: var(--brass);
+  border-left-color: var(--brass);
+}
+
+.we-world-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Detail pane */
+.we-detail { min-width: 0; }
+
+/* Same reasoning as .ce-main: the shared `.grid.cols-2` goes two-up at a 720px
+   viewport, but here the detail pane is already narrowed by the 200px world
+   list. Hold one column until there's genuine room (≥1100px) so dense forms in
+   the 760–1099px band don't split into cramped half-width fields. */
+.we-canvas .we-detail .grid.cols-2 { grid-template-columns: 1fr; }
+@media (min-width: 1100px) {
+  .we-canvas .we-detail .grid.cols-2 { grid-template-columns: 1fr 1fr; }
+}
+
+/* World-note rows: the title (<strong>) and body (.dim) carry user-entered text
+   with no spaces guarantee — break long unbroken tokens so they can't overflow
+   the note's .flex-fill column and push the Delete button off-card. Scoped to
+   the detail pane so the global .list-item/.dim primitives are untouched. */
+.we-detail .list-item .flex-fill > strong,
+.we-detail .list-item .flex-fill > .dim {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Generate locations row */
+.we-gen-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.we-gen-row .field,
+.we-gen-row select { flex: 1; min-width: 120px; }
+.we-gen-btn { align-self: flex-end; }
+
+/* Location collapsible cards */
+.we-locations { display: flex; flex-direction: column; gap: 8px; }
+
+.we-loc-card {}
+
+.we-loc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.we-loc-toggle {
+  flex: 1;
+  /* min-width:0 lets the toggle shrink below its content width so the name can
+     ellipsize and the trailing trash button stays on-card on narrow screens. */
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: left;
+}
+
+.we-loc-name {
+  font-weight: 500;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.we-loc-badge { font-size: 0.65rem; }
+
+/* Keep the trash/delete control on the card — never let the badge row push it
+   past the (overflow-hidden) page edge. */
+.we-loc-header > .btn { flex-shrink: 0; }
+
+/* On narrow phones drop the non-essential tag badges (plain .badge) so the
+   location name keeps room to truncate; the Indoor badge (.we-loc-badge) and
+   the "+N" overflow count are plain .badge too, so this hides them as well —
+   acceptable, the name is the signal here. */
+@media (max-width: 480px) {
+  .we-loc-toggle .badge:not(.we-loc-badge) { display: none; }
+}
+
+.we-loc-body { margin-top: 12px; }
+
+.we-loc-indoor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.we-loc-image-section { margin-top: 10px; }
+.we-loc-image-section .kicker { display: block; margin-bottom: 8px; }

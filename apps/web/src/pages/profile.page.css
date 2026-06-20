@@ -1,0 +1,391 @@
+/* ===========================================================================
+   Character profile — a read-only dossier that mirrors the Character editor:
+   a framed workbench masthead, a sticky portrait rail (portrait + relationship
+   gauges + at-a-glance figures), and a tab strip over stacked content cards.
+
+   Layout scaffolding lives in .prof-mast / .prof-canvas / .prof-rail /
+   .prof-tabs / .prof-panel. Content styling (gauges, taxonomies, chronicle,
+   memories) is unchanged. All classes are prefixed .prof-; no shared class is
+   redefined.
+   =========================================================================== */
+.prof-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 1320px;
+  margin-inline: auto;
+}
+
+/* --- Masthead: framed workbench header (matches the editor) --------------- */
+.prof-mast {
+  --cut: 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.prof-mast-titles { min-width: 0; }
+.prof-mast-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.prof-mast-tag {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.prof-mast h1 {
+  margin: 4px 0 6px;
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 3.4vw, 2.3rem);
+  line-height: 1.05;
+}
+.prof-mast-vitals {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  color: var(--text-mute);
+  display: flex;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  /* break inside a pathological unbroken pronoun token rather than overflow */
+  overflow-wrap: anywhere;
+}
+.prof-mast-vitals .sep { color: var(--border-bright); margin: 0 6px; }
+.prof-mast p {
+  margin: 8px 0 0;
+  max-width: 66ch;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.prof-mast-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (max-width: 560px) { .prof-mast-actions { width: 100%; } }
+
+/* --- Canvas: portrait rail + content column ------------------------------ */
+.prof-canvas {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+/* Below the breakpoint the rail STACKS above the content (never hidden — it
+   carries the portrait, gauges and figures that anchor the page). */
+@media (max-width: 860px) {
+  .prof-canvas { grid-template-columns: 1fr; }
+  .prof-rail { position: static; }
+}
+
+/* --- Sticky portrait rail ------------------------------------------------ */
+.prof-rail { position: sticky; top: 24px; }
+.prof-rail-plate {
+  --cut: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 16px 14px;
+  text-align: center;
+}
+.prof-rail-img {
+  width: 128px;
+  height: 128px;
+  font-size: 2rem;
+  box-shadow: inset 0 0 0 1px rgba(230, 177, 94, 0.42), inset 0 0 0 5px rgba(10, 12, 24, 0.32);
+}
+.prof-rail-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+  line-height: 1.15;
+}
+.prof-rail-meta {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-mute);
+  letter-spacing: 0.04em;
+}
+.prof-rail-badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.prof-rail-bars { width: 100%; margin-top: 4px; }
+
+/* At-a-glance figures, tucked under the gauges */
+.prof-rail-figs {
+  display: flex;
+  width: 100%;
+  justify-content: space-around;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border-soft);
+}
+.prof-rail-fig { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.prof-rail-fig-n {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--brass);
+  text-shadow: 0 0 14px rgba(230, 177, 94, 0.26);
+}
+.prof-rail-fig-l {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-mute);
+}
+
+/* --- Content column + tabs ----------------------------------------------- */
+.prof-main { min-width: 0; }
+
+.prof-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+@media (max-width: 400px) {
+  .prof-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .prof-tab { white-space: nowrap; }
+}
+.prof-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: color 0.12s, border-color 0.12s;
+  margin-bottom: -1px;
+}
+.prof-tab:hover { color: var(--text); }
+.prof-tab.prof-tab-active {
+  color: var(--brass);
+  border-bottom-color: var(--brass);
+}
+
+/* Panel — one per tab; hidden panels leave layout entirely. The compound
+   selector keeps specificity above `.stack` (which also sets `display`), so
+   `display: none` always wins regardless of stylesheet injection order. */
+.prof-panel { display: block; }
+.prof-panel.prof-panel-hidden { display: none; }
+
+/* --- Read-only detail blocks (label + prose / tags) ---------------------- */
+.prof-detail { margin-bottom: 16px; }
+.prof-detail:last-child { margin-bottom: 0; }
+.prof-detail-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 7px;
+}
+.prof-detail-text {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* --- Connections: tappable rows to other characters ---------------------- */
+.prof-conns { display: flex; flex-direction: column; gap: 8px; }
+.prof-conn {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--brass);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  transition: background 0.12s, border-color 0.12s, transform 0.12s;
+}
+.prof-conn:hover { background: var(--ink-3); transform: translateX(2px); }
+.prof-conn svg { color: var(--text-mute); flex-shrink: 0; }
+.prof-conn-kind {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brass);
+  border: 1px solid var(--border-bright);
+  border-radius: 5px;
+  padding: 2px 7px;
+  background: var(--ink-2);
+  white-space: nowrap;
+}
+.prof-conn-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- Weather preference chips -------------------------------------------- */
+.prof-weather { display: flex; flex-wrap: wrap; gap: 8px; }
+.prof-weather-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  color: var(--text-dim);
+}
+.prof-weather-chip.fav { color: var(--rose); border-color: rgba(232, 138, 166, 0.34); background: rgba(232, 138, 166, 0.07); }
+.prof-weather-chip.dis { color: var(--ember); border-color: rgba(224, 122, 130, 0.3); background: rgba(224, 122, 130, 0.06); }
+
+/* --- Gauge grids: tile relationship + dating stats to fill the column ----- */
+.prof-gaugegrid > div {
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 34px;
+}
+.prof-gaugegrid > div > .statbar { margin-bottom: 11px; }
+/* auto-fit keeps StatBars ≥180px wide: the rail+sidebar steal width the viewport
+   media query can't see, so column count must follow the actual column width. */
+@media (min-width: 560px) { .prof-gaugegrid > div { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
+
+/* Buffs / flags row beneath the relationship gauges */
+.prof-meta-row {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 1fr;
+  margin-top: 18px;
+}
+@media (min-width: 680px) { .prof-meta-row { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); } }
+
+.prof-subhead {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0 0 9px;
+}
+
+.prof-buff {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--sage);
+  border-color: rgba(143, 207, 159, 0.4);
+  background: rgba(143, 207, 159, 0.08);
+}
+.prof-buff.down { color: var(--ember); border-color: rgba(224, 122, 130, 0.4); background: rgba(224, 122, 130, 0.08); }
+.prof-buff .left { color: var(--text-mute); font-weight: 500; }
+.prof-flag { color: var(--text-dim); }
+
+/* --- About: personality prose + likes/dislikes/goals --------------------- */
+.prof-personality {
+  font-family: var(--font-display);
+  font-size: 1.04rem;
+  line-height: 1.62;
+  font-variation-settings: 'SOFT' 30, 'opsz' 18;
+  color: var(--text-dim);
+  max-width: 80ch;
+  margin: 0 0 16px;
+  white-space: pre-wrap;
+}
+.prof-taxons {
+  display: grid;
+  gap: 18px 28px;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 680px) { .prof-taxons { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); } }
+.prof-taxons > .prof-detail { margin-bottom: 0; }
+.prof-tag-like { border-color: rgba(232, 138, 166, 0.34); background: rgba(232, 138, 166, 0.07); }
+.prof-tag-dislike { border-color: rgba(224, 122, 130, 0.3); background: rgba(224, 122, 130, 0.06); }
+
+/* --- History: the chronicle set in readable newspaper columns ------------ */
+.prof-chronicle {
+  white-space: pre-wrap;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  line-height: 1.66;
+  font-variation-settings: 'SOFT' 40, 'opsz' 20;
+  color: var(--text-dim);
+  margin: 0;
+}
+@media (min-width: 1400px) { .prof-chronicle { columns: 2; column-gap: 40px; } }
+@media (min-width: 1900px) { .prof-chronicle { columns: 3; column-gap: 40px; } }
+.prof-log {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+@media (min-width: 900px) { .prof-log { grid-template-columns: 1fr 1fr; } }
+.prof-log-line {
+  display: flex;
+  gap: 11px;
+  align-items: baseline;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  padding-left: 13px;
+  border-left: 2px solid var(--border-soft);
+}
+.prof-log-day {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brass);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+/* --- Memories: tile the list to fill the column -------------------------- */
+.prof-mem-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  align-items: start;
+}
+/* auto-fill against a 260px floor: the content column is only ~632px wide even
+   at 1200–1320px viewport, so a fixed 3-up left memories ~53px for text. Let the
+   column width decide the count (1-up narrow, 2-up at the column's real width). */
+@media (min-width: 860px) { .prof-mem-list { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } }
+.prof-mem {
+  position: relative;
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  padding: 13px 13px 13px 15px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--brass);
+}
+/* Importance as brass diamond pips — matches the energy gauge vocabulary. */
+.prof-mem-pips { display: inline-flex; gap: 4px; flex-shrink: 0; padding-top: 5px; align-self: flex-start; }
+.prof-pip { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); background: var(--ink-2); border: 1px solid var(--border); }
+.prof-pip.on { background: radial-gradient(circle at 35% 30%, #ffe7a8, var(--brass)); border-color: transparent; box-shadow: 0 0 6px rgba(230, 177, 94, 0.6); }
+.prof-mem-src svg { vertical-align: -1px; }
+.prof-mem-text { color: var(--text); line-height: 1.5; }
+.prof-mem-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 6px; }
+.prof-mem-src { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.03em; color: var(--text-mute); }
+.prof-mem-src.date { color: var(--rose); }
+.prof-mem-tag { font-size: 0.7rem; padding: 2px 9px; }
+.prof-mem-del { flex-shrink: 0; }

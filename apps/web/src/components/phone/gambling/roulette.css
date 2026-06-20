@@ -1,0 +1,196 @@
+/* roulette.css — stylized wheel + bet table. Classes prefixed .rl- ; Nocturne. */
+
+.rl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Wheel ────────────────────────────────────────────────────────────────── */
+.rl-stage {
+  display: flex;
+  justify-content: center;
+  padding: 18px 12px;
+}
+.rl-wheel {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+}
+.rl-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, var(--ember) 0 9.7deg, var(--ink) 9.7deg 19.4deg);
+  -webkit-mask: radial-gradient(circle, transparent 40%, #000 41%, #000 100%);
+  mask: radial-gradient(circle, transparent 40%, #000 41%, #000 100%);
+  box-shadow: 0 0 0 3px rgba(230, 177, 94, 0.6), 0 0 0 6px var(--ink-2), inset 0 0 20px rgba(0, 0, 0, 0.6);
+  opacity: 0.85;
+}
+/* the orbiting ball */
+.rl-ball {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: rotate(var(--spin, 0deg));
+  transition: transform 2.7s cubic-bezier(0.12, 0.66, 0.16, 1);
+  transform-origin: 0 0;
+  margin: -75px 0 0 0;
+  pointer-events: none;
+}
+.rl-ball::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #c9c4b8);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+}
+.rl-hub {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, var(--panel-2), var(--ink));
+  border: 1px solid rgba(230, 177, 94, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.6);
+}
+.rl-landed {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: var(--text);
+}
+.rl-landed.idle { color: rgba(230, 177, 94, 0.5); }
+.rl-landed.is-red { color: var(--ember); text-shadow: 0 0 12px rgba(199, 122, 122, 0.6); }
+.rl-landed.is-black { color: var(--moon); }
+.rl-landed.is-green { color: var(--sage); text-shadow: 0 0 12px rgba(168, 200, 154, 0.6); }
+
+/* ── Bank line: stake + chip denominations + clear ────────────────────────── */
+.rl-bankline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-mute);
+}
+.rl-bankline > span {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.rl-denoms { display: flex; gap: 4px; margin-left: auto; }
+.rl-denom {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, 0.4);
+  background: var(--ink-2);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 0.58rem;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s, color 0.12s;
+}
+.rl-denom.active {
+  border-color: var(--brass);
+  color: var(--brass);
+  transform: scale(1.08);
+  box-shadow: 0 0 10px rgba(230, 177, 94, 0.3);
+}
+.rl-clear {
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  color: var(--text-mute);
+  border-radius: var(--radius-sm);
+  font-size: 0.62rem;
+  padding: 11px 12px;
+  cursor: pointer;
+}
+.rl-clear:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Number grid ──────────────────────────────────────────────────────────── */
+.rl-grid { display: flex; gap: 5px; }
+.rl-nums {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+}
+.rl-num {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 5px;
+  border: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.72rem;
+  color: #f3ead7;
+  cursor: pointer;
+  transition: filter 0.12s, box-shadow 0.12s;
+}
+.rl-num.is-green { background: linear-gradient(180deg, #2f5d44, #1e3d2d); flex: 0 0 30px; }
+.rl-num.is-red { background: linear-gradient(180deg, #7c2b2b, #571d1d); }
+.rl-num.is-black { background: linear-gradient(180deg, #1b2036, #11152a); }
+.rl-num:hover:not(:disabled) { filter: brightness(1.2); }
+.rl-num.win { box-shadow: 0 0 0 2px var(--brass), 0 0 12px rgba(230, 177, 94, 0.5); }
+
+/* ── Outside bet cells ────────────────────────────────────────────────────── */
+.rl-outside { display: flex; gap: 5px; }
+.rl-cell {
+  position: relative;
+  flex: 1;
+  padding: 9px 4px;
+  border-radius: 5px;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  color: var(--text-dim);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.rl-cell:hover:not(:disabled) { border-color: var(--border-bright); color: var(--text); }
+.rl-cell.tone-red { background: linear-gradient(180deg, #7c2b2b, #4a1a1a); color: #f3ead7; }
+.rl-cell.tone-black { background: linear-gradient(180deg, #1b2036, #0f1326); color: #f3ead7; }
+.rl-cell.win { box-shadow: 0 0 0 2px var(--brass), 0 0 12px rgba(230, 177, 94, 0.5); }
+.rl-cell:disabled,
+.rl-num:disabled { cursor: default; }
+
+/* placed-chip badge */
+.rl-chip {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 3px;
+  border-radius: 9px;
+  background: var(--brass);
+  color: #0b0f22;
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-weight: 800;
+  font-size: 0.56rem;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-ball { transition: transform 0.4s linear; }
+}

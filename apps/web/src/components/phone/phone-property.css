@@ -1,0 +1,371 @@
+/* =============================================================================
+   Property App — "Real estate on the phone".
+   Nocturne visual language: deep indigo panels, brass price accents, lamplit
+   card frames. All classes prefixed .prop- to avoid collisions.
+   Sits inside .phone-embed so it never needs full-page layout concerns.
+   ============================================================================= */
+
+/* — Embed wrapper ——————————————————————————————————————————————————————— */
+.prop-embed {
+  padding: 12px;
+  gap: 14px;
+}
+
+/* — Wallet readout in the app bar right slot ——————————————————————————— */
+.prop-purse {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ink-2);
+  border: 1px solid rgba(230, 177, 94, 0.32);
+  box-shadow: inset 0 0 12px rgba(230, 177, 94, 0.08);
+  color: var(--text-mute);
+}
+.prop-purse-coin {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--brass);
+  letter-spacing: 0.02em;
+}
+
+/* — Creator action bar ————————————————————————————————————————————————— */
+.prop-creator-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* — Generate / create panels (framed workshop) ——————————————————————— */
+.prop-gen {
+  position: relative;
+}
+.prop-gen-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.prop-gen-title {
+  margin: 2px 0 0;
+  font-size: 1rem;
+}
+.prop-create-form {
+  position: relative;
+}
+
+/* — Generate divider (brass rule between form and drafts) ——————————— */
+.prop-gen-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 2px;
+  color: var(--brass);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.prop-gen-divider::before,
+.prop-gen-divider::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+.prop-gen-divider::before {
+  background: linear-gradient(90deg, transparent, var(--border-bright));
+}
+
+/* — Draft cards ——————————————————————————————————————————————————————— */
+.prop-drafts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.prop-draft {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--brass);
+  background: var(--ink-2);
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.prop-draft.dropped {
+  opacity: 0.5;
+  border-left-color: var(--text-mute);
+}
+.prop-draft-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.prop-draft-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.prop-money-pill {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--brass);
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brass) 10%, transparent);
+  border: 1px solid rgba(230, 177, 94, 0.28);
+}
+
+/* — Section head above the grid ——————————————————————————————————————— */
+.prop-list-head {
+  margin: 6px 0 2px;
+}
+.prop-list-count {
+  margin: 2px 0 0;
+  font-size: 0.96rem;
+  font-weight: 600;
+}
+
+/* — Property card grid —————————————————————————————————————————————— */
+.prop-grid {
+  display: grid;
+  gap: var(--gap, 12px);
+  grid-template-columns: 1fr;
+}
+
+/* Each property card — a Nocturne indigo panel with a top accent bar. */
+.prop-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: var(--shadow-sm), var(--rim);
+  transition: transform 0.14s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.prop-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  border-color: var(--border-bright);
+}
+/* Top accent stripe (brass for owned, subtle for available) */
+.prop-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+  opacity: 0.7;
+}
+.prop-card.owned::before {
+  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+  opacity: 0.85;
+}
+.prop-card.owned {
+  border-color: rgba(230, 177, 94, 0.28);
+  box-shadow: var(--shadow-sm), var(--rim), inset 0 0 24px rgba(230, 177, 94, 0.04);
+}
+
+/* Card body — name, category, description, tags */
+.prop-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 0;
+}
+.prop-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.prop-card-icon {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+  color: var(--text-mute);
+}
+.prop-card.owned .prop-card-icon {
+  border-color: rgba(230, 177, 94, 0.36);
+  color: var(--brass);
+}
+.prop-card-name {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.25;
+}
+.prop-card-cat {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  margin-top: 3px;
+}
+.prop-owned-badge {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--brass);
+  border: 1px solid rgba(230, 177, 94, 0.42);
+  background: color-mix(in srgb, var(--brass) 10%, transparent);
+}
+.prop-card-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* — Economics strip ————————————————————————————————————————————————— */
+.prop-card-econ {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  margin-top: 10px;
+  border-top: 1px solid var(--border-soft);
+  background: rgba(10, 12, 24, 0.22);
+}
+.prop-econ-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.prop-price-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.prop-price {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--brass);
+  letter-spacing: 0.01em;
+}
+.prop-price.secondary {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.prop-price.earn {
+  color: var(--sage, #8db89a);
+}
+.prop-buff-row {
+  margin-top: 2px;
+}
+.prop-buff {
+  font-size: 0.72rem;
+  color: var(--moon, #c8bfea);
+  font-style: italic;
+}
+
+/* — Leased card variant ————————————————————————————————————————————— */
+.prop-card.leased::before {
+  background: linear-gradient(90deg, transparent, var(--sage, #8db89a), transparent);
+  opacity: 0.7;
+}
+.prop-card.leased {
+  border-color: rgba(141, 184, 154, 0.28);
+}
+
+/* — Leased badge (teal/sage, calm) ————————————————————————————————— */
+.prop-leased-badge {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--sage, #8db89a);
+  border: 1px solid rgba(141, 184, 154, 0.42);
+  background: color-mix(in srgb, var(--sage, #8db89a) 10%, transparent);
+}
+
+/* — Overdue badge (ember, urgent) ———————————————————————————————— */
+.prop-overdue-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--ember, #e87c45);
+  border: 1px solid rgba(232, 124, 69, 0.5);
+  background: color-mix(in srgb, var(--ember, #e87c45) 12%, transparent);
+  box-shadow: 0 0 8px rgba(232, 124, 69, 0.25);
+}
+
+/* — Overdue notice inside economics strip ———————————————————————— */
+.prop-overdue-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ember, #e87c45) 10%, transparent);
+  border: 1px solid rgba(232, 124, 69, 0.38);
+  color: var(--ember, #e87c45);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.prop-overdue-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* — Card action row ——————————————————————————————————————————————————— */
+.prop-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 0 14px 14px;
+}
+
+/* — Checkbox label in create form ————————————————————————————————————— */
+.prop-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding-top: 6px;
+}

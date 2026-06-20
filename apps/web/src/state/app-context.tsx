@@ -1,0 +1,307 @@
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { ActiveDate, Asset, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
+import { deriveCalendar } from '@dsim/shared';
+import { api } from '../lib/api';
+
+const ACTIVE_WORLD_KEY = 'dsim.activeWorldId';
+const CREATOR_KEY = 'dsim.creatorMode';
+const THEME_KEY = 'dsim.theme';
+
+export interface Theme {
+  accent: string | null;
+  accent2: string | null;
+  wallpaper: string | null; // data URL
+}
+
+const DEFAULT_THEME: Theme = { accent: null, accent2: null, wallpaper: null };
+
+function loadTheme(): Theme {
+  try {
+    const raw = localStorage.getItem(THEME_KEY);
+    return raw ? { ...DEFAULT_THEME, ...JSON.parse(raw) } : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+interface AppData {
+  player: PlayerProfile | null;
+  assets: Asset[];
+  assetById: (id: string | null | undefined) => Asset | undefined;
+  reloadPlayer: () => Promise<void>;
+  reloadAssets: () => Promise<void>;
+  // World clock
+  worlds: World[];
+  /** True once the world list has been fetched at least once (so the app can tell
+   *  "no world chosen yet" apart from "still loading"). */
+  worldsLoaded: boolean;
+  activeWorldId: string | null;
+  activeWorld: World | null;
+  worldState: WorldState | null;
+  /** Monotonic counter bumped whenever the world clock advances (sleep) or a
+   *  total reset happens. Day-derived per-tab effects depend on it so they
+   *  refetch after End day / reset without each page re-deriving worldState.day. */
+  dayTick: number;
+  setActiveWorld: (id: string) => void;
+  reloadWorlds: () => Promise<void>;
+  refreshWorldState: () => Promise<void>;
+  sleep: () => Promise<SleepResponse | null>;
+  // Mode + theme (client-side)
+  creatorMode: boolean;
+  setCreatorMode: (on: boolean) => void;
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+  // Phone: unread incoming TEXTS (not emails), for the sidebar badge
+  unreadTexts: number;
+  refreshInbox: () => Promise<void>;
+  /** The active world's single in-progress date (if any). Drives the Date-tab
+   *  auto-resume, the nav "date underway" badge, and the lock on day-spending
+   *  actions (Sleep / Work / Minigames). Null when no date is open. */
+  activeDate: ActiveDate | null;
+  /** False until the active-date has been fetched at least once for the current
+   *  session, so the Date tab can show a spinner instead of flashing "plan a date"
+   *  before it knows whether a date is already underway. */
+  activeDateLoaded: boolean;
+  refreshActiveDate: () => Promise<void>;
+  // Total reset
+  resetProgress: () => Promise<void>;
+}
+
+const AppDataContext = createContext<AppData | null>(null);
+
+export function AppDataProvider({ children }: { children: ReactNode }) {
+  const [player, setPlayer] = useState<PlayerProfile | null>(null);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [worlds, setWorlds] = useState<World[]>([]);
+  const [worldsLoaded, setWorldsLoaded] = useState(false);
+  const [activeWorldId, setActiveWorldId] = useState<string | null>(() => localStorage.getItem(ACTIVE_WORLD_KEY));
+  const [worldState, setWorldState] = useState<WorldState | null>(null);
+  const [dayTick, setDayTick] = useState(0);
+  const [creatorMode, setCreatorModeState] = useState<boolean>(() => localStorage.getItem(CREATOR_KEY) !== 'false');
+  const [theme, setThemeState] = useState<Theme>(loadTheme);
+  const [unreadTexts, setUnreadTexts] = useState(0);
+  const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
+  const [activeDateLoaded, setActiveDateLoaded] = useState(false);
+
+  const reloadPlayer = useCallback(async () => {
+    try {
+      // The player profile (money + persona) is per-world; fetch the active world's.
+      setPlayer(await api.getPlayer(activeWorldId ?? undefined));
+    } catch {
+      /* server may not be up yet */
+    }
+  }, [activeWorldId]);
+  const reloadAssets = useCallback(async () => {
+    try {
+      setAssets(await api.listAssets());
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const reloadWorlds = useCallback(async () => {
+    try {
+      setWorlds(await api.listWorlds());
+    } catch {
+      /* ignore */
+    } finally {
+      setWorldsLoaded(true);
+    }
+  }, []);
+  const refreshInbox = useCallback(async () => {
+    try {
+      setUnreadTexts((await api.phoneInbox(activeWorldId ?? undefined)).unreadTexts);
+    } catch {
+      /* server may not be up yet */
+    }
+  }, [activeWorldId]);
+  // The active world's in-progress date, the single source of truth for resume +
+  // action-locking. Refetched on world change; the Date page also drives explicit
+  // refreshes as a date starts and ends.
+  const refreshActiveDate = useCallback(async () => {
+    if (!activeWorldId) {
+      setActiveDate(null);
+      setActiveDateLoaded(true);
+      return;
+    }
+    try {
+      setActiveDate((await api.activeDate(activeWorldId)).date);
+    } catch {
+      /* leave the last-known value on a transient error */
+    } finally {
+      setActiveDateLoaded(true);
+    }
+  }, [activeWorldId]);
+
+  useEffect(() => {
+    void reloadPlayer();
+    void reloadAssets();
+    void reloadWorlds();
+  }, [reloadPlayer, reloadAssets, reloadWorlds]);
+
+  // Poll the unread-text count so the sidebar badge stays current (texts can
+  // arrive in the background as the world clock advances).
+  useEffect(() => {
+    void refreshInbox();
+    const id = setInterval(() => void refreshInbox(), 15000);
+    return () => clearInterval(id);
+  }, [refreshInbox]);
+
+  // World selection is DELIBERATE — we never silently drop the player into worlds[0].
+  // Once the world list is known, only clear a STALE active id (a world that was
+  // deleted), which routes the app back to the selector.
+  useEffect(() => {
+    if (!worldsLoaded) return;
+    setActiveWorldId((cur) => {
+      if (cur && worlds.some((w) => w.id === cur)) return cur;
+      if (cur) localStorage.removeItem(ACTIVE_WORLD_KEY); // forget a deleted world
+      return null;
+    });
+  }, [worldsLoaded, worlds]);
+
+  const setActiveWorld = useCallback((id: string) => {
+    localStorage.setItem(ACTIVE_WORLD_KEY, id);
+    setActiveWorldId(id);
+  }, []);
+
+  const refreshWorldState = useCallback(async () => {
+    if (!activeWorldId) {
+      setWorldState(null);
+      return;
+    }
+    try {
+      setWorldState(await api.getWorldState(activeWorldId));
+    } catch {
+      setWorldState(null);
+    }
+  }, [activeWorldId]);
+
+  useEffect(() => {
+    void refreshWorldState();
+  }, [refreshWorldState]);
+
+  // Re-derive the in-progress date whenever the active world changes (and on first
+  // mount) — so a refresh lands you back on the Date tab mid-date, and switching
+  // worlds reflects that world's own open date (or none).
+  useEffect(() => {
+    void refreshActiveDate();
+  }, [refreshActiveDate]);
+
+  const sleep = useCallback(async (): Promise<SleepResponse | null> => {
+    if (!activeWorldId) return null;
+    const res = await api.sleep(activeWorldId);
+    setWorldState(res.state);
+    setDayTick((t) => t + 1); // signal day-derived tabs to refetch
+    await reloadPlayer();
+    return res;
+  }, [activeWorldId, reloadPlayer]);
+
+  const setCreatorMode = useCallback((on: boolean) => {
+    localStorage.setItem(CREATOR_KEY, String(on));
+    setCreatorModeState(on);
+  }, []);
+
+  const setTheme = useCallback((t: Theme) => {
+    localStorage.setItem(THEME_KEY, JSON.stringify(t));
+    setThemeState(t);
+  }, []);
+
+  // Apply theme to CSS variables.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme.accent) {
+      root.style.setProperty('--accent', theme.accent);
+      root.style.setProperty('--accent-2', theme.accent2 ?? theme.accent);
+    } else {
+      root.style.removeProperty('--accent');
+      root.style.removeProperty('--accent-2');
+    }
+    root.style.setProperty('--phone-wallpaper', theme.wallpaper ? `url("${theme.wallpaper}")` : 'none');
+  }, [theme]);
+
+  // The Nocturne signature: the ambient lamplight breathes with the in-world
+  // hour and season. We only set data-* hooks (consumed by styles.css) — never
+  // --accent — so the user's chosen accent always survives.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (worldState) {
+      root.dataset.phase = worldState.phase;
+      root.dataset.season = deriveCalendar(worldState.day).season;
+    } else {
+      delete root.dataset.phase;
+      delete root.dataset.season;
+    }
+  }, [worldState]);
+
+  // Today's weather for the active world drives the ambient atmosphere overlay
+  // (rain/snow/fog/sun…). Refetched when the world or the day changes.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!activeWorldId) {
+      delete root.dataset.weather;
+      return;
+    }
+    let cancelled = false;
+    void api
+      .worldWeather(activeWorldId)
+      .then((w) => {
+        if (!cancelled) root.dataset.weather = w.today.kind;
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorldId, worldState?.day]);
+
+  const resetProgress = useCallback(async () => {
+    await api.resetData();
+    setDayTick((t) => t + 1); // everything is day-derived after a reset
+    setActiveDate(null); // a reset wipes all sessions
+    await Promise.all([reloadPlayer(), refreshWorldState(), refreshActiveDate()]);
+  }, [reloadPlayer, refreshWorldState, refreshActiveDate]);
+
+  const assetMap = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
+  const assetById = useCallback(
+    (id: string | null | undefined) => (id ? assetMap.get(id) : undefined),
+    [assetMap],
+  );
+  const activeWorld = useMemo(() => worlds.find((w) => w.id === activeWorldId) ?? null, [worlds, activeWorldId]);
+
+  const value = useMemo<AppData>(
+    () => ({
+      player,
+      assets,
+      assetById,
+      reloadPlayer,
+      reloadAssets,
+      worlds,
+      worldsLoaded,
+      activeWorldId,
+      activeWorld,
+      worldState,
+      dayTick,
+      setActiveWorld,
+      reloadWorlds,
+      refreshWorldState,
+      sleep,
+      creatorMode,
+      setCreatorMode,
+      theme,
+      setTheme,
+      unreadTexts,
+      refreshInbox,
+      activeDate,
+      activeDateLoaded,
+      refreshActiveDate,
+      resetProgress,
+    }),
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, theme, setTheme, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
+  );
+
+  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
+}
+
+export function useAppData(): AppData {
+  const ctx = useContext(AppDataContext);
+  if (!ctx) throw new Error('useAppData must be used within AppDataProvider');
+  return ctx;
+}

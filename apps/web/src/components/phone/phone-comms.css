@@ -1,0 +1,752 @@
+/* Phone — Messages + Mail. Page-prefixed: .pcom-*
+   Layers a bolder "phone OS" feel on top of the shared .phone-* shells.
+   Lives inside a ~410px device frame, so everything stays compact. */
+
+/* --- Shared appbar treatment (real phone OS bar) ----------------------- */
+.pcom-bar {
+  position: relative;
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  box-shadow: 0 1px 0 var(--border-bright), 0 6px 14px -10px rgba(0, 0, 0, 0.7);
+}
+.pcom-bar::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  right: 15px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brass-dim), transparent);
+  opacity: 0.5;
+}
+.pcom-bar .pcom-title {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  align-items: center;
+}
+.pcom-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brass);
+  line-height: 1;
+}
+.pcom-bar-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.02rem;
+  line-height: 1.1;
+  max-width: 200px;
+}
+.pcom-iconbtn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.pcom-bar .pcom-spacer { width: 34px; flex-shrink: 0; }
+
+/* --- Icon-only button used in PhoneAppBar left/right slots ------------- */
+.pbar-iconbtn {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 999px;
+}
+
+/* Mail reader: when/date shown inline next to sender meta. */
+.pcom-reader-when {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* --- Thread list (Messages inbox) ------------------------------------- */
+.pcom-rows { overflow-y: auto; overflow-x: hidden; flex: 1; padding: 6px 0; }
+.pcom-row {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 11px 15px 11px 16px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.pcom-row + .pcom-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 67px;
+  right: 0;
+  height: 1px;
+  background: var(--border-soft);
+}
+.pcom-row:hover { background: var(--panel); }
+.pcom-row:active { background: var(--panel-2); }
+.pcom-row.pcom-unread { background: rgba(230, 177, 94, 0.05); }
+
+.pcom-ava {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+}
+.pcom-ava .portrait {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border), var(--shadow-sm);
+}
+.pcom-unread .pcom-ava .portrait {
+  box-shadow: 0 0 0 1px var(--brass-dim), var(--glow-warm);
+}
+.pcom-count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent));
+  color: var(--on-accent);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 8px rgba(232, 138, 166, 0.5);
+}
+
+.pcom-body { flex: 1; min-width: 0; }
+.pcom-toprow { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pcom-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.96rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pcom-unread .pcom-name { color: var(--text); }
+.pcom-when {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pcom-unread .pcom-when { color: var(--brass); }
+.pcom-preview {
+  margin-top: 2px;
+  font-size: 0.81rem;
+  color: var(--text-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pcom-unread .pcom-preview { color: var(--text-dim); }
+
+/* --- Unavailable ("Do Not Disturb") cues ----------------------------- */
+/* Moon badge on the avatar, mirroring the unread count's corner placement. */
+.pcom-dnd {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--moon);
+  background: var(--ink);
+  box-shadow: 0 0 0 1px var(--border), 0 0 8px rgba(157, 184, 222, 0.5);
+}
+/* A busy contact reads dimmer in the picker/inbox, but stays tappable so the
+   player can still open the thread and read past messages. */
+.pcom-row-busy .pcom-ava .portrait { filter: grayscale(0.5); opacity: 0.7; }
+.pcom-row-busy .pcom-name { color: var(--text-dim); }
+/* Reason line under the name in the contact picker. */
+.pcom-busy {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--moon);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Notice above the (disabled) composer in a thread with a busy character. */
+.pcom-dnd-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 14px;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-dim);
+  background: rgba(157, 184, 222, 0.07);
+  border-top: 1px solid var(--border-soft);
+}
+.pcom-dnd-bar svg { flex-shrink: 0; margin-top: 1px; color: var(--moon); }
+.pcom-compose input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* --- Empty / hint states --------------------------------------------- */
+/* Icon variant — replaces the emoji glyph with an <Icon> component. */
+.pcom-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  opacity: 0.6;
+  color: var(--brass);
+}
+
+.pcom-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 30px 26px;
+  text-align: center;
+}
+.pcom-empty-glyph {
+  font-size: 2rem;
+  filter: grayscale(0.2);
+  opacity: 0.85;
+}
+.pcom-empty-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--text);
+}
+.pcom-empty p { color: var(--text-mute); font-size: 0.84rem; margin: 0; line-height: 1.5; }
+
+/* --- New message: contact picker ------------------------------------- */
+.pcom-pick-head {
+  padding: 12px 16px 6px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* --- Chat thread ----------------------------------------------------- */
+.pcom-thread {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 120px;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(230, 177, 94, 0.05), transparent 60%);
+}
+.pcom-day {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 8px 0 4px;
+}
+.pcom-day::before,
+.pcom-day::after {
+  content: "";
+  width: 26px;
+  height: 1px;
+  background: var(--border-soft);
+}
+
+.pcom-msg { display: flex; flex-direction: column; max-width: 80%; }
+.pcom-msg.player { align-self: flex-end; align-items: flex-end; }
+.pcom-msg.character { align-self: flex-start; align-items: flex-start; }
+.pcom-bubble {
+  padding: 9px 13px;
+  border-radius: 16px;
+  line-height: 1.42;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+}
+.pcom-msg.player .pcom-bubble {
+  background: linear-gradient(135deg, var(--accent-2), var(--accent));
+  color: var(--on-accent);
+  border-bottom-right-radius: 5px;
+  box-shadow: var(--glow-rose);
+}
+.pcom-msg.character .pcom-bubble {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 5px;
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* Gift attachment — a brass keepsake offer. */
+.pcom-gift {
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(140deg, var(--vellum), var(--vellum-2));
+  color: var(--ink-on-vellum);
+  border: 1px solid rgba(230, 177, 94, 0.5);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+.pcom-gift:hover:not(:disabled) { box-shadow: var(--glow-warm); }
+.pcom-gift:active:not(:disabled) { transform: scale(0.98); }
+.pcom-gift:disabled { cursor: default; opacity: 0.78; filter: saturate(0.6); }
+.pcom-gift-glyph { font-size: 1.25rem; line-height: 1; flex-shrink: 0; }
+.pcom-gift-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.pcom-gift-label {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.pcom-gift-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Transient "feeling" cue. */
+.pcom-feeling {
+  align-self: center;
+  font-size: 0.76rem;
+  font-family: var(--font-body);
+  color: var(--text-dim);
+  padding: 3px 12px;
+  margin: 2px 0 6px;
+  border-radius: 999px;
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+  animation: pcom-feeling-rise 2.2s ease-out forwards;
+}
+@keyframes pcom-feeling-rise {
+  0% { opacity: 0; transform: translateY(6px); }
+  15% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+/* Composer. */
+.pcom-compose {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 11px;
+  border-top: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  box-shadow: 0 -1px 0 rgba(230, 177, 94, 0.08);
+  flex-shrink: 0;
+}
+.pcom-compose input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.pcom-compose input:focus {
+  outline: none;
+  border-color: var(--brass-dim);
+  box-shadow: 0 0 0 2px rgba(230, 177, 94, 0.18);
+}
+.pcom-send {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+}
+.pcom-attachbtn {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Sent photos (chat image attachments) ---------------------------- */
+.pcom-image-link {
+  display: block;
+  line-height: 0;
+}
+.pcom-image {
+  display: block;
+  /* Kept small in the thread so a big upload never bloats the scroll. */
+  max-width: min(170px, 100%);
+  max-height: 170px;
+  width: auto;
+  height: auto;
+  border-radius: 16px;
+  object-fit: cover;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+.pcom-msg.player .pcom-image { border-bottom-right-radius: 5px; }
+.pcom-msg.character .pcom-image { border-bottom-left-radius: 5px; }
+.pcom-image + .pcom-bubble { margin-top: 4px; }
+
+/* Staged-attachment preview above the compose bar. */
+.pcom-attach {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 0;
+}
+.pcom-attach-thumb {
+  max-height: 52px;
+  max-width: 52px;
+  border-radius: 9px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+.pcom-attach-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.78rem;
+  color: var(--text-mute);
+}
+.pcom-attach-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.pcom-attach-remove:hover { border-color: var(--brass-dim); }
+.pcom-attach-gifticon { flex-shrink: 0; display: inline-flex; color: var(--brass); }
+
+/* Player-sent gift: the same vellum card as a received gift, but inert. */
+.pcom-gift-sent { cursor: default; }
+/* Toggled-on state for the round photo/gift compose buttons. */
+.pcom-attachbtn-on { border-color: var(--brass); color: var(--brass); }
+
+/* The held-items picker that drops in above the compose bar. */
+.pcom-giftmenu {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 168px;
+  overflow-y: auto;
+  margin: 8px 12px 0;
+  padding: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+@media (max-height: 700px) {
+  .pcom-giftmenu { max-height: 100px; }
+}
+.pcom-giftmenu-empty { margin: 2px; font-size: 0.78rem; text-align: center; }
+.pcom-giftmenu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.pcom-giftmenu-item:hover { color: var(--text); border-color: var(--brass); background: rgba(230, 177, 94, 0.08); }
+.pcom-giftmenu-name { font-family: var(--font-display); font-weight: 600; font-size: 0.88rem; }
+.pcom-giftmenu-qty { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-mute); }
+
+/* --- Mail ------------------------------------------------------------- */
+.pcom-mail-row {
+  position: relative;
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px 12px 28px;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.pcom-mail-row + .pcom-mail-row::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 28px;
+  right: 0;
+  height: 1px;
+  background: var(--border-soft);
+}
+.pcom-mail-row:hover { background: var(--panel); }
+.pcom-mail-row:active { background: var(--panel-2); }
+.pcom-mail-row.pcom-unread {
+  background: rgba(157, 184, 222, 0.06);
+  box-shadow: inset 3px 0 0 var(--moon);
+}
+.pcom-mail-dot {
+  position: absolute;
+  left: 13px;
+  top: 18px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--moon);
+  box-shadow: 0 0 8px rgba(157, 184, 222, 0.7);
+}
+.pcom-mail-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pcom-mail-sender {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.94rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pcom-mail-row.pcom-unread .pcom-mail-sender { color: var(--text); }
+.pcom-mail-subject {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.86rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pcom-mail-row.pcom-unread .pcom-mail-subject { color: var(--text); font-weight: 600; }
+/* Body preview: wrap to at most 5 lines, then ellipsis. Never allow a long
+   unbroken token to push the row wider than the screen. */
+.pcom-mail-snippet {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  line-clamp: 5;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-mute);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* --- Landlord notices (Property Management pinned thread) ------------ */
+
+/* Pinned row in the thread list — ember-tinted, always above character threads. */
+.lnd-row {
+  border-left: 3px solid var(--ember, #e87c45);
+  background: color-mix(in srgb, var(--ember, #e87c45) 4%, transparent);
+}
+.lnd-row:hover { background: color-mix(in srgb, var(--ember, #e87c45) 8%, transparent); }
+.lnd-row:active { background: color-mix(in srgb, var(--ember, #e87c45) 12%, transparent); }
+.lnd-row.lnd-unread { background: color-mix(in srgb, var(--ember, #e87c45) 8%, transparent); }
+.lnd-row + .pcom-row::before { left: 67px; } /* keep divider rule from normal rows */
+
+/* Avatar circle — uses an icon instead of a portrait. */
+.lnd-ava {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+}
+.lnd-ava-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel-2);
+  border: 1px solid rgba(232, 124, 69, 0.45);
+  color: var(--ember, #e87c45);
+  box-shadow: 0 0 10px rgba(232, 124, 69, 0.2);
+}
+
+/* Name row — ember tint with warn icon. */
+.lnd-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ember, #e87c45);
+  font-weight: 700;
+}
+.lnd-name svg { flex-shrink: 0; }
+
+/* Preview text for the landlord row. */
+.lnd-preview { color: var(--ember, #e87c45); opacity: 0.85; }
+
+/* Notice thread — scrollable area, same as .pcom-thread. */
+.lnd-thread {
+  gap: 10px;
+}
+
+/* Each notice bubble — ember-tinted, left-aligned like a character message. */
+.lnd-notice {
+  max-width: 92%;
+}
+.lnd-notice-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+.lnd-notice-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ember, #e87c45);
+}
+.lnd-notice-kind svg { flex-shrink: 0; }
+.lnd-notice-day {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* The bubble itself — ember-tinted panel variant. */
+.lnd-bubble {
+  background: color-mix(in srgb, var(--ember, #e87c45) 8%, var(--panel-2));
+  border: 1px solid rgba(232, 124, 69, 0.38);
+  border-bottom-left-radius: 5px;
+  color: var(--text);
+}
+
+/* Eviction notices are the most severe — stronger tint + border. */
+.lnd-eviction .lnd-bubble {
+  background: color-mix(in srgb, var(--ember, #e87c45) 15%, var(--panel-2));
+  border-color: rgba(232, 124, 69, 0.6);
+  box-shadow: 0 0 12px rgba(232, 124, 69, 0.18);
+}
+.lnd-eviction .lnd-notice-kind {
+  color: var(--ember, #e87c45);
+  text-shadow: 0 0 8px rgba(232, 124, 69, 0.4);
+}
+
+/* Mail reader. */
+.pcom-reader { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 18px 16px 24px; }
+.pcom-reader-subject {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.3rem;
+  line-height: 1.25;
+  margin: 0 0 12px;
+  /* A long unbroken subject token must wrap, not overflow at narrow widths. */
+  overflow-wrap: anywhere;
+}
+.pcom-reader-from {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.pcom-reader-seal {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--brass);
+  background: var(--panel-2);
+  border: 1px solid var(--brass-dim);
+  box-shadow: inset 0 0 10px rgba(230, 177, 94, 0.12);
+}
+.pcom-reader-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+/* Truncate the sender name with ellipsis, matching .pcom-reader-handle
+   (the shared .pcom-reader-meta already provides min-width: 0). */
+.pcom-reader-sendername {
+  font-weight: 600;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pcom-reader-handle {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pcom-reader-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+  font-size: 0.92rem;
+  color: var(--text);
+}

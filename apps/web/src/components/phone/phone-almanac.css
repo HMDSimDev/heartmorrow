@@ -1,0 +1,496 @@
+/* ===========================================================================
+   phone-almanac.css — the Calendar app: an almanac of every day.
+   Built on Nocturne v2 tokens. All selectors prefixed `pal-`. Renders inside a
+   ~410px device frame (wider in tablet mode), so everything stays compact.
+   The whole app's identity is "a private record of days" — lean into the ledger.
+   =========================================================================== */
+
+/* The calendar app instance becomes the positioning context for the day-detail
+   overlay (so it can cover the whole app, app-bar included, for a single header). */
+.pal-host { position: relative; }
+
+/* Everything behind the day-detail. Marked `inert` from JS while a day is open,
+   so the overlay reads as a true modal (no focus/AT leakage to the grid). */
+.pal-base {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The grid view: a scroll region under the season header. */
+.pal-app {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 12px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* "Today" jump button in the app bar. */
+.pal-today-btn {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brass);
+  background: transparent;
+  border: 1px solid rgba(230, 177, 94, 0.4);
+  border-radius: 999px;
+  padding: 8px 14px;
+  min-height: 36px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pal-today-btn:hover { background: rgba(230, 177, 94, 0.12); border-color: var(--brass); }
+
+/* --- Season header: an almanac masthead with prev/next ------------------- */
+.pal-season {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.pal-season-mid {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  min-width: 0;
+}
+.pal-season-icon {
+  font-size: 1.7rem;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.45));
+}
+.pal-season-text { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+.pal-season-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.32rem;
+  color: var(--text);
+}
+.pal-season-sub {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--text-mute);
+  margin-top: 2px;
+}
+.pal-nav {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  color: var(--text-dim);
+  cursor: pointer;
+  box-shadow: var(--rim);
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.18s ease;
+}
+.pal-nav:hover:not(:disabled) {
+  border-color: var(--brass);
+  color: var(--brass);
+  box-shadow: 0 0 12px -3px var(--brass);
+}
+.pal-nav:active:not(:disabled) { transform: scale(0.9); }
+.pal-nav:disabled { opacity: 0.32; cursor: not-allowed; }
+.pal-flip { transform: scaleX(-1); }
+
+/* --- Weekday legend ------------------------------------------------------ */
+.pal-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-bottom: 6px;
+  /* No horizontal padding — must share .pal-grid's exact track geometry so each
+     weekday label sits dead-center over its column. */
+}
+.pal-wd {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.pal-wd.is-weekend { color: var(--brass-dim); }
+
+/* --- The 4×7 month grid -------------------------------------------------- */
+.pal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.pal-cell {
+  position: relative;
+  /* min-height (not aspect-ratio) so stacked content — day number + weather
+     glyph + event dots + today marker — dictates height and is never clipped
+     by `overflow:hidden` when the column squeezes to ~32px on narrow phones. */
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 9px;
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  color: var(--text-dim);
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: var(--rim);
+  /* entrance — replays on season change (grid is keyed by block) */
+  animation: pal-cell-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.2s ease, background 0.15s ease;
+}
+.pal-cell::before {
+  /* faint top sheen, like the home-screen app tiles */
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 40%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent);
+  pointer-events: none;
+}
+.pal-cell.is-past:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-bright);
+  box-shadow: var(--shadow-sm);
+}
+.pal-cell:active { transform: scale(0.95); }
+.pal-cell:focus-visible { outline: 2px solid var(--brass); outline-offset: 1px; }
+.pal-cell:disabled { cursor: default; }
+
+.pal-cell-day {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--text-mute);
+  line-height: 1;
+}
+.pal-cell-wx {
+  font-size: 1.18rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.4));
+}
+.pal-cell-holiday {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  font-size: 0.5rem;
+  color: var(--brass);
+  text-shadow: 0 0 6px rgba(230, 177, 94, 0.7);
+}
+.pal-cell-dots {
+  display: flex;
+  gap: 2px;
+  height: 4px;
+  margin-top: 1px;
+}
+.pal-cell-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  display: block;
+}
+.pal-cell-dots i.tone-good { background: var(--sage); }
+.pal-cell-dots i.tone-bad { background: var(--ember); }
+.pal-cell-dots i.tone-neutral { background: var(--text-mute); }
+
+/* Weekend days read a hair warmer. */
+.pal-cell.is-weekend { background: linear-gradient(180deg, var(--panel-2), rgba(230, 177, 94, 0.05)); }
+/* A day with recorded events earns a quiet brass left edge. */
+.pal-cell.has-events { border-color: rgba(230, 177, 94, 0.32); }
+/* Holidays glow a touch. */
+.pal-cell.is-holiday { border-color: rgba(230, 177, 94, 0.45); }
+
+/* Future days are a faint forecast — dimmer, no number weight. */
+.pal-cell.is-future {
+  opacity: 0.4;
+  background: var(--ink-2);
+  border-style: dashed;
+}
+.pal-cell.is-future .pal-cell-wx { filter: grayscale(0.4); }
+
+/* Today — a lamplit ring that gently pulses. */
+.pal-cell.is-today {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--brass), 0 0 14px -2px rgba(230, 177, 94, 0.6);
+  background: linear-gradient(180deg, rgba(230, 177, 94, 0.16), var(--panel));
+  animation: pal-cell-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both, pal-today-pulse 3.2s ease-in-out 0.5s infinite;
+}
+.pal-cell.is-today .pal-cell-day { color: var(--brass); }
+.pal-cell-today {
+  position: absolute;
+  bottom: 1px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.pal-foot {
+  margin-top: 14px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.78rem;
+  color: var(--text-mute);
+}
+
+@keyframes pal-cell-in {
+  from { opacity: 0; transform: translateY(7px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pal-today-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--brass), 0 0 12px -3px rgba(230, 177, 94, 0.5); }
+  50% { box-shadow: 0 0 0 1px var(--brass), 0 0 18px 0 rgba(230, 177, 94, 0.7); }
+}
+
+/* On the narrowest phones the 7 columns squeeze to ~32px — shrink the glyph and
+   tighten the gaps so the weather emoji + dots still fit the (now min-height) cell. */
+@media (max-width: 380px) {
+  .pal-grid,
+  .pal-week { gap: 3px; }
+  .pal-cell-wx { font-size: 0.95rem; }
+}
+
+/* On the wider tablet frame (see phone.page.css), the cells balloon — scale the
+   day number + weather glyph + gaps up to match, like the home screen does. */
+@media (min-width: 1200px) {
+  .pal-app { padding: 16px 16px 22px; }
+  .pal-week { gap: 8px; }
+  .pal-grid { gap: 8px; }
+  .pal-cell { border-radius: 12px; }
+  .pal-cell-day { font-size: 0.78rem; }
+  .pal-cell-wx { font-size: 1.7rem; }
+  .pal-wd { font-size: 0.66rem; }
+  .pal-season-name { font-size: 1.5rem; }
+}
+
+/* --- Day detail: a full-stage takeover that slides up over the grid ------ */
+.pal-detail {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(420px 240px at 90% -12%, var(--halo-1), transparent 66%),
+    linear-gradient(180deg, var(--ink-2), var(--ink));
+}
+.pal-detail.is-opening { animation: pal-detail-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.pal-detail.is-closing { animation: pal-detail-out 0.26s ease-in both; }
+@keyframes pal-detail-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pal-detail-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(16px); }
+}
+
+.pal-detail-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border-soft);
+  background: rgba(11, 13, 26, 0.5);
+}
+.pal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: var(--brass);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 12px 8px;
+  min-height: 44px;
+}
+.pal-back:hover { color: var(--brass); filter: brightness(1.12); }
+.pal-coin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--sage);
+}
+
+.pal-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 15px 15px 22px;
+}
+
+/* Date plate */
+.pal-plate {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.pal-plate-day {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.85rem;
+  line-height: 1;
+  color: var(--text);
+}
+.pal-plate-when {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+.pal-plate-wx {
+  margin-top: 6px;
+  font-size: 0.86rem;
+  color: var(--text-dim);
+}
+.pal-plate-wx-icon { font-size: 1rem; }
+
+.pal-holiday-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(230, 177, 94, 0.4);
+  background: rgba(230, 177, 94, 0.08);
+}
+.pal-holiday-banner strong { color: var(--brass); font-family: var(--font-display); font-weight: 600; }
+.pal-holiday-banner span { font-size: 0.82rem; color: var(--text-dim); }
+
+/* The generated recap of the day */
+.pal-recap { margin-bottom: 16px; }
+.pal-recap-head {
+  margin: 0 0 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.18rem;
+  line-height: 1.2;
+  color: var(--text);
+}
+.pal-recap-body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+.pal-highlights {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pal-highlights li {
+  font-size: 0.84rem;
+  color: var(--text-mute);
+  line-height: 1.45;
+}
+.pal-recon {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+  font-style: italic;
+}
+.pal-recap-quiet { padding: 8px 0; }
+
+/* Section eyebrow */
+.pal-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.pal-eyebrow::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+
+/* What happened — beats with a tone-colored rail */
+.pal-beats { display: flex; flex-direction: column; gap: 7px; }
+.pal-beat {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--border);
+  animation: pal-beat-in 0.4s ease both;
+}
+.pal-beat.tone-good { border-left-color: var(--sage); }
+.pal-beat.tone-bad { border-left-color: var(--ember); }
+.pal-beat.tone-neutral { border-left-color: var(--brass-dim); }
+.pal-beat-icon { font-size: 1.05rem; line-height: 1.3; flex-shrink: 0; }
+/* min-width:0 lets the clamped text shrink/ellipsize inside the flex row. */
+.pal-beat-body { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.pal-beat-text { font-size: 0.86rem; line-height: 1.45; color: var(--text-dim); }
+.pal-beat-text.clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pal-beat-more {
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 0.76rem;
+  color: var(--brass);
+  cursor: pointer;
+}
+.pal-beat-more:hover { text-decoration: underline; }
+.pal-beat:nth-child(2) { animation-delay: 0.04s; }
+.pal-beat:nth-child(3) { animation-delay: 0.08s; }
+.pal-beat:nth-child(4) { animation-delay: 0.12s; }
+.pal-beat:nth-child(n + 5) { animation-delay: 0.16s; }
+@keyframes pal-beat-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Respect reduced-motion: keep the layout, drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .pal-cell,
+  .pal-cell.is-today,
+  .pal-detail.is-opening,
+  .pal-detail.is-closing,
+  .pal-beat {
+    animation: none;
+  }
+  .pal-cell.is-past:hover { transform: none; }
+}

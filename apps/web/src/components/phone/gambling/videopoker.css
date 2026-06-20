@@ -1,0 +1,74 @@
+/* videopoker.css — Jacks-or-Better hold/draw. Classes prefixed .vp- ; Nocturne. */
+
+.vp {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 5-column grid so the hand always fits one row inside the narrow felt
+   (fixed-width cards used to wrap to two rows at ≤360px). */
+.vp-hand {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  align-items: flex-start;
+}
+
+.vp-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.vp-slot:disabled { cursor: default; }
+/* Fluid cards fill their grid column; aspect-ratio 5/7 keeps the base 1.4
+   card proportion. height:auto lets the ratio drive height (overrides the
+   base .gmb-card calc(var(--cw) * 1.4)). */
+.vp-slot { min-width: 0; }
+.vp-slot .gmb-card { width: 100%; height: auto; aspect-ratio: 5 / 7; }
+
+.vp-hold {
+  font-family: var(--font-mono);
+  font-size: 0.5rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  min-height: 0.7rem;
+}
+.vp-hold.on {
+  color: var(--sage);
+  text-shadow: 0 0 8px rgba(168, 200, 154, 0.5);
+  font-weight: 700;
+}
+
+/* ── Paytable ─────────────────────────────────────────────────────────────── */
+.vp-paytable {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+}
+.vp-payrow {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 11px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: var(--text-mute);
+  transition: background 0.2s, color 0.2s;
+}
+.vp-payrow span:first-child { font-family: var(--font-body); }
+.vp-paymult { color: var(--text-dim); font-weight: 700; }
+.vp-payrow.hit {
+  background: linear-gradient(90deg, rgba(230, 177, 94, 0.18), transparent);
+  color: var(--brass);
+}
+.vp-payrow.hit .vp-paymult { color: var(--brass); }

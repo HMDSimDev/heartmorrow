@@ -1,0 +1,24 @@
+{
+  "name": "dsim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first LLM-powered dating simulator framework",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "mock": "pnpm --filter @dsim/server run mock",
+    "dev:mock": "pnpm -r --parallel run dev:mock",
+    "build": "pnpm --filter @dsim/shared run build && pnpm --filter @dsim/server run build && pnpm --filter @dsim/web run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "seed": "pnpm --filter @dsim/server run seed",
+    "clean": "pnpm -r run clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

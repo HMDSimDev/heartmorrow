@@ -1,0 +1,14 @@
+{
+  "name": "dsim-screenshots",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Headless-browser screenshot capture of the DSim mock world for Reddit/press shots.",
+  "scripts": {
+    "shoot": "node capture.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

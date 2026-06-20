@@ -1,0 +1,662 @@
+/* ===========================================================================
+   Minigames — "The Arcade Almanac"
+   An arcade-style picker of bold game cabinets, a chamfered active-game frame,
+   and a celebratory reward result. All classes prefixed .mga- to avoid clashes.
+   Builds on Nocturne v2 tokens + shared .mg-/.meter-/.quiz- classes.
+   =========================================================================== */
+
+/* --- "Playing with" selector — a HUD console bar ------------------------- */
+.mga-console {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+}
+.mga-console .kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.mga-console .kicker::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--rose);
+  box-shadow: 0 0 8px var(--rose);
+}
+
+/* --- The cabinet grid ---------------------------------------------------- */
+.mga-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 14px;
+}
+@media (min-width: 1900px) {
+  .mga-grid { grid-template-columns: repeat(4, minmax(240px, 1fr)); }
+}
+@media (min-width: 2400px) {
+  .mga-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* A single game "cabinet" — bold, layered, with a brass marquee top. */
+.mga-cabinet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(420px 160px at 50% -60%, rgba(230, 177, 94, 0.1), transparent 70%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+  box-shadow: var(--rim), var(--shadow-sm);
+  overflow: hidden;
+  transition: transform 0.12s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.mga-cabinet:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-bright);
+  box-shadow: var(--rim), var(--shadow), var(--glow-warm);
+}
+.mga-cabinet::before {
+  /* marquee hairline */
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brass), transparent);
+  opacity: 0.8;
+}
+
+.mga-marquee {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.mga-no {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--brass);
+  opacity: 0.85;
+}
+.mga-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  line-height: 1.1;
+  color: var(--text);
+}
+.mga-desc {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+  flex: 1;
+}
+
+.mga-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.mga-stats-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.mga-stat {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  color: var(--rose);
+}
+.mga-heart {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--rose);
+  opacity: 0.85;
+}
+
+/* --- Active game frame --------------------------------------------------- */
+.mga-active {
+  /* tuned .framed cut */
+  --cut: 16px;
+  max-width: 800px;
+  margin-inline: auto;
+}
+@media (max-width: 899px) {
+  .mga-active { overflow-y: auto; max-height: calc(100dvh - 220px); }
+}
+.mga-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.mga-stage-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mga-stage-title h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+}
+
+/* --- Result card extras -------------------------------------------------- */
+.mga-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mga-grade {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.mga-grade-badge {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: linear-gradient(150deg, var(--accent), var(--accent-2));
+  box-shadow: var(--glow-rose), inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+.mga-score {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mga-score .num {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.mga-score .lbl {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.mga-reward-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  margin: 14px 0 8px;
+}
+
+/* --- MinigameShell shared chrome ----------------------------------------- */
+.mgs-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mgs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.mgs-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+.mgs-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mgs-progress {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mgs-prog-text {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--text-mute);
+  margin-left: 4px;
+}
+.mgs-combo {
+  flex-shrink: 0;
+}
+.mgs-body {
+  /* body container — games lay their content here */
+}
+
+/* --- Shared ConfidenceControl: segmented brass buttons ------------------- */
+.mgs-conf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.mgs-conf-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  flex-shrink: 0;
+}
+.mgs-conf-seg {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  max-width: 100%;
+}
+.mgs-conf-btn {
+  appearance: none;
+  background: var(--ink-2);
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.mgs-conf-btn:last-child { border-right: none; }
+.mgs-conf-btn:hover { background: var(--panel-2); color: var(--text); }
+.mgs-conf-btn.on {
+  background: linear-gradient(135deg, var(--brass), rgba(230, 177, 94, 0.7));
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* --- Lore Quiz: partner portrait frame ----------------------------------- */
+.lq-partner-frame {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+}
+.lq-portrait {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.lq-lead {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.96rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+/* --- mga-starting spinner overlay during game load ----------------------- */
+.mga-starting {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+}
+
+/* --- Result modal layout ------------------------------------------------- */
+.mga-result-modal {
+  min-width: 280px;
+}
+
+/* --- Memory match polish ------------------------------------------------- */
+.mga-card-flip {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  transition: transform 0.16s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.3s ease;
+}
+.mga-card-flip:not(.face-down):not(.matched) {
+  border-color: var(--brass);
+  box-shadow: var(--rim), var(--glow-warm);
+  color: var(--text);
+}
+.mga-card-flip.matched {
+  border-color: var(--sage);
+  box-shadow: inset 0 0 0 1px rgba(143, 207, 159, 0.4);
+}
+.mga-progress {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.mga-pip {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--ink-2);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+.mga-pip.on {
+  background: var(--sage);
+  border-color: var(--sage);
+  box-shadow: 0 0 8px rgba(143, 207, 159, 0.5);
+}
+
+/* --- Timing meter polish ------------------------------------------------- */
+.mga-meter {
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 28px),
+    linear-gradient(180deg, var(--ink), var(--ink-2));
+  border: 1px solid var(--border);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+.mga-meter .meter-needle {
+  transition: none;
+}
+.mga-last {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+}
+.mga-last .num {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--brass);
+}
+.mga-last .lbl {
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* --- Lore quiz polish ---------------------------------------------------- */
+.mga-question {
+  font-family: var(--font-display);
+  font-size: 1.18rem;
+  line-height: 1.3;
+  margin: 4px 0 4px;
+  color: var(--text);
+}
+.mga-quiz-choice {
+  position: relative;
+  text-align: left;
+  width: 100%;
+  padding-left: 42px;
+}
+.mga-quiz-choice::before {
+  content: attr(data-key);
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--brass);
+}
+.mga-quiz-choice:hover {
+  border-color: var(--brass);
+}
+.mga-quiz-source {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: var(--text-mute);
+}
+
+/* --- "Mattering" result extras: reaction, milestone, best, favorite ------ */
+.mga-grade-badge.grade-D { background: linear-gradient(150deg, var(--moon), var(--panel-2)); box-shadow: none; }
+.mga-grade-badge.grade-F { background: linear-gradient(150deg, var(--ember), #7a2e36); box-shadow: none; color: #fff; }
+
+.mga-best-ribbon {
+  margin: 12px 0 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--on-accent);
+  background: linear-gradient(90deg, var(--brass), var(--accent-2));
+  box-shadow: var(--glow-warm);
+}
+.mga-reaction {
+  margin: 12px 0 0;
+  padding: 11px 14px;
+  border-left: 3px solid var(--moon);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--ink-2);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.02rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.mga-reaction.tone-delighted { border-left-color: var(--rose); color: var(--text); }
+.mga-reaction.tone-warm { border-left-color: var(--brass); color: var(--text); }
+.mga-reaction.tone-playful { border-left-color: var(--sage); }
+.mga-reaction.tone-neutral { border-left-color: var(--moon); }
+.mga-reaction.tone-disappointed { border-left-color: var(--ember); }
+.mga-milestone {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(232, 138, 166, 0.4);
+  background: rgba(232, 138, 166, 0.1);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+.mga-fav-note { color: var(--rose); text-transform: none; letter-spacing: 0.02em; }
+
+/* --- Memory match learned-fact caption ----------------------------------- */
+.mm-caption {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.02em;
+  color: var(--sage);
+  padding: 2px 2px 6px;
+  min-height: 1.2em;
+}
+
+/* --- Sweet & Sour -------------------------------------------------------- */
+.sns-card {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  min-height: 96px;
+  margin: 8px 0;
+  padding: 18px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(280px 90px at 50% -30%, rgba(157, 184, 222, 0.12), transparent 70%),
+    linear-gradient(180deg, var(--vellum), var(--vellum-2));
+  color: var(--ink-on-vellum);
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  box-shadow: var(--shadow-sm);
+}
+.sns-confidence {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.sns-confidence input[type='range'] { flex: 1; accent-color: var(--brass); }
+.sns-conf-read {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--brass);
+  min-width: 84px;
+  text-align: right;
+}
+.sns-trays { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 360px) {
+  .sns-trays { grid-template-columns: 1fr; }
+}
+.sns-tray { font-weight: 600; padding: 14px 8px; border-width: 1px; }
+.sns-tray.tray-adore { border-color: rgba(232, 138, 166, 0.5); color: var(--rose); }
+.sns-tray.tray-adore:hover { background: rgba(232, 138, 166, 0.12); }
+.sns-tray.tray-avoid { border-color: rgba(224, 122, 130, 0.5); color: var(--ember); }
+.sns-tray.tray-avoid:hover { background: rgba(224, 122, 130, 0.12); }
+.sns-tray.tray-meh { border-color: rgba(143, 207, 159, 0.45); color: var(--sage); }
+.sns-tray.tray-meh:hover { background: rgba(143, 207, 159, 0.1); }
+
+/* --- Read Between the Lines (two truths) --------------------------------- */
+.ttl-pips { display: flex; gap: 5px; align-items: center; }
+.mga-pip.cur { background: var(--brass); border-color: var(--brass); box-shadow: 0 0 8px rgba(230, 177, 94, 0.5); }
+.ttl-lead {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--text-dim);
+  margin: 6px 0 10px;
+}
+.ttl-statements { gap: 8px; margin-bottom: 12px; }
+.ttl-statement {
+  text-align: left;
+  width: 100%;
+  white-space: normal;
+  line-height: 1.4;
+  border-color: rgba(157, 184, 222, 0.35);
+}
+.ttl-statement:hover { border-color: var(--moon); }
+.ttl-statement.picked {
+  border-color: var(--rose);
+  background: rgba(232, 138, 166, 0.12);
+  box-shadow: var(--glow-rose);
+}
+.ttl-wager { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.ttl-wager-label {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.ttl-notches { display: flex; gap: 6px; flex-wrap: wrap; }
+.ttl-notch.on { border-color: var(--ember); color: var(--ember); background: rgba(224, 122, 130, 0.12); }
+
+/* --- Heartbeat Serenade (rhythm) ----------------------------------------- */
+.rhy-stage {
+  position: relative;
+  height: clamp(130px, 22vh, 220px);
+  margin: 10px 0;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 38px),
+    linear-gradient(180deg, var(--ink), var(--ink-2));
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+}
+.rhy-strike {
+  position: absolute;
+  top: 6%;
+  bottom: 6%;
+  width: 3px;
+  margin-left: -1px;
+  background: linear-gradient(180deg, transparent, var(--moon), transparent);
+  box-shadow: 0 0 12px var(--moon);
+}
+.rhy-lantern {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  will-change: left;
+}
+.rhy-lantern.beat {
+  background: radial-gradient(circle at 35% 30%, #fff0d8, var(--brass) 55%, #b27c2c);
+  box-shadow: var(--glow-warm);
+}
+.rhy-lantern.rest {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  background: transparent;
+  border: 1px dashed var(--text-mute);
+  opacity: 0.6;
+}
+.rhy-lantern.struck { opacity: 0.25; filter: grayscale(0.6); }
+.rhy-countin {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  color: var(--brass);
+  text-shadow: var(--glow-warm);
+}
+.rhy-feedback {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--brass);
+}
+.rhy-key { font-family: var(--font-mono); font-size: 0.7rem; opacity: 0.7; }
+@media (pointer: coarse) {
+  .rhy-key { display: none; }
+}
