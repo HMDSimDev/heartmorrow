@@ -601,7 +601,7 @@ export function PropertyApp() {
 
                     return (
                       <div
-                        className={`prop-card${owned ? ' owned' : ''}${isLeased ? ' leased' : ''}`}
+                        className={`ph-rise prop-card${owned ? ' owned' : ''}${isLeased ? ' leased' : ''}`}
                         key={property.id}
                       >
                         <div className="prop-card-body">

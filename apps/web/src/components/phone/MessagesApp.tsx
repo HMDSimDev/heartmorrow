@@ -223,7 +223,7 @@ function ThreadList({
           {threads.map((t) => (
             <button
               key={t.characterId}
-              className={`pcom-row ${t.unread > 0 ? 'pcom-unread' : ''}`}
+              className={`ph-rise pcom-row ${t.unread > 0 ? 'pcom-unread' : ''}`}
               onClick={() => onOpen(t.characterId)}
             >
               <span className="pcom-ava">

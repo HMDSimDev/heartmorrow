@@ -135,7 +135,7 @@ export function MomentsApp() {
         ) : (
           <div className="mom-reel">
             {moments.map((m) => (
-              <div className={`mom-clip kind-${m.kind}`} key={m.id}>
+              <div className={`ph-rise mom-clip kind-${m.kind}`} key={m.id}>
                 {character && (
                   <div className="mom-clip-snap">
                     <Portrait character={character} expression={KIND_EXPRESSION[m.kind]} />

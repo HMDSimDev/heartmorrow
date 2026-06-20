@@ -61,7 +61,7 @@ function CompanyRow({
   const busy = tradingId !== null;
 
   return (
-    <div className="mkt-row card">
+    <div className="ph-rise mkt-row card">
       <div className="mkt-row-head">
         <div className="mkt-ticker-block">
           <span className="mkt-ticker">{company.ticker}</span>

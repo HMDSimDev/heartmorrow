@@ -51,7 +51,7 @@ export function EndingsApp() {
             {endings.map((e) => {
               const c = charOf(e.characterId);
               return (
-                <div className="end-keepsake" key={e.characterId}>
+                <div className="ph-rise end-keepsake" key={e.characterId}>
                   <div className="end-seal" aria-hidden="true">
                     <Icon name="trophy" size={16} />
                   </div>

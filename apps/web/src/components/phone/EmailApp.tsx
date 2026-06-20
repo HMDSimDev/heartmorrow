@@ -113,7 +113,7 @@ export function EmailApp() {
             return (
               <button
                 key={e.id}
-                className={`pcom-mail-row ${e.read ? '' : 'pcom-unread'}`}
+                className={`ph-rise pcom-mail-row ${e.read ? '' : 'pcom-unread'}`}
                 onClick={() => openEmail(e)}
               >
                 {!e.read && <span className="pcom-mail-dot" />}

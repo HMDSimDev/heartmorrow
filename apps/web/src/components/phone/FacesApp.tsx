@@ -182,7 +182,7 @@ function PostCard({
   };
 
   return (
-    <article className={`fcs-card${hint ? ` fcs-tone-${hint.tone}` : ''}`}>
+    <article className={`ph-rise fcs-card${hint ? ` fcs-tone-${hint.tone}` : ''}`}>
       <header className="fcs-card-head">
         <span className="fcs-ava">
           <Portrait

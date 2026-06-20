@@ -286,3 +286,82 @@
 .ph-homebtn:active::before { transform: scale(0.88); }
 .ph-homebtn:focus-visible { outline: none; }
 .ph-homebtn:focus-visible::before { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(230, 177, 94, 0.45); }
+
+/* ===========================================================================
+   Cheap, on-theme entrance motion. All additive and behind a reduced-motion
+   guard at the bottom. The phone "wakes up": the header settles, the icons
+   cascade in, the dock rises, and unread badges pop to catch the eye. List
+   items in each app cascade via the shared .ph-rise utility.
+   =========================================================================== */
+
+/* --- Home screen: header settle + icon cascade + dock rise --- */
+@keyframes ph-icon-in {
+  from { opacity: 0; transform: translateY(9px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ph-fade-down {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ph-fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ph-greeting { animation: ph-fade-down 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.ph-hint { animation: ph-fade-up 0.5s ease-out 0.25s backwards; }
+.ph-dock { animation: ph-fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.12s backwards; }
+/* `backwards` (not `both`) so the finished state releases back to declared
+   styles — keeps the :active press scale and :hover lift working afterward. */
+.ph-grid .ph-app {
+  animation: ph-icon-in 0.44s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.ph-grid .ph-app:nth-child(1)  { animation-delay: 0.05s; }
+.ph-grid .ph-app:nth-child(2)  { animation-delay: 0.09s; }
+.ph-grid .ph-app:nth-child(3)  { animation-delay: 0.13s; }
+.ph-grid .ph-app:nth-child(4)  { animation-delay: 0.17s; }
+.ph-grid .ph-app:nth-child(5)  { animation-delay: 0.21s; }
+.ph-grid .ph-app:nth-child(6)  { animation-delay: 0.25s; }
+.ph-grid .ph-app:nth-child(7)  { animation-delay: 0.29s; }
+.ph-grid .ph-app:nth-child(8)  { animation-delay: 0.33s; }
+.ph-grid .ph-app:nth-child(9)  { animation-delay: 0.37s; }
+.ph-grid .ph-app:nth-child(10) { animation-delay: 0.41s; }
+.ph-grid .ph-app:nth-child(n+11) { animation-delay: 0.45s; }
+
+/* --- Unread badge: a quick spring-y pop so new texts/mail draw the eye --- */
+@keyframes ph-badge-pop {
+  0%   { opacity: 0; transform: scale(0); }
+  60%  { opacity: 1; transform: scale(1.22); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.ph-badge { animation: ph-badge-pop 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s backwards; }
+
+/* --- Shared list-item cascade (opt-in via the .ph-rise class) -------------
+   Each app's repeating row gets .ph-rise; on app open the list fans in. The
+   stagger is capped at ~10 — beyond the fold the cascade isn't seen anyway. */
+@keyframes ph-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ph-rise { animation: ph-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.ph-rise:nth-child(1)  { animation-delay: 0.03s; }
+.ph-rise:nth-child(2)  { animation-delay: 0.07s; }
+.ph-rise:nth-child(3)  { animation-delay: 0.11s; }
+.ph-rise:nth-child(4)  { animation-delay: 0.15s; }
+.ph-rise:nth-child(5)  { animation-delay: 0.19s; }
+.ph-rise:nth-child(6)  { animation-delay: 0.23s; }
+.ph-rise:nth-child(7)  { animation-delay: 0.27s; }
+.ph-rise:nth-child(8)  { animation-delay: 0.31s; }
+.ph-rise:nth-child(9)  { animation-delay: 0.35s; }
+.ph-rise:nth-child(10) { animation-delay: 0.39s; }
+.ph-rise:nth-child(n+11) { animation-delay: 0.42s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-greeting,
+  .ph-hint,
+  .ph-dock,
+  .ph-grid .ph-app,
+  .ph-badge,
+  .ph-rise {
+    animation: none;
+  }
+}
