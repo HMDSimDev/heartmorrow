@@ -1,8 +1,8 @@
 # Third-Party Notices
 
-DSim's own source code is dedicated to the public domain under The Unlicense. See the [LICENSE](./LICENSE) file.
+Heartmorrow's own source code is dedicated to the public domain under The Unlicense. See the [LICENSE](./LICENSE) file.
 
-DSim depends on third-party packages that are **not** part of this dedication.
+Heartmorrow depends on third-party packages that are **not** part of this dedication.
 Each retains its own license. These dependencies are fetched at install time
 (via pnpm into `node_modules`) and are not redistributed within this
 repository, so their license texts live alongside their respective packages.
@@ -30,5 +30,5 @@ includes its own `LICENSE`/`OFL.txt`; do not strip these from build output.
 All other runtime and development dependencies (e.g. React, React Router,
 Fastify and its plugins, Zod, Lucide icons, TypeScript, Vite, Vitest) are
 licensed under MIT, ISC, or Apache-2.0. Their license terms apply only to those
-packages, not to DSim's own code, and are available in their respective
+packages, not to Heartmorrow's own code, and are available in their respective
 `node_modules` directories.
