@@ -293,8 +293,8 @@ The point of this text is to gently ALERT the player and point to the off-ramp: 
  */
 export const FEED_POST_GUARDRAILS = `You write ONE short social-media post a character publishes to "Faces" (an in-world social network), in their own voice — 1-3 sentences, like a real status update or caption. Write ONLY the post text.
 
-Match the post to the KIND and CONTEXT provided, and to how close this character is to the player:
-- "life": a casual everyday post — about the weather, the season or a holiday, their mood, what they're up to, or a small need/craving. Light and human.
+Let the POSTING-STYLE NOTE (below, if given) drive WHAT this character posts about and HOW they word it — it is your best guide to their feed voice. Then match the post to the KIND and CONTEXT provided, and to how close this character is to the player:
+- "life": a casual everyday post that sounds like THIS specific person — pull from their interests, goals, opinions, something that just happened to them, a craving, a small observation, a joke, or a fun fact. Weather, season, and holidays are allowed as occasional flavor only — they must NOT be the default subject (real people rarely post about the weather). Lead with something specific to who this character is. Light and human.
 - "milestone": reacting to news that someone in their circle has grown closer to / committed with the player. Sentiment follows your relationship to that person: a friend is happy or teasing, a rival is cool or catty, an ex is wistful or pointed, family is protective, a partner is directly wounded.
 - "jealousy": you've just learned the player has also been seeing someone else. Post something quietly hurt, wistful, or pointed — a vague public ache, NEVER naming names or airing the specifics. If it's an EX of yours they're seeing, the sting is sharper.
 - "breakup": you and the player have ended things — post with closure, sadness, or quiet relief, true to who you are.
@@ -314,8 +314,8 @@ export const PROFILE_GEN_GUARDRAILS = `You flesh out a dating-sim character's PR
 
 Provide, all consistent with the character's described personality, age, and tastes:
 - appearance: a vivid 1-3 sentence physical descriptor (build, features, hair, how they carry/dress themselves). Tasteful; no explicit content.
-- textingStyle: how they write TEXTS and posts (punctuation, capitalization, emoji use, length, slang) — distinct from how they speak aloud.
-- onlinePersona: how they behave on a social feed (e.g. oversharer, lurker, cryptic one-liner poster, earnest hype-friend, dry meme-poster).
+- textingStyle: how they write TEXTS and posts (punctuation, capitalization, emoji use, length, slang) — distinct from how they speak aloud. Describe only their WRITTEN style: do NOT say they send photos, selfies, images, voice messages, voice notes, or audio — texting is text-only here.
+- onlinePersona: what they tend to POST ABOUT on the "Faces" feed and the voice they post in — the content and tone of their status updates (e.g. "posts new jokes she just heard", "shares little fun facts", "vents in dramatic one-liners, then deletes them", "earnest hype in everyone's comments"). Describe HOW they show up in the feed, NOT a specific online activity, platform, or role: do NOT say they stream, blog, vlog, run/contribute to a forum or community, or that they "post pics/gifs/memes" as an identity. Keep it to their posting voice, distinct from textingStyle.
 - loveLanguage: their primary love language (words of affirmation / acts of service / gifts / physical touch / quality time), in a short phrase.
 - physicalNeeds / physicalDesires / physicalDislikes: a few short items each — sensory/physical needs to feel good, what (tastefully) draws them in, and physical/sensory turn-offs.
 - insecurities: a few quiet fears or insecurities that make them human.
@@ -357,7 +357,7 @@ Fill EVERY field consistently:
 - pronouns, gender, sexuality: infer a reasonable presentation from the description; when genuinely ambiguous, choose pronouns that fit and leave gender/sexuality unspecified rather than guessing wildly.
 - shortDescription, personality, speechStyle, relationshipPreferences, relationshipStyle: a believable, specific person — not a bland archetype.
 - likes, dislikes, goals, boundaries, quirks, insecurities: a few short phrases each, true to the character and the world.
-- appearance, textingStyle, onlinePersona, loveLanguage, physicalNeeds, physicalDesires, physicalDislikes: the expressive "feels alive" fields.
+- appearance, textingStyle, onlinePersona, loveLanguage, physicalNeeds, physicalDesires, physicalDislikes: the expressive "feels alive" fields. For textingStyle, describe only their WRITTEN style (punctuation, capitalization, emoji, length, slang) — do NOT say they send photos, selfies, images, voice messages, or audio; texting is text-only here. For onlinePersona, describe what they POST ABOUT on the "Faces" feed and the voice they post in (e.g. "posts jokes she just heard", "shares little fun facts") — NOT a specific online activity, platform, or role: do NOT say they stream, blog, vlog, run/contribute to a forum or community, or "post pics/gifs/memes" as an identity.
 - datingStats (charm, empathy, humor, confidence, intellect, style): integers 0-100, varied and honest to the personality — not all average.
 - guardedness: an integer 0-100 for how slow this character is to warm up on a date — 0-20 = an open book who connects easily, ~30 = average, 50-70 = reserved and slow to trust, 80-100 = walled off and hard to reach. Match it honestly to the personality (a warm, bubbly extrovert is low; a wary, private, or wounded character is high).
 

@@ -230,7 +230,7 @@ export async function generateFeedForDay(
     if (rng(`feed|${worldId}|${day}|${c.id}|ambient`) >= FEED_AMBIENT_CHANCE) continue;
     if (feedPostsRepo.existsForAuthorDayKind(worldId, c.id, day, 'life')) continue;
 
-    const situation = ambientSituation(worldId, day, c);
+    const situation = ambientSituation(worldId, day, c, rng);
     await emitNpcPost({
       worldId,
       day,
@@ -302,24 +302,42 @@ function milestoneSituation(linkKind: string, subjectName: string, playerName: s
   }
 }
 
-/** Build the SITUATION for an ambient "life" post from weather + mood + calendar. */
-function ambientSituation(worldId: string, day: number, c: Character): string {
+/**
+ * Build the SITUATION for an ambient "life" post. Real people rarely post about
+ * the weather, so this leads with something specific to WHO the character is — an
+ * interest, a goal, a quirk, a craving, a small opinion, or simply the kind of
+ * thing their posting style suggests — and keeps weather/season/holiday as a
+ * minority of the angle pool (flavor, not the default). The focus is chosen
+ * deterministically from `rng`, so a re-run of the same day reproduces it.
+ */
+function ambientSituation(worldId: string, day: number, c: Character, rng: SeededRandom): string {
   const weather = weatherForDay(worldId, day);
   const mood = moodForCharacter(worldId, day, c).mood;
   const cal = deriveCalendar(day);
-  const parts: string[] = [];
-  parts.push(`It is ${weather.label.toLowerCase()} out and you're feeling ${mood}.`);
-  if (c.favoriteWeather.includes(weather.kind)) {
-    parts.push('This is your kind of weather.');
-  } else if (c.dislikedWeather.includes(weather.kind)) {
-    parts.push("This weather isn't your favorite.");
-  }
-  if (cal.holiday) parts.push(`Today is ${cal.holiday.name}.`);
-  else parts.push(`It's ${cal.dayOfWeek} in ${cal.season}.`);
-  const flavor = c.physicalNeeds[0] ?? c.likes[0];
-  if (flavor) parts.push(`Lately you've been thinking about ${flavor}.`);
-  parts.push('Post a small, ordinary update about your day or the world around you.');
-  return parts.join(' ');
+
+  // Concrete things to post ABOUT, drawn from who this character actually is — so
+  // the feed reads like a neighborhood of people, not a wall of weather updates.
+  const angles: string[] = [];
+  for (const like of c.likes) angles.push(`something about ${like} — a thought, a recommendation, or a little enthusiasm`);
+  for (const goal of c.goals) angles.push(`how ${goal} is going — a small update, a win, or a bit of frustration`);
+  for (const quirk of c.quirks) angles.push(`a little moment that shows you being you (${quirk})`);
+  for (const want of c.physicalDesires) angles.push(`a craving or want on your mind: ${want}`);
+  for (const dislike of c.dislikes) angles.push(`a mild, good-humored gripe about ${dislike}`);
+  if (c.onlinePersona) angles.push(`exactly the kind of thing you usually post (your posting style: ${c.onlinePersona})`);
+  // Generic-but-human fallbacks so a sparsely-written character still varies.
+  angles.push('a small, specific observation about something you noticed today');
+  angles.push('a random thought, a joke, or a fun fact you felt like sharing');
+  // Weather / season / holiday: a MINORITY of the pool — flavor, never the default.
+  if (cal.holiday) angles.push(`a quick note about ${cal.holiday.name}`);
+  angles.push(`a passing mention of the weather (${weather.label.toLowerCase()}) or the ${cal.season} season, but ONLY if it genuinely fits your mood`);
+
+  const idx = Math.floor(rng(`feedangle|${worldId}|${day}|${c.id}`) * angles.length);
+  const focus = angles[Math.min(idx, angles.length - 1)];
+
+  return (
+    `You're feeling ${mood}. Post a short, ordinary update in your own voice — make it ${focus}. ` +
+    `Do NOT default to talking about the weather or the season unless that truly fits this post.`
+  );
 }
 
 /**
