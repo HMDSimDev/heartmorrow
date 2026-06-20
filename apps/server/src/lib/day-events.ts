@@ -145,7 +145,7 @@ export function summarizeRepeatables(events: GameEvent[]): DayRecordBeat[] {
       if (p.kind === 'work') {
         shifts += 1;
         earned += Number(p.money) || 0;
-      } else if (p.kind === 'training' && typeof p.characterId === 'string') {
+      } else if (p.kind === 'together' && typeof p.characterId === 'string') {
         bondedWith.set(p.characterId, true);
       }
     } else if (e.type === 'text_reply' && typeof p.characterId === 'string') {

@@ -3,6 +3,7 @@ import {
   Users,
   Heart,
   HeartHandshake,
+  HandHeart,
   HeartCrack,
   Smartphone,
   Gamepad2,
@@ -139,6 +140,7 @@ const ICONS = {
   weather: CloudSun,
   calendar: CalendarDays,
   work: Briefcase,
+  together: HandHeart,
 
   // economy / rewards
   coin: Coins,

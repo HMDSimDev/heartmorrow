@@ -770,6 +770,7 @@ export function isInternalFlagKey(key: string): boolean {
     key.startsWith('state:') ||
     key.startsWith('walkout:') ||
     key.startsWith('jealousy:') ||
+    key.startsWith('together:') ||
     key.startsWith('milestone:') ||
     key.startsWith('dtr:') ||
     key.startsWith('vouch:') ||

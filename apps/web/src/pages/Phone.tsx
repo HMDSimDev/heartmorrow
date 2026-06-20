@@ -8,6 +8,7 @@ import { MessagesApp } from '../components/phone/MessagesApp';
 import { FacesApp } from '../components/phone/FacesApp';
 import { EmailApp } from '../components/phone/EmailApp';
 import { WorkApp } from '../components/phone/WorkApp';
+import { TogetherApp } from '../components/phone/TogetherApp';
 import { SettingsApp } from '../components/phone/SettingsApp';
 import { MomentsApp } from '../components/phone/MomentsApp';
 import { SocialApp } from '../components/phone/SocialApp';
@@ -21,7 +22,7 @@ import { Shop } from './Shop';
 import { Minigames } from './Minigames';
 import { Inventory } from './Inventory';
 
-type AppId = 'home' | 'messages' | 'email' | 'faces' | 'moments' | 'social' | 'weather' | 'calendar' | 'endings' | 'work' | 'property' | 'market' | 'gambling' | 'shop' | 'games' | 'bag' | 'settings';
+type AppId = 'home' | 'messages' | 'email' | 'faces' | 'moments' | 'social' | 'weather' | 'calendar' | 'endings' | 'work' | 'together' | 'property' | 'market' | 'gambling' | 'shop' | 'games' | 'bag' | 'settings';
 
 type Tint = 'rose' | 'brass' | 'moon' | 'sage';
 
@@ -37,6 +38,7 @@ const APPS: AppDef[] = [
   { id: 'weather', icon: 'weather', label: 'Weather', tint: 'moon' },
   { id: 'endings', icon: 'endings', label: 'Endings', tint: 'brass' },
   { id: 'work', icon: 'work', label: 'Work', tint: 'brass' },
+  { id: 'together', icon: 'together', label: 'Together', tint: 'rose' },
   { id: 'property', icon: 'property', label: 'Property', tint: 'brass' },
   { id: 'market', icon: 'stocks', label: 'Market', tint: 'sage' },
   { id: 'gambling', icon: 'gambling', label: 'Casino', tint: 'rose' },
@@ -171,6 +173,7 @@ export function Phone() {
               {app === 'calendar' && <CalendarApp />}
               {app === 'endings' && <EndingsApp />}
               {app === 'work' && <WorkApp />}
+              {app === 'together' && <TogetherApp />}
               {app === 'property' && <PropertyApp />}
               {app === 'market' && <MarketApp />}
               {app === 'gambling' && <GamblingApp />}

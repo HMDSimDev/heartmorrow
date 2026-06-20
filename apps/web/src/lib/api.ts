@@ -29,6 +29,7 @@ import type {
   PhoneThreadSummary,
   StructuredResult,
   TextMessage,
+  TogetherResult,
   ActiveDate,
   ConversationCreate,
   ConversationSession,
@@ -481,13 +482,17 @@ export const api = {
     post<FeedPostView>(`/phone/feed/posts/${postId}/comment`, { body }),
   facesSeen: (worldId: string) => post<{ ok: true }>('/phone/feed/seen', { worldId }),
 
-  // activities (work / training)
+  // activities (work / together)
   listActivities: () => get<ActivityDef[]>('/activities'),
   performActivity: (input: PerformActivity) =>
-    post<{ activityId: string; kind: string; money: number; relationship: Relationship | null; state: WorldState }>(
-      '/activities/perform',
-      input,
-    ),
+    post<{
+      activityId: string;
+      kind: string;
+      money: number;
+      relationship: Relationship | null;
+      together: TogetherResult | null;
+      state: WorldState;
+    }>('/activities/perform', input),
 
   // data / debug
   listEvents: () => get<GameEvent[]>('/events'),

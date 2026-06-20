@@ -7,6 +7,7 @@ import { performActivity } from './activity-service';
 import { ensureWorldState } from './world-clock-service';
 import { getOrCreatePlayer } from './player-service';
 import { getRelationship } from './relationship-service';
+import { applyRelationshipChange } from './stat-service';
 import { playerIdForWorld } from '../lib/ids';
 
 beforeEach(() => resetDb());
@@ -45,7 +46,7 @@ describe('availability (Do Not Disturb)', () => {
   });
 });
 
-describe('activities (work / training)', () => {
+describe('activities (work / together)', () => {
   it('work earns money into the per-world wallet and spends one stamina', () => {
     const { world } = seedWorldAndCharacter();
     const playerId = playerIdForWorld(world.id);
@@ -57,12 +58,43 @@ describe('activities (work / training)', () => {
     expect(ensureWorldState(world.id).stamina).toBe(beforeStamina - 1);
   });
 
-  it('training improves a relationship stat and requires a character', () => {
+  it('time together improves a relationship stat and requires a character', () => {
     const { world, character } = seedWorldAndCharacter();
-    expect(() => performActivity({ activityId: 'bond_talk', worldId: world.id, characterId: null })).toThrow();
-    const beforeTrust = getRelationship(character.id).trust;
-    performActivity({ activityId: 'bond_talk', worldId: world.id, characterId: character.id });
-    expect(getRelationship(character.id).trust).toBeGreaterThan(beforeTrust);
+    // tg_in (a quiet night in) is the zero-risk option, so it always lands.
+    expect(() => performActivity({ activityId: 'tg_in', worldId: world.id, characterId: null })).toThrow();
+    const beforeComfort = getRelationship(character.id).comfort;
+    const res = performActivity({ activityId: 'tg_in', worldId: world.id, characterId: character.id });
+    expect(res.kind).toBe('together');
+    expect(res.together).toBeTruthy();
+    expect(getRelationship(character.id).comfort).toBeGreaterThan(beforeComfort);
+  });
+
+  it('a per-person daily cap makes repeats fizzle, then crowd', () => {
+    const { world, character } = seedWorldAndCharacter();
+    const c0 = getRelationship(character.id).comfort;
+    performActivity({ activityId: 'tg_in', worldId: world.id, characterId: character.id });
+    const c1 = getRelationship(character.id).comfort;
+    performActivity({ activityId: 'tg_in', worldId: world.id, characterId: character.id });
+    const c2 = getRelationship(character.id).comfort;
+    // The second outing the same day gives strictly less than the first.
+    expect(c1 - c0).toBeGreaterThan(0);
+    expect(c2 - c1).toBeLessThan(c1 - c0);
+    // A third outing the same day crowds them: no warmth, and it grates.
+    const t2 = getRelationship(character.id).tension;
+    const res3 = performActivity({ activityId: 'tg_in', worldId: world.id, characterId: character.id });
+    expect(res3.together!.outcome).toBe('crowded');
+    expect(getRelationship(character.id).comfort).toBe(c2);
+    expect(getRelationship(character.id).tension).toBeGreaterThan(t2);
+  });
+
+  it('casual time stalls at the soft ceiling — only a real date goes deeper', () => {
+    const { world, character } = seedWorldAndCharacter();
+    // Nudge comfort to the brink of the getting-close band (45).
+    applyRelationshipChange(character.id, { comfort: 39 }, { source: 'test' });
+    const atCeiling = getRelationship(character.id).comfort;
+    const res = performActivity({ activityId: 'tg_in', worldId: world.id, characterId: character.id });
+    expect(res.together!.outcome).toBe('flat');
+    expect(getRelationship(character.id).comfort).toBe(atCeiling); // easy time can't push past it
   });
 
   it('rejects an unknown activity', () => {

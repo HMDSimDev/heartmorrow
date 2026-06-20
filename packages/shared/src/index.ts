@@ -15,6 +15,7 @@ export * from './intent';
 export * from './wealth';
 export * from './gambling';
 export * from './activities';
+export * from './together';
 export * from './venues';
 export * from './schemas/settings';
 export * from './schemas/items';

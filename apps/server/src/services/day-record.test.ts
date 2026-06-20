@@ -58,7 +58,7 @@ describe('day records — live persistence', () => {
     // free/cheap actions that fire one event each and used to vanish from the recap.
     recordEvent('activity', { worldId: a.world.id, activityId: 'work_shift', kind: 'work', money: 50 });
     recordEvent('activity', { worldId: a.world.id, activityId: 'odd_jobs', kind: 'work', money: 50 });
-    recordEvent('activity', { worldId: a.world.id, activityId: 'bond_talk', kind: 'training', characterId: a.character.id, money: 0 });
+    recordEvent('activity', { worldId: a.world.id, activityId: 'tg_in', kind: 'together', characterId: a.character.id, money: 0 });
     recordEvent('text_reply', { characterId: a.character.id, tone: 'warm' });
 
     await advanceDay(a.world.id); // day 1 → 2

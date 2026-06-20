@@ -96,6 +96,7 @@
 .pl-tile:hover { transform: translateX(2px); }
 .pl-tile.pl-work { border-left-color: var(--brass); }
 .pl-tile.pl-train { border-left-color: var(--rose); }
+.pl-tile.pl-together { border-left-color: var(--rose); align-items: flex-start; }
 
 .pl-tile-icon {
   flex-shrink: 0;
@@ -110,6 +111,48 @@
 }
 .pl-tile.pl-work .pl-tile-icon { color: var(--brass); }
 .pl-tile.pl-train .pl-tile-icon { color: var(--rose); }
+.pl-tile.pl-together .pl-tile-icon { color: var(--rose); font-size: 1.15rem; }
+
+/* Together: a meta row of small read-at-a-glance chips (fit · risk · cost) */
+.pl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+}
+.pl-fit {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--fc, var(--border)) 55%, transparent);
+  background: color-mix(in srgb, var(--fc, var(--border)) 12%, transparent);
+  color: var(--fc, var(--text-dim));
+  white-space: nowrap;
+}
+.pl-fit.is-great { --fc: var(--sage); }
+.pl-fit.is-ok { --fc: var(--moon); }
+.pl-fit.is-poor { --fc: var(--text-mute); }
+.pl-bold {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass);
+  white-space: nowrap;
+}
+.pl-cost {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--brass);
+  white-space: nowrap;
+}
+/* The Together action button states a stat rather than a payout; keep it calm. */
+.pl-tile.pl-together .pl-coin { font-size: 0.72rem; color: var(--text-dim); }
 
 .pl-tile-body { flex: 1; min-width: 0; }
 .pl-tile-label {
