@@ -11,7 +11,7 @@ import { getDb } from '../db/index';
 import { createWorld } from './world-service';
 import { performActivity } from './activity-service';
 import { createShopItem, purchaseItem, listInventory } from './shop-service';
-import { getOrCreatePlayer, updatePlayer } from './player-service';
+import { getOrCreatePlayer, updatePlayer, addMoney } from './player-service';
 import { minigameResultsRepo, playersRepo, inventoryRepo } from '../db/repositories';
 import { migratePlayerIdentity } from '../db/migrate-player-identity';
 import { playerIdForWorld } from '../lib/ids';
@@ -40,6 +40,7 @@ describe('per-world economy', () => {
       effects: [], infiniteStock: true, stock: 0, assetId: null,
     });
 
+    addMoney(50, playerIdForWorld(a.id)); // fund world A's wallet — no free starting money
     purchaseItem(item.id, 1, playerIdForWorld(a.id));
 
     expect(listInventory(playerIdForWorld(a.id)).some((e) => e.inventoryItem.shopItemId === item.id)).toBe(true);

@@ -3,7 +3,7 @@ import { CharacterCreateSchema, type ShopItemCreate } from '@dsim/shared';
 import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { createShopItem, purchaseItem, useItem } from './shop-service';
-import { getOrCreatePlayer } from './player-service';
+import { getOrCreatePlayer, addMoney } from './player-service';
 import { getRelationship } from './relationship-service';
 import { getCharacter } from './character-service';
 import { applyRelationshipChange } from './stat-service';
@@ -39,6 +39,7 @@ afterEach(() => setAdapterOverride(null));
 
 describe('shop purchase', () => {
   it('validates money', () => {
+    addMoney(200); // fund the wallet — money is no longer handed out
     const player = getOrCreatePlayer();
     const flowers = createShopItem(item({ name: 'Flowers', price: 50 }));
     const res = purchaseItem(flowers.id, 1);
@@ -49,6 +50,7 @@ describe('shop purchase', () => {
   });
 
   it('validates stock', () => {
+    addMoney(10); // fund the wallet for the purchase
     const rare = createShopItem(item({ name: 'Rare', price: 1, infiniteStock: false, stock: 1 }));
     purchaseItem(rare.id, 1); // ok, stock -> 0
     expect(() => purchaseItem(rare.id, 1)).toThrow(/stock/i);

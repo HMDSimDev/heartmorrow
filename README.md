@@ -45,11 +45,12 @@ holidays — **First Bloom** (Spring), **Midsummer Night** (Summer), the **Lante
 the calendar, the social feed, and your dates.
 
 - **Energy economy.** Each day gives you a small action pool — **3 actions (4 on
-  weekends)**. A date, a paid event, a work/training session, and a minigame each spend one;
+  weekends)**. A date, a paid event, a work shift, time spent with someone (Together), and a minigame each spend one;
   plain texting and chatting are free. Time-of-day phases aren't just decor — they advance as
   you spend energy, get pinned as hard facts in date scenes, and gate when characters' texts
-  arrive. When you're out of energy, **Sleep** to end the day: you get a written recap, a
-  small passive income, the day's events around town, and a fresh morning with new weather.
+  arrive. When you're out of energy, **Sleep** to end the day: you get a written recap, the
+  day's events around town, and a fresh morning with new weather. Money isn't handed out —
+  you earn it from work and minigames (or from wealth holdings you own).
 - **Deterministic weather + moods.** Every world day has forecastable weather (browse a
   5-day forecast in the Weather app), and every character has a **mood of the day** plus
   weather they love or hate — which nudges how a date goes.
@@ -119,8 +120,11 @@ A whole home screen of apps:
 - **Social** — a browsable map of the cast's ties to each other and to you.
 - **Moments** — a polaroid scrapbook of your relationship highlights.
 - **Endings** — your gallery of earned epilogues.
-- **Work & Training** — pick up shifts for money, or spend an action training a relationship
-  stat.
+- **Work** — pick up shifts for money.
+- **Together** — give an afternoon to someone: time spent grows a bond, but who they are
+  (fit), how bold the outing is (risk), and how often you've leaned on them that day (a
+  daily cap) all shape it — and casual time alone never reaches the romantic bands, only a
+  real date does.
 - **Settings** — accent colors, wallpaper, play/creator mode, and a total reset.
 - Plus optional, world-gated money apps (**Property**, **Market**, **Casino** — see below)
   and quick access to **Shop**, **Games**, and your **Bag**.
@@ -161,7 +165,7 @@ partners) plus an off-screen world-sim means the cast knows each other:
 
 ### 💰 Optional money systems
 
-Work and quality-time **Training** are always on. Each world's creator can also switch on
+Work and **Together** (time spent with people) are always on. Each world's creator can also switch on
 three richer, opt-in systems (all **OFF by default**):
 
 - **Property** — lease or buy in-world places, collect rent, and date somewhere you hold for

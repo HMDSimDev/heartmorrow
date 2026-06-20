@@ -8,13 +8,9 @@ export const MIN_CHARACTER_AGE = 18;
 /** The default single-player profile id. This app models one player. */
 export const DEFAULT_PLAYER_ID = 'player-default';
 
-/** Starting money for a fresh player profile. */
-export const DEFAULT_STARTING_MONEY = 250;
-
-/** Passive money credited to a world's wallet each time its day advances (Sleep).
- *  Deliberately small — a token trickle so you're never fully stranded, while the
- *  real income comes from work shifts and minigames (the stamina-vs-cash tradeoff). */
-export const DAILY_INCOME = 15;
+/** Starting money for a fresh player profile. Zero by design — money is something
+ *  you EARN (work shifts, minigames, wealth-system yield), never handed out. */
+export const DEFAULT_STARTING_MONEY = 0;
 
 /** Prompt-builder budget approximations (rough char-based, not real tokens). */
 export const PROMPT_LIMITS = {

@@ -3,7 +3,6 @@ import {
   DayRecapSchema,
   DEFAULT_STAMINA_MAX,
   ACTION_STAMINA_COST,
-  DAILY_INCOME,
   LAST_SEEN_FLAG,
   WEEKEND_BONUS_STAMINA,
   currentStatus,
@@ -19,8 +18,6 @@ import {
 } from '@dsim/shared';
 import { charactersRepo, eventsRepo, worldStatesRepo } from '../db/repositories';
 import { badRequest } from '../lib/errors';
-import { playerIdForWorld } from '../lib/ids';
-import { addMoney } from './player-service';
 import { ensureRelationship } from './relationship-service';
 import { applyNeglectDecay } from './stat-service';
 import { evaluateRelationshipStrain } from './breakup-service';
@@ -178,18 +175,10 @@ export async function advanceDay(worldId: string): Promise<SleepResult> {
   });
   worldStatesRepo.update(next);
 
-  // 2b. Passive daily income for the new day — a small trickle into THIS world's
-  //     wallet so you're never fully stranded (real money still comes from work
-  //     shifts + minigames). Best-effort: never block the day rollover.
+  // 2b. There is NO free daily stipend — the only passive income for the new day
+  //     is stock dividends from holdings you own (credited in 2c below). Real
+  //     spending money is earned from work shifts and minigames.
   let income = 0;
-  try {
-    if (DAILY_INCOME > 0) {
-      addMoney(DAILY_INCOME, playerIdForWorld(worldId));
-      income = DAILY_INCOME;
-    }
-  } catch {
-    /* income is best-effort */
-  }
 
   // 2c. Wealth systems (per-world opt-in): charge due lease rent (warn + evict on
   //     default), roll the stock market forward (deterministic walk + event shocks
@@ -218,13 +207,11 @@ export async function advanceDay(worldId: string): Promise<SleepResult> {
   const { recap, recapError } = await generateDayRecap(simDay, events, worldSim);
 
   // 4b. Persist the ended day to the almanac (the Calendar app's history). Best-
-  //     effort: a failure here must never block the day rollover. Income belongs to
-  //     the day it was credited (a day's START): `income` above is the NEW day's
-  //     credit, so the day we're recording (simDay) got its own at its start — none
-  //     on day 1, which never had a rollover before it.
-  const endedDayIncome = simDay > 1 ? DAILY_INCOME : 0;
+  //     effort: a failure here must never block the day rollover. There is no flat
+  //     passive stipend anymore, and stock dividends are credited live + surfaced as
+  //     their own beats — so a recorded day carries no passive-income line.
   try {
-    recordDay(worldId, simDay, { recap, worldSim, income: endedDayIncome, events });
+    recordDay(worldId, simDay, { recap, worldSim, income: 0, events });
   } catch {
     /* almanac persistence is best-effort */
   }

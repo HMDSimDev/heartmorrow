@@ -1,6 +1,6 @@
 /* ===========================================================================
-   phone-life.css — bespoke styling for three phone apps:
-   Work & Training, Weather, and Social.
+   phone-life.css — bespoke styling for phone apps:
+   Work, Together, Weather, and Social.
    Built ON TOP of Nocturne v2 shared tokens/classes. All selectors are
    prefixed `pl-` to avoid collisions; existing .weather-* / .social-*
    shared classes are enhanced in place where it helps the layout.

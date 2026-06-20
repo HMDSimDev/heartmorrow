@@ -213,6 +213,6 @@ describe('persistence', () => {
     expect(exportAll().gamblingRounds.length).toBe(1);
     resetProgress();
     expect(gamblingRoundsRepo.list()).toHaveLength(0);
-    expect(moneyOf(w.id)).toBe(250); // DEFAULT_STARTING_MONEY
+    expect(moneyOf(w.id)).toBe(0); // DEFAULT_STARTING_MONEY (a fresh wallet starts empty)
   });
 });

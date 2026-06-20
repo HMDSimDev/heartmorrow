@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DAILY_INCOME, DEFAULT_STARTING_MONEY, venueCost } from '@dsim/shared';
+import { venueCost } from '@dsim/shared';
 import { resetDb, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { createWorld } from './world-service';
@@ -21,6 +21,10 @@ const evalReply = () =>
     }),
   ]);
 
+// Money is no longer handed out (starting balance is 0), so each test funds its
+// world wallet to a known balance to exercise the affordability/charge paths.
+const START = 250;
+
 function worldWithVenues() {
   const world = createWorld({
     name: 'Lumen',
@@ -36,7 +40,9 @@ function worldWithVenues() {
     age: 25,
     datingStats: { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 },
   });
-  return { world, character, wallet: playerIdForWorld(world.id) };
+  const wallet = playerIdForWorld(world.id);
+  addMoney(START, wallet);
+  return { world, character, wallet };
 }
 
 beforeEach(() => resetDb());
@@ -45,7 +51,7 @@ afterEach(() => setAdapterOverride(null));
 describe('paid dates — affordability gate', () => {
   it('blocks a venue you cannot afford, but never deducts at setup', () => {
     const { character, wallet } = worldWithVenues();
-    spendMoney(DEFAULT_STARTING_MONEY - 30, wallet); // leave 30 in the wallet
+    spendMoney(START - 30, wallet); // leave 30 in the wallet
 
     expect(() => createSession({ characterId: character.id, mode: 'date', locationId: 'loc_lavish' })).toThrow();
     expect(getOrCreatePlayer(wallet).money).toBe(30); // gate didn't charge
@@ -74,7 +80,7 @@ describe('paid dates — charging', () => {
 
     const res = await endSession(sess.id);
     expect(res.evaluated).toBe(true);
-    expect(getOrCreatePlayer(wallet).money).toBe(DEFAULT_STARTING_MONEY - venueCost(2)); // 250 - 100
+    expect(getOrCreatePlayer(wallet).money).toBe(START - venueCost(2)); // 250 - 100
   });
 
   it('refuses to end a paid date you can no longer afford (no silent discount, no stamina spent)', async () => {
@@ -82,7 +88,7 @@ describe('paid dates — charging', () => {
     const sess = createSession({ characterId: character.id, mode: 'date', locationId: 'loc_nice' }); // 100, affordable now
     addPlayerMessage(sess.id, 'Lovely place.');
     // Drain the wallet below the venue cost AFTER the date opened.
-    spendMoney(DEFAULT_STARTING_MONEY - 10, wallet); // 10 left, venue costs 100
+    spendMoney(START - 10, wallet); // 10 left, venue costs 100
     setAdapterOverride(evalReply());
 
     await expect(endSession(sess.id)).rejects.toThrow(/can no longer afford/i);
@@ -97,7 +103,7 @@ describe('paid dates — charging', () => {
     setAdapterOverride(evalReply());
 
     await endSession(sess.id);
-    expect(getOrCreatePlayer(wallet).money).toBe(DEFAULT_STARTING_MONEY);
+    expect(getOrCreatePlayer(wallet).money).toBe(START);
   });
 
   it('does not charge a date you never actually spoke on (empty date)', async () => {
@@ -107,16 +113,17 @@ describe('paid dates — charging', () => {
     const res = await endSession(sess.id);
     expect(res.evaluated).toBe(false);
     expect(sessionsRepo.get(sess.id)).toBeUndefined();
-    expect(getOrCreatePlayer(wallet).money).toBe(DEFAULT_STARTING_MONEY);
+    expect(getOrCreatePlayer(wallet).money).toBe(START);
   });
 });
 
 describe('passive income', () => {
-  it('credits the world wallet a daily trickle on Sleep', async () => {
+  it('hands out no free money on Sleep — you have to earn it', async () => {
     const { world, wallet } = worldWithVenues();
     const before = getOrCreatePlayer(wallet).money;
     const res = await advanceDay(world.id);
-    expect(res.income).toBe(DAILY_INCOME);
-    expect(getOrCreatePlayer(wallet).money).toBe(before + DAILY_INCOME);
+    // No flat daily stipend; a world with no wealth holdings earns nothing passively.
+    expect(res.income).toBe(0);
+    expect(getOrCreatePlayer(wallet).money).toBe(before);
   });
 });

@@ -126,7 +126,7 @@ describe('leasing: recurring rent, overdue warnings, eviction', () => {
   });
 
   it('an unaffordable payment goes overdue (landlord text + grace), then evicts if still unpaid', () => {
-    const world = richWorld(0); // wallet = default 250
+    const world = richWorld(250); // fund the wallet (no free starting money)
     const playerId = playerIdForWorld(world.id);
     const prop = createProperty({ worldId: world.id, name: 'Loft', buyPrice: 9000, rentAmount: 70, rentCadence: 'weekly' });
     leaseProperty(world.id, prop.id); // -70 → 180
@@ -146,7 +146,7 @@ describe('leasing: recurring rent, overdue warnings, eviction', () => {
   });
 
   it('paying rent before the deadline clears the overdue state', () => {
-    const world = richWorld(0);
+    const world = richWorld(250);
     const playerId = playerIdForWorld(world.id);
     const prop = createProperty({ worldId: world.id, name: 'Loft', buyPrice: 9000, rentAmount: 70, rentCadence: 'weekly' });
     leaseProperty(world.id, prop.id);
