@@ -87,6 +87,102 @@
 }
 .date-pick-card.unavailable .portrait { filter: grayscale(0.65); }
 .date-pick-card.unavailable .date-pick-sub { color: var(--ember); text-transform: lowercase; }
+
+/* --- Location picker — photo tiles instead of a bare dropdown ----------- */
+.date-loc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.date-loc-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  overflow: hidden;
+  transition: transform 0.14s ease, border-color 0.15s ease, box-shadow 0.2s ease;
+}
+.date-loc-card:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: var(--border-bright);
+  box-shadow: var(--shadow-sm);
+}
+.date-loc-photo {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background:
+    radial-gradient(120% 90% at 30% 0%, rgba(230, 177, 94, 0.14), transparent 70%),
+    linear-gradient(160deg, var(--ink-2), var(--panel));
+  overflow: hidden;
+}
+.date-loc-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.date-loc-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  opacity: 0.7;
+}
+.date-loc-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--on-accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: var(--glow-rose);
+}
+.date-loc-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px 9px;
+}
+.date-loc-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.date-loc-sub {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  color: var(--text-mute);
+}
+.date-loc-card.selected {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--brass), var(--glow-warm);
+}
+.date-loc-card.unavailable {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.date-loc-card.unavailable .date-loc-photo img { filter: grayscale(0.65); }
+.date-loc-card.unavailable .date-loc-sub { color: var(--ember); }
 /* A lamplit title block above the planner. */
 .date-setup-head {
   display: flex;
@@ -182,6 +278,31 @@
   content: '';
   position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
   background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.5), transparent);
+  z-index: 2;
+}
+/* When a venue photo exists, it fills the scene HUD behind the chips, with a
+   scrim so the readout stays legible. */
+.date-scene.has-photo { overflow: hidden; }
+.date-scene.has-photo > :not(.date-scene-backdrop) { position: relative; z-index: 2; }
+.date-scene-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.date-scene-backdrop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.date-scene-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* darken toward the bottom/left where the chips sit */
+  background:
+    linear-gradient(180deg, rgba(18, 12, 20, 0.45), rgba(18, 12, 20, 0.78)),
+    radial-gradient(420px 180px at 12% 120%, rgba(18, 12, 20, 0.55), transparent 70%);
 }
 /* The primary scene readout (day + phase) leads, set apart. */
 .date-scene-lead {

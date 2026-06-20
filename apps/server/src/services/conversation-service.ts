@@ -263,6 +263,7 @@ export function resolveSessionLocation(
       tags: ['private', 'home'],
       indoor: true,
       priceTier: 0, // staying in is always free
+      imageAssetId: null,
     };
   }
   // A property you own or rent: a virtual venue synthesized from its definition. Its
@@ -278,6 +279,7 @@ export function resolveSessionLocation(
       tags: info.property.tags,
       indoor: info.property.indoor,
       priceTier: 0,
+      imageAssetId: info.property.assetId ?? null,
     };
   }
   return world ? world.locations.find((l) => l.id === locationId) ?? null : null;

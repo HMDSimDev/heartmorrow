@@ -13,6 +13,7 @@ import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { Banner, ConfirmDialog, Empty, Field, Spinner, TagInput } from '../components/ui';
 import { Icon } from '../components/Icon';
+import { AssetPicker } from '../components/AssetPicker';
 import './creator.page.css';
 
 const SCOPES: WorldNoteScope[] = ['global', 'location', 'faction', 'lore', 'rule', 'character', 'misc'];
@@ -135,7 +136,7 @@ export function WorldEditor() {
   const addLocation = () =>
     setField('locations', [
       ...(world?.locations ?? []),
-      { id: crypto.randomUUID(), name: 'New location', description: '', tags: [], indoor: false, priceTier: 0 },
+      { id: crypto.randomUUID(), name: 'New location', description: '', tags: [], indoor: false, priceTier: 0, imageAssetId: null },
     ]);
 
   const updateLocation = (i: number, patch: Partial<Location>) =>
@@ -515,7 +516,15 @@ function LocationCard({
               ))}
             </select>
           </Field>
-          {/* Note: a location image field would require a schema addition — deferred */}
+          <Field label="Photo (optional)">
+            <AssetPicker
+              value={location.imageAssetId ?? null}
+              onChange={(imageAssetId) => onUpdate({ imageAssetId })}
+              uploadType="location"
+              filterType="location"
+            />
+            <small className="muted">Upload a photo of this place — it shows in the date location picker and the scene.</small>
+          </Field>
         </div>
       )}
     </div>

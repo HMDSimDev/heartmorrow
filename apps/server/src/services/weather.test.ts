@@ -4,7 +4,7 @@ import { resetDb, seedWorldAndCharacter } from '../test/helpers';
 import { weatherForDay, moodForCharacter, weatherDateEffect, weatherReaction, forecastForWorld } from './ambiance-service';
 
 const W = (kind: WeatherKind) => resolveWeather(kind);
-const loc = (indoor: boolean): Location => ({ id: 'l', name: 'Spot', description: '', tags: [], indoor, priceTier: 0 });
+const loc = (indoor: boolean): Location => ({ id: 'l', name: 'Spot', description: '', tags: [], indoor, priceTier: 0, imageAssetId: null });
 
 beforeEach(() => resetDb());
 

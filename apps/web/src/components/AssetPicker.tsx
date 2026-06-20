@@ -17,12 +17,21 @@ export function AssetPicker({
   value,
   onChange,
   uploadType = 'portrait',
+  filterType,
 }: {
   value: string | null;
   onChange: (id: string | null) => void;
   uploadType?: Asset['type'];
+  /** When set, only show assets of this type (plus the always-selectable
+   *  "None" tile). Keeps the picker focused — e.g. only location photos. */
+  filterType?: Asset['type'];
 }) {
-  const { assets, reloadAssets } = useAppData();
+  const { assets: allAssets, reloadAssets } = useAppData();
+  // Always keep the currently-selected asset visible even if it predates the
+  // filter (e.g. an older photo saved under a different type).
+  const assets = filterType
+    ? allAssets.filter((a) => a.type === filterType || a.id === value)
+    : allAssets;
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>();
   const inputRef = useRef<HTMLInputElement>(null);

@@ -41,6 +41,9 @@ export const LocationSchema = z.object({
    *  money cost (charged per-world when a real date ends) and to how a character
    *  judges the spend. Defaults to free so existing authored venues cost nothing. */
   priceTier: z.number().int().min(0).max(3).default(0),
+  /** Optional uploaded photo for this venue (an Asset id). Shown in the date
+   *  location picker and the date scene. Null = use the generic placeholder. */
+  imageAssetId: id.nullable().default(null),
 });
 export type Location = z.infer<typeof LocationSchema>;
 
@@ -246,6 +249,7 @@ export const AssetTypeSchema = z.enum([
   'portrait',
   'expression',
   'background',
+  'location',
   'item',
   'other',
 ]);

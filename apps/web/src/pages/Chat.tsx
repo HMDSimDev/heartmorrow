@@ -34,7 +34,7 @@ import {
   type PropertyView,
   type ActiveDate,
 } from '@dsim/shared';
-import { api, streamChat } from '../lib/api';
+import { api, streamChat, assetUrl } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { Portrait } from '../components/Portrait';
@@ -86,7 +86,7 @@ function DateTrajectory({
 
 export function Chat() {
   const [params] = useSearchParams();
-  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate } =
+  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, assetById } =
     useAppData();
   const [availability, setAvailability] = useState<Record<string, { available: boolean; reason: string | null }>>({});
   // The wallet of the SELECTED character's world (may differ from the active
@@ -801,36 +801,88 @@ export function Chat() {
             </div>
             {((setupWorld && setupWorld.locations.length > 0) || roomUnlocked || setupProperties.length > 0) && (
               <Field label="Location / activity (optional)">
-                <select value={setup.locationId} onChange={(e) => setSetup((s) => ({ ...s, locationId: e.target.value }))}>
-                  <option value="">— Anywhere (free) —</option>
-                  {setupProperties.map((pv) => {
-                    // You can date at a property you OWN or currently LEASE (both free —
-                    // the lease rent is paid separately). Lease/buy one in the Property app first.
-                    if (!pv.owned && !pv.lease) return null;
-                    return (
-                      <option key={`prop:${pv.property.id}`} value={`prop:${pv.property.id}`}>
-                        🏠 {pv.property.name} · {pv.owned ? 'your place' : 'leased'} (free)
-                      </option>
-                    );
-                  })}
-                  {setupWorld?.locations.map((l) => {
+                {(() => {
+                  // One unified list of pickable venues rendered as photo tiles.
+                  // Each tile: a value (locationId), label, optional sub-line,
+                  // optional photo, an emoji fallback, and an afford/disabled flag.
+                  type Tile = {
+                    value: string;
+                    label: string;
+                    sub?: string;
+                    image?: string;
+                    glyph: string;
+                    disabled?: boolean;
+                  };
+                  const tiles: Tile[] = [
+                    { value: '', label: 'Anywhere', sub: 'free', glyph: '✨' },
+                  ];
+                  for (const pv of setupProperties) {
+                    // Date at a property you OWN or currently LEASE (both free — the
+                    // lease rent is paid separately). Lease/buy one in the Property app.
+                    if (!pv.owned && !pv.lease) continue;
+                    tiles.push({
+                      value: `prop:${pv.property.id}`,
+                      label: pv.property.name,
+                      sub: `${pv.owned ? 'your place' : 'leased'} · free`,
+                      image: assetById(pv.property.assetId)?.path,
+                      glyph: '🏠',
+                    });
+                  }
+                  for (const l of setupWorld?.locations ?? []) {
                     const cost = venueCost(l.priceTier);
                     const meta = venueTierMeta(l.priceTier);
                     const broke = cost > wallet;
-                    return (
-                      <option key={l.id} value={l.id} disabled={broke}>
-                        {l.name}
-                        {cost > 0 ? ` · ${meta.symbol} ${cost}${broke ? " (can't afford)" : ''}` : ''}
-                      </option>
-                    );
-                  })}
-                  {roomUnlocked && (
-                    <option value={`room:${setup.characterId}`}>
-                      🚪 {characters.find((c) => c.id === setup.characterId)?.name ?? 'Their'}'s Room (free)
-                    </option>
-                  )}
-                </select>
-                <div className="muted" style={{ fontSize: '0.78rem', marginTop: '0.35rem' }}>
+                    tiles.push({
+                      value: l.id,
+                      label: l.name,
+                      sub: cost > 0 ? `${meta.symbol} ${cost}${broke ? " · can't afford" : ''}` : 'free',
+                      image: assetById(l.imageAssetId)?.path,
+                      glyph: '📍',
+                      disabled: broke,
+                    });
+                  }
+                  if (roomUnlocked) {
+                    tiles.push({
+                      value: `room:${setup.characterId}`,
+                      label: `${characters.find((c) => c.id === setup.characterId)?.name ?? 'Their'}'s Room`,
+                      sub: 'stay in · free',
+                      glyph: '🚪',
+                    });
+                  }
+                  return (
+                    <div className="date-loc-grid" role="radiogroup" aria-label="Choose a location">
+                      {tiles.map((t) => {
+                        const selected = setup.locationId === t.value;
+                        return (
+                          <button
+                            key={t.value || 'anywhere'}
+                            type="button"
+                            role="radio"
+                            aria-checked={selected}
+                            className={`date-loc-card${selected ? ' selected' : ''}${t.disabled ? ' unavailable' : ''}`}
+                            onClick={() => !t.disabled && setSetup((s) => ({ ...s, locationId: t.value }))}
+                            disabled={t.disabled}
+                            title={t.disabled ? `${t.label} — can't afford` : t.label}
+                          >
+                            <div className="date-loc-photo">
+                              {t.image ? (
+                                <img src={assetUrl(t.image)} alt="" />
+                              ) : (
+                                <span className="date-loc-glyph" aria-hidden="true">{t.glyph}</span>
+                              )}
+                              {selected && <span className="date-loc-check" aria-hidden="true">✓</span>}
+                            </div>
+                            <div className="date-loc-meta">
+                              <span className="date-loc-name">{t.label}</span>
+                              {t.sub && <span className="date-loc-sub">{t.sub}</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+                <div className="muted" style={{ fontSize: '0.78rem', marginTop: '0.5rem' }}>
                   Wallet: {wallet} · a nicer venue costs money but can impress the right person.
                 </div>
               </Field>
@@ -887,6 +939,15 @@ export function Chat() {
         ? setupProperties.find((pv) => `prop:${pv.property.id}` === session.locationId)?.property.name ?? 'Your place'
         : setupWorld?.locations.find((l) => l.id === session.locationId)?.name ?? 'Somewhere'
     : 'Anywhere';
+  // The chosen venue's uploaded photo, if any — surfaced as a scene backdrop.
+  const locationAssetId = session.locationId
+    ? session.locationId.startsWith('prop:')
+      ? setupProperties.find((pv) => `prop:${pv.property.id}` === session.locationId)?.property.assetId ?? null
+      : session.locationId.startsWith('room:')
+        ? null
+        : setupWorld?.locations.find((l) => l.id === session.locationId)?.imageAssetId ?? null
+    : null;
+  const locationImage = assetById(locationAssetId)?.path;
   const cal = scene ? deriveCalendar(scene.day) : null;
 
   // Compute the single most-important outcome to surface. Only one is shown at a time.
@@ -1090,7 +1151,12 @@ export function Chat() {
         </aside>
 
         <section className="framed date-stage">
-          <div className="date-scene">
+          <div className={`date-scene${locationImage ? ' has-photo' : ''}`}>
+            {locationImage && (
+              <div className="date-scene-backdrop" aria-hidden="true">
+                <img src={assetUrl(locationImage)} alt="" />
+              </div>
+            )}
             {scene && cal && (
               <span className="date-scene-lead" title={`${cal.dayOfWeek}, ${cal.season}`}>
                 <span className="ph">{PHASE_ICONS[scene.phase]}</span>

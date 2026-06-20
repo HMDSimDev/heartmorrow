@@ -627,7 +627,10 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 .portrait.md { width: 76px; }
 
 /* --- PhoneAppBar — the one shared phone app header ------------------------ */
-.pbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+/* Sides size to their buttons; the title takes the remaining space and ellipsizes
+   only when genuinely too long — so short names ("Messages") never clip while the
+   side action/back buttons are always protected. */
+.pbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .pbar-side { display: flex; align-items: center; min-width: 0; }
 .pbar-right { justify-content: flex-end; }
 .pbar-title { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
@@ -638,7 +641,7 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 .pbar-name {
   display: inline-flex; align-items: center; gap: 6px;
   font-family: var(--font-display); font-weight: 600; font-size: 1.02rem; line-height: 1.1;
-  max-width: min(280px, 55%); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pbar-name svg { color: var(--brass); }
 
@@ -1202,7 +1205,9 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .hud-clock { display: flex; align-items: center; gap: 11px; }
 .hud-phase { font-size: 1.7rem; line-height: 1; filter: drop-shadow(0 0 8px rgba(230, 177, 94, 0.45)); }
 .hud-when { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.hud-day { font-family: var(--font-mono); font-weight: 700; font-size: 1.02rem; color: var(--text); letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+/* Short, bounded text ("Day N · Morning") — let it wrap rather than ellipsize;
+   the phase emoji + gap can otherwise starve this column in the ~256px sidebar. */
+.hud-day { font-family: var(--font-mono); font-weight: 700; font-size: 1.02rem; color: var(--text); letter-spacing: 0.02em; }
 .hud-cal { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-mute); text-transform: capitalize; }
 .hud-energy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .hud-energy-label {
