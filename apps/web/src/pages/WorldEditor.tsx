@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   VENUE_TIERS,
   GAMBLING,
-  type ContentFlags,
   type FeatureFlags,
   type GamblingConfig,
   type Location,
@@ -85,9 +84,6 @@ export function WorldEditor() {
   const setField = <K extends keyof World>(key: K, value: World[K]) =>
     setWorld((w) => (w ? { ...w, [key]: value } : w));
 
-  const setFlag = <K extends keyof ContentFlags>(key: K, value: ContentFlags[K]) =>
-    setWorld((w) => (w ? { ...w, contentFlags: { ...w.contentFlags, [key]: value } } : w));
-
   const setFeature = <K extends keyof FeatureFlags>(key: K, value: FeatureFlags[K]) =>
     setWorld((w) => (w ? { ...w, featureFlags: { ...w.featureFlags, [key]: value } } : w));
 
@@ -108,7 +104,6 @@ export function WorldEditor() {
         rules: world.rules,
         lore: world.lore,
         locations: world.locations,
-        contentFlags: world.contentFlags,
         featureFlags: world.featureFlags,
         gamblingConfig: world.gamblingConfig,
       });
@@ -282,40 +277,6 @@ export function WorldEditor() {
                   <Field label="Rules (in-fiction)">
                     <textarea value={world.rules} onChange={(e) => setField('rules', e.target.value)} />
                   </Field>
-                  <div className="divider" />
-                  <div className="creator-sec">
-                    <h3>Content flags</h3>
-                    <span className="trail" />
-                  </div>
-                  <div className="creator-flags">
-                    <label className="creator-flag">
-                      <input
-                        type="checkbox"
-                        checked={world.contentFlags.allowRomance}
-                        onChange={(e) => setFlag('allowRomance', e.target.checked)}
-                      />
-                      Allow romance
-                    </label>
-                    <label className="creator-flag">
-                      <input
-                        type="checkbox"
-                        checked={world.contentFlags.allowMatureThemes}
-                        onChange={(e) => setFlag('allowMatureThemes', e.target.checked)}
-                      />
-                      Allow mature themes (still never explicit)
-                    </label>
-                  </div>
-                  <Field label="Intensity">
-                    <select
-                      value={world.contentFlags.intensity}
-                      onChange={(e) => setFlag('intensity', e.target.value as ContentFlags['intensity'])}
-                    >
-                      <option value="mild">Mild</option>
-                      <option value="moderate">Moderate</option>
-                      <option value="spicy">Spicy</option>
-                    </select>
-                  </Field>
-
                   <div className="divider" />
                   <div className="creator-sec">
                     <h3>Game features</h3>

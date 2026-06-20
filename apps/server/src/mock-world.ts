@@ -386,7 +386,6 @@ function mock(): void {
     rules: 'Grounded contemporary fiction — no magic, no sci-fi. Keep conflict interpersonal and low-stakes.',
     lore: 'Asterfall Bay was a working harbor that became a university town; the lighthouse went dark the same year the train station became an arcade. The Star Festival has marked the end of summer for as long as anyone remembers.',
     locations: [cafe, aquarium, lighthouse, arcade, conservatory, boardwalk],
-    contentFlags: { allowRomance: true, allowMatureThemes: true, intensity: 'moderate' },
     // Showcase the optional mechanics (property / stock market / casino) in the demo world.
     featureFlags: { property: true, stockMarket: true, gambling: true },
   });

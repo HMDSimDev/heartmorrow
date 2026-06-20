@@ -19,7 +19,6 @@ CREATE TABLE IF NOT EXISTS worlds (
   locations     TEXT NOT NULL DEFAULT '[]',
   rules         TEXT NOT NULL DEFAULT '',
   lore          TEXT NOT NULL DEFAULT '',
-  content_flags TEXT NOT NULL DEFAULT '{}',
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
 );

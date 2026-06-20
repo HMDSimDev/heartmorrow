@@ -41,7 +41,6 @@ function seed(): void {
     rules: 'No magic or sci-fi; this is grounded contemporary fiction.',
     lore: 'The Quarter was an old textile district reclaimed by artists a generation ago.',
     locations: [cafe, glasshouse, boardwalk, vinyl, aurora],
-    contentFlags: { allowRomance: true, allowMatureThemes: false, intensity: 'mild' },
     // The mock world ships with the wealth + casino systems ON to showcase them.
     featureFlags: { property: true, stockMarket: true, gambling: true },
   });

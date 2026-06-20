@@ -102,7 +102,6 @@ function rowToWorld(r: Row): World {
     locations: fromJson(r.locations, []),
     rules: r.rules,
     lore: r.lore,
-    contentFlags: fromJson(r.content_flags, {}),
     featureFlags: fromJson(r.feature_flags, {}),
     gamblingConfig: fromJson(r.gambling_config, {}),
     createdAt: Number(r.created_at),
@@ -122,16 +121,16 @@ export const worldsRepo = {
   },
   insert(w: World): World {
     getDb().run(
-      `INSERT INTO worlds (id,name,summary,tone,global_notes,locations,rules,lore,content_flags,feature_flags,gambling_config,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      w.id, w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.contentFlags), j(w.featureFlags), j(w.gamblingConfig), w.createdAt, w.updatedAt,
+      `INSERT INTO worlds (id,name,summary,tone,global_notes,locations,rules,lore,feature_flags,gambling_config,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      w.id, w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.featureFlags), j(w.gamblingConfig), w.createdAt, w.updatedAt,
     );
     return w;
   },
   update(w: World): World {
     getDb().run(
-      `UPDATE worlds SET name=?,summary=?,tone=?,global_notes=?,locations=?,rules=?,lore=?,content_flags=?,feature_flags=?,gambling_config=?,updated_at=? WHERE id=?`,
-      w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.contentFlags), j(w.featureFlags), j(w.gamblingConfig), w.updatedAt, w.id,
+      `UPDATE worlds SET name=?,summary=?,tone=?,global_notes=?,locations=?,rules=?,lore=?,feature_flags=?,gambling_config=?,updated_at=? WHERE id=?`,
+      w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.featureFlags), j(w.gamblingConfig), w.updatedAt, w.id,
     );
     return w;
   },

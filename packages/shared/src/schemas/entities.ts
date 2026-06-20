@@ -44,20 +44,11 @@ export const LocationSchema = z.object({
 });
 export type Location = z.infer<typeof LocationSchema>;
 
-export const ContentFlagsSchema = z.object({
-  allowRomance: z.boolean().default(true),
-  /** Allow mature emotional themes. This app never produces explicit content. */
-  allowMatureThemes: z.boolean().default(false),
-  intensity: z.enum(['mild', 'moderate', 'spicy']).default('mild'),
-});
-export type ContentFlags = z.infer<typeof ContentFlagsSchema>;
-
 /**
- * Which optional GAME MECHANICS a world turns on. Distinct from `contentFlags`
- * (which is about romance/maturity): these gate whole subsystems that don't fit
- * every setting — property ownership and the stock market. Default OFF so a world
- * opts in. The server is the authority (route handlers call `requireFeature`); the
- * client merely hides surfaces for a clean UI.
+ * Which optional GAME MECHANICS a world turns on: these gate whole subsystems
+ * that don't fit every setting — property ownership and the stock market. Default
+ * OFF so a world opts in. The server is the authority (route handlers call
+ * `requireFeature`); the client merely hides surfaces for a clean UI.
  */
 export const FeatureFlagsSchema = z.object({
   /** Property ownership: buy/rent places, collect rent, date there for a buff. */
@@ -96,7 +87,6 @@ export const WorldSchema = z.object({
   /** Free-form rules / lore the LLM should treat as world DATA, not commands. */
   rules: z.string().default(''),
   lore: z.string().default(''),
-  contentFlags: ContentFlagsSchema.default({}),
   /** Which optional mechanics (property / stock market / gambling) this world enables. */
   featureFlags: FeatureFlagsSchema.default({}),
   /** Casino limits when `featureFlags.gambling` is on (per-bet + per-day caps). */

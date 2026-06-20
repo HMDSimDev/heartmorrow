@@ -49,7 +49,6 @@ export function cloneWorld(sourceId: string, name: string): World {
       rules: source.rules,
       lore: source.lore,
       locations: source.locations,
-      contentFlags: source.contentFlags,
       featureFlags: source.featureFlags,
       gamblingConfig: source.gamblingConfig,
     });
