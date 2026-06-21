@@ -178,6 +178,7 @@ async function runStructured(def: BenchCaseDef, settings: LlmSettings, signal?: 
   const r = rollup(calls);
 
   let comparison: BenchComparison | null = null;
+  let judgeFailReason = '';
   if (res.ok && def.score && def.baselineSpec) {
     // The user's saved baseline wins; otherwise fall back to the case's built-in
     // default so a run is scored out-of-the-box. Only when neither exists do we
@@ -185,20 +186,24 @@ async function runStructured(def: BenchCaseDef, settings: LlmSettings, signal?: 
     const baselineValue = benchBaselinesStore.get(def.id)?.value ?? def.defaultBaseline ?? null;
     if (baselineValue) {
       const scored = def.score(baselineValue, res.data);
-      comparison = { human: baselineValue, llm: scored.llmValue, closeness: scored.closeness, agree: scored.agree, rows: scored.rows };
+      comparison = { human: baselineValue, llm: scored.llmValue, closeness: scored.closeness, agree: scored.agree, pass: scored.pass, rows: scored.rows };
+      // A judge that lands outside the baseline's tolerance FAILS the case (the model
+      // meaningfully misjudged) — even though it produced valid structured output.
+      if (!scored.pass) judgeFailReason = scored.failReason || 'The model disagreed with the baseline.';
     } else {
       const scored = def.score({}, res.data);
-      comparison = { human: null, llm: scored.llmValue, closeness: null, agree: null, rows: scored.rows.map((row) => ({ ...row, human: '—', delta: '' })) };
+      comparison = { human: null, llm: scored.llmValue, closeness: null, agree: null, pass: null, rows: scored.rows.map((row) => ({ ...row, human: '—', delta: '' })) };
     }
   }
+  const ok = res.ok && comparison?.pass !== false;
 
   return BenchCaseResultSchema.parse({
     caseId: def.id,
     label: def.label,
     group: def.group,
     kind: def.kind,
-    ok: res.ok,
-    error: res.ok ? '' : res.error,
+    ok,
+    error: res.ok ? judgeFailReason : res.error,
     calls,
     promptTokens: r.promptTokens,
     completionTokens: r.completionTokens,

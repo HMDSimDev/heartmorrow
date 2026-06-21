@@ -126,9 +126,19 @@ import {
 export interface BenchScoreResult {
   closeness: number | null;
   agree: boolean | null;
+  /** Did the model's judgment land WITHIN the baseline's tolerance? When false, the
+   *  case fails (the model meaningfully misjudged — not just a hair off). */
+  pass: boolean;
+  /** A short explanation shown when `pass` is false. */
+  failReason: string;
   rows: BenchComparisonRow[];
   llmValue: BenchBaselineValue;
 }
+
+/** Engagement may be off by at most this much (−3..+3 scale) before a judge fails. */
+const ENGAGEMENT_TOLERANCE = 1;
+/** Relationship-delta judges fail when the mean per-stat error exceeds this. */
+const DELTAS_MEAN_TOLERANCE = 4;
 
 /** A multi-turn generated conversation. */
 export interface DialogueSpec {
@@ -212,15 +222,26 @@ function scoreEngagement(human: BenchBaselineValue, llm: unknown, withHostile: b
   ];
   const llmValue: BenchBaselineValue = { engagement: l };
   const engClose = clamp01(1 - Math.abs(h - l) / 6);
+  const diff = Math.abs(h - l);
+  const engOk = diff <= ENGAGEMENT_TOLERANCE;
   if (withHostile) {
     const hh = Boolean(human.hostile);
     const lh = Boolean(data.hostile);
     rows.push({ label: 'Hostile?', human: hh ? 'yes' : 'no', llm: lh ? 'yes' : 'no', delta: hh === lh ? 'match' : 'differ' });
     llmValue.hostile = lh;
     const hostileMatch = hh === lh;
-    return { closeness: (engClose + (hostileMatch ? 1 : 0)) / 2, agree: hostileMatch, rows, llmValue };
+    const pass = engOk && hostileMatch;
+    const failReason = !hostileMatch
+      ? hh
+        ? 'Missed hostility: your baseline flagged the text as hostile, the model did not.'
+        : 'False alarm: the model flagged the text as hostile, your baseline did not.'
+      : !engOk
+        ? `Read it ${fmtSigned(l)} vs your ${fmtSigned(h)} (off by ${diff}; tolerance ±${ENGAGEMENT_TOLERANCE}).`
+        : '';
+    return { closeness: (engClose + (hostileMatch ? 1 : 0)) / 2, agree: hostileMatch, pass, failReason, rows, llmValue };
   }
-  return { closeness: engClose, agree: null, rows, llmValue };
+  const failReason = engOk ? '' : `Read it ${fmtSigned(l)} vs your ${fmtSigned(h)} (off by ${diff}; tolerance ±${ENGAGEMENT_TOLERANCE}).`;
+  return { closeness: engClose, agree: null, pass: engOk, failReason, rows, llmValue };
 }
 
 /** Relationship-stat deltas (session evaluator / gift reaction). */
@@ -239,7 +260,9 @@ function scoreDeltas(human: BenchBaselineValue, llm: unknown, stats: string[]): 
   const meanErr = sumErr / Math.max(1, stats.length);
   // An average per-stat miss of a full MAX_EVAL_DELTA reads as total disagreement.
   const closeness = clamp01(1 - meanErr / MAX_EVAL_DELTA);
-  return { closeness, agree: null, rows, llmValue };
+  const pass = meanErr <= DELTAS_MEAN_TOLERANCE;
+  const failReason = pass ? '' : `Stat changes were off by ${meanErr.toFixed(1)} on average vs your baseline (tolerance ${DELTAS_MEAN_TOLERANCE}).`;
+  return { closeness, agree: null, pass, failReason, rows, llmValue };
 }
 
 /** One-of-N categorical decision (DTR). */
@@ -250,6 +273,8 @@ function scoreChoice(human: BenchBaselineValue, llmDecision: unknown, label: str
   return {
     closeness: agree ? 1 : 0,
     agree,
+    pass: agree,
+    failReason: agree ? '' : `Chose "${l || '—'}" vs your "${h || '—'}".`,
     rows: [{ label, human: h || '—', llm: l || '—', delta: agree ? 'match' : 'differ' }],
     llmValue: { choice: l },
   };
@@ -263,6 +288,8 @@ function scoreBoolean(human: BenchBaselineValue, llmBool: unknown, label: string
   return {
     closeness: agree ? 1 : 0,
     agree,
+    pass: agree,
+    failReason: agree ? '' : `Said ${l ? 'yes' : 'no'} vs your ${h ? 'yes' : 'no'} (${label}).`,
     rows: [{ label, human: h ? 'yes' : 'no', llm: l ? 'yes' : 'no', delta: agree ? 'match' : 'differ' }],
     llmValue: { value: l },
   };

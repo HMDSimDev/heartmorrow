@@ -181,6 +181,9 @@ export const BenchComparisonSchema = z.object({
   closeness: z.number().nullable().default(null),
   /** Exact-match agreement for categorical/boolean cases; null for continuous ones. */
   agree: z.boolean().nullable().default(null),
+  /** Did the model land within the baseline's tolerance? false → the case fails.
+   *  null when there was no baseline to judge against. */
+  pass: z.boolean().nullable().default(null),
   rows: z.array(BenchComparisonRowSchema).default([]),
 });
 export type BenchComparison = z.infer<typeof BenchComparisonSchema>;

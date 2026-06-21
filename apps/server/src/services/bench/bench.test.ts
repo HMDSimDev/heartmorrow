@@ -48,42 +48,48 @@ describe('bench catalog', () => {
 });
 
 describe('bench scoring', () => {
-  it('engagement closeness is continuous; pure turn judges report agree=null', () => {
+  it('engagement: off-by-1 passes, off-by-2+ fails; pure turn judges report agree=null', () => {
     const score = getBenchCase('judge_turn_good')!.score!;
-    expect(score({ engagement: 2 }, { engagement: 2 }).closeness).toBe(1);
+    expect(score({ engagement: 2 }, { engagement: 2 }).pass).toBe(true);
+    expect(score({ engagement: 3 }, { engagement: 2 }).pass).toBe(true); // off by 1 → pass
+    const off = score({ engagement: 2 }, { engagement: 0 });
+    expect(off.pass).toBe(false); // off by 2 → fail
     const half = score({ engagement: 2 }, { engagement: -1 });
+    expect(half.pass).toBe(false);
     expect(half.closeness).toBeCloseTo(0.5, 5);
-    // continuous score → no categorical "same/different call" (matches the contract)
-    expect(half.agree).toBeNull();
+    expect(half.agree).toBeNull(); // continuous → no categorical call (matches the contract)
   });
 
-  it('text judge folds the hostile flag into BOTH agreement and closeness', () => {
+  it('text judge: a missed hostility call fails, and folds into closeness', () => {
     const score = getBenchCase('judge_text_hostile')!.score!;
     const match = score({ engagement: -3, hostile: true }, { engagement: -3, hostile: true });
     expect(match.agree).toBe(true);
     expect(match.closeness).toBe(1);
-    // engagement matches but hostility is missed → closeness must drop below 1
+    expect(match.pass).toBe(true);
+    // engagement matches but hostility is missed → fail (and closeness drops)
     const miss = score({ engagement: -3, hostile: true }, { engagement: -3, hostile: false });
     expect(miss.agree).toBe(false);
-    expect(miss.closeness).toBeLessThan(1);
+    expect(miss.pass).toBe(false);
     expect(miss.closeness).toBeCloseTo(0.5, 5);
+    expect(miss.failReason.toLowerCase()).toContain('hostil');
   });
 
-  it('deltas closeness rewards matching the human', () => {
+  it('deltas: close passes, a gross all-stats miss fails', () => {
     const score = getBenchCase('judge_eval_good')!.score!;
     const perfect = score({ affection: 4, trust: 2 }, { relationshipDeltas: { affection: 4, trust: 2 } });
     expect(perfect.closeness).toBe(1);
-    const off = score({ affection: 0 }, { relationshipDeltas: { affection: 15 } });
-    expect(off.closeness).toBeLessThan(1);
+    expect(perfect.pass).toBe(true);
+    const gross = score({ affection: 4, trust: 3, chemistry: 3 }, { relationshipDeltas: { affection: -10, trust: -10, chemistry: -10 } });
+    expect(gross.pass).toBe(false);
   });
 
-  it('boolean + choice are exact-match', () => {
+  it('boolean + choice fail on a flipped call', () => {
     const walk = getBenchCase('judge_walkout')!.score!;
-    expect(walk({ value: true }, { walkout: true }).agree).toBe(true);
-    expect(walk({ value: true }, { walkout: false }).agree).toBe(false);
+    expect(walk({ value: true }, { walkout: true }).pass).toBe(true);
+    expect(walk({ value: true }, { walkout: false }).pass).toBe(false);
     const dtr = getBenchCase('judge_dtr')!.score!;
-    expect(dtr({ choice: 'accept' }, { decision: 'accept' }).agree).toBe(true);
-    expect(dtr({ choice: 'accept' }, { decision: 'backfire' }).agree).toBe(false);
+    expect(dtr({ choice: 'accept' }, { decision: 'accept' }).pass).toBe(true);
+    expect(dtr({ choice: 'accept' }, { decision: 'backfire' }).pass).toBe(false);
   });
 });
 
@@ -97,25 +103,44 @@ describe('bench runner', () => {
 
   it('a saved user baseline overrides the built-in default', async () => {
     setAdapterOverride(new ScriptedAdapter(['{"engagement":2,"expression":"happy","note":"warm read"}']));
-    // default for judge_turn_good is +2; save a DIFFERENT user baseline (0) to prove override
-    benchBaselinesStore.upsert('judge_turn_good', { engagement: 0 }, '', 1);
+    // default for judge_turn_good is +2; save a DIFFERENT user baseline (+1, still within tolerance of the model's +2) to prove override
+    benchBaselinesStore.upsert('judge_turn_good', { engagement: 1 }, '', 1);
     const res = await runBenchCase({ caseId: 'judge_turn_good', llmPlayer: false, dialogueTurns: 4 });
     expect(res.ok).toBe(true);
     expect(res.calls.length).toBeGreaterThan(0);
     expect(res.promptTokens).toBeGreaterThan(0); // chars/4 estimate (scripted adapter reports no usage)
     expect(res.tokensEstimated).toBe(true);
-    expect(res.comparison?.human).toEqual({ engagement: 0 }); // the USER baseline, not the +2 default
-    expect(res.comparison?.closeness).toBeCloseTo(1 - 2 / 6, 5); // |0 - 2| / 6
-    expect(res.comparison?.agree).toBeNull(); // pure engagement judge → continuous, no categorical call
+    expect(res.comparison?.human).toEqual({ engagement: 1 }); // the USER baseline, not the +2 default
+    expect(res.comparison?.closeness).toBeCloseTo(1 - 1 / 6, 5); // |1 - 2| / 6
+    expect(res.comparison?.pass).toBe(true); // off by 1 → within tolerance
   });
 
   it('scores against the built-in default baseline when the user has not saved one', async () => {
     setAdapterOverride(new ScriptedAdapter(['{"engagement":-2,"expression":"uncomfortable","note":"x"}']));
     const res = await runBenchCase({ caseId: 'judge_turn_bad', llmPlayer: false, dialogueTurns: 4 });
-    expect(res.ok).toBe(true);
+    expect(res.ok).toBe(true); // default −3 vs model −2 → off by 1 → passes, no user input needed
     expect(res.comparison?.human).toEqual({ engagement: -3 }); // the hardcoded default
-    expect(res.comparison?.closeness).toBeCloseTo(1 - 1 / 6, 5); // |−3 − (−2)| / 6 — scored without any user input
+    expect(res.comparison?.pass).toBe(true);
     expect(res.comparison?.llm).toEqual({ engagement: -2 });
+  });
+
+  it('FAILS a judge when the model misjudges beyond tolerance', async () => {
+    // default for judge_turn_good is +2; model reads it −1 → off by 3 → fail
+    setAdapterOverride(new ScriptedAdapter(['{"engagement":-1,"expression":"cold","note":"x"}']));
+    const res = await runBenchCase({ caseId: 'judge_turn_good', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(false);
+    expect(res.comparison?.pass).toBe(false);
+    expect(res.error).toBeTruthy();
+  });
+
+  it('FAILS a text judge that misses real hostility (baseline hostile, model says no)', async () => {
+    // default for judge_text_hostile is {engagement:-3, hostile:true}; model matches the
+    // number but calls it NOT hostile → fail, per the requested rule
+    setAdapterOverride(new ScriptedAdapter(['{"engagement":-3,"hostile":false,"note":"x"}']));
+    const res = await runBenchCase({ caseId: 'judge_text_hostile', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(false);
+    expect(res.comparison?.pass).toBe(false);
+    expect(res.error.toLowerCase()).toContain('hostil');
   });
 
   it('FAILS a dialogue that loops (identical replies exceed the repetition threshold)', async () => {
@@ -213,8 +238,8 @@ describe('bench persistence + aggregate', () => {
       repetitionMax: null, repetitionAvg: null,
     };
     const agg = computeAggregate([
-      { ...base, caseId: 'a', ok: true, error: '', comparison: { human: { engagement: 2 }, llm: { engagement: 2 }, closeness: 1, agree: true, rows: [] } },
-      { ...base, caseId: 'b', ok: true, error: '', comparison: { human: { engagement: 2 }, llm: { engagement: 0 }, closeness: 0.5, agree: false, rows: [] } },
+      { ...base, caseId: 'a', ok: true, error: '', comparison: { human: { engagement: 2 }, llm: { engagement: 2 }, closeness: 1, agree: null, pass: true, rows: [] } },
+      { ...base, caseId: 'b', ok: true, error: '', comparison: { human: { engagement: 2 }, llm: { engagement: 0 }, closeness: 0.5, agree: null, pass: false, rows: [] } },
       { ...base, caseId: 'c', ok: false, error: 'boom', comparison: null },
     ]);
     expect(agg.cases).toBe(3);

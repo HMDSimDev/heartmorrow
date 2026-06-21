@@ -274,8 +274,11 @@ function ComparisonTable({ result }: { result: BenchCaseResult }) {
       </table>
       {cmp.closeness != null ? (
         <div className="bench-cmp-score">
-          <span className="bench-cmp-pct" style={{ color: closenessColor(cmp.closeness) }}>{pct(cmp.closeness)}</span>
-          <span className="muted">agreement with the baseline{cmp.agree != null ? (cmp.agree ? ' · same call' : ' · different call') : ''}</span>
+          <span className="bench-cmp-pct" style={{ color: cmp.pass === false ? 'var(--ember)' : closenessColor(cmp.closeness) }}>{pct(cmp.closeness)}</span>
+          <span className="muted">
+            agreement with the baseline
+            {cmp.pass === true ? ' · within tolerance ✓' : cmp.pass === false ? ' · off the baseline ✗' : ''}
+          </span>
         </div>
       ) : (
         <div className="muted bench-cmp-nobase">Not scored.</div>
@@ -372,7 +375,7 @@ function CaseCard({
               </span>
             )}
             {result && result.comparison?.closeness != null && (
-              <span className="badge" style={{ color: closenessColor(result.comparison.closeness) }}>{pct(result.comparison.closeness)}</span>
+              <span className="badge" style={{ color: result.comparison.pass === false ? 'var(--ember)' : closenessColor(result.comparison.closeness) }}>{pct(result.comparison.closeness)}</span>
             )}
           </span>
           <Icon name={open ? 'chevronDown' : 'chevronRight'} size={16} />
