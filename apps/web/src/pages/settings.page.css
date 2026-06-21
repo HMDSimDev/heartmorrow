@@ -181,3 +181,54 @@
 .pset-danger .pset-group-head::after {
   background: linear-gradient(90deg, rgba(224, 122, 130, 0.5), transparent);
 }
+
+/* Heartmorrow Bench entry card — a lamplit invitation to the proving bench. */
+.set-bench-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease;
+}
+.set-bench-card:hover {
+  transform: translateY(-2px);
+}
+.set-bench-mark {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brass);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--brass) 24%, transparent), transparent 70%);
+  border: 1px solid color-mix(in srgb, var(--brass) 40%, var(--border));
+}
+.set-bench-body {
+  flex: 1;
+  min-width: 0;
+}
+.set-bench-body h2 {
+  margin: 2px 0 6px;
+}
+.set-bench-body p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.set-bench-go {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brass);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+@media (max-width: 560px) {
+  .set-bench-card { flex-wrap: wrap; }
+  .set-bench-go { width: 100%; justify-content: flex-end; }
+}

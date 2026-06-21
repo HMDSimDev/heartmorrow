@@ -515,6 +515,26 @@ CREATE TABLE IF NOT EXISTS session_rapport (
   rapport    INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- Heartmorrow Bench: saved model-evaluation runs. The full BenchRunSummary lives
+-- in the data column (JSON); the top columns are denormalized for cheap list ordering.
+CREATE TABLE IF NOT EXISTS bench_runs (
+  id         TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL,
+  label      TEXT NOT NULL DEFAULT '',
+  model      TEXT NOT NULL DEFAULT '',
+  data       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bench_runs_created ON bench_runs(created_at);
+
+-- Heartmorrow Bench: the human baselines for the scoring judges, keyed by case id
+-- and persisted independently of any run so they're reused across runs.
+CREATE TABLE IF NOT EXISTS bench_baselines (
+  case_id    TEXT PRIMARY KEY,
+  value      TEXT NOT NULL,
+  note       TEXT NOT NULL DEFAULT '',
+  updated_at INTEGER NOT NULL
+);
 `;
 
 /**

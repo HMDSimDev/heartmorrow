@@ -20,6 +20,7 @@ import { minigameRoutes } from './routes/minigames';
 import { playerRoutes } from './routes/player';
 import { dataRoutes } from './routes/data';
 import { packRoutes } from './routes/packs';
+import { benchRoutes } from './routes/bench';
 import { phoneRoutes } from './routes/phone';
 import { activityRoutes } from './routes/activities';
 import './services/phone-bootstrap'; // registers world-clock → phone lifecycle hooks
@@ -86,6 +87,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await activityRoutes(api);
       await dataRoutes(api);
       await packRoutes(api);
+      await benchRoutes(api);
     },
     { prefix: '/api' },
   );
