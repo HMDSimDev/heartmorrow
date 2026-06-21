@@ -31,6 +31,7 @@ export function WorldSelector() {
   const { worlds, worldsLoaded, activeWorldId, setActiveWorld, reloadWorlds, creatorMode } = useAppData();
   const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<World | null>(null);
+  const [deleteChars, setDeleteChars] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
   // Bulk-share selection: pick one or more worlds, then preview + tweak before export.
@@ -68,9 +69,10 @@ export function WorldSelector() {
     setDeleting(true);
     setError(undefined);
     try {
-      await api.deleteWorld(pendingDelete.id);
+      await api.deleteWorld(pendingDelete.id, deleteChars);
       await reloadWorlds();
       setPendingDelete(null);
+      setDeleteChars(false);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -168,12 +170,34 @@ export function WorldSelector() {
         <ConfirmDialog
           kicker="Delete world"
           title={`Delete ${pendingDelete.name}?`}
-          body="This permanently removes the world and everything in it — its people, your relationships, money, messages, and history. This cannot be undone."
+          body={
+            <>
+              This permanently removes the world and your progress in it — relationships, money, messages, and
+              history. This cannot be undone.
+              <label
+                style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 12 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={deleteChars}
+                  onChange={(e) => setDeleteChars(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  Also delete this world's characters. Leave unchecked to keep them — they'll move to Unassigned
+                  (People → Unassigned) so you can place them in another world.
+                </span>
+              </label>
+            </>
+          }
           confirmLabel="Delete forever"
           danger
           busy={deleting}
           onConfirm={doDelete}
-          onCancel={() => setPendingDelete(null)}
+          onCancel={() => {
+            setPendingDelete(null);
+            setDeleteChars(false);
+          }}
         />
       )}
     </div>
@@ -686,15 +710,20 @@ function ImportPeopleStep({
 }) {
   const { worlds } = useAppData();
   const all = useAsync(() => api.listCharacters(), []);
-  const others = (all.data ?? []).filter((c) => c.worldId && c.worldId !== newWorldId);
+  // Anyone not already in the new world is importable — including unassigned
+  // (world-less) people, who'd otherwise be invisible here. '' groups them.
+  const UNASSIGNED = '';
+  const others = (all.data ?? []).filter((c) => (c.worldId ?? UNASSIGNED) !== newWorldId);
 
   const byWorld = new Map<string, Character[]>();
   for (const c of others) {
-    const arr = byWorld.get(c.worldId!) ?? [];
+    const key = c.worldId ?? UNASSIGNED;
+    const arr = byWorld.get(key) ?? [];
     arr.push(c);
-    byWorld.set(c.worldId!, arr);
+    byWorld.set(key, arr);
   }
-  const worldName = (id: string) => worlds.find((w) => w.id === id)?.name ?? 'Another world';
+  const worldName = (id: string) =>
+    id === UNASSIGNED ? 'Unassigned' : worlds.find((w) => w.id === id)?.name ?? 'Another world';
 
   return (
     <>
@@ -707,7 +736,7 @@ function ImportPeopleStep({
         <Spinner />
       ) : others.length === 0 ? (
         <div className="wonb-blank">
-          <p>You don't have anyone in other worlds to import yet. Skip ahead — you can always create people once you're in.</p>
+          <p>You don't have anyone to import yet. Skip ahead — you can always create people once you're in.</p>
         </div>
       ) : (
         <div className="wonb-import">

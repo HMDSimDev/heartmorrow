@@ -68,7 +68,9 @@ export async function worldRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete('/worlds/:id', async (req) => {
     const { id } = req.params as { id: string };
-    deleteWorld(id);
+    // Opt-in: also delete the world's characters. Default keeps them (unassigned).
+    const { deleteCharacters } = req.query as { deleteCharacters?: string };
+    deleteWorld(id, deleteCharacters === 'true');
     return { ok: true };
   });
 

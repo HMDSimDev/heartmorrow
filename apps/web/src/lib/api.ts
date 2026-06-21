@@ -336,7 +336,8 @@ export const api = {
   importCharacters: (worldId: string, sourceCharacterIds: string[]) =>
     post<Character[]>(`/worlds/${worldId}/import-characters`, { sourceCharacterIds }),
   updateWorld: (id: string, patchInput: WorldUpdate) => patch<World>(`/worlds/${id}`, patchInput),
-  deleteWorld: (id: string) => del<{ ok: true }>(`/worlds/${id}`),
+  deleteWorld: (id: string, deleteCharacters = false) =>
+    del<{ ok: true }>(`/worlds/${id}${deleteCharacters ? '?deleteCharacters=true' : ''}`),
   generateLocations: (worldId: string, input: GenerateLocationsInput) =>
     post<StructuredResult<Location[]>>(`/worlds/${worldId}/locations/generate`, input),
   listWorldNotes: (worldId: string) => get<WorldNote[]>(`/worlds/${worldId}/notes`),

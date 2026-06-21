@@ -47,11 +47,11 @@ function seedFullWorld(name: string) {
 }
 
 describe('deleting a world cascades everything it owns (no orphans)', () => {
-  it('removes the world and ALL its progress, leaving other worlds intact', () => {
+  it('with deleteCharacters: removes the world and ALL its progress, leaving other worlds intact', () => {
     const doomed = seedFullWorld('Doomed');
     const survivor = seedFullWorld('Survivor');
 
-    deleteWorld(doomed.world.id);
+    deleteWorld(doomed.world.id, true);
 
     // The world and its character are gone.
     expect(worldsRepo.get(doomed.world.id)).toBeUndefined();
@@ -75,5 +75,34 @@ describe('deleting a world cascades everything it owns (no orphans)', () => {
     expect(rows('minigame_results', 'world_id = ?', survivor.world.id)).toBe(1);
     expect(playersRepo.get(playerIdForWorld(survivor.world.id))).toBeDefined();
     expect(rows('inventory_items', 'player_id = ?', playerIdForWorld(survivor.world.id))).toBe(1);
+  });
+
+  it('by default: keeps characters (unassigned + pristine), still wipes the world + progress', () => {
+    const doomed = seedFullWorld('Doomed');
+    const survivor = seedFullWorld('Survivor');
+
+    deleteWorld(doomed.world.id);
+
+    // The world is gone, but the character SURVIVES — detached to unassigned.
+    expect(worldsRepo.get(doomed.world.id)).toBeUndefined();
+    expect(worldStatesRepo.get(doomed.world.id)).toBeUndefined();
+    const kept = charactersRepo.get(doomed.character.id);
+    expect(kept).toBeDefined();
+    expect(kept?.worldId).toBeNull();
+
+    // The kept character returns pristine — its playthrough progress is wiped.
+    expect(rows('relationships', 'character_id = ?', doomed.character.id)).toBe(0);
+    expect(rows('message_threads', 'character_id = ?', doomed.character.id)).toBe(0);
+
+    // The no-FK / per-world tails are still cleaned up.
+    expect(rows('game_events', 'world_id = ?', doomed.world.id)).toBe(0);
+    expect(rows('minigame_results', 'world_id = ?', doomed.world.id)).toBe(0);
+    expect(playersRepo.get(playerIdForWorld(doomed.world.id))).toBeUndefined();
+    expect(rows('inventory_items', 'player_id = ?', playerIdForWorld(doomed.world.id))).toBe(0);
+
+    // The OTHER world is fully intact.
+    expect(worldsRepo.get(survivor.world.id)).toBeDefined();
+    expect(charactersRepo.get(survivor.character.id)?.worldId).toBe(survivor.world.id);
+    expect(rows('relationships', 'character_id = ?', survivor.character.id)).toBe(1);
   });
 });

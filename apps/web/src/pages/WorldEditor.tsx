@@ -55,6 +55,7 @@ export function WorldEditor() {
   const [genCount, setGenCount] = useState(4);
   const [generating, setGenerating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteChars, setDeleteChars] = useState(false);
   const [deletingWorld, setDeletingWorld] = useState(false);
   const [creatingWorld, setCreatingWorld] = useState(false);
 
@@ -178,7 +179,7 @@ export function WorldEditor() {
     if (!world) return;
     setDeletingWorld(true);
     try {
-      await api.deleteWorld(world.id);
+      await api.deleteWorld(world.id, deleteChars);
       setSelectedId(null);
       await loadWorlds();
     } catch (e) {
@@ -186,6 +187,7 @@ export function WorldEditor() {
     } finally {
       setDeletingWorld(false);
       setConfirmDelete(false);
+      setDeleteChars(false);
     }
   };
 
@@ -500,12 +502,33 @@ export function WorldEditor() {
         <ConfirmDialog
           kicker="Destructive action"
           title={`Delete "${world.name}"?`}
-          body="Notes are removed; characters are detached. This cannot be undone."
+          body={
+            <>
+              The world, its notes, and your progress in it are removed. This cannot be undone.
+              <label
+                style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 12 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={deleteChars}
+                  onChange={(e) => setDeleteChars(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  Also delete this world's characters. Leave unchecked to keep them — they'll move to Unassigned
+                  (People → Unassigned) so you can place them in another world.
+                </span>
+              </label>
+            </>
+          }
           confirmLabel="Delete world"
           danger
           busy={deletingWorld}
           onConfirm={deleteWorld}
-          onCancel={() => setConfirmDelete(false)}
+          onCancel={() => {
+            setConfirmDelete(false);
+            setDeleteChars(false);
+          }}
         />
       )}
     </div>
