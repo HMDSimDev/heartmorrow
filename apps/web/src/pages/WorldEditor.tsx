@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   VENUE_TIERS,
   GAMBLING,
@@ -12,16 +12,40 @@ import {
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { Banner, ConfirmDialog, Empty, Field, Spinner, TagInput } from '../components/ui';
+import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
+import { useDraft } from '../lib/useDraft';
+import { draftKey, listDrafts } from '../lib/drafts';
 import { Icon } from '../components/Icon';
 import { AssetPicker } from '../components/AssetPicker';
 import './creator.page.css';
 
 const SCOPES: WorldNoteScope[] = ['global', 'location', 'faction', 'lore', 'rule', 'character', 'misc'];
 
+// The user-editable slice of a World — exactly the fields save() sends. Drafts
+// diff against THIS (not the whole record) so server-managed fields like
+// updatedAt never make a freshly-loaded world look "unsaved".
+type EditableWorld = Pick<
+  World,
+  'name' | 'summary' | 'tone' | 'globalNotes' | 'rules' | 'lore' | 'locations' | 'featureFlags' | 'gamblingConfig'
+>;
+const editableWorld = (w: World): EditableWorld => ({
+  name: w.name,
+  summary: w.summary,
+  tone: w.tone,
+  globalNotes: w.globalNotes,
+  rules: w.rules,
+  lore: w.lore,
+  locations: w.locations,
+  featureFlags: w.featureFlags,
+  gamblingConfig: w.gamblingConfig,
+});
+
 export function WorldEditor() {
   const [worlds, setWorlds] = useState<World[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [world, setWorld] = useState<World | null>(null);
+  // The saved snapshot of the selected world, diffed against `world` for drafts.
+  const [baseline, setBaseline] = useState<World | null>(null);
   const [notes, setNotes] = useState<WorldNote[]>([]);
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
@@ -55,12 +79,15 @@ export function WorldEditor() {
   useEffect(() => {
     if (!selectedId) {
       setWorld(null);
+      setBaseline(null);
       setNotes([]);
       return;
     }
     void (async () => {
       try {
-        setWorld(await api.getWorld(selectedId));
+        const w = await api.getWorld(selectedId);
+        setWorld(w);
+        setBaseline(w); // the loaded world is the clean baseline for drafts
         setNotes(await api.listWorldNotes(selectedId));
       } catch (e) {
         setError(errorMessage(e));
@@ -81,6 +108,33 @@ export function WorldEditor() {
       setCreatingWorld(false);
     }
   };
+
+  // Auto-keep unsaved world edits as a draft, keyed by the selected world. The
+  // sidebar can edit many worlds without a route change, so switching worlds
+  // re-keys the draft (the hook flushes the leaving world's draft first).
+  const draftValue = useMemo(() => (world ? editableWorld(world) : null), [world]);
+  const draftBaseline = useMemo(() => (baseline ? editableWorld(baseline) : null), [baseline]);
+  const draft = useDraft<EditableWorld>({
+    key: selectedId ? draftKey.world(selectedId) : null,
+    value: draftValue as EditableWorld,
+    baseline: draftBaseline,
+    enabled: !!world && !!baseline && world.id === selectedId && baseline.id === selectedId,
+    meta: {
+      kind: 'world',
+      scopeId: selectedId ?? '',
+      worldId: selectedId,
+      isNew: false,
+      label: () => world?.name?.trim() || 'Untitled world',
+    },
+  });
+
+  // Other worlds in the sidebar that carry an unsaved draft get a lamplit dot
+  // (the selected world is excluded — its state is shown by the masthead pill).
+  // `draft.persisted` re-reads localStorage right after a draft is written/cleared.
+  const draftedWorldIds = useMemo(
+    () => new Set(listDrafts({ kind: 'world' }).map((d) => d.scopeId)),
+    [worlds, draft.persisted],
+  );
 
   const setField = <K extends keyof World>(key: K, value: World[K]) =>
     setWorld((w) => (w ? { ...w, [key]: value } : w));
@@ -109,6 +163,8 @@ export function WorldEditor() {
         gamblingConfig: world.gamblingConfig,
       });
       setWorld(updated);
+      setBaseline(updated); // saved → the world is clean again
+      draft.clear();
       await loadWorlds();
       setSavedNote('World saved!');
     } catch (e) {
@@ -191,6 +247,7 @@ export function WorldEditor() {
             <Icon name="plus" size={14} />
             New world
           </button>
+          {world && <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />}
           {world && (
             <button className="btn primary" onClick={save} disabled={saving}>
               <Icon name="save" size={14} />
@@ -202,6 +259,19 @@ export function WorldEditor() {
 
       {error && <Banner kind="error">{error}</Banner>}
       {savedNote && <Banner kind="ok">{savedNote}</Banner>}
+
+      {draft.found && (
+        <DraftRestoreBar
+          env={draft.found}
+          noun="world"
+          onRestore={() => {
+            const d = draft.restore();
+            if (d) setWorld((w) => (w ? { ...w, ...d } : w)); // merge editable fields, keep id/timestamps
+          }}
+          onDiscard={() => draft.discard()}
+          onDismiss={() => draft.dismissFound()}
+        />
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Two-column layout: world list sidebar + detail pane                 */}
@@ -226,6 +296,9 @@ export function WorldEditor() {
                   >
                     <Icon name="location" size={14} />
                     <span className="we-world-name">{w.name}</span>
+                    {w.id !== selectedId && draftedWorldIds.has(w.id) && (
+                      <span className="we-world-draft-dot" title="Has unsaved changes" aria-label="Has unsaved changes" />
+                    )}
                   </button>
                 </li>
               ))}

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   DATING_STAT_KEYS,
   DATING_STAT_LABELS,
@@ -34,6 +34,9 @@ import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { Banner, ConfirmDialog, Field, TagInput } from '../components/ui';
+import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
+import { useDraft } from '../lib/useDraft';
+import { draftKey, NEW_CHAR_SCOPE } from '../lib/drafts';
 import { AssetPicker } from '../components/AssetPicker';
 import { RelationshipBars } from '../components/StatBars';
 import { Portrait } from '../components/Portrait';
@@ -140,9 +143,17 @@ export function CharacterEditor() {
   const { id } = useParams();
   const isNew = !id;
   const nav = useNavigate();
+  const location = useLocation();
   const { reloadAssets, activeWorldId } = useAppData();
 
   const [form, setForm] = useState<Form>(emptyForm);
+  // The saved/initial snapshot the live form is diffed against for draft
+  // persistence — set once the record (or empty new form) is loaded.
+  const [baseline, setBaseline] = useState<Form | null>(null);
+  // The id whose record is currently loaded into form/baseline. Gates draft
+  // persistence so a mid-flight id change (back/forward between two edit URLs)
+  // can't write the old record's data under the new id's key.
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [worlds, setWorlds] = useState<World[]>([]);
   const [allChars, setAllChars] = useState<Character[]>([]);
   const [memories, setMemories] = useState<CharacterMemory[]>([]);
@@ -194,14 +205,17 @@ export function CharacterEditor() {
     if (!id) {
       // A brand-new character defaults to the world you're playing, so it never
       // gets orphaned (a world-less character shows up in no world's roster).
-      setForm({ ...emptyForm, worldId: activeWorldId });
+      const initial = { ...emptyForm, worldId: activeWorldId };
+      setForm(initial);
+      setBaseline(initial); // a fresh form is its own clean baseline
+      setLoadedId(null);
       return;
     }
     void (async () => {
       try {
         const bundle = await api.getCharacterBundle(id);
         const c = bundle.character;
-        setForm({
+        const loaded: Form = {
           name: c.name,
           age: c.age,
           pronouns: c.pronouns,
@@ -236,7 +250,10 @@ export function CharacterEditor() {
           quirks: c.quirks,
           portraitAssetId: c.portraitAssetId,
           expressionRows: EXPRESSIONS.map((name) => ({ name, assetId: c.expressionAssets[name] ?? null })),
-        });
+        };
+        setForm(loaded);
+        setBaseline(loaded); // the saved record is the clean baseline for edits
+        setLoadedId(id); // enable draft persistence now that this id's record is in
         setMemories(bundle.memories);
         setRelationship(bundle.relationship);
       } catch (e) {
@@ -292,6 +309,44 @@ export function CharacterEditor() {
     [form],
   );
 
+  // Auto-keep unsaved work as a draft. A new character is keyed by the world
+  // it'll belong to (one in-flight new character per world); an edit is keyed by
+  // the character id. The draft is cleared the moment Save succeeds.
+  const draftScopeId = isNew ? NEW_CHAR_SCOPE(activeWorldId) : id!;
+  const draft = useDraft<Form>({
+    key: draftKey.character(draftScopeId),
+    value: form,
+    baseline,
+    // A new form has no async load; an edit is enabled only once ITS record is in
+    // (so re-keying to another id can't persist the prior record under the new key).
+    enabled: isNew || loadedId === id,
+    meta: {
+      kind: 'character',
+      scopeId: draftScopeId,
+      // Tag edits by the SAVED world, so an unsaved World-dropdown change doesn't
+      // re-file the draft under a world the character doesn't live in yet.
+      worldId: isNew ? activeWorldId : baseline?.worldId ?? form.worldId,
+      isNew,
+      label: () => form.name.trim() || 'Untitled character',
+    },
+  });
+
+  // Arriving via "Resume" from the People drafts strip means the choice to
+  // continue is already made — apply the draft immediately (before paint, so the
+  // restore bar never flashes) instead of offering it again. One-shot: consume
+  // the nav flag so a later manual revisit still shows the normal offer.
+  const resumedRef = useRef(false);
+  useLayoutEffect(() => {
+    if (resumedRef.current) return;
+    if ((location.state as { resumeDraft?: boolean } | null)?.resumeDraft !== true) return;
+    if (!draft.found) return;
+    resumedRef.current = true;
+    const d = draft.restore();
+    if (d) setForm({ ...emptyForm, ...d });
+    nav(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.found]);
+
   const save = async () => {
     setSaving(true);
     setError(undefined);
@@ -299,9 +354,15 @@ export function CharacterEditor() {
     try {
       if (isNew) {
         const created = await api.createCharacter(payload);
+        // The current form is now the saved truth; clear the new-character draft
+        // BEFORE the key re-keys to /edit so it doesn't orphan under new__<world>.
+        setBaseline(form);
+        draft.clear();
         nav(`/characters/${created.id}/edit`);
       } else {
         await api.updateCharacter(id!, payload);
+        setBaseline(form); // saved → the form is clean again
+        draft.clear();
         setSavedNote('Saved!');
       }
     } catch (e) {
@@ -343,6 +404,7 @@ export function CharacterEditor() {
       if (res.ok) {
         set('datingStats', res.data);
         setSavedNote('Stats generated — review and Save.');
+        draft.dismissFound(); // generated content supersedes any stale restore offer
       } else {
         setError(`Stat generation failed: ${res.error}`);
       }
@@ -383,6 +445,7 @@ export function CharacterEditor() {
           quirks: res.data.quirks,
         }));
         setSavedNote('Profile generated — review and Save.');
+        draft.dismissFound();
       } else {
         setError(`Profile generation failed: ${res.error}`);
       }
@@ -443,6 +506,7 @@ export function CharacterEditor() {
         }));
         setActiveTab('identity');
         setSavedNote('Character generated from portrait — review every tab and Save.');
+        draft.dismissFound();
       } else {
         setError(`Generation from image failed: ${res.error}`);
       }
@@ -505,6 +569,7 @@ export function CharacterEditor() {
               Preview prompt
             </button>
           )}
+          <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />
           <button className="btn primary" onClick={save} disabled={saving || !form.name.trim()}>
             <Icon name="save" size={14} />
             {saving ? 'Saving…' : isNew ? 'Create' : 'Save'}
@@ -514,6 +579,19 @@ export function CharacterEditor() {
 
       {error && <Banner kind="error">{error}</Banner>}
       {savedNote && <Banner kind="ok">{savedNote}</Banner>}
+
+      {draft.found && (
+        <DraftRestoreBar
+          env={draft.found}
+          noun="character"
+          onRestore={() => {
+            const d = draft.restore();
+            if (d) setForm({ ...emptyForm, ...d }); // spread over defaults = forward-tolerant
+          }}
+          onDiscard={() => draft.discard()}
+          onDismiss={() => draft.dismissFound()}
+        />
+      )}
 
       {/* ------------------------------------------------------------------ */}
       {/* Two-column canvas: side rail (portrait preview) + main form         */}

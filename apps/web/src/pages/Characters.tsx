@@ -1,22 +1,67 @@
 import './characters.page.css';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
+import {
+  type DraftEnvelope,
+  isNewCharScope,
+  keyForEnvelope,
+  listDrafts,
+  pruneDrafts,
+  relativeTime,
+  removeDraft,
+} from '../lib/drafts';
 import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
 import { Banner, Empty, Loader, ConfirmDialog } from '../components/ui';
 import { useAppData } from '../state/app-context';
 
+const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // forget month-old drafts
+
 export function Characters() {
   const nav = useNavigate();
-  const { creatorMode, activeWorldId, activeWorld, dayTick } = useAppData();
+  const { creatorMode, activeWorldId, activeWorld, worlds, worldsLoaded, dayTick } = useAppData();
   const state = useAsync(() => api.listCharacters(), [activeWorldId, dayTick]);
   const memorials = useAsync(() => api.listMemorials(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   const lost = new Set(memorials.data ?? []);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Unfinished character drafts (auto-kept but never saved) for THIS world, so an
+  // abandoned new character / unsaved edit is findable here, not just behind the
+  // editor route. Pruned of drafts whose world or character no longer exists.
+  const [drafts, setDrafts] = useState<DraftEnvelope[]>([]);
+  const [pendingDraftDiscard, setPendingDraftDiscard] = useState<DraftEnvelope | null>(null);
+  const allChars = state.data;
+  useEffect(() => {
+    if (!creatorMode || !activeWorldId) {
+      setDrafts([]);
+      return;
+    }
+    // Only prune against the world/character lists once they're actually loaded —
+    // pruning against an empty set would wrongly delete everything.
+    pruneDrafts({
+      maxAgeMs: DRAFT_MAX_AGE_MS,
+      liveWorldIds: worldsLoaded ? new Set(worlds.map((w) => w.id)) : undefined,
+      liveCharacterIds: allChars ? new Set(allChars.map((c) => c.id)) : undefined,
+    });
+    setDrafts(listDrafts({ kind: 'character', worldId: activeWorldId }));
+  }, [creatorMode, activeWorldId, worlds, worldsLoaded, allChars, dayTick]);
+
+  const discardDraft = (env: DraftEnvelope) => {
+    removeDraft(keyForEnvelope(env));
+    setDrafts((ds) => ds.filter((d) => d.scopeId !== env.scopeId));
+    setPendingDraftDiscard(null);
+  };
+
+  const resumeDraft = (env: DraftEnvelope) =>
+    // The user already chose to continue this draft — tell the editor to apply it
+    // straight away rather than offer its own restore bar a second time.
+    nav(isNewCharScope(env.scopeId) ? '/characters/new' : `/characters/${env.scopeId}/edit`, {
+      state: { resumeDraft: true },
+    });
 
   const duplicate = async (id: string) => {
     if (actingId) return;
@@ -72,6 +117,38 @@ export function Characters() {
           </Link>
         )}
       </div>
+
+      {creatorMode && drafts.length > 0 && (
+        <section className="ppl-drafts">
+          <div className="ppl-drafts-head">
+            <span className="ppl-draft-mark"><Icon name="recap" size={15} /></span>
+            <span className="kicker">Unfinished drafts</span>
+          </div>
+          <div className="ppl-drafts-list">
+            {drafts.map((d) => {
+              const isNewChar = isNewCharScope(d.scopeId);
+              return (
+                <div className="ppl-draft-row" key={d.scopeId}>
+                  <div className="ppl-draft-main">
+                    <span className="ppl-draft-name">{d.label || 'Untitled character'}</span>
+                    <span className="ppl-draft-meta">
+                      {isNewChar ? 'New character' : 'Unsaved changes'} · {relativeTime(d.updatedAt)}
+                    </span>
+                  </div>
+                  <div className="ppl-draft-actions">
+                    <button className="btn sm primary" onClick={() => resumeDraft(d)}>
+                      <Icon name="edit" size={14} /> Resume
+                    </button>
+                    <button className="btn sm ghost" onClick={() => setPendingDraftDiscard(d)}>
+                      <Icon name="trash" size={14} /> Discard
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <Loader state={state}>
         {(allCharacters) => {
@@ -238,6 +315,18 @@ export function Characters() {
           busy={deleting}
           onConfirm={() => remove(pendingDelete.id)}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {pendingDraftDiscard && (
+        <ConfirmDialog
+          kicker="Discard draft"
+          title={`Discard ${pendingDraftDiscard.label?.trim() || 'this draft'}?`}
+          body="This permanently removes the unsaved draft. Anything already saved is untouched."
+          confirmLabel="Discard draft"
+          danger
+          onConfirm={() => discardDraft(pendingDraftDiscard)}
+          onCancel={() => setPendingDraftDiscard(null)}
         />
       )}
     </div>

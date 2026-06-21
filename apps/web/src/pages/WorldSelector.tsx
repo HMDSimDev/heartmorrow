@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PHASE_ICONS,
@@ -19,6 +19,9 @@ import { useAppData } from '../state/app-context';
 import { Portrait } from '../components/Portrait';
 import { Icon, type IconName } from '../components/Icon';
 import { Banner, ConfirmDialog, Field, Spinner } from '../components/ui';
+import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
+import { useDraft } from '../lib/useDraft';
+import { draftKey } from '../lib/drafts';
 import './worldselect.page.css';
 
 /** The deliberate "which world am I playing?" landing page. Reachable at any time
@@ -220,6 +223,19 @@ const HOW_TO_PLAY: { icon: IconName; text: string }[] = [
 
 const STEP_TITLES = ['Set the scene', 'Who are you here?', 'Bring people in', 'How it works'];
 
+/** Only step 1's pre-commit choices are a true unsaved draft — past step 1 the
+ *  world is created server-side and lives in the world list. */
+interface OnboardingDraft {
+  mode: 'blank' | 'clone';
+  sourceWorldId: string;
+  worldForm: { name: string; summary: string; tone: string };
+}
+const ONBOARDING_EMPTY: OnboardingDraft = {
+  mode: 'blank',
+  sourceWorldId: '',
+  worldForm: { name: '', summary: '', tone: '' },
+};
+
 /** A guided first-run for a new world: set the scene (blank or cloned from a save),
  *  set up your persona, import people from other worlds, then a how-to-play welcome. */
 export function WorldOnboarding() {
@@ -243,6 +259,29 @@ export function WorldOnboarding() {
 
   const canClone = worlds.length > 0;
 
+  // Auto-keep the step-1 setup as a draft so a half-filled new world survives a
+  // refresh / nav back to the selector. Only step 1 is draftable — once the
+  // world is created (step 2+) it's a real, persisted record.
+  const step1Value = useMemo<OnboardingDraft>(
+    () => ({ mode, sourceWorldId, worldForm }),
+    [mode, sourceWorldId, worldForm],
+  );
+  const draft = useDraft<OnboardingDraft>({
+    // Disabled once the world is created (step 2+, world != null) so going Back to
+    // step 1 can't re-persist a draft for a world that already exists.
+    key: step === 1 && world == null ? draftKey.worldOnboarding() : null,
+    value: step1Value,
+    baseline: ONBOARDING_EMPTY,
+    enabled: step === 1 && world == null,
+    meta: {
+      kind: 'worldOnboarding',
+      scopeId: 'singleton',
+      worldId: null,
+      isNew: true,
+      label: () => worldForm.name.trim() || 'Untitled world',
+    },
+  });
+
   const pickSource = (id: string) => {
     setSourceWorldId(id);
     const src = worlds.find((w) => w.id === id);
@@ -250,6 +289,12 @@ export function WorldOnboarding() {
   };
 
   const createTheWorld = async () => {
+    // Already created this session (user went Back from step 2) — just continue,
+    // never mint a duplicate world.
+    if (world) {
+      setStep(2);
+      return;
+    }
     if (!worldForm.name.trim()) {
       setError('Give your world a name to continue.');
       return;
@@ -270,6 +315,7 @@ export function WorldOnboarding() {
               tone: worldForm.tone.trim(),
             });
       setWorld(w);
+      draft.clear(); // committed to the server → the step-1 draft is done
       await reloadWorlds();
       setStep(2);
     } catch (e) {
@@ -346,6 +392,23 @@ export function WorldOnboarding() {
       </div>
 
       {error && <Banner kind="error">{error}</Banner>}
+
+      {step === 1 && draft.found && (
+        <DraftRestoreBar
+          env={draft.found}
+          noun="new world"
+          onRestore={() => {
+            const d = draft.restore();
+            if (d) {
+              setMode(d.mode);
+              setSourceWorldId(d.sourceWorldId);
+              setWorldForm({ ...ONBOARDING_EMPTY.worldForm, ...d.worldForm });
+            }
+          }}
+          onDiscard={() => draft.discard()}
+          onDismiss={() => draft.dismissFound()}
+        />
+      )}
 
       <div className="framed wonb-panel">
         {step === 1 && (
@@ -430,6 +493,7 @@ export function WorldOnboarding() {
             )}
 
             <div className="row end wonb-actions">
+              <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />
               <button className="btn ghost" onClick={() => navigate('/worlds')} disabled={busy}>
                 Back
               </button>

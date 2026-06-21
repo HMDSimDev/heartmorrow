@@ -169,3 +169,68 @@
   width: 100%;
 }
 .ppl-actions .ppl-creator-row .btn { flex: 1 1 auto; }
+
+/* --- Unfinished drafts strip ---------------------------------------------- */
+/* Surfaces character work auto-kept but never saved, so an abandoned new
+   character (or unsaved edits) is findable here — not stranded behind a route. */
+.ppl-drafts {
+  border: 1px solid rgba(230, 177, 94, 0.32);
+  border-left: 3px solid var(--brass);
+  border-radius: var(--radius);
+  background: rgba(230, 177, 94, 0.05);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ppl-drafts-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ppl-drafts-head .kicker { color: var(--brass); }
+.ppl-drafts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ppl-draft-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+.ppl-draft-mark { flex: none; display: inline-flex; color: var(--brass); }
+.ppl-draft-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.ppl-draft-name {
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ppl-draft-meta {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+}
+.ppl-draft-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+@media (max-width: 480px) {
+  .ppl-draft-row { flex-wrap: wrap; }
+  .ppl-draft-actions { width: 100%; }
+  .ppl-draft-actions .btn { flex: 1; }
+}

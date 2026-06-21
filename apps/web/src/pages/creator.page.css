@@ -556,3 +556,82 @@
 
 .we-loc-image-section { margin-top: 10px; }
 .we-loc-image-section .kicker { display: block; margin-bottom: 8px; }
+
+/* A lamplit dot on a world in the sidebar list that has an unsaved draft, so
+   switching away from an edited-but-unsaved world is never silent. */
+.we-world-item .we-world-draft-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--brass);
+  box-shadow: 0 0 6px rgba(230, 177, 94, 0.6);
+}
+
+/* ===========================================================================
+   Draft persistence — the "Unsaved draft" pill + the restore offer bar.
+   Shared by CharacterEditor / WorldEditor / WorldOnboarding (.draft-*).
+   =========================================================================== */
+
+/* Pill: rides on the existing .badge.warn (brass), with a breathing dot that
+   echoes the app's ambient-lamplight motif. */
+.draft-pill {
+  gap: 6px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.draft-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  /* inherit the badge's text colour (brass for warn, red for the failed variant) */
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: draft-breathe 2.4s ease-in-out infinite;
+}
+@keyframes draft-breathe {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .draft-pill-dot { animation: none; }
+}
+
+/* Restore bar: a persistent (not transient like a Banner) brass-edged inset. */
+.draft-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid rgba(230, 177, 94, 0.42);
+  border-left: 3px solid var(--brass);
+  border-radius: var(--radius-sm);
+  background: rgba(230, 177, 94, 0.08);
+}
+.draft-bar-mark {
+  flex: none;
+  display: inline-flex;
+  color: var(--brass);
+}
+.draft-bar-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.draft-bar-text strong { font-size: 0.9rem; color: var(--text); }
+.draft-bar-detail { font-size: 0.82rem; color: var(--text-dim); }
+.draft-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  flex-wrap: wrap;
+}
+.draft-bar-x { padding-left: 8px; padding-right: 8px; }
+@media (max-width: 560px) {
+  .draft-bar { flex-wrap: wrap; }
+  .draft-bar-actions { width: 100%; }
+  .draft-bar-actions .btn:not(.draft-bar-x) { flex: 1; }
+}
