@@ -950,6 +950,29 @@ export function Chat() {
   const locationImage = assetById(locationAssetId)?.path;
   const cal = scene ? deriveCalendar(scene.day) : null;
 
+  // The end-of-date evaluation note (mood, summary, memories) — or a safe-failure
+  // notice. Extracted so it can stand in as the primary moment OR ride along as a
+  // secondary note when a milestone/DTR moment takes the primary slot (going
+  // official otherwise hid the evaluation entirely).
+  const evalBanner = evalResult
+    ? evalResult.evaluated
+      ? (
+        <Banner kind="ok">
+          <strong>Date evaluated.</strong> Mood: {evalResult.mood}. {evalResult.summaryLine}{' '}
+          ({evalResult.memoriesWritten} memor{evalResult.memoriesWritten === 1 ? 'y' : 'ies'} saved)
+        </Banner>
+      )
+      : (
+        <Banner kind="error">
+          <strong>Evaluation failed safely</strong> — no stats were changed. {evalResult.evalError}
+        </Banner>
+      )
+    : null;
+
+  // When a milestone or accepted "define the relationship" moment is the headline,
+  // the evaluation note is shown below it rather than suppressed.
+  const milestoneTookPrimary = !!milestone || dtrOutcome?.decision === 'accept';
+
   // Compute the single most-important outcome to surface. Only one is shown at a time.
   const primaryOutcome = (() => {
     if (evalResult?.ending) {
@@ -1040,21 +1063,7 @@ export function Chat() {
       }
       return <Banner kind="info">Not yet — give it a little more time.</Banner>;
     }
-    if (evalResult) {
-      if (evalResult.evaluated) {
-        return (
-          <Banner kind="ok">
-            <strong>Date evaluated.</strong> Mood: {evalResult.mood}. {evalResult.summaryLine}{' '}
-            ({evalResult.memoriesWritten} memor{evalResult.memoriesWritten === 1 ? 'y' : 'ies'} saved)
-          </Banner>
-        );
-      }
-      return (
-        <Banner kind="error">
-          <strong>Evaluation failed safely</strong> — no stats were changed. {evalResult.evalError}
-        </Banner>
-      );
-    }
+    if (evalResult) return evalBanner;
     return null;
   })();
 
@@ -1230,6 +1239,7 @@ export function Chat() {
           {primaryOutcome}
 
           {/* Secondary outcomes — quiet notes below the primary moment */}
+          {milestoneTookPrimary && evalBanner}
           {evalResult?.reconciled && (
             <Banner kind="ok">
               <Icon name="date" size={14} /> <strong>You and {character.name} are back together.</strong> Don't let it slip again.
