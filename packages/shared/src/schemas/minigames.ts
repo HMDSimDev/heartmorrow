@@ -17,6 +17,8 @@ export const MINIGAME_IDS = [
   'sweet_and_sour',
   'two_truths_a_lie',
   'rhythm_serenade',
+  'lumberjack',
+  'writer',
 ] as const;
 export const MinigameIdSchema = z.enum(MINIGAME_IDS);
 export type MinigameId = z.infer<typeof MinigameIdSchema>;
@@ -141,6 +143,38 @@ export const RhythmSerenadeConfigSchema = z
   .refine((c) => c.slots.length === c.beatCount, { message: 'slots length must equal beatCount' });
 export type RhythmSerenadeConfig = z.infer<typeof RhythmSerenadeConfigSchema>;
 
+// lumberjack — a money-only SKILL JOB (no character/relationship). Time each axe
+// swing into the log's "grain" zone; the zone narrows and the swing quickens with
+// every log as your arms tire. Same sweep chassis as timing_meter, but graded on a
+// server-derived combo, and it pays coin instead of building a bond.
+export const LumberjackLogSchema = z.object({
+  /** The grain "sweet spot" as [0..1] positions along the swing arc. */
+  targetStart: z.number().min(0).max(1),
+  targetEnd: z.number().min(0).max(1),
+  /** Swing speed for this log (units per second) — ramps up as you tire. */
+  speed: z.number().positive(),
+});
+export type LumberjackLog = z.infer<typeof LumberjackLogSchema>;
+
+export const LumberjackConfigSchema = z.object({
+  logs: z.array(LumberjackLogSchema).min(1).max(20),
+});
+export type LumberjackConfig = z.infer<typeof LumberjackConfigSchema>;
+
+// writer — a money-only SKILL JOB: transcribe a short, world-flavored newspaper
+// dispatch verbatim. The copy is LLM-written (with a deterministic fallback) and
+// graded on typing precision + speed. The passage is sent to the client to type,
+// but the server keeps its own copy as the answer key and scores the submission.
+export const WriterConfigSchema = z.object({
+  /** A flavor headline shown above the copy. */
+  headline: z.string().default(''),
+  /** The passage the player must transcribe, verbatim. */
+  passage: z.string().min(1),
+  /** Whether the copy was LLM-written or assembled from a deterministic fallback. */
+  source: z.enum(['llm', 'fallback']),
+});
+export type WriterConfig = z.infer<typeof WriterConfigSchema>;
+
 export const MinigameConfigSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('memory_match'), config: MemoryMatchConfigSchema }),
   z.object({ minigameId: z.literal('timing_meter'), config: TimingMeterConfigSchema }),
@@ -148,6 +182,8 @@ export const MinigameConfigSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('sweet_and_sour'), config: SweetAndSourConfigSchema }),
   z.object({ minigameId: z.literal('two_truths_a_lie'), config: TwoTruthsConfigSchema }),
   z.object({ minigameId: z.literal('rhythm_serenade'), config: RhythmSerenadeConfigSchema }),
+  z.object({ minigameId: z.literal('lumberjack'), config: LumberjackConfigSchema }),
+  z.object({ minigameId: z.literal('writer'), config: WriterConfigSchema }),
 ]);
 export type MinigameConfig = z.infer<typeof MinigameConfigSchema>;
 
@@ -210,6 +246,23 @@ export const RhythmSerenadeSubmissionSchema = z.object({
 });
 export type RhythmSerenadeSubmission = z.infer<typeof RhythmSerenadeSubmissionSchema>;
 
+export const LumberjackSubmissionSchema = z.object({
+  /** Per-swing accuracy in [0..1], where 1 is a perfect hit on the grain. The
+   *  server derives the combo + score from this raw sequence — the client never
+   *  claims a combo or a score. */
+  swings: z.array(z.object({ accuracy: z.number().min(0).max(1) })).min(1).max(20),
+});
+export type LumberjackSubmission = z.infer<typeof LumberjackSubmissionSchema>;
+
+export const WriterSubmissionSchema = z.object({
+  /** Exactly what the player typed. The SERVER scores it against its held copy of
+   *  the passage (the answer key), so the client never claims an accuracy or score. */
+  typed: z.string().max(4000),
+  /** Elapsed time from first keystroke to submit, in ms (drives words-per-minute). */
+  elapsedMs: z.number().int().min(0),
+});
+export type WriterSubmission = z.infer<typeof WriterSubmissionSchema>;
+
 export const MinigameSubmissionSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('memory_match'), submission: MemoryMatchSubmissionSchema }),
   z.object({ minigameId: z.literal('timing_meter'), submission: TimingMeterSubmissionSchema }),
@@ -217,6 +270,8 @@ export const MinigameSubmissionSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('sweet_and_sour'), submission: SweetAndSourSubmissionSchema }),
   z.object({ minigameId: z.literal('two_truths_a_lie'), submission: TwoTruthsSubmissionSchema }),
   z.object({ minigameId: z.literal('rhythm_serenade'), submission: RhythmSerenadeSubmissionSchema }),
+  z.object({ minigameId: z.literal('lumberjack'), submission: LumberjackSubmissionSchema }),
+  z.object({ minigameId: z.literal('writer'), submission: WriterSubmissionSchema }),
 ]);
 export type MinigameSubmission = z.infer<typeof MinigameSubmissionSchema>;
 

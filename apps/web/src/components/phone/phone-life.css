@@ -179,6 +179,19 @@
   margin-top: 2px;
   line-height: 1.35;
 }
+/* Little brass chips that flag a job's risk/quirk (variable pay, weather-priced). */
+.pl-work-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.pl-work-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brass);
+  border: 1px solid rgba(230, 177, 94, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
 
 /* the action button sits on the right; keep the existing .btn look but
    give the payout a confident mono ledger feel via a child span */

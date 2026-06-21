@@ -25,8 +25,18 @@ export interface ActivityDef {
   kind: ActivityKind;
   label: string;
   description: string;
-  /** Work: money earned per shift. */
+  /** Work: money earned per shift (the BASE before any variance/weather pricing). */
   money?: number;
+  /** Work: how many daily actions this shift consumes (default 1). A heavier job
+   *  buys more pay for more of your day. */
+  staminaCost?: number;
+  /** Work: deterministic pay spread as a fraction of {@link money} (e.g. 0.6 = ±60%).
+   *  0/omitted = fixed pay. Turns a steady wage into a gamble whose floor can dip
+   *  below a safe shift and whose ceiling beats it — without being re-rollable. */
+  moneyVariance?: number;
+  /** Work: when true, the day's weather scales pay — harsh weather pays a salvage
+   *  premium, fair weather pays less (the almanac "prices the work by the sky"). */
+  weatherPriced?: boolean;
   /** Together: the primary relationship stat this nurtures. */
   relationshipStat?: RelationshipStatKey;
   /** Together: base delta to the primary stat at the easy end of the curve. */
@@ -47,8 +57,31 @@ export interface ActivityDef {
 }
 
 export const ACTIVITIES: readonly ActivityDef[] = [
-  { id: 'work_shift', kind: 'work', label: 'Work a shift', description: 'Steady hours for steady pay.', money: 50 },
-  { id: 'odd_jobs', kind: 'work', label: 'Hustle odd jobs', description: 'Grittier work, a better cut.', money: 90 },
+  // The steady FLOOR: low pay, zero variance, one action. The number you can count
+  // on when rent is due tonight — every other job is measured against this.
+  { id: 'work_shift', kind: 'work', label: 'Work a shift', description: 'Steady hours for steady pay. No surprises.', money: 50 },
+  // The GAMBLE: higher expected pay than a steady shift, but the cut is uneven — some
+  // days it beats the floor handily, some days it comes in under it.
+  {
+    id: 'odd_jobs',
+    kind: 'work',
+    label: 'Hustle odd jobs',
+    description: 'Grittier work, an uneven cut — clean up on a good day, scrape by on a bad one.',
+    money: 68,
+    moneyVariance: 0.6,
+  },
+  // The HEAVY shift: the most money in a single go, but it eats two pieces of the
+  // day and the sky sets the price (storms pay a salvage premium, fair days less).
+  {
+    id: 'job_weatherwork',
+    kind: 'work',
+    label: 'Day-labor outdoors',
+    description: 'Hard graft the almanac prices by the sky — storms pay best, fair days least. Costs two actions.',
+    money: 140,
+    moneyVariance: 0.3,
+    staminaCost: 2,
+    weatherPriced: true,
+  },
   {
     id: 'tg_in',
     kind: 'together',

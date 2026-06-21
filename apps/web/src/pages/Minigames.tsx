@@ -6,8 +6,12 @@ import {
   SweetAndSourConfigSchema,
   TwoTruthsConfigSchema,
   RhythmSerenadeConfigSchema,
+  LumberjackConfigSchema,
+  WriterConfigSchema,
   type Character,
   type LoreQuizSubmission,
+  type LumberjackSubmission,
+  type WriterSubmission,
   type MemoryMatchSubmission,
   type MinigameFinishResponse,
   type MinigameId,
@@ -32,6 +36,8 @@ import { LoreQuizGame } from '../components/minigames/LoreQuizGame';
 import { SweetAndSourGame } from '../components/minigames/SweetAndSourGame';
 import { TwoTruthsGame } from '../components/minigames/TwoTruthsGame';
 import { RhythmSerenade } from '../components/minigames/RhythmSerenade';
+import { LumberjackGame } from '../components/minigames/LumberjackGame';
+import { WriterGame } from '../components/minigames/WriterGame';
 import './minigames.page.css';
 
 interface ActiveGame {
@@ -93,7 +99,11 @@ export function Minigames() {
     setError(undefined);
     setResult(null);
     try {
-      const res = await api.startMinigame({ minigameId, characterId: characterId || null, worldId: activeWorldId ?? null });
+      // A money-only job (no bond reward) is impersonal — never tie it to the
+      // selected partner, even though the picker stays on screen for the bonding games.
+      const info = games.find((g) => g.id === minigameId);
+      const cid = info && !info.rewardsCharacter ? null : characterId || null;
+      const res = await api.startMinigame({ minigameId, characterId: cid, worldId: activeWorldId ?? null });
       setActive({ minigameId, runId: res.runId, config: res.config });
     } catch (e) {
       setError(errorMessage(e));
@@ -136,7 +146,7 @@ export function Minigames() {
       <div className="page-head">
         <span className="kicker">The Arcade Almanac</span>
         <h1>Minigames</h1>
-        <p>Play together to grow closer — and earn a little money.</p>
+        <p>Play together to grow closer — or pick up skill work, like a shift at the Woodlot, for honest coin.</p>
       </div>
       {error && <Banner kind="error">{error}</Banner>}
       {outOfEnergy && !active && (
@@ -285,6 +295,20 @@ function GameView({
         <RhythmSerenade
           config={RhythmSerenadeConfigSchema.parse(active.config)}
           onComplete={(submission: RhythmSerenadeSubmission) => onComplete({ minigameId: 'rhythm_serenade', submission })}
+        />
+      );
+    case 'lumberjack':
+      return (
+        <LumberjackGame
+          config={LumberjackConfigSchema.parse(active.config)}
+          onComplete={(submission: LumberjackSubmission) => onComplete({ minigameId: 'lumberjack', submission })}
+        />
+      );
+    case 'writer':
+      return (
+        <WriterGame
+          config={WriterConfigSchema.parse(active.config)}
+          onComplete={(submission: WriterSubmission) => onComplete({ minigameId: 'writer', submission })}
         />
       );
     default:

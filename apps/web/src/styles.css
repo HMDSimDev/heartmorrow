@@ -874,6 +874,47 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 @media (min-width: 2000px) {
   .phone-device { max-width: 880px; height: min(90vh, 1180px); height: min(90dvh, 1180px); }
 }
+/* Thin / small screens: drop the device frame entirely — no bezel, border, rounded
+   corners, centered island or vh height cap — so the phone goes full-bleed and the
+   content (plus the status bar and home button) uses every pixel down to the nav. */
+@media (max-width: 540px) {
+  /* A definite viewport height (not just min-height) so the flex chain below has a
+     concrete height to fill — otherwise app-main/phone-wrap size to content and
+     leave dead space above the bottom nav. */
+  .app[data-route='phone'] {
+    height: 100vh;
+    height: 100dvh;
+  }
+  /* No padding-bottom reserve: the bottom nav is in normal flow (.app > .bottomnav is
+     position: relative), so it already takes its own space below app-main. Reserving
+     the nav's height here just left a dead 56px strip that exposed the route's
+     atmosphere grid between the phone and the nav. */
+  .app[data-route='phone'] .app-main {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .app[data-route='phone'] .phone-wrap {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    /* Column so the device grows along the main axis to fill the wrap — relying on
+       cross-axis stretch left the device at content height, exposing the route's
+       atmosphere grid in the gap above the bottom nav. */
+    flex-direction: column;
+  }
+  .app[data-route='phone'] .phone-device {
+    max-width: none;
+    width: 100%;
+    flex: 1;
+    height: auto;
+    min-height: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
 .phone-statusbar {
   display: flex; justify-content: space-between; align-items: center;
   padding: 11px 24px 6px; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-dim); flex-shrink: 0;

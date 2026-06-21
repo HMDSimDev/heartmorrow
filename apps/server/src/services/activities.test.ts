@@ -102,3 +102,28 @@ describe('activities (work / together)', () => {
     expect(() => performActivity({ activityId: 'nope', worldId: world.id, characterId: null })).toThrow();
   });
 });
+
+describe('work jobs: stamina cost + variable pay', () => {
+  it('a heavy shift spends two actions and is refused when the day cannot afford it', () => {
+    const { world } = seedWorldAndCharacter();
+    const before = ensureWorldState(world.id).stamina; // 3 on a fresh weekday
+    const res = performActivity({ activityId: 'job_weatherwork', worldId: world.id, characterId: null });
+    expect(res.money).toBeGreaterThan(0);
+    expect(ensureWorldState(world.id).stamina).toBe(before - 2);
+    // Only one action left — a 2-action shift must be refused, not silently clamped.
+    expect(() => performActivity({ activityId: 'job_weatherwork', worldId: world.id, characterId: null })).toThrow();
+    // ...and the refusal didn't quietly spend the remaining action.
+    expect(ensureWorldState(world.id).stamina).toBe(before - 2);
+  });
+
+  it('a gig pays an uneven cut, always within its variance band', () => {
+    const { world } = seedWorldAndCharacter();
+    const lo = Math.round(68 * (1 - 0.6)); // floor can dip below a steady shift
+    const hi = Math.round(68 * (1 + 0.6)); // ceiling beats it
+    for (let i = 0; i < 3; i += 1) {
+      const pay = performActivity({ activityId: 'odd_jobs', worldId: world.id, characterId: null }).money;
+      expect(pay).toBeGreaterThanOrEqual(lo);
+      expect(pay).toBeLessThanOrEqual(hi);
+    }
+  });
+});

@@ -15,7 +15,8 @@ export function WorkApp() {
   const [note, setNote] = useState<string>();
   const [error, setError] = useState<string>();
   // No actions left today — gate the tiles up front instead of letting the POST 400.
-  const noEnergy = (worldState?.stamina ?? 0) <= 0;
+  const stamina = worldState?.stamina ?? 0;
+  const noEnergy = stamina <= 0;
   // You can't clock in while you're out on a date — finish it first.
   const onDate = !!activeDate;
 
@@ -61,7 +62,8 @@ export function WorkApp() {
 
         <div className="pl-board">
           <p className="pl-board-note">
-            Each shift spends one action — a piece of the day — for coin. Time spent with people lives in Together.
+            Each shift spends part of your day for coin — some jobs take more than one action, and some pay an
+            uneven cut. Skill work that pays by how well you play (like a shift at the Woodlot) lives in the Games app.
           </p>
           {noEnergy && (
             <p className="pl-board-note">You're out of energy for today — end the day to rest.</p>
@@ -82,21 +84,51 @@ export function WorkApp() {
             </span>
           </div>
         )}
-        {work.map((a) => (
-          <div className="pl-tile pl-work" key={a.id}>
-            <div className="pl-tile-icon"><Icon name="work" size={18} /></div>
-            <div className="pl-tile-body">
-              <div className="pl-tile-label">{a.label}</div>
-              <div className="pl-tile-desc">{a.description}</div>
+        {work.map((a) => {
+          const cost = a.staminaCost ?? 1;
+          const cantAfford = stamina < cost;
+          const v = a.moneyVariance ?? 0;
+          const base = a.money ?? 0;
+          // Show an honest spread: variance widens the range, and weather pricing can
+          // push the floor lower / the ceiling higher still (server: 0.85×–1.4×).
+          const loMult = a.weatherPriced ? 0.85 : 1;
+          const hiMult = a.weatherPriced ? 1.4 : 1;
+          const payLabel =
+            v > 0 || a.weatherPriced
+              ? `◈ ${Math.round(base * loMult * (1 - v))}–${Math.round(base * hiMult * (1 + v))}`
+              : `◈ ${base}`;
+          return (
+            <div className="pl-tile pl-work" key={a.id}>
+              <div className="pl-tile-icon"><Icon name="work" size={18} /></div>
+              <div className="pl-tile-body">
+                <div className="pl-tile-label">{a.label}</div>
+                <div className="pl-tile-desc">{a.description}</div>
+                {(v > 0 || a.weatherPriced) && (
+                  <div className="pl-work-tags">
+                    {v > 0 && <span className="pl-work-tag">pay varies</span>}
+                    {a.weatherPriced && <span className="pl-work-tag">☼ weather-priced</span>}
+                  </div>
+                )}
+              </div>
+              <div className="pl-tile-action">
+                <span
+                  className="pl-tile-cost"
+                  title={`Costs ${cost} action${cost > 1 ? 's' : ''} — ${cost > 1 ? 'a big' : 'a'} piece of the day`}
+                >
+                  −{cost} ◆
+                </span>
+                <button
+                  className="btn sm primary"
+                  onClick={() => perform(a)}
+                  disabled={busy || cantAfford || onDate}
+                  title={cantAfford && !noEnergy ? `Needs ${cost} energy — you have ${stamina} left.` : undefined}
+                >
+                  <span className="pl-coin">{payLabel}</span>
+                </button>
+              </div>
             </div>
-            <div className="pl-tile-action">
-              <span className="pl-tile-cost" title="Costs one action — a piece of the day">−1 ◆</span>
-              <button className="btn sm primary" onClick={() => perform(a)} disabled={busy || noEnergy || onDate}>
-                <span className="pl-coin">◈ {a.money}</span>
-              </button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

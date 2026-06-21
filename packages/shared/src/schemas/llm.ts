@@ -144,6 +144,15 @@ export const QuizGenerationSchema = z.object({
 });
 export type QuizGeneration = z.infer<typeof QuizGenerationSchema>;
 
+/** A freelance writing commission generated for The Copy Desk (Writer) job: a short
+ *  in-world newspaper dispatch the player transcribes. Length is bounded so a typing
+ *  shift stays brief and the LLM call stays cheap; the body is prose only (no stats). */
+export const WriterCommissionGenSchema = z.object({
+  headline: z.string().min(1).max(120),
+  body: z.string().min(60).max(600),
+});
+export type WriterCommissionGen = z.infer<typeof WriterCommissionGenSchema>;
+
 // --- Shop-item generation (creator tool: batch in-world items) --------------
 
 /**

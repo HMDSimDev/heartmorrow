@@ -111,7 +111,11 @@ export function finishMinigame(input: MinigameFinish): MinigameFinishResponse {
   const resolved = module.resolve(input.submission.submission, run.state);
   const reward = boundReward(resolved.reward);
 
-  const characterId = run.characterId;
+  // A money-only JOB (rewardsCharacter:false — e.g. The Woodlot, The Copy Desk) is
+  // impersonal: it must NOT touch a relationship, leave a memory, or sting a partner
+  // on a flop, even if one happened to be selected when it started. Ignore the run's
+  // character entirely for such games (money + best-score still key off the world).
+  const characterId = module.info.rewardsCharacter ? run.characterId : null;
   const character = characterId ? getCharacter(characterId) : null;
   const playedFavorite = !!character && favoriteMinigameFor(character) === run.minigameId;
 

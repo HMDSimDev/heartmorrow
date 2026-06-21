@@ -1,5 +1,7 @@
 import {
   ACTIVITIES,
+  HARSH_WEATHER,
+  PLEASANT_WEATHER,
   PerformActivitySchema,
   resolveTogether,
   type ActivityDef,
@@ -13,6 +15,7 @@ import { badRequest } from '../lib/errors';
 import { getDb } from '../db/index';
 import { assertCanAct, ensureWorldState, spendStamina } from './world-clock-service';
 import { getCharacterAvailability } from './availability-service';
+import { weatherForDay } from './ambiance-service';
 import { addMoney, spendMoney } from './player-service';
 import { applyRelationshipChange, setRelationshipFlag, stampLastDate } from './stat-service';
 import { getCharacter } from './character-service';
@@ -66,6 +69,16 @@ export function performActivity(input: PerformActivity): ActivityResult {
 
   assertCanAct(worldId); // throws if out of stamina
 
+  // A heavier shift can cost more than one action; assertCanAct only guards the
+  // out-of-energy (>0) case, so make sure the day can actually afford this one.
+  const staminaCost = activity.kind === 'work' ? activity.staminaCost ?? 1 : 1;
+  const preState = ensureWorldState(worldId);
+  if (staminaCost > preState.stamina) {
+    throw badRequest(
+      `That shift takes ${staminaCost} energy, but you only have ${preState.stamina} left today.`,
+    );
+  }
+
   // Apply the reward and spend the action in ONE transaction, so a failure
   // can't leave a free reward (or a spent action with no reward).
   return getDb().transaction<ActivityResult>(() => {
@@ -73,17 +86,46 @@ export function performActivity(input: PerformActivity): ActivityResult {
     let relationship: Relationship | null = null;
     let together: TogetherResult | null = null;
     if (activity.kind === 'work') {
-      money = activity.money ?? 0;
+      // Pay can vary by the day's weather + a deterministic spread (see computeWorkPay).
+      money = computeWorkPay(activity, worldId, preState.day, preState.actionsToday);
       addMoney(money, playerIdForWorld(worldId));
     } else {
       const out = performTogether(activity, worldId, character!, ensureWorldState(worldId).day);
       relationship = out.relationship;
       together = out.together;
     }
-    const state = spendStamina(worldId);
+    const state = spendStamina(worldId, staminaCost);
     recordEvent('activity', { worldId, activityId: activity.id, kind: activity.kind, characterId: data.characterId, money });
     return { activityId: activity.id, kind: activity.kind, money, relationship, together, state };
   });
+}
+
+/** Storm/salvage premium vs fair-weather ease, for weather-priced outdoor jobs. */
+const HARSH_WEATHER_PAY_MULT = 1.4;
+const PLEASANT_WEATHER_PAY_MULT = 0.85;
+
+/**
+ * Resolve a work shift's pay. The base ({@link ActivityDef.money}) can be:
+ *  - scaled by the day's weather for outdoor jobs ({@link ActivityDef.weatherPriced}),
+ *    and
+ *  - given a deterministic spread ({@link ActivityDef.moneyVariance}) so a "gig" pays
+ *    a different amount each shift.
+ * The spread is seeded by (world, day, activity, actionsToday) so it's stable for the
+ * Nth shift of a given day and fully replay-safe — never a fresh Math.random roll.
+ */
+function computeWorkPay(activity: ActivityDef, worldId: string, day: number, actionsToday: number): number {
+  let pay = activity.money ?? 0;
+  if (activity.weatherPriced) {
+    const kind = weatherForDay(worldId, day).kind;
+    if (HARSH_WEATHER.includes(kind)) pay *= HARSH_WEATHER_PAY_MULT;
+    else if (PLEASANT_WEATHER.includes(kind)) pay *= PLEASANT_WEATHER_PAY_MULT;
+  }
+  const variance = activity.moneyVariance ?? 0;
+  if (variance > 0) {
+    const roll = hashFloat(`${worldId}|${day}|${activity.id}|work|${actionsToday}`);
+    pay *= 1 - variance + roll * 2 * variance; // uniform in [base·(1−v), base·(1+v)]
+  }
+  return Math.max(0, Math.round(pay));
 }
 
 /**
