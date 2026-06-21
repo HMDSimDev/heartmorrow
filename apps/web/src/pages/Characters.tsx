@@ -28,6 +28,7 @@ export function Characters() {
   const memorials = useAsync(() => api.listMemorials(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   const lost = new Set(memorials.data ?? []);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [pendingDuplicate, setPendingDuplicate] = useState<{ id: string; name: string } | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   // Bulk-share selection: pick people, then preview + tweak before export.
@@ -307,7 +308,11 @@ export function Characters() {
                               <Link className="btn sm ghost" to={`/characters/${c.id}/edit`}>
                                 <Icon name="edit" size={14} /> Edit
                               </Link>
-                              <button className="btn sm ghost" onClick={() => duplicate(c.id)} disabled={actingId !== null}>
+                              <button
+                                className="btn sm ghost"
+                                onClick={() => setPendingDuplicate({ id: c.id, name: c.name })}
+                                disabled={actingId !== null}
+                              >
                                 <Icon name="duplicate" size={14} /> Duplicate
                               </button>
                               <button className="btn sm ghost" onClick={() => setExportChars([c])}>
@@ -396,6 +401,22 @@ export function Characters() {
           busy={deleting}
           onConfirm={() => remove(pendingDelete.id)}
           onCancel={() => setPendingDelete(null)}
+        />
+      )}
+
+      {pendingDuplicate && (
+        <ConfirmDialog
+          kicker="Duplicate character"
+          title={`Duplicate ${pendingDuplicate.name}?`}
+          body={`This creates a saved copy of ${pendingDuplicate.name} now and opens it in the editor. The copy is kept whether or not you save your edits.`}
+          confirmLabel="Duplicate"
+          busy={actingId !== null}
+          onConfirm={() => {
+            const id = pendingDuplicate.id;
+            setPendingDuplicate(null);
+            void duplicate(id);
+          }}
+          onCancel={() => setPendingDuplicate(null)}
         />
       )}
 

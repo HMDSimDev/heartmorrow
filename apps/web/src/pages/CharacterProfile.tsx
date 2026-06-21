@@ -74,6 +74,7 @@ export function CharacterProfile() {
   const nav = useNavigate();
   const { creatorMode, dayTick } = useAppData();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const bundle = useAsync(() => api.getCharacterBundle(id), [id]);
@@ -226,7 +227,7 @@ export function CharacterProfile() {
                     <Link className="btn" to={`/characters/${character.id}/edit`}>
                       <Icon name="edit" size={16} /> Edit
                     </Link>
-                    <button className="btn ghost" onClick={duplicate} disabled={busy}>
+                    <button className="btn ghost" onClick={() => setConfirmDuplicate(true)} disabled={busy}>
                       <Icon name="duplicate" size={16} /> Duplicate
                     </button>
                     <button className="btn danger ghost" onClick={() => setConfirmDelete(true)} disabled={busy}>
@@ -614,6 +615,21 @@ export function CharacterProfile() {
                 busy={busy}
                 onConfirm={remove}
                 onCancel={() => setConfirmDelete(false)}
+              />
+            )}
+
+            {confirmDuplicate && (
+              <ConfirmDialog
+                kicker="Duplicate character"
+                title={`Duplicate ${character.name}?`}
+                body={`This creates a saved copy of ${character.name} now and opens it. The copy is kept whether or not you edit it further.`}
+                confirmLabel="Duplicate"
+                busy={busy}
+                onConfirm={() => {
+                  setConfirmDuplicate(false);
+                  void duplicate();
+                }}
+                onCancel={() => setConfirmDuplicate(false)}
               />
             )}
           </div>
