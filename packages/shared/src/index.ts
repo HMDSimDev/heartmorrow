@@ -23,4 +23,5 @@ export * from './schemas/minigames';
 export * from './schemas/llm';
 export * from './schemas/entities';
 export * from './schemas/api';
+export * from './schemas/pack';
 export * from './crisis';

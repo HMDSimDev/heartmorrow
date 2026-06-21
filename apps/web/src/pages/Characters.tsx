@@ -1,6 +1,7 @@
 import './characters.page.css';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import type { Character } from '@dsim/shared';
 import { api } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
 import {
@@ -15,6 +16,7 @@ import {
 import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
 import { Banner, Empty, Loader, ConfirmDialog } from '../components/ui';
+import { ShareImportButton, ShareExportDialog } from '../components/ShareTools';
 import { useAppData } from '../state/app-context';
 
 const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // forget month-old drafts
@@ -28,6 +30,29 @@ export function Characters() {
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Bulk-share selection: pick people, then preview + tweak before export.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // The people queued for the export dialog (a single Export click, or the selection).
+  const [exportChars, setExportChars] = useState<Character[] | null>(null);
+
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const cancelSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const openExportSelected = () => {
+    const picked = (state.data ?? []).filter((c) => selected.has(c.id));
+    if (picked.length > 0) setExportChars(picked);
+  };
 
   // Unfinished character drafts (auto-kept but never saved) for THIS world, so an
   // abandoned new character / unsaved edit is findable here, not just behind the
@@ -112,11 +137,46 @@ export function Characters() {
           <p>The hearts you keep close — every face you can call on for a date.</p>
         </div>
         {creatorMode && (
-          <Link className="btn primary" to="/characters/new">
-            <Icon name="plus" size={16} /> New
-          </Link>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            {selecting ? (
+              <>
+                <span className="muted" style={{ alignSelf: 'center' }}>
+                  {selected.size} selected
+                </span>
+                <button
+                  className="btn primary"
+                  type="button"
+                  disabled={selected.size === 0}
+                  onClick={openExportSelected}
+                >
+                  <Icon name="download" size={16} /> Export {selected.size > 0 ? selected.size : ''}…
+                </button>
+                <button className="btn ghost" type="button" onClick={cancelSelecting}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <ShareImportButton
+                  targetWorldId={activeWorldId ?? null}
+                  onImported={() => state.reload()}
+                  label="Import"
+                />
+                <button className="btn ghost" type="button" onClick={() => setSelecting(true)}>
+                  <Icon name="download" size={16} /> Export…
+                </button>
+                <Link className="btn primary" to="/characters/new">
+                  <Icon name="plus" size={16} /> New
+                </Link>
+              </>
+            )}
+          </div>
         )}
       </div>
+
+      {exportChars && exportChars.length > 0 && (
+        <ShareExportDialog worlds={[]} characters={exportChars} onClose={() => setExportChars(null)} />
+      )}
 
       {creatorMode && drafts.length > 0 && (
         <section className="ppl-drafts">
@@ -182,7 +242,11 @@ export function Characters() {
                 {characters.map((c) => {
                   const memorial = lost.has(c.id);
                   return (
-                  <article className={`ppl-plate${memorial ? ' ppl-memorial' : ''}`} key={c.id}>
+                  <article
+                    className={`ppl-plate${memorial ? ' ppl-memorial' : ''}${selecting && selected.has(c.id) ? ' is-selected' : ''}`}
+                    key={c.id}
+                    style={selecting && selected.has(c.id) ? { outline: '2px solid var(--accent, #c9a36a)', outlineOffset: 3 } : undefined}
+                  >
                     <div className="ppl-frame">
                       <Link className="ppl-portrait-link" to={`/characters/${c.id}`}>
                         <Portrait character={c} memorial={memorial} />
@@ -217,27 +281,44 @@ export function Characters() {
                     </p>
 
                     <div className="ppl-actions">
-                      {memorial ? (
-                        <Link className="btn sm ghost ppl-date" to={`/characters/${c.id}`}>
-                          <Icon name="remember" size={15} /> Remember
-                        </Link>
+                      {selecting ? (
+                        <button
+                          className={`btn sm ${selected.has(c.id) ? 'primary' : 'ghost'} ppl-date`}
+                          type="button"
+                          onClick={() => toggleSelect(c.id)}
+                          aria-pressed={selected.has(c.id)}
+                        >
+                          <Icon name={selected.has(c.id) ? 'check' : 'plus'} size={15} />{' '}
+                          {selected.has(c.id) ? 'Selected' : 'Select'}
+                        </button>
                       ) : (
-                        <Link className="btn sm primary ppl-date" to={`/chat?character=${c.id}`}>
-                          <Icon name="date" size={15} /> Date
-                        </Link>
-                      )}
-                      {creatorMode && (
-                        <div className="ppl-creator-row">
-                          <Link className="btn sm ghost" to={`/characters/${c.id}/edit`}>
-                            <Icon name="edit" size={14} /> Edit
-                          </Link>
-                          <button className="btn sm ghost" onClick={() => duplicate(c.id)} disabled={actingId !== null}>
-                            <Icon name="duplicate" size={14} /> Duplicate
-                          </button>
-                          <button className="btn sm danger" onClick={() => setPendingDelete({ id: c.id, name: c.name })}>
-                            <Icon name="trash" size={14} /> Delete
-                          </button>
-                        </div>
+                        <>
+                          {memorial ? (
+                            <Link className="btn sm ghost ppl-date" to={`/characters/${c.id}`}>
+                              <Icon name="remember" size={15} /> Remember
+                            </Link>
+                          ) : (
+                            <Link className="btn sm primary ppl-date" to={`/chat?character=${c.id}`}>
+                              <Icon name="date" size={15} /> Date
+                            </Link>
+                          )}
+                          {creatorMode && (
+                            <div className="ppl-creator-row">
+                              <Link className="btn sm ghost" to={`/characters/${c.id}/edit`}>
+                                <Icon name="edit" size={14} /> Edit
+                              </Link>
+                              <button className="btn sm ghost" onClick={() => duplicate(c.id)} disabled={actingId !== null}>
+                                <Icon name="duplicate" size={14} /> Duplicate
+                              </button>
+                              <button className="btn sm ghost" onClick={() => setExportChars([c])}>
+                                <Icon name="download" size={14} /> Export
+                              </button>
+                              <button className="btn sm danger" onClick={() => setPendingDelete({ id: c.id, name: c.name })}>
+                                <Icon name="trash" size={14} /> Delete
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </article>

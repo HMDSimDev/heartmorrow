@@ -19,6 +19,7 @@ import { gamblingRoutes } from './routes/gambling';
 import { minigameRoutes } from './routes/minigames';
 import { playerRoutes } from './routes/player';
 import { dataRoutes } from './routes/data';
+import { packRoutes } from './routes/packs';
 import { phoneRoutes } from './routes/phone';
 import { activityRoutes } from './routes/activities';
 import './services/phone-bootstrap'; // registers world-clock → phone lifecycle hooks
@@ -84,6 +85,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await phoneRoutes(api);
       await activityRoutes(api);
       await dataRoutes(api);
+      await packRoutes(api);
     },
     { prefix: '/api' },
   );

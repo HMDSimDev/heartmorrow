@@ -48,6 +48,8 @@ import type {
   MemoryCreate,
   Message,
   Moment,
+  PackInspectResult,
+  PackImportResult,
   MinigameFinish,
   MinigameFinishResponse,
   MinigameInfo,
@@ -148,6 +150,54 @@ const worldQuery = (worldId?: string): string => (worldId ? `?worldId=${encodeUR
 /** Build a browser URL for an uploaded asset path. */
 export function assetUrl(relativePath: string): string {
   return `/uploads/${relativePath.replace(/^\/+/, '')}`;
+}
+
+/**
+ * Fetch a binary share file and save it via a temporary download link. Prefers the
+ * server's Content-Disposition filename, falling back to a supplied name.
+ */
+async function downloadShareFile(path: string, init: RequestInit, fallbackName: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, init);
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      message = (await res.json()).error ?? message;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(message, res.status);
+  }
+  const blob = await res.blob();
+  const cd = res.headers.get('Content-Disposition') ?? '';
+  const match = /filename="?([^"]+)"?/.exec(cd);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = match?.[1] ?? fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/** POST a single uploaded share file (multipart) and read the JSON response. */
+async function postShareFile<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch(`${BASE}${path}`, { method: 'POST', body: form });
+  if (!res.ok) {
+    let message = res.statusText;
+    let details: unknown;
+    try {
+      const body = await res.json();
+      message = body.error ?? message;
+      details = body.details;
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(message, res.status, details);
+  }
+  return res.json() as Promise<T>;
 }
 
 export interface StreamHandlers {
@@ -493,6 +543,36 @@ export const api = {
       together: TogetherResult | null;
       state: WorldState;
     }>('/activities/perform', input),
+
+  // share files (export/import of characters + worlds as .hmchr/.hmwrld/.hmpack)
+  exportCharacterFile: (id: string, name: string) =>
+    downloadShareFile(`/packs/character/${id}`, {}, `${name || 'character'}.hmchr`),
+  exportWorldFile: (id: string, name: string, includeCharacters = true) =>
+    downloadShareFile(
+      `/packs/world/${id}${includeCharacters ? '' : '?includeCharacters=false'}`,
+      {},
+      `${name || 'world'}.hmwrld`,
+    ),
+  exportBundleFile: (selection: {
+    worldIds: string[];
+    characterIds: string[];
+    includeCharacters?: boolean;
+    title?: string;
+    note?: string;
+  }) =>
+    downloadShareFile(
+      '/packs/export',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(selection) },
+      'heartmorrow-bundle.hmpack',
+    ),
+  inspectPackFile: (file: File) => postShareFile<PackInspectResult>('/packs/inspect', file),
+  importPackFile: (file: File, targetWorldId?: string, includeCharacters = true) => {
+    const params = new URLSearchParams();
+    if (targetWorldId) params.set('targetWorldId', targetWorldId);
+    if (!includeCharacters) params.set('includeCharacters', 'false');
+    const qs = params.toString();
+    return postShareFile<PackImportResult>(`/packs/import${qs ? `?${qs}` : ''}`, file);
+  },
 
   // data / debug
   listEvents: () => get<GameEvent[]>('/events'),

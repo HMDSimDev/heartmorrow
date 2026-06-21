@@ -19,6 +19,7 @@ import { useAppData } from '../state/app-context';
 import { Portrait } from '../components/Portrait';
 import { Icon, type IconName } from '../components/Icon';
 import { Banner, ConfirmDialog, Field, Spinner } from '../components/ui';
+import { ShareImportButton, ShareExportDialog } from '../components/ShareTools';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
 import { useDraft } from '../lib/useDraft';
 import { draftKey } from '../lib/drafts';
@@ -32,10 +33,34 @@ export function WorldSelector() {
   const [pendingDelete, setPendingDelete] = useState<World | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string>();
+  // Bulk-share selection: pick one or more worlds, then preview + tweak before export.
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [exportOpen, setExportOpen] = useState(false);
 
   const enter = (id: string) => {
     setActiveWorld(id);
     navigate('/');
+  };
+
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const cancelSelecting = () => {
+    setSelecting(false);
+    setSelected(new Set());
+    setExportOpen(false);
+  };
+
+  const selectedWorlds = worlds.filter((w) => selected.has(w.id));
+
+  const onImported = async () => {
+    await reloadWorlds();
   };
 
   const doDelete = async () => {
@@ -75,6 +100,40 @@ export function WorldSelector() {
 
       {error && <Banner kind="error">{error}</Banner>}
 
+      <div className="wsel-share row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 18 }}>
+        {!selecting ? (
+          <>
+            <ShareImportButton
+              targetWorldId={activeWorldId ?? null}
+              onImported={onImported}
+              label="Import a share file"
+            />
+            {worlds.length > 0 && (
+              <button className="btn ghost" type="button" onClick={() => setSelecting(true)}>
+                <Icon name="download" size={16} /> Export worlds…
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="muted" style={{ alignSelf: 'center' }}>
+              {selected.size} selected
+            </span>
+            <button
+              className="btn primary"
+              type="button"
+              disabled={selected.size === 0}
+              onClick={() => setExportOpen(true)}
+            >
+              <Icon name="download" size={16} /> Export {selected.size > 0 ? selected.size : ''}…
+            </button>
+            <button className="btn ghost" type="button" onClick={cancelSelecting}>
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
+
       <div className="wsel-grid">
         {worlds.map((w) => (
           <WorldCard
@@ -83,6 +142,9 @@ export function WorldSelector() {
             isActive={w.id === activeWorldId}
             onEnter={() => enter(w.id)}
             onDelete={creatorMode ? () => setPendingDelete(w) : undefined}
+            selecting={selecting}
+            isSelected={selected.has(w.id)}
+            onToggleSelect={() => toggleSelect(w.id)}
           />
         ))}
         <button className="wsel-new" onClick={() => navigate('/worlds/new')}>
@@ -96,6 +158,10 @@ export function WorldSelector() {
 
       {worlds.length === 0 && (
         <p className="wsel-empty-note">Your almanac is empty. Start your first world above to begin.</p>
+      )}
+
+      {exportOpen && selectedWorlds.length > 0 && (
+        <ShareExportDialog worlds={selectedWorlds} characters={[]} onClose={cancelSelecting} />
       )}
 
       {pendingDelete && (
@@ -119,11 +185,17 @@ function WorldCard({
   isActive,
   onEnter,
   onDelete,
+  selecting = false,
+  isSelected = false,
+  onToggleSelect,
 }: {
   world: World;
   isActive: boolean;
   onEnter: () => void;
   onDelete?: () => void;
+  selecting?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }) {
   const data = useAsync(
     () =>
@@ -138,7 +210,10 @@ function WorldCard({
   const unread = inbox ? inbox.unreadTexts + inbox.unreadEmails + inbox.feedUnread : 0;
 
   return (
-    <div className={`wsel-card framed bracketed${isActive ? ' is-active' : ''}`}>
+    <div
+      className={`wsel-card framed bracketed${isActive ? ' is-active' : ''}`}
+      style={isSelected ? { outline: '2px solid var(--accent, #c9a36a)', outlineOffset: 3 } : undefined}
+    >
       {isActive && <span className="wsel-current">Currently playing</span>}
       <div className="wsel-card-body">
         <div className="wsel-card-head">
@@ -195,13 +270,21 @@ function WorldCard({
       </div>
 
       <div className="wsel-card-actions">
-        <button className="btn primary flex-fill" onClick={onEnter}>
-          {isActive ? 'Continue' : 'Enter'} <Icon name="chevronRight" size={16} />
-        </button>
-        {onDelete && (
-          <button className="btn danger ghost" onClick={onDelete} title="Delete world" aria-label="Delete world">
-            <Icon name="trash" size={16} />
+        {selecting ? (
+          <button className="btn ghost flex-fill" type="button" onClick={onToggleSelect} aria-pressed={isSelected}>
+            {isSelected ? 'Selected' : 'Select to export'} <Icon name={isSelected ? 'check' : 'plus'} size={16} />
           </button>
+        ) : (
+          <>
+            <button className="btn primary flex-fill" onClick={onEnter}>
+              {isActive ? 'Continue' : 'Enter'} <Icon name="chevronRight" size={16} />
+            </button>
+            {onDelete && (
+              <button className="btn danger ghost" onClick={onDelete} title="Delete world" aria-label="Delete world">
+                <Icon name="trash" size={16} />
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -1,0 +1,178 @@
+/* Share files — the import preview + export tweak dialogs. Styled to the Nocturne
+   system (tokens from styles.css), readable inside the centered Modal. */
+
+.share-title {
+  margin: 2px 0 4px;
+}
+.share-sub {
+  margin: 0 0 10px;
+  text-transform: capitalize;
+}
+.share-note {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--accent-2, #e6b15e);
+  background: rgba(230, 177, 94, 0.07);
+  border-radius: var(--radius-sm, 8px);
+  color: var(--text-dim);
+  font-style: italic;
+}
+.share-adds {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+}
+
+/* The scrollable body of worlds + people. */
+.share-scroll {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 4px 0 12px;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* — A world card — */
+.share-world {
+  border: 1px solid var(--border, #313a5e);
+  background: var(--panel-2, #222a48);
+  border-radius: var(--radius-sm, 8px);
+  padding: 10px 12px;
+}
+.share-world-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.share-world-name {
+  font-family: var(--font-display, inherit);
+  font-weight: 600;
+  font-size: 1.02rem;
+}
+.share-chip {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--brass, #e6b15e);
+  border: 1px solid var(--border-bright, #41507c);
+}
+.share-world-sum {
+  margin: 6px 0 0;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.share-world-locs {
+  margin-top: 7px;
+  color: var(--moon, #9db8de);
+  font-size: 0.84rem;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.share-locs-list {
+  color: var(--text-mute);
+}
+.share-world-meta {
+  margin-top: 6px;
+  color: var(--text-mute);
+  font-size: 0.82rem;
+}
+
+/* — People roster — */
+.share-people {
+  border: 1px solid var(--border-soft, #262d4a);
+  border-radius: var(--radius-sm, 8px);
+  padding: 8px 10px;
+}
+.share-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.share-people-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.share-person {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.share-person-port {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--panel-3, #2a3457);
+  color: var(--text-mute);
+  margin-top: 1px;
+}
+.share-person-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.share-person-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.share-person-meta {
+  color: var(--text-mute);
+  font-size: 0.8rem;
+}
+.share-person-desc {
+  color: var(--text-dim);
+  font-size: 0.84rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.share-more {
+  color: var(--text-mute);
+  font-size: 0.82rem;
+  margin-top: 6px;
+}
+
+/* — The include-characters toggle — */
+.share-toggle {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  cursor: pointer;
+  padding: 9px 11px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border, #313a5e);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--panel, #1a2038);
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.share-toggle input {
+  margin-top: 2px;
+}
+
+.share-field {
+  margin-bottom: 10px;
+}
+.share-actions {
+  margin-top: 8px;
+}

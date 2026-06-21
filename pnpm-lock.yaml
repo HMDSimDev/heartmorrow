@@ -29,6 +29,9 @@ importers:
       fastify:
         specifier: ^5.2.1
         version: 5.8.5
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       zod:
         specifier: ^3.24.1
         version: 3.25.76
@@ -1097,6 +1100,9 @@ packages:
     peerDependenciesMeta:
       picomatch:
         optional: true
+
+  fflate@0.8.3:
+    resolution: {integrity: sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==}
 
   find-my-way@9.6.0:
     resolution: {integrity: sha512-Zf4Xve4RymLl7NgaavNebZ01joJ8MfVerOG43wy7SHLO+r+K0C6d/SE0BiR7AV5V1VOCFlOP7ecdo+I4qmiHrQ==}
@@ -2382,6 +2388,8 @@ snapshots:
   fdir@6.5.0(picomatch@4.0.4):
     optionalDependencies:
       picomatch: 4.0.4
+
+  fflate@0.8.3: {}
 
   find-my-way@9.6.0:
     dependencies:
