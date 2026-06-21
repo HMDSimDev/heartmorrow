@@ -110,9 +110,12 @@ function buildModeChain(start: LlmSettings['structuredMode']): LlmSettings['stru
   }
 }
 
-/** Heuristic: did the server reject the request specifically over response_format? */
+/** Heuristic: did the server reject the request specifically over the structured
+ * -output directive? Covers the OpenAI `response_format` field and Anthropic's
+ * `output_config` / schema, so an unsupported grammar downgrades the mode chain
+ * (json_schema → json_object → prompt_only) instead of failing outright. */
 function isResponseFormatError(message: string): boolean {
-  return /response[_ ]?format/i.test(message);
+  return /response[_ ]?format|output[_ ]?config|json[_ ]?schema/i.test(message);
 }
 
 /**

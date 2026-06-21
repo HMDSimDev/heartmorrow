@@ -43,6 +43,7 @@ import type {
   InventoryItem,
   ItemEffect,
   LlmHealthResult,
+  LlmModelInfo,
   LlmSettings,
   LlmSettingsUpdate,
   PromptEstimateRequest,
@@ -338,7 +339,7 @@ export const api = {
   updateSettings: (update: LlmSettingsUpdate) => patch<SettingsResponse>('/settings', update),
   testLlm: (override?: LlmSettingsUpdate) => post<LlmHealthResult>('/settings/test', override ?? {}),
   listModels: (override?: LlmSettingsUpdate) =>
-    post<{ ok: boolean; models: string[]; error?: string }>('/settings/models', override ?? {}),
+    post<{ ok: boolean; models: LlmModelInfo[]; error?: string }>('/settings/models', override ?? {}),
   estimatePrompts: (input: Partial<PromptEstimateRequest>) =>
     post<PromptEstimateResult>('/settings/prompt-estimate', input),
 

@@ -2,7 +2,7 @@ import { LlmSettingsSchema, type LlmSettings } from '@dsim/shared';
 import { initDatabase } from '../db/index';
 import { createWorld } from '../services/world-service';
 import { createCharacter } from '../services/character-service';
-import type { ChatAdapter, ChatRequest, ChatResult } from '../llm/types';
+import type { ChatAdapter, ChatRequest, ChatResult, LlmModelInfo } from '../llm/types';
 
 /** Reset to a fresh in-memory database for each test. */
 export function resetDb(): void {
@@ -31,7 +31,7 @@ export class ScriptedAdapter implements ChatAdapter {
     return result;
   }
 
-  async listModels(): Promise<string[]> {
+  async listModels(): Promise<LlmModelInfo[]> {
     return [];
   }
 }

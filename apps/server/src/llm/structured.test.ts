@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { callStructuredLlm } from './structured';
 import { ScriptedAdapter, testSettings } from '../test/helpers';
-import type { ChatAdapter, ChatRequest, ChatResult } from './types';
+import type { ChatAdapter, ChatRequest, ChatResult, LlmModelInfo } from './types';
 
 const Schema = z.object({ mood: z.string(), score: z.number().int() });
 
@@ -29,7 +29,7 @@ class FormatPickyAdapter implements ChatAdapter {
     onDelta(r.content);
     return r;
   }
-  async listModels(): Promise<string[]> {
+  async listModels(): Promise<LlmModelInfo[]> {
     return [];
   }
 }

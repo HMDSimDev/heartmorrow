@@ -2,6 +2,9 @@
  * they are given and return raw text. Structured-output policy, retries, and
  * validation live in `structured.ts` — never in the adapter. */
 
+import type { LlmModelInfo } from '@dsim/shared';
+export type { LlmModelInfo };
+
 /** A plain-text part of a multimodal message. */
 export interface ChatTextPart {
   type: 'text';
@@ -47,12 +50,22 @@ export interface TokenUsage {
   totalTokens?: number;
 }
 
+/** Per-response generation stats some endpoints report (notably LM Studio's
+ * native API). All optional — absent on servers that don't measure them. */
+export interface GenerationStats {
+  tokensPerSecond?: number;
+  timeToFirstTokenSec?: number;
+  generationTimeSec?: number;
+}
+
 export interface ChatResult {
   content: string;
   finishReason?: string;
   /** The endpoint's `usage` block, when it reports one. `promptTokens` is the
    * exact prefill size of the request — used by the prompt-size estimator. */
   usage?: TokenUsage;
+  /** Generation telemetry (tokens/sec, time-to-first-token), when reported. */
+  stats?: GenerationStats;
 }
 
 export interface ChatAdapter {
@@ -65,6 +78,8 @@ export interface ChatAdapter {
     onDelta: (text: string) => void,
     signal?: AbortSignal,
   ): Promise<ChatResult>;
-  /** List models advertised by the endpoint, if supported. */
-  listModels(signal?: AbortSignal): Promise<string[]>;
+  /** List models advertised by the endpoint, if supported. Returns at least an
+   * `id` per model; LM Studio's native adapter enriches each with loaded state,
+   * context length, etc. */
+  listModels(signal?: AbortSignal): Promise<LlmModelInfo[]>;
 }

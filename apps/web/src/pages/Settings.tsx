@@ -7,6 +7,7 @@ import {
   type Gender,
   type Sexuality,
   type LlmHealthResult,
+  type LlmModelInfo,
   type StructuredOutputMode,
   type EndpointMode,
 } from '@dsim/shared';
@@ -17,6 +18,35 @@ import { Banner, Field, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { CrisisResources } from '../components/CrisisResources';
 import './settings.page.css';
+
+/** The endpoint-mode banner: each provider as a prominent, selectable chip with
+ * a short tag and a one-line descriptor shown when it's active. */
+const PROVIDERS: Array<{ value: EndpointMode; name: string; tag: string; desc: string }> = [
+  {
+    value: 'chat_completions',
+    name: 'OpenAI-compatible',
+    tag: '/v1 · chat',
+    desc: 'OpenAI /chat/completions — LM Studio (/v1), Ollama, llama.cpp, vLLM, or any compatible server.',
+  },
+  {
+    value: 'lmstudio',
+    name: 'LM Studio',
+    tag: 'native /api/v0',
+    desc: "LM Studio's native API — richer model listing (loaded state, context, quant) and per-response speed stats. Point Base URL at …/api/v0.",
+  },
+  {
+    value: 'anthropic',
+    name: 'Anthropic',
+    tag: 'messages',
+    desc: 'Anthropic Messages API — api.anthropic.com or any compatible proxy/gateway. Needs an API key + anthropic-version.',
+  },
+  {
+    value: 'responses',
+    name: 'Responses',
+    tag: 'reserved',
+    desc: 'Reserved for the OpenAI Responses API — not implemented yet; falls back to chat/completions.',
+  },
+];
 
 interface Form {
   baseUrl: string;
@@ -34,6 +64,7 @@ interface Form {
   structuredMode: StructuredOutputMode;
   omitSchemaInPrompt: boolean;
   endpointMode: EndpointMode;
+  anthropicVersion: string;
   maxRetries: number;
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
@@ -55,7 +86,7 @@ export function Settings() {
   const [playerSaving, setPlayerSaving] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
   const [apiKeySet, setApiKeySet] = useState(false);
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<LlmModelInfo[]>([]);
   const [health, setHealth] = useState<LlmHealthResult | null>(null);
   const [error, setError] = useState<string>();
   const [savedNote, setSavedNote] = useState<string>();
@@ -104,6 +135,7 @@ export function Settings() {
           structuredMode: s.structuredMode,
           omitSchemaInPrompt: s.omitSchemaInPrompt,
           endpointMode: s.endpointMode,
+          anthropicVersion: s.anthropicVersion,
           maxRetries: s.maxRetries,
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,
@@ -120,6 +152,16 @@ export function Settings() {
 
   if (!form) return <Spinner />;
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
+  const hasModel = (id: string) => models.some((m) => m.id === id);
+  // Compact "8K ctx · loaded · Q4_K_M" suffix from whatever metadata is present
+  // (LM Studio's native listing fills these in; other endpoints just give an id).
+  const modelMeta = (m: LlmModelInfo): string => {
+    const bits: string[] = [];
+    if (m.contextLength) bits.push(`${Math.round(m.contextLength / 1024)}K ctx`);
+    if (m.loaded != null) bits.push(m.loaded ? 'loaded' : 'not loaded');
+    if (m.quantization) bits.push(m.quantization);
+    return bits.length ? ` — ${bits.join(' · ')}` : '';
+  };
   // Nullable sampling inputs: blank → null (field omitted from the request);
   // any other value parses to a number (NaN guarded so partial typing is kept null).
   const setNullable = (k: 'topP' | 'topK' | 'minP' | 'frequencyPenalty' | 'presencePenalty' | 'repeatPenalty', raw: string) => {
@@ -145,6 +187,7 @@ export function Settings() {
       structuredMode: form.structuredMode,
       omitSchemaInPrompt: form.omitSchemaInPrompt,
       endpointMode: form.endpointMode,
+      anthropicVersion: form.anthropicVersion,
       maxRetries: form.maxRetries,
       nsfwEnabled: form.nsfwEnabled,
       rapportCadence: form.rapportCadence,
@@ -282,8 +325,9 @@ export function Settings() {
         <div className="kicker">The control desk</div>
         <h1>Settings</h1>
         <p>
-          Configure your local OpenAI-compatible endpoint (LM Studio, Ollama, llama.cpp, …). The browser never calls
-          the model directly — the local server does.
+          Configure your model endpoint — OpenAI-compatible (LM Studio, Ollama, llama.cpp, …), LM Studio's native API,
+          or an Anthropic-compatible one — via the Endpoint mode below. The browser never calls the model directly;
+          the server does.
         </p>
       </div>
       {error && <Banner kind="error">{error}</Banner>}
@@ -467,42 +511,103 @@ export function Settings() {
             <div className="set-console-sub">Local model link</div>
             <div className="set-console-title">Connection console</div>
           </div>
-          <span className="set-console-dot">{form.baseUrl ? 'Endpoint set' : 'No endpoint'}</span>
+          <span className="set-console-dot">
+            {PROVIDERS.find((p) => p.value === form.endpointMode)?.name ?? 'Provider'} ·{' '}
+            {form.baseUrl ? 'endpoint set' : 'no endpoint'}
+          </span>
+        </div>
+
+        {/* Provider selector — the first decision on this console: it picks the
+            wire protocol every field below speaks, so it spans the full width
+            above the two columns rather than hiding among the sampling knobs. */}
+        <div className="set-provider">
+          <div className="set-col-label">Provider</div>
+          <div className="set-provider-seg" role="group" aria-label="Endpoint mode">
+            {PROVIDERS.map((p) => {
+              const active = form.endpointMode === p.value;
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  className={`set-provider-chip ${active ? 'active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => set('endpointMode', p.value)}
+                >
+                  <span className="set-provider-name">{p.name}</span>
+                  <span className="set-provider-tag">{p.tag}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="set-provider-desc">
+            {PROVIDERS.find((p) => p.value === form.endpointMode)?.desc}
+          </p>
         </div>
 
         <div className="set-console-grid">
           <div className="set-console-col">
             <div className="set-col-label">Connection</div>
-            <Field label="Base URL" hint="e.g. http://localhost:1234/v1">
+            <Field
+              label="Base URL"
+              hint={
+                form.endpointMode === 'anthropic'
+                  ? 'e.g. https://api.anthropic.com/v1 (or your compatible proxy)'
+                  : form.endpointMode === 'lmstudio'
+                    ? 'e.g. http://localhost:1234/api/v0 (LM Studio native API)'
+                    : 'e.g. http://localhost:1234/v1'
+              }
+            >
               <input value={form.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} />
             </Field>
-            <Field label="API key" hint={apiKeySet ? 'A key is set. Leave blank to keep it.' : 'Optional for local servers.'}>
+            <Field
+              label="API key"
+              hint={
+                apiKeySet
+                  ? 'A key is set. Leave blank to keep it.'
+                  : form.endpointMode === 'anthropic'
+                    ? 'Required for the Anthropic API.'
+                    : 'Optional for local servers.'
+              }
+            >
               <input
                 type="password"
-                placeholder={apiKeySet ? '•••••••• (unchanged)' : 'optional'}
+                placeholder={apiKeySet ? '•••••••• (unchanged)' : form.endpointMode === 'anthropic' ? 'required' : 'optional'}
                 value={form.apiKey}
                 onChange={(e) => set('apiKey', e.target.value)}
               />
             </Field>
+            {form.endpointMode === 'anthropic' && (
+              <Field
+                label="Anthropic version"
+                hint="Sent as the anthropic-version header. Leave at the default unless your endpoint needs a newer revision."
+              >
+                <input
+                  value={form.anthropicVersion}
+                  onChange={(e) => set('anthropicVersion', e.target.value)}
+                  placeholder="2023-06-01"
+                />
+              </Field>
+            )}
             <Field label="Model" hint="Type any model name, or pick from the loaded list below.">
               <input value={form.model} onChange={(e) => set('model', e.target.value)} list="model-list" />
               {models.length > 0 && (
                 <select
                   className="set-model-picker"
-                  value={models.includes(form.model) ? form.model : ''}
+                  value={hasModel(form.model) ? form.model : ''}
                   onChange={(e) => e.target.value && set('model', e.target.value)}
                 >
-                  <option value="">{`Pick from ${models.length} loaded model${models.length === 1 ? '' : 's'}…`}</option>
+                  <option value="">{`Pick from ${models.length} model${models.length === 1 ? '' : 's'}…`}</option>
                   {models.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
+                    <option key={m.id} value={m.id}>
+                      {m.id}
+                      {modelMeta(m)}
                     </option>
                   ))}
                 </select>
               )}
               <datalist id="model-list">
                 {models.map((m) => (
-                  <option key={m} value={m} />
+                  <option key={m.id} value={m.id} />
                 ))}
               </datalist>
             </Field>
@@ -519,20 +624,21 @@ export function Settings() {
               {models.length > 0 && (
                 <select
                   className="set-model-picker"
-                  value={models.includes(form.visionModel) ? form.visionModel : ''}
+                  value={hasModel(form.visionModel) ? form.visionModel : ''}
                   onChange={(e) => e.target.value && set('visionModel', e.target.value)}
                 >
-                  <option value="">Pick a loaded model…</option>
+                  <option value="">Pick a model…</option>
                   {models.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
+                    <option key={m.id} value={m.id}>
+                      {m.id}
+                      {modelMeta(m)}
                     </option>
                   ))}
                 </select>
               )}
             </Field>
             <button className="btn sm" onClick={loadModels} disabled={loadingModels}>
-              {loadingModels ? 'Loading…' : 'Load models from /v1/models'}
+              {loadingModels ? 'Loading…' : 'Load models'}
             </button>
           </div>
 
@@ -649,12 +755,6 @@ export function Settings() {
                 />
                 <span>Skip the duplicate schema text (json_schema mode)</span>
               </label>
-            </Field>
-            <Field label="Endpoint mode" hint="responses is reserved for future use.">
-              <select value={form.endpointMode} onChange={(e) => set('endpointMode', e.target.value as EndpointMode)}>
-                <option value="chat_completions">chat_completions</option>
-                <option value="responses">responses</option>
-              </select>
             </Field>
             <Field label="Structured retry limit" hint="Retries after a malformed/invalid structured response.">
               <input type="number" min={0} max={10} value={form.maxRetries} onChange={(e) => set('maxRetries', Number(e.target.value))} />

@@ -1,6 +1,8 @@
 import type { LlmSettings } from '@dsim/shared';
 import type { ChatAdapter } from './types';
 import { OpenAiCompatibleAdapter } from './openai-adapter';
+import { AnthropicAdapter } from './anthropic-adapter';
+import { LmStudioAdapter } from './lmstudio-adapter';
 
 /**
  * Optional adapter override. When set (used by tests), every consumer that
@@ -16,15 +18,18 @@ export function setAdapterOverride(adapter: ChatAdapter | null): void {
 /**
  * Build a chat adapter from the current LLM settings.
  *
- * The `endpointMode` setting selects the transport. Today only
- * `chat_completions` is implemented; `responses` is reserved — the adapter
- * interface (`ChatAdapter`) is intentionally transport-agnostic so a
- * `ResponsesAdapter` hitting `/v1/responses` can be added later without
- * touching the structured-output / retry logic.
+ * The `endpointMode` setting selects the transport. The adapter interface
+ * (`ChatAdapter`) is intentionally transport-agnostic so each mode can hit a
+ * different wire format without touching the structured-output / retry logic:
+ *  - `chat_completions` — OpenAI-compatible `/chat/completions`
+ *  - `lmstudio`         — LM Studio's native `/api/v0` (OpenAI-shaped chat +
+ *                         richer model listing & per-response stats)
+ *  - `anthropic`        — Anthropic Messages API `/messages`
+ *  - `responses`        — reserved (`/v1/responses`); falls back to OpenAI today
  */
 export function getAdapter(settings: LlmSettings): ChatAdapter {
   if (adapterOverride) return adapterOverride;
-  const cfg = {
+  const openAiCfg = {
     baseUrl: settings.baseUrl,
     apiKey: settings.apiKey,
     model: settings.model,
@@ -38,12 +43,22 @@ export function getAdapter(settings: LlmSettings): ChatAdapter {
     },
   };
   switch (settings.endpointMode) {
+    case 'anthropic':
+      return new AnthropicAdapter({
+        baseUrl: settings.baseUrl,
+        apiKey: settings.apiKey,
+        model: settings.model,
+        anthropicVersion: settings.anthropicVersion,
+        sampling: { topP: settings.topP, topK: settings.topK },
+      });
+    case 'lmstudio':
+      return new LmStudioAdapter(openAiCfg);
     case 'responses':
       // Not yet implemented. Fall back to chat/completions so the app keeps
       // working; swap in a ResponsesAdapter here when ready.
-      return new OpenAiCompatibleAdapter(cfg);
+      return new OpenAiCompatibleAdapter(openAiCfg);
     case 'chat_completions':
     default:
-      return new OpenAiCompatibleAdapter(cfg);
+      return new OpenAiCompatibleAdapter(openAiCfg);
   }
 }

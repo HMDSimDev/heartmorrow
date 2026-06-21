@@ -94,6 +94,42 @@
   background: linear-gradient(90deg, var(--border-bright), transparent);
 }
 
+/* --- Provider selector (endpoint mode) ----------------------------------- */
+/* The prominent banner above the two columns: picking a provider here is the
+   first move, so it's a row of selectable chips, not a buried <select>. */
+.set-provider { margin-bottom: 20px; }
+.set-provider .set-col-label { margin-bottom: 10px; }
+.set-provider-seg {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.set-provider-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 10px 13px; cursor: pointer; text-align: left; font: inherit;
+  color: var(--text-dim);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.12s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.set-provider-chip:hover { transform: translateY(-1px); border-color: var(--border-bright); color: var(--text); }
+.set-provider-chip:active { transform: scale(0.99); }
+.set-provider-chip.active {
+  color: var(--text); border-color: var(--brass);
+  background: linear-gradient(180deg, rgba(230, 177, 94, 0.1), var(--panel));
+  box-shadow: 0 0 0 1px var(--brass), 0 0 14px rgba(230, 177, 94, 0.28);
+}
+.set-provider-name { font-family: var(--font-display); font-weight: 600; font-size: 0.98rem; line-height: 1.15; }
+.set-provider-tag {
+  font-family: var(--font-mono); font-size: 0.6rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-mute);
+}
+.set-provider-chip.active .set-provider-tag { color: var(--brass); }
+.set-provider-desc {
+  margin: 10px 0 0; font-size: 0.82rem; line-height: 1.45;
+  color: var(--text-mute); max-width: 75ch;
+}
+
 /* Real dropdown for picking among loaded models — sits under the free-text input
    (the native <datalist> is unreliable: clicking often shows nothing). */
 .set-model-picker { margin-top: 6px; width: 100%; }

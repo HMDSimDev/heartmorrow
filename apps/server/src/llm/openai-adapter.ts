@@ -1,4 +1,5 @@
-import type { ChatAdapter, ChatRequest, ChatResult } from './types';
+import type { LlmModelInfo } from '@dsim/shared';
+import type { ChatAdapter, ChatRequest, ChatResult, GenerationStats } from './types';
 
 /**
  * Adapter for any OpenAI-API-compatible endpoint (LM Studio, Ollama,
@@ -29,16 +30,32 @@ export interface OpenAiAdapterConfig {
   };
 }
 
-function joinUrl(baseUrl: string, path: string): string {
+export function joinUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
 }
 
+/** Map an LM-Studio-style `stats` block (also emitted by some other servers)
+ * to our camelCased GenerationStats. Returns undefined when nothing is present. */
+export function parseGenerationStats(stats: unknown): GenerationStats | undefined {
+  if (!stats || typeof stats !== 'object') return undefined;
+  const s = stats as Record<string, unknown>;
+  const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : undefined);
+  const out: GenerationStats = {
+    tokensPerSecond: num(s.tokens_per_second),
+    timeToFirstTokenSec: num(s.time_to_first_token),
+    generationTimeSec: num(s.generation_time),
+  };
+  return out.tokensPerSecond != null || out.timeToFirstTokenSec != null || out.generationTimeSec != null
+    ? out
+    : undefined;
+}
+
 export class OpenAiCompatibleAdapter implements ChatAdapter {
-  readonly name = 'openai-compatible';
+  readonly name: string = 'openai-compatible';
 
-  constructor(private readonly cfg: OpenAiAdapterConfig) {}
+  constructor(protected readonly cfg: OpenAiAdapterConfig) {}
 
-  private headers(): Record<string, string> {
+  protected headers(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.cfg.apiKey) h.Authorization = `Bearer ${this.cfg.apiKey}`;
     return h;
@@ -87,6 +104,9 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
         finish_reason?: string;
       }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+      // LM Studio's native /api/v0 chat response carries a `stats` block; plain
+      // OpenAI servers omit it (so this stays undefined there).
+      stats?: unknown;
     };
     const choice = data.choices?.[0];
     const message = choice?.message;
@@ -104,6 +124,7 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
             totalTokens: data.usage.total_tokens,
           }
         : undefined,
+      stats: parseGenerationStats(data.stats),
     };
   }
 
@@ -183,7 +204,7 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
     return { content, finishReason };
   }
 
-  async listModels(signal?: AbortSignal): Promise<string[]> {
+  async listModels(signal?: AbortSignal): Promise<LlmModelInfo[]> {
     const res = await fetch(joinUrl(this.cfg.baseUrl, 'models'), {
       method: 'GET',
       headers: this.headers(),
@@ -193,6 +214,9 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
       throw new Error(`Model listing returned ${res.status} ${res.statusText}`);
     }
     const data = (await res.json()) as { data?: Array<{ id?: string }> };
-    return (data.data ?? []).map((m) => m.id).filter((id): id is string => typeof id === 'string');
+    return (data.data ?? [])
+      .map((m) => m.id)
+      .filter((id): id is string => typeof id === 'string')
+      .map((id) => ({ id }));
   }
 }

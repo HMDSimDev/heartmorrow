@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resetDb, seedWorldAndCharacter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
-import type { ChatAdapter, ChatRequest, ChatResult, ChatContentPart, ChatImagePart } from '../llm/types';
+import type { ChatAdapter, ChatRequest, ChatResult, ChatContentPart, ChatImagePart, LlmModelInfo } from '../llm/types';
 import { saveUploadedAsset, deleteAsset } from './asset-service';
 import { generateCharacterFromImage } from './character-service';
 
@@ -25,7 +25,7 @@ class RecordingAdapter implements ChatAdapter {
     onDelta(r.content);
     return r;
   }
-  async listModels(): Promise<string[]> {
+  async listModels(): Promise<LlmModelInfo[]> {
     return [];
   }
 }

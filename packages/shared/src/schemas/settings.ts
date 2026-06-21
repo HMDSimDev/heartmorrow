@@ -14,10 +14,31 @@ export const StructuredOutputModeSchema = z.enum([
 export type StructuredOutputMode = z.infer<typeof StructuredOutputModeSchema>;
 
 export const EndpointModeSchema = z.enum([
-  'chat_completions', // POST {baseUrl}/chat/completions  (implemented)
+  'chat_completions', // POST {baseUrl}/chat/completions — OpenAI-compatible (LM Studio /v1, Ollama, llama.cpp, vLLM)
   'responses', // POST {baseUrl}/responses  (reserved — adapter interface left open)
+  'anthropic', // POST {baseUrl}/messages — Anthropic Messages API shape (api.anthropic.com or any compatible proxy/gateway)
+  'lmstudio', // POST {baseUrl}/chat/completions on LM Studio's NATIVE REST API (baseUrl ending /api/v0) — richer model metadata + per-response stats
 ]);
 export type EndpointMode = z.infer<typeof EndpointModeSchema>;
+
+/**
+ * One model advertised by the endpoint's listing. `id` is always present; the
+ * remaining fields are best-effort enrichment only LM Studio's native
+ * `/api/v0/models` provides (OpenAI-compatible and Anthropic listings return
+ * just the id). The Settings model picker annotates entries with whatever is set.
+ */
+export const LlmModelInfoSchema = z.object({
+  id: z.string(),
+  /** LM Studio: is the model currently loaded into memory (vs merely downloaded)? */
+  loaded: z.boolean().optional(),
+  /** Max context window in tokens, when the endpoint reports it. */
+  contextLength: z.number().int().positive().optional(),
+  /** Quantization label (e.g. "Q4_K_M"), when reported. */
+  quantization: z.string().optional(),
+  /** Model family/role (e.g. "llm", "vlm", "embeddings"), when reported. */
+  type: z.string().optional(),
+});
+export type LlmModelInfo = z.infer<typeof LlmModelInfoSchema>;
 
 export const LlmSettingsSchema = z.object({
   baseUrl: z
@@ -63,6 +84,12 @@ export const LlmSettingsSchema = z.object({
    */
   omitSchemaInPrompt: z.boolean().default(false),
   endpointMode: EndpointModeSchema.default('chat_completions'),
+  /**
+   * `anthropic-version` request header, only used when `endpointMode` is
+   * 'anthropic'. The Messages API requires it; bump this if you target a newer
+   * API revision. Ignored by every other endpoint mode.
+   */
+  anthropicVersion: z.string().default('2023-06-01'),
   maxRetries: z.number().int().min(0).max(10).default(3),
   /**
    * When true, the SERVER permits mature/explicit content in date dialogue —
