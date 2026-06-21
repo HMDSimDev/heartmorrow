@@ -16,6 +16,8 @@ import type {
   FeedView,
   GenerateDatingStatsInput,
   GenerateLocationsInput,
+  GenerateWorldInput,
+  WorldGenDraft,
   GenerateProfileInput,
   GenerateCharacterFromImageInput,
   GenerateShopItemsInput,
@@ -340,6 +342,8 @@ export const api = {
     del<{ ok: true }>(`/worlds/${id}${deleteCharacters ? '?deleteCharacters=true' : ''}`),
   generateLocations: (worldId: string, input: GenerateLocationsInput) =>
     post<StructuredResult<Location[]>>(`/worlds/${worldId}/locations/generate`, input),
+  generateWorld: (input: GenerateWorldInput) =>
+    post<StructuredResult<WorldGenDraft>>(`/worlds/generate`, input),
   listWorldNotes: (worldId: string) => get<WorldNote[]>(`/worlds/${worldId}/notes`),
   createWorldNote: (worldId: string, input: WorldNoteCreate) =>
     post<WorldNote>(`/worlds/${worldId}/notes`, input),

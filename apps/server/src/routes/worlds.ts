@@ -5,11 +5,12 @@ import {
   WorldNoteCreateSchema,
   WorldNoteUpdateSchema,
   GenerateLocationsInputSchema,
+  GenerateWorldInputSchema,
   CloneWorldSchema,
   ImportCharactersSchema,
 } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
-import { generateLocations } from '../services/location-service';
+import { generateLocations, generateWorld } from '../services/location-service';
 import {
   cloneWorld,
   createWorld,
@@ -36,6 +37,13 @@ export async function worldRoutes(app: FastifyInstance): Promise<void> {
     const input = parseInput(WorldCreateSchema, req.body);
     reply.code(201);
     return createWorld(input);
+  });
+
+  // Onboarding tool: generate a whole world DRAFT (setting + locations, no cast)
+  // from a few seeds. Read-only — returns a draft for review, creates nothing.
+  app.post('/worlds/generate', async (req) => {
+    const input = parseInput(GenerateWorldInputSchema, req.body);
+    return generateWorld(input);
   });
 
   // Start a new save from an existing world: clones its definition, notes, and cast.

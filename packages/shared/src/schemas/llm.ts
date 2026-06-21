@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WorldNoteScopeSchema } from './entities';
 import { MAX_EVAL_DELTA, EMAILS_MAX_PER_DAY, MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, WEALTH } from '../constants';
 import { PhaseSchema } from '../time';
 import { ItemCategorySchema, ItemRaritySchema } from './items';
@@ -240,6 +241,60 @@ export const LocationGenerationSchema = z.object({
   locations: z.array(GeneratedLocationSchema).min(1).max(LOCATION_GEN.MAX_LOCATIONS),
 });
 export type LocationGeneration = z.infer<typeof LocationGenerationSchema>;
+
+// --- World generation (onboarding tool: a whole world from a few seeds) ------
+
+/**
+ * Bounds for the LLM WORLD generator. The server clamp (`boundGeneratedWorld`) is
+ * the authority: it trims every text field to length and bounds the locations. The
+ * generator intentionally does NOT produce characters — only the setting + venues.
+ */
+export const WORLD_GEN = {
+  MAX_NAME: 80,
+  MAX_SUMMARY: 280,
+  MAX_TONE: 120,
+  MAX_LORE: 2000,
+  MAX_RULES: 1200,
+  MAX_GLOBAL_NOTES: 1500,
+  MIN_LOCATIONS: 3,
+  MAX_LOCATIONS: 8,
+  MIN_NOTES: 3,
+  MAX_NOTES: 6,
+  MAX_NOTE_TITLE: 70,
+  MAX_NOTE_BODY: 600,
+  MAX_NOTE_TAGS: 6,
+} as const;
+
+/** One generated structured world note (lore/faction/rule/place entry, no id). */
+export const GeneratedWorldNoteSchema = z.object({
+  title: z.string().min(1).max(WORLD_GEN.MAX_NOTE_TITLE),
+  body: z.string().min(1).max(WORLD_GEN.MAX_NOTE_BODY),
+  tags: z
+    .array(z.string().min(1).max(LOCATION_GEN.MAX_TAG_LEN))
+    .max(WORLD_GEN.MAX_NOTE_TAGS)
+    .default([]),
+  /** Mirrors WorldNoteScope. 'character' is disallowed — the generator makes no cast. */
+  scope: WorldNoteScopeSchema.exclude(['character']).default('lore'),
+  importance: z.number().int().min(1).max(5).default(3),
+});
+export type GeneratedWorldNote = z.infer<typeof GeneratedWorldNoteSchema>;
+
+/**
+ * A whole generated world DRAFT: the setting (summary/tone/lore/rules + always-on
+ * global notes), a batch of locations, and a set of structured world notes — but NO
+ * cast. The world is a fleshed-out stage; its people are created separately.
+ */
+export const WorldGenerationSchema = z.object({
+  name: z.string().min(1).max(WORLD_GEN.MAX_NAME),
+  summary: z.string().min(1).max(WORLD_GEN.MAX_SUMMARY),
+  tone: z.string().min(1).max(WORLD_GEN.MAX_TONE),
+  lore: z.string().max(WORLD_GEN.MAX_LORE).default(''),
+  rules: z.string().max(WORLD_GEN.MAX_RULES).default(''),
+  globalNotes: z.string().max(WORLD_GEN.MAX_GLOBAL_NOTES).default(''),
+  locations: z.array(GeneratedLocationSchema).min(WORLD_GEN.MIN_LOCATIONS).max(WORLD_GEN.MAX_LOCATIONS),
+  notes: z.array(GeneratedWorldNoteSchema).min(WORLD_GEN.MIN_NOTES).max(WORLD_GEN.MAX_NOTES),
+});
+export type WorldGeneration = z.infer<typeof WorldGenerationSchema>;
 
 // --- Property generation (creator tool: batch in-world properties) ----------
 

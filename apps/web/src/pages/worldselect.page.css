@@ -468,6 +468,57 @@
   background: var(--brass);
 }
 
+/* step 1 — AI "generate the whole world" (blank mode) */
+.wonb-gen {
+  margin-top: 18px;
+}
+.wonb-gen textarea {
+  width: 100%;
+  resize: vertical;
+}
+.wonb-gen-preview {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--panel-2) 55%, transparent);
+}
+.wonb-gen-locs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wonb-gen-loc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--panel) 55%, transparent);
+}
+.wonb-gen-loc-name {
+  flex: 1;
+  font-family: var(--font-display);
+}
+.wonb-gen-loc textarea {
+  width: 100%;
+  resize: vertical;
+}
+.wonb-gen-loc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.wonb-chip {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--brass) 10%, transparent);
+  border: 1px solid var(--border-soft);
+}
+
 /* step 4 — how to play */
 .wonb-howto {
   list-style: none;

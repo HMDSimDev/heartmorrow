@@ -43,7 +43,7 @@ import {
   MarketNewsSchema,
   GamblingRoundSchema,
 } from './entities';
-import { DayRecapSchema, ITEM_GEN, LOCATION_GEN, PROPERTY_GEN, STOCK_GEN } from './llm';
+import { DayRecapSchema, ITEM_GEN, LOCATION_GEN, PROPERTY_GEN, STOCK_GEN, WORLD_GEN } from './llm';
 import { ItemCategorySchema, ItemRaritySchema } from './items';
 import { RelationshipStatusSchema } from '../social';
 import { PropertyCategorySchema, StockSectorSchema } from '../wealth';
@@ -63,16 +63,35 @@ import {
  * stat deltas) are deliberately omitted from input shapes.
  */
 
+// --- World notes ------------------------------------------------------------
+
+export const WorldNoteCreateSchema = WorldNoteSchema.omit({
+  id: true,
+  worldId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type WorldNoteCreate = z.input<typeof WorldNoteCreateSchema>;
+
+export const WorldNoteUpdateSchema = WorldNoteCreateSchema.partial();
+export type WorldNoteUpdate = z.input<typeof WorldNoteUpdateSchema>;
+
 // --- World ------------------------------------------------------------------
 
-export const WorldCreateSchema = WorldSchema.omit({
+const WorldBaseSchema = WorldSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
 });
+
+export const WorldCreateSchema = WorldBaseSchema.extend({
+  // Optional structured notes to persist alongside the world in one shot (used by
+  // the onboarding world generator). Create-only — not part of WorldUpdate.
+  notes: z.array(WorldNoteCreateSchema).max(WORLD_GEN.MAX_NOTES).optional(),
+});
 export type WorldCreate = z.input<typeof WorldCreateSchema>;
 
-export const WorldUpdateSchema = WorldCreateSchema.partial();
+export const WorldUpdateSchema = WorldBaseSchema.partial();
 export type WorldUpdate = z.input<typeof WorldUpdateSchema>;
 
 /** Clone an existing world (definition + notes + cast) into a fresh save. */
@@ -86,19 +105,6 @@ export const ImportCharactersSchema = z.object({
   sourceCharacterIds: z.array(z.string().min(1)).min(1).max(50),
 });
 export type ImportCharacters = z.input<typeof ImportCharactersSchema>;
-
-// --- World notes ------------------------------------------------------------
-
-export const WorldNoteCreateSchema = WorldNoteSchema.omit({
-  id: true,
-  worldId: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export type WorldNoteCreate = z.input<typeof WorldNoteCreateSchema>;
-
-export const WorldNoteUpdateSchema = WorldNoteCreateSchema.partial();
-export type WorldNoteUpdate = z.input<typeof WorldNoteUpdateSchema>;
 
 // --- Character --------------------------------------------------------------
 
@@ -291,6 +297,47 @@ export const GenerateLocationsInputSchema = z.object({
 export type GenerateLocationsInput = z.input<typeof GenerateLocationsInputSchema>;
 /** Parsed form (defaults applied) used by the server prompt builder + bounding. */
 export type GenerateLocationsParsed = z.output<typeof GenerateLocationsInputSchema>;
+
+/**
+ * Input for the LLM whole-world generator (onboarding tool). The creator supplies a
+ * few optional seeds (name/summary/tone) plus a free-form `prompt` idea; the server
+ * fleshes out the setting + a batch of locations. No world need exist yet, so unlike
+ * location generation this carries its own seed context rather than loading a world.
+ */
+export const GenerateWorldInputSchema = z.object({
+  name: z.string().max(WORLD_GEN.MAX_NAME).default(''),
+  summary: z.string().max(600).default(''),
+  tone: z.string().max(300).default(''),
+  prompt: z.string().max(1000).default(''),
+  locationCount: z
+    .number()
+    .int()
+    .min(WORLD_GEN.MIN_LOCATIONS)
+    .max(WORLD_GEN.MAX_LOCATIONS)
+    .default(5),
+  noteCount: z.number().int().min(WORLD_GEN.MIN_NOTES).max(WORLD_GEN.MAX_NOTES).default(4),
+});
+export type GenerateWorldInput = z.input<typeof GenerateWorldInputSchema>;
+export type GenerateWorldParsed = z.output<typeof GenerateWorldInputSchema>;
+
+/**
+ * The server-bounded world DRAFT returned to the client: the full setting
+ * (summary/tone/lore/rules/globalNotes) + locations + structured world notes, no
+ * cast. `notes` are ready-to-create WorldNoteCreate rows (the world doesn't exist
+ * yet, so they're persisted right after it's created).
+ */
+export const WorldGenDraftSchema = WorldSchema.pick({
+  name: true,
+  summary: true,
+  tone: true,
+  lore: true,
+  rules: true,
+  globalNotes: true,
+  locations: true,
+}).extend({
+  notes: z.array(WorldNoteCreateSchema),
+});
+export type WorldGenDraft = z.infer<typeof WorldGenDraftSchema>;
 
 export const PurchaseSchema = z.object({
   shopItemId: z.string().min(1),

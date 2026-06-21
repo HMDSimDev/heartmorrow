@@ -8,9 +8,11 @@ import {
   deriveCalendar,
   type Character,
   type Gender,
+  type Location,
   type PhoneInbox,
   type Sexuality,
   type World,
+  type WorldNoteCreate,
   type WorldState,
 } from '@dsim/shared';
 import { api } from '../lib/api';
@@ -363,6 +365,17 @@ export function WorldOnboarding() {
   const [importIds, setImportIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  // AI "generate the whole world" (blank mode only): a free-form idea + the
+  // generated draft (lore/rules/locations) the player can edit before creating.
+  const [genPrompt, setGenPrompt] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [generated, setGenerated] = useState<{
+    lore: string;
+    rules: string;
+    globalNotes: string;
+    locations: Location[];
+    notes: WorldNoteCreate[];
+  } | null>(null);
 
   const canClone = worlds.length > 0;
 
@@ -420,6 +433,17 @@ export function WorldOnboarding() {
               name: worldForm.name.trim(),
               summary: worldForm.summary.trim(),
               tone: worldForm.tone.trim(),
+              // Carry the generated setting + locations + notes through when present.
+              // The server persists the notes atomically with the world.
+              ...(generated
+                ? {
+                    lore: generated.lore,
+                    rules: generated.rules,
+                    globalNotes: generated.globalNotes,
+                    locations: generated.locations,
+                    notes: generated.notes,
+                  }
+                : {}),
             });
       setWorld(w);
       draft.clear(); // committed to the server → the step-1 draft is done
@@ -431,6 +455,53 @@ export function WorldOnboarding() {
       setBusy(false);
     }
   };
+
+  const generateTheWorld = async () => {
+    setGenerating(true);
+    setError(undefined);
+    try {
+      const res = await api.generateWorld({
+        name: worldForm.name.trim(),
+        summary: worldForm.summary.trim(),
+        tone: worldForm.tone.trim(),
+        prompt: genPrompt.trim(),
+      });
+      if (res.ok) {
+        // Fill the seeds from the draft (keep a name the player already typed),
+        // then stash the rest for the editable preview.
+        setWorldForm((f) => ({
+          name: f.name.trim() || res.data.name,
+          summary: res.data.summary,
+          tone: res.data.tone,
+        }));
+        setGenerated({
+          lore: res.data.lore,
+          rules: res.data.rules,
+          globalNotes: res.data.globalNotes,
+          locations: res.data.locations,
+          notes: res.data.notes,
+        });
+      } else {
+        setError(`World generation failed: ${res.error}`);
+      }
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const updateGenLocation = (i: number, patch: Partial<Location>) =>
+    setGenerated((g) =>
+      g ? { ...g, locations: g.locations.map((l, j) => (j === i ? { ...l, ...patch } : l)) } : g,
+    );
+  const removeGenLocation = (i: number) =>
+    setGenerated((g) => (g ? { ...g, locations: g.locations.filter((_, j) => j !== i) } : g));
+
+  const updateGenNote = (i: number, patch: Partial<WorldNoteCreate>) =>
+    setGenerated((g) => (g ? { ...g, notes: g.notes.map((n, j) => (j === i ? { ...n, ...patch } : n)) } : g));
+  const removeGenNote = (i: number) =>
+    setGenerated((g) => (g ? { ...g, notes: g.notes.filter((_, j) => j !== i) } : g));
 
   const savePersona = async () => {
     if (!world) return;
@@ -596,6 +667,137 @@ export function WorldOnboarding() {
                     onChange={(e) => setWorldForm({ ...worldForm, tone: e.target.value })}
                   />
                 </Field>
+
+                <div className="wonb-gen">
+                  <div className="wonb-cast-head">
+                    <span className="kicker">Or conjure it with AI</span>
+                    <span className="trail" />
+                  </div>
+                  <p className="wonb-flavor">
+                    Give a spark — a vibe, a place, a premise — and generate a whole setting, lore, and locations to
+                    start from. No people are created; you'll bring those in later. Edit anything before you continue.
+                  </p>
+                  <Field label="Your idea" hint="Optional — the more you give, the more it has to work with.">
+                    <textarea
+                      value={genPrompt}
+                      rows={3}
+                      placeholder="e.g. A storm-battered lighthouse town where everyone keeps a secret — autumn, slow-burn, a little melancholy."
+                      onChange={(e) => setGenPrompt(e.target.value)}
+                    />
+                  </Field>
+                  <button className="btn" type="button" onClick={generateTheWorld} disabled={generating || busy}>
+                    <Icon name="generate" size={14} />
+                    {generating ? 'Generating…' : generated ? 'Regenerate world' : 'Generate world'}
+                  </button>
+
+                  {generated && (
+                    <div className="wonb-gen-preview">
+                      <Field label="Lore" hint="The setting's backstory — edit freely.">
+                        <textarea
+                          value={generated.lore}
+                          rows={5}
+                          onChange={(e) => setGenerated((g) => (g ? { ...g, lore: e.target.value } : g))}
+                        />
+                      </Field>
+                      <Field label="World rules" hint="How this world works — may be blank for an ordinary setting.">
+                        <textarea
+                          value={generated.rules}
+                          rows={3}
+                          onChange={(e) => setGenerated((g) => (g ? { ...g, rules: e.target.value } : g))}
+                        />
+                      </Field>
+                      <Field
+                        label="Global notes"
+                        hint="The always-in-mind briefing the narrator keeps for every scene."
+                      >
+                        <textarea
+                          value={generated.globalNotes}
+                          rows={3}
+                          onChange={(e) => setGenerated((g) => (g ? { ...g, globalNotes: e.target.value } : g))}
+                        />
+                      </Field>
+                      <div className="wonb-cast-head">
+                        <span className="kicker">Locations · {generated.locations.length}</span>
+                        <span className="trail" />
+                      </div>
+                      {generated.locations.length === 0 ? (
+                        <p className="wonb-flavor">No locations — regenerate to get some.</p>
+                      ) : (
+                        <div className="wonb-gen-locs">
+                          {generated.locations.map((loc, i) => (
+                            <div key={loc.id} className="wonb-gen-loc">
+                              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                                <input
+                                  className="wonb-gen-loc-name"
+                                  value={loc.name}
+                                  onChange={(e) => updateGenLocation(i, { name: e.target.value })}
+                                />
+                                <button
+                                  className="btn ghost sm"
+                                  type="button"
+                                  title="Remove location"
+                                  onClick={() => removeGenLocation(i)}
+                                >
+                                  <Icon name="trash" size={13} />
+                                </button>
+                              </div>
+                              <textarea
+                                value={loc.description}
+                                rows={2}
+                                onChange={(e) => updateGenLocation(i, { description: e.target.value })}
+                              />
+                              {loc.tags.length > 0 && (
+                                <div className="wonb-gen-loc-tags">
+                                  {loc.tags.map((t) => (
+                                    <span key={t} className="wonb-chip">
+                                      {t}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="wonb-cast-head">
+                        <span className="kicker">World notes · {generated.notes.length}</span>
+                        <span className="trail" />
+                      </div>
+                      {generated.notes.length === 0 ? (
+                        <p className="wonb-flavor">No notes — regenerate to get some.</p>
+                      ) : (
+                        <div className="wonb-gen-locs">
+                          {generated.notes.map((note, i) => (
+                            <div key={i} className="wonb-gen-loc">
+                              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                                <input
+                                  className="wonb-gen-loc-name"
+                                  value={note.title}
+                                  onChange={(e) => updateGenNote(i, { title: e.target.value })}
+                                />
+                                {note.scope && <span className="wonb-chip">{note.scope}</span>}
+                                <button
+                                  className="btn ghost sm"
+                                  type="button"
+                                  title="Remove note"
+                                  onClick={() => removeGenNote(i)}
+                                >
+                                  <Icon name="trash" size={13} />
+                                </button>
+                              </div>
+                              <textarea
+                                value={note.body ?? ''}
+                                rows={3}
+                                onChange={(e) => updateGenNote(i, { body: e.target.value })}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </>
             )}
 

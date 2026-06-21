@@ -28,8 +28,16 @@ export function getWorld(id: string): World {
 
 export function createWorld(input: WorldCreate): World {
   const now = Date.now();
-  const world = WorldSchema.parse({ ...input, id: newId('world'), createdAt: now, updatedAt: now });
-  return worldsRepo.insert(world);
+  // `notes` are persisted as separate world_notes rows, not columns on the world.
+  const { notes, ...worldInput } = input;
+  const world = WorldSchema.parse({ ...worldInput, id: newId('world'), createdAt: now, updatedAt: now });
+  if (!notes?.length) return worldsRepo.insert(world);
+  // Insert the world + its notes atomically (nested-transaction safe via savepoints).
+  return getDb().transaction(() => {
+    const created = worldsRepo.insert(world);
+    for (const n of notes) createWorldNote(created.id, n);
+    return created;
+  });
 }
 
 /**

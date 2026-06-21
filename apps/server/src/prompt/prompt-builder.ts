@@ -35,6 +35,7 @@ import {
   type GenerateShopItemsParsed,
   type GeneratePropertiesParsed,
   type GenerateCompaniesParsed,
+  type GenerateWorldParsed,
 } from '@dsim/shared';
 import type { ChatMessage } from '../llm/types';
 import {
@@ -63,6 +64,7 @@ import {
   CHRONICLE_GUARDRAILS,
   ITEM_GEN_GUARDRAILS,
   LOCATION_GEN_GUARDRAILS,
+  WORLD_GEN_GUARDRAILS,
   PROPERTY_GEN_GUARDRAILS,
   STOCK_GEN_GUARDRAILS,
   MARKET_NEWS_GUARDRAILS,
@@ -1178,6 +1180,30 @@ export function buildLocationGenMessages(args: {
     {
       role: 'user',
       content: `${worldBlock}\n\n${existingBlock}\n\n=== REQUEST (reference only) ===\n${reqLines.join('\n')}`,
+    },
+  ];
+}
+
+/** Messages for the onboarding whole-world generator. Seeds + idea are DATA. */
+export function buildWorldGenMessages(input: GenerateWorldParsed): ChatMessage[] {
+  const seedLines: string[] = [];
+  if (input.name.trim()) seedLines.push(`Name: ${input.name.trim()}`);
+  if (input.summary.trim()) seedLines.push(`Summary: ${input.summary.trim()}`);
+  if (input.tone.trim()) seedLines.push(`Tone: ${input.tone.trim()}`);
+  const seedBlock = seedLines.length
+    ? `=== SEEDS (reference only — build on these) ===\n${seedLines.join('\n')}`
+    : '=== SEEDS ===\n(none provided — invent an original, evocative setting)';
+
+  const reqLines = [
+    `Design ONE complete, fleshed-out world with exactly ${input.locationCount} locations and ${input.noteCount} world notes. Do NOT invent any characters.`,
+  ];
+  if (input.prompt.trim()) reqLines.push(`Creator's idea / guidance (reference only): ${input.prompt.trim()}`);
+
+  return [
+    { role: 'system', content: WORLD_GEN_GUARDRAILS },
+    {
+      role: 'user',
+      content: `${seedBlock}\n\n=== REQUEST (reference only) ===\n${reqLines.join('\n')}`,
     },
   ];
 }
