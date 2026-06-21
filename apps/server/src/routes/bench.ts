@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { BenchRunCaseRequestSchema, BenchSaveRunRequestSchema, BenchBaselineValueSchema } from '@dsim/shared';
+import { BenchRunCaseRequestSchema, BenchSaveRunRequestSchema, BenchBaselineValueSchema, BenchCancelRequestSchema } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
 import { notFound } from '../lib/errors';
 import { getLlmSettings } from '../services/settings-service';
@@ -15,6 +15,11 @@ import { benchRunsStore, benchBaselinesStore } from '../services/bench/store';
  * + snapshots the settings it ran under).
  */
 export async function benchRoutes(app: FastifyInstance): Promise<void> {
+  // Maps a client run id → the AbortController of its currently-running case, so
+  // `POST /bench/cancel` can stop the in-flight model calls without relying on the
+  // browser→proxy→server connection close actually propagating.
+  const activeRuns = new Map<string, AbortController>();
+
   app.get('/bench/catalog', async () => buildBenchCatalog(getLlmSettings().model));
 
   app.get('/bench/baselines', async () => ({ baselines: benchBaselinesStore.list() }));
@@ -38,6 +43,10 @@ export async function benchRoutes(app: FastifyInstance): Promise<void> {
   app.post('/bench/run-case', async (req, reply) => {
     const input = parseInput(BenchRunCaseRequestSchema, req.body ?? {});
     const ac = new AbortController();
+    // Two abort paths, whichever fires first: (1) the explicit /bench/cancel
+    // endpoint (reliable), and (2) the client disconnecting (best-effort — listen
+    // on the RESPONSE socket; req.raw 'close' would fire as soon as the body is read).
+    if (input.runId) activeRuns.set(input.runId, ac);
     let done = false;
     reply.raw.on('close', () => {
       if (!done) ac.abort();
@@ -46,7 +55,16 @@ export async function benchRoutes(app: FastifyInstance): Promise<void> {
       return await runBenchCase(input, ac.signal);
     } finally {
       done = true;
+      if (input.runId && activeRuns.get(input.runId) === ac) activeRuns.delete(input.runId);
     }
+  });
+
+  // Abort the in-flight case for a run. Idempotent; safe to call when nothing runs.
+  app.post('/bench/cancel', async (req) => {
+    const { runId } = parseInput(BenchCancelRequestSchema, req.body ?? {});
+    const ac = activeRuns.get(runId);
+    if (ac) ac.abort();
+    return { ok: true, cancelled: Boolean(ac) };
   });
 
   app.post('/bench/runs', async (req) => {

@@ -172,6 +172,11 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
   const totalAttempts = maxRetries + 1; // 1 initial call + N retries
   let attempt = 0;
   while (attempt < totalAttempts) {
+    // Stop before each call if the caller aborted (e.g. the bench user hit Cancel) —
+    // works even for adapters that don't propagate the signal to their transport.
+    if (options.signal?.aborted) {
+      return { ok: false, error: 'Aborted.', attempts: attempt, lastRaw };
+    }
     const mode = modeChain[modeIdx]!;
     const responseFormat = buildResponseFormat(mode, schemaName, jsonSchema);
     const temperature = Math.max(0, baseTemp - attempt * 0.2);

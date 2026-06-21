@@ -172,6 +172,15 @@ export interface BenchCaseDef {
   dialogue?: DialogueSpec;
   /** judge: compare the model's parsed output to the human baseline. */
   score?: (human: BenchBaselineValue, llm: unknown) => BenchScoreResult;
+  /** generation: an extra quality gate BEYOND schema validity. Returns an error
+   *  string to FAIL the case (e.g. a required-but-defaulted field came back empty),
+   *  or null when the output is acceptable. */
+  validate?: (data: unknown) => string | null;
+}
+
+/** True when a value is a present, non-blank string. */
+function nonBlank(v: unknown): boolean {
+  return typeof v === 'string' && v.trim().length > 0;
 }
 
 // --- display helpers --------------------------------------------------------
@@ -1208,6 +1217,8 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Write a Faces feed post.',
       maxTokens: 500,
     }),
+    // The schema defaults `mood` to '' — an empty mood label is a real miss, so fail it.
+    validate: (data) => (nonBlank((data as { mood?: unknown }).mood) ? null : 'No mood label — the post’s "mood" field came back empty.'),
   },
   {
     id: 'gen_feed_comment',
@@ -1232,6 +1243,8 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Write a comment on the player’s post.',
       maxTokens: 400,
     }),
+    // The schema defaults `tone` to '' — an empty tone label is a real miss, so fail it.
+    validate: (data) => (nonBlank((data as { tone?: unknown }).tone) ? null : 'No tone label — the comment’s "tone" field came back empty.'),
   },
 ];
 

@@ -180,6 +180,44 @@ describe('bench runner', () => {
     }
   });
 
+  it('FAILS a Faces post whose mood label is empty (extra validate gate)', async () => {
+    setAdapterOverride(new ScriptedAdapter(['{"body":"a quiet day at the bindery","mood":""}']));
+    const res = await runBenchCase({ caseId: 'gen_feed_post', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(false);
+    expect(res.error.toLowerCase()).toContain('mood');
+  });
+
+  it('PASSES a Faces post that has a mood label', async () => {
+    setAdapterOverride(new ScriptedAdapter(['{"body":"a quiet day at the bindery","mood":"wistful"}']));
+    const res = await runBenchCase({ caseId: 'gen_feed_post', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(true);
+  });
+
+  it('FAILS a Faces comment whose tone label is empty', async () => {
+    setAdapterOverride(new ScriptedAdapter(['{"body":"so proud of you","tone":""}']));
+    const res = await runBenchCase({ caseId: 'gen_feed_comment', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(false);
+    expect(res.error.toLowerCase()).toContain('tone');
+  });
+
+  it('honors an aborted signal — stops a dialogue before sending any turn', async () => {
+    setAdapterOverride(new ScriptedAdapter(['{"body":"hi","tone":"warm"}']));
+    const ac = new AbortController();
+    ac.abort();
+    const res = await runBenchCase({ caseId: 'dialogue_text', llmPlayer: false, dialogueTurns: 4 }, ac.signal);
+    expect(res.transcript.length).toBe(0);
+    expect(res.calls.length).toBe(0);
+  });
+
+  it('honors an aborted signal — a structured judge bails before any model call', async () => {
+    setAdapterOverride(new ScriptedAdapter(['{"engagement":2,"expression":"happy","note":"x"}']));
+    const ac = new AbortController();
+    ac.abort();
+    const res = await runBenchCase({ caseId: 'judge_turn_good', llmPlayer: false, dialogueTurns: 4 }, ac.signal);
+    expect(res.ok).toBe(false);
+    expect(res.calls.length).toBe(0);
+  });
+
   it('returns a failed result for an unknown case via the route helper path', async () => {
     await expect(runBenchCase({ caseId: 'does_not_exist', llmPlayer: false, dialogueTurns: 4 })).rejects.toThrow();
   });

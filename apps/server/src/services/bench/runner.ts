@@ -195,7 +195,10 @@ async function runStructured(def: BenchCaseDef, settings: LlmSettings, signal?: 
       comparison = { human: null, llm: scored.llmValue, closeness: null, agree: null, pass: null, rows: scored.rows.map((row) => ({ ...row, human: '—', delta: '' })) };
     }
   }
-  const ok = res.ok && comparison?.pass !== false;
+  // Generation cases can declare an extra quality gate beyond schema validity
+  // (e.g. a required-but-defaulted field came back empty).
+  const validationError = res.ok && def.validate ? def.validate(res.data) ?? '' : '';
+  const ok = res.ok && comparison?.pass !== false && !validationError;
 
   return BenchCaseResultSchema.parse({
     caseId: def.id,
@@ -203,7 +206,7 @@ async function runStructured(def: BenchCaseDef, settings: LlmSettings, signal?: 
     group: def.group,
     kind: def.kind,
     ok,
-    error: res.ok ? judgeFailReason : res.error,
+    error: res.ok ? validationError || judgeFailReason : res.error,
     calls,
     promptTokens: r.promptTokens,
     completionTokens: r.completionTokens,
@@ -363,8 +366,13 @@ function failedResult(def: BenchCaseDef, message: string): BenchCaseResult {
   });
 }
 
-/** Run a single bench case end-to-end. Never throws — a bad case yields a failed result. */
-export async function runBenchCase(req: BenchRunCaseRequest, signal?: AbortSignal): Promise<BenchCaseResult> {
+/** Run a single bench case end-to-end. Never throws — a bad case yields a failed result.
+ *  (`runId` from the request is route-only — used to register cancellation — so the
+ *  runner needs just the execution fields.) */
+export async function runBenchCase(
+  req: Pick<BenchRunCaseRequest, 'caseId' | 'llmPlayer' | 'dialogueTurns'>,
+  signal?: AbortSignal,
+): Promise<BenchCaseResult> {
   const def = getBenchCase(req.caseId);
   if (!def) throw notFound(`Unknown bench case: ${req.caseId}`);
   const settings = getLlmSettings();

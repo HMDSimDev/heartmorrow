@@ -132,8 +132,16 @@ export const BenchRunCaseRequestSchema = z.object({
   caseId: z.string().min(1),
   llmPlayer: z.boolean().default(false),
   dialogueTurns: z.number().int().min(1).max(20).default(8),
+  /** A client-generated id shared by every case in one run, so a single
+   *  `POST /bench/cancel { runId }` can abort the in-flight case server-side
+   *  (independent of connection-close detection through the dev proxy). */
+  runId: z.string().default(''),
 });
 export type BenchRunCaseRequest = z.infer<typeof BenchRunCaseRequestSchema>;
+
+/** Body for the cancel endpoint. */
+export const BenchCancelRequestSchema = z.object({ runId: z.string().min(1) });
+export type BenchCancelRequest = z.infer<typeof BenchCancelRequestSchema>;
 
 /** Metrics for a single model call. */
 export const BenchCallMetricSchema = z.object({

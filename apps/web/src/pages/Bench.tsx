@@ -702,6 +702,9 @@ export function Bench() {
   const [running, setRunning] = useState(false);
   const [savedNote, setSavedNote] = useState<string>();
   const abortRef = useRef<AbortController | null>(null);
+  /** Id shared by every case in the current run, so Cancel can abort the in-flight
+   *  case server-side via /bench/cancel (not just the local fetch). */
+  const runIdRef = useRef<string>('');
   /** Settings snapshot captured when the current results' run STARTED, so saving
    *  records what the run actually executed under (not what's configured now). */
   const runSnapshotRef = useRef<BenchSettingsSnapshot | null>(null);
@@ -789,6 +792,8 @@ export function Bench() {
     }
     const ac = new AbortController();
     abortRef.current = ac;
+    const runId = crypto.randomUUID();
+    runIdRef.current = runId;
     for (const id of ids) {
       if (ac.signal.aborted) {
         setStatus((s) => ({ ...s, [id]: 'idle' }));
@@ -796,7 +801,7 @@ export function Bench() {
       }
       setStatus((s) => ({ ...s, [id]: 'running' }));
       try {
-        const r = await api.benchRunCase({ caseId: id, llmPlayer, dialogueTurns }, ac.signal);
+        const r = await api.benchRunCase({ caseId: id, llmPlayer, dialogueTurns, runId }, ac.signal);
         setResults((prev) => ({ ...prev, [id]: r }));
         setStatus((s) => ({ ...s, [id]: r.ok ? 'done' : 'error' }));
       } catch (e) {
@@ -817,6 +822,9 @@ export function Bench() {
   };
 
   const cancel = () => {
+    // Tell the server to abort the in-flight case (reliable), then abort the local
+    // fetch + stop the client loop.
+    if (runIdRef.current) void api.benchCancel(runIdRef.current).catch(() => undefined);
     abortRef.current?.abort();
     setRunning(false);
   };
