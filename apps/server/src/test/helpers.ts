@@ -46,3 +46,14 @@ export function seedWorldAndCharacter() {
   });
   return { world, character };
 }
+
+const STATS = { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 };
+
+/** A world with group dates enabled + two available characters (the host `a` and a
+ *  co-attendee `b`), for exercising the group-date data spine and turn loop. */
+export function seedGroupWorld() {
+  const world = createWorld({ name: 'Group World', featureFlags: { groupDates: true } });
+  const a = createCharacter({ worldId: world.id, name: 'Avery', age: 27, datingStats: STATS });
+  const b = createCharacter({ worldId: world.id, name: 'Bo', age: 29, datingStats: STATS });
+  return { world, a, b };
+}

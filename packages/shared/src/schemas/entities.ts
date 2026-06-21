@@ -61,6 +61,9 @@ export const FeatureFlagsSchema = z.object({
   /** The casino: wager money on slots/blackjack/roulette/video poker, behind a
    *  flat per-bet cap and a per-day wager cap so it never becomes a money engine. */
   gambling: z.boolean().default(false),
+  /** Group dates: invite a second person to a date — one shared session with a
+   *  per-seat rapport track for each attendee. */
+  groupDates: z.boolean().default(false),
 });
 export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 
@@ -309,6 +312,29 @@ export const MessageSchema = z.object({
   createdAt: ts,
 });
 export type Message = z.infer<typeof MessageSchema>;
+
+/** Whether an attendee is still at a (group) date, or left it early. */
+export const SessionParticipantStateSchema = z.enum(['present', 'left_early', 'walked_out']);
+export type SessionParticipantState = z.infer<typeof SessionParticipantStateSchema>;
+
+/**
+ * One attendee of a conversation session. A solo date has a single row (seat 0 =
+ * the session's `characterId`); a group date adds a row per co-attendee. Holds the
+ * per-seat live rapport (0..100) so each person's vibe is tracked independently.
+ */
+export const SessionParticipantSchema = z.object({
+  sessionId: id,
+  characterId: id,
+  /** Stable render/turn order; 0 = host (= ConversationSession.characterId). */
+  seat: z.number().int().nonnegative(),
+  /** Reserved for later date formats (romance / guest / wing_a / wing_b). */
+  role: z.string().default('romance'),
+  state: SessionParticipantStateSchema.default('present'),
+  /** Live per-seat rapport 0..100; null until the first judged turn seeds it. */
+  rapport: z.number().int().min(0).max(100).nullable().default(null),
+  updatedAt: ts,
+});
+export type SessionParticipant = z.infer<typeof SessionParticipantSchema>;
 
 // --- Shop / Inventory -------------------------------------------------------
 

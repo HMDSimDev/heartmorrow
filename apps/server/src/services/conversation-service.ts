@@ -2,6 +2,7 @@ import {
   ConversationSessionSchema,
   type ActiveDate,
   MessageSchema,
+  SessionParticipantSchema,
   SessionEvaluationSchema,
   SessionSummarySchema,
   WalkoutReactionSchema,
@@ -51,7 +52,7 @@ import {
   type RelationshipStatus,
   type SessionWithMessages,
 } from '@dsim/shared';
-import { charactersRepo, chroniclesRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
+import { charactersRepo, chroniclesRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, sessionParticipantsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
 import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
 import { getCharacter, listAcquaintances } from './character-service';
@@ -163,7 +164,22 @@ export function createSession(input: ConversationCreate): ConversationSession {
     createdAt: now,
     updatedAt: now,
   });
-  return sessionsRepo.insert(session);
+  const saved = sessionsRepo.insert(session);
+  // Record the attendee roster. A solo date is the N=1 case: a single seat-0 row for
+  // the host. Group dates (later phases) add a row per co-attendee. Purely additive —
+  // nothing reads this yet for a 1:1 date, so behavior is unchanged.
+  sessionParticipantsRepo.upsert(
+    SessionParticipantSchema.parse({
+      sessionId: saved.id,
+      characterId: input.characterId,
+      seat: 0,
+      role: 'romance',
+      state: 'present',
+      rapport: null,
+      updatedAt: now,
+    }),
+  );
+  return saved;
 }
 
 export function getSession(id: string): ConversationSession {

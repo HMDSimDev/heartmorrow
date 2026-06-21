@@ -30,7 +30,9 @@ export function requireFeature(worldId: string, key: FeatureKey): void {
         ? 'Property ownership is not enabled for this world.'
         : key === 'gambling'
           ? 'The casino is not enabled for this world.'
-          : 'The stock market is not enabled for this world.',
+          : key === 'groupDates'
+            ? 'Group dates are not enabled for this world.'
+            : 'The stock market is not enabled for this world.',
     );
   }
 }

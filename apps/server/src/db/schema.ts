@@ -515,6 +515,23 @@ CREATE TABLE IF NOT EXISTS session_rapport (
   rapport    INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- Attendees of a conversation session. A solo date has one row (seat 0 = the
+-- session's character_id); a group date adds a row per co-attendee. Holds the
+-- per-seat live rapport (0..100; NULL = unseeded) so each person's vibe is tracked
+-- independently. Cascades when the session (or a character) is deleted.
+CREATE TABLE IF NOT EXISTS session_participants (
+  session_id   TEXT    NOT NULL REFERENCES conversation_sessions(id) ON DELETE CASCADE,
+  character_id TEXT    NOT NULL REFERENCES characters(id)            ON DELETE CASCADE,
+  seat         INTEGER NOT NULL,
+  role         TEXT    NOT NULL DEFAULT 'romance',
+  state        TEXT    NOT NULL DEFAULT 'present',
+  rapport      INTEGER,
+  updated_at   INTEGER NOT NULL,
+  PRIMARY KEY (session_id, character_id)
+);
+CREATE INDEX IF NOT EXISTS idx_session_participants_session   ON session_participants(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_participants_character ON session_participants(character_id);
 `;
 
 /**
