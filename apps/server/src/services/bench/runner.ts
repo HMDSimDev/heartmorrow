@@ -41,7 +41,7 @@ const RUN_BASE_TS = 1_700_000_000_000;
 /** A dialogue FAILS if any character reply is more than this similar (char-3gram
  *  Jaccard) to the model's PREVIOUS reply — i.e. it's looping / losing the plot.
  *  Normal distinct in-voice replies run well under this (~5–12%). */
-export const REPETITION_FAIL_THRESHOLD = 0.25;
+export const REPETITION_FAIL_THRESHOLD = 0.3;
 
 // --- metric helpers ---------------------------------------------------------
 

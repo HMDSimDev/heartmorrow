@@ -863,9 +863,13 @@ export function Bench() {
         <div className="kicker">Diagnostics · the proving bench</div>
         <h1>Heartmorrow Benchmark</h1>
         <p>
-          Run the real prompts this game asks of your model — the rapport judges, the date evaluator, the texting
-          replies, the world &amp; creator generators — against a fixed sample cast in <strong>Lanternford</strong>.
-          Where there’s a right answer, score the model against your own baseline. Model:{' '}
+          Run the real prompts this game asks of your model - the rapport judges, the date evaluator, the texting
+          replies, the world &amp; creator generators - against a fixed sample cast in <strong>Lanternford</strong>.
+          The point of this is to measure whether or not your model is, on a technical level, able to produce the structured output needed,
+		  and on a subjective level, produce interesting and fun prose which is not repetitive and does not go off the rails. Some models can easily produce the structured output but
+		  also produce very dry or bad prose.
+		  <br />
+		  <br />Current Model:{' '}
           <strong className="mono">{catalog.model}</strong>.
         </p>
       </div>
