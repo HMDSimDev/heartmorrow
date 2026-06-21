@@ -3,7 +3,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { LlmSettings, StructuredResult } from '@dsim/shared';
 import { parseJsonStrict, JsonParseError } from '../lib/json';
 import { getAdapter } from './provider';
-import type { ChatAdapter, ChatMessage, ResponseFormat } from './types';
+import type { ChatAdapter, ChatMessage, ResponseFormat, TokenUsage } from './types';
 
 /**
  * Central structured-output caller. This is the ONLY way game-state-affecting
@@ -41,6 +41,31 @@ export interface StructuredCallOptions {
   signal?: AbortSignal;
   /** Optional logger for retry diagnostics. */
   log?: (message: string) => void;
+  /**
+   * Optional per-attempt telemetry hook (used by the Heartmorrow Bench). Fires once
+   * for EVERY model call this function makes — including retries and response-format
+   * downgrades — with the round-trip latency, the endpoint's reported usage (when
+   * any), and the prompt/completion character counts. Purely observational: it never
+   * affects control flow. Production callers omit it.
+   */
+  onAttempt?: (info: {
+    /** 1-based index of this model call within the structured call. */
+    call: number;
+    latencyMs: number;
+    usage?: TokenUsage;
+    /** Transport-level success (the call returned content, before parse/validation). */
+    ok: boolean;
+    promptChars: number;
+    completionChars: number;
+  }) => void;
+}
+
+/** Total characters across a message list (text parts only; image data excluded). */
+function messagesChars(messages: ChatMessage[]): number {
+  return messages.reduce((n, m) => {
+    if (typeof m.content === 'string') return n + m.content.length;
+    return n + m.content.reduce((a, p) => a + (p.type === 'text' ? p.text.length : 0), 0);
+  }, 0);
 }
 
 function formatZodError(err: z.ZodError): string {
@@ -142,10 +167,16 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
 
   let lastError = 'No attempts were made.';
   let lastRaw: string | undefined;
+  let callIndex = 0; // counts every model call (incl. retries + format downgrades)
 
   const totalAttempts = maxRetries + 1; // 1 initial call + N retries
   let attempt = 0;
   while (attempt < totalAttempts) {
+    // Stop before each call if the caller aborted (e.g. the bench user hit Cancel) —
+    // works even for adapters that don't propagate the signal to their transport.
+    if (options.signal?.aborted) {
+      return { ok: false, error: 'Aborted.', attempts: attempt, lastRaw };
+    }
     const mode = modeChain[modeIdx]!;
     const responseFormat = buildResponseFormat(mode, schemaName, jsonSchema);
     const temperature = Math.max(0, baseTemp - attempt * 0.2);
@@ -169,6 +200,8 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
     }
 
     let content: string;
+    callIndex += 1;
+    const callStarted = Date.now();
     try {
       const result = await adapter.chat(
         { messages: attemptMessages, temperature, maxTokens: options.maxTokens ?? settings.maxTokens, responseFormat },
@@ -176,8 +209,29 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
       );
       content = result.content;
       lastRaw = content;
+      options.onAttempt?.({
+        call: callIndex,
+        latencyMs: Date.now() - callStarted,
+        usage: result.usage,
+        ok: true,
+        promptChars: messagesChars(attemptMessages),
+        completionChars: content.length,
+      });
     } catch (err) {
+      options.onAttempt?.({
+        call: callIndex,
+        latencyMs: Date.now() - callStarted,
+        usage: undefined,
+        ok: false,
+        promptChars: messagesChars(attemptMessages),
+        completionChars: 0,
+      });
       const message = (err as Error).message;
+      // If the caller aborted (e.g. the bench user hit Cancel / disconnected),
+      // stop immediately rather than spending the remaining retry budget.
+      if (options.signal?.aborted || (err as Error).name === 'AbortError') {
+        return { ok: false, error: `Aborted: ${message}`, attempts: attempt + 1, lastRaw };
+      }
       lastError = `Transport error: ${message}`;
       // A transport failure produced no model reply — clear any stale reply from an
       // earlier attempt so the repair prompt shows "(none / not valid JSON)" rather

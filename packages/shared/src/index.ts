@@ -25,4 +25,5 @@ export * from './schemas/llm';
 export * from './schemas/entities';
 export * from './schemas/api';
 export * from './schemas/pack';
+export * from './schemas/bench';
 export * from './crisis';

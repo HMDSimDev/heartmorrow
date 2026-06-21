@@ -10,10 +10,23 @@
    =========================================================================== */
 
 /* --- Main page: section scaffolding -------------------------------------- */
-.set-page { gap: 18px; max-width: 860px; margin-inline: auto; }
+.set-page { gap: 30px; max-width: 860px; margin-inline: auto; }
 /* On very large monitors give the technical settings (form rows + console)
    a touch more room; kept modest so line length stays readable. */
 @media (min-width: 1900px) { .set-page { max-width: 1040px; } }
+
+/* Group dividers — cluster the framed sections under mono brass headers so the
+   page reads as a few labelled groups rather than one undifferentiated stack. */
+.set-group { display: flex; flex-direction: column; gap: 16px; }
+.set-group-head {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 2px; padding: 0 2px;
+  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--brass);
+}
+.set-group-head::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
 
 /* A labelled section block. Quieter than .card so the one framed console
    below carries the boldness. */
@@ -180,4 +193,55 @@
 .pset-danger .pset-group-head { color: var(--ember); }
 .pset-danger .pset-group-head::after {
   background: linear-gradient(90deg, rgba(224, 122, 130, 0.5), transparent);
+}
+
+/* Heartmorrow Bench entry card — a lamplit invitation to the proving bench. */
+.set-bench-card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.15s ease;
+}
+.set-bench-card:hover {
+  transform: translateY(-2px);
+}
+.set-bench-mark {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brass);
+  background: radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--brass) 24%, transparent), transparent 70%);
+  border: 1px solid color-mix(in srgb, var(--brass) 40%, var(--border));
+}
+.set-bench-body {
+  flex: 1;
+  min-width: 0;
+}
+.set-bench-body h2 {
+  margin: 2px 0 6px;
+}
+.set-bench-body p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.set-bench-go {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brass);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+}
+@media (max-width: 560px) {
+  .set-bench-card { flex-wrap: wrap; }
+  .set-bench-go { width: 100%; justify-content: flex-end; }
 }

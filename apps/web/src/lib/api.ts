@@ -47,6 +47,15 @@ import type {
   LlmSettingsUpdate,
   PromptEstimateRequest,
   PromptEstimateResult,
+  BenchCatalog,
+  BenchBaseline,
+  BenchBaselineValue,
+  BenchCaseResult,
+  BenchRunSummary,
+  BenchRunListItem,
+  BenchRunCaseRequest,
+  BenchRunRequest,
+  BenchSettingsSnapshot,
   MemoryCreate,
   Message,
   Moment,
@@ -332,6 +341,26 @@ export const api = {
     post<{ ok: boolean; models: string[]; error?: string }>('/settings/models', override ?? {}),
   estimatePrompts: (input: Partial<PromptEstimateRequest>) =>
     post<PromptEstimateResult>('/settings/prompt-estimate', input),
+
+  // Heartmorrow Bench — model evaluation harness
+  benchCatalog: () => get<BenchCatalog>('/bench/catalog'),
+  benchBaselines: () => get<{ baselines: BenchBaseline[] }>('/bench/baselines'),
+  benchSaveBaseline: (caseId: string, value: BenchBaselineValue, note = '') =>
+    request<BenchBaseline>(`/bench/baselines/${encodeURIComponent(caseId)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ value, note }),
+    }),
+  benchClearBaseline: (caseId: string) => del<{ ok: boolean }>(`/bench/baselines/${encodeURIComponent(caseId)}`),
+  /** Run ONE case. Accepts an AbortSignal so a long run can be cancelled. */
+  benchRunCase: (body: BenchRunCaseRequest, signal?: AbortSignal) =>
+    request<BenchCaseResult>('/bench/run-case', { method: 'POST', body: JSON.stringify(body), signal }),
+  /** Abort the in-flight case for a run id (server-side, proxy-independent). */
+  benchCancel: (runId: string) => post<{ ok: boolean; cancelled: boolean }>('/bench/cancel', { runId }),
+  benchSaveRun: (label: string, runReq: BenchRunRequest, results: BenchCaseResult[], settings?: BenchSettingsSnapshot | null) =>
+    post<BenchRunSummary>('/bench/runs', { label, request: runReq, results, settings: settings ?? null }),
+  benchRuns: () => get<{ runs: BenchRunListItem[] }>('/bench/runs'),
+  benchRun: (id: string) => get<BenchRunSummary>(`/bench/runs/${encodeURIComponent(id)}`),
+  benchDeleteRun: (id: string) => del<{ ok: boolean }>(`/bench/runs/${encodeURIComponent(id)}`),
 
   // player (per-world: money + persona live under the active world)
   getPlayer: (worldId?: string) => get<PlayerProfile>(`/player${worldQuery(worldId)}`),

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import {
   GENDER_LABELS,
   SEXUALITY_LABELS,
@@ -288,7 +289,10 @@ export function Settings() {
       {error && <Banner kind="error">{error}</Banner>}
       {savedNote && <Banner kind="ok">{savedNote}</Banner>}
 
-      <div className="card set-section">
+      <section className="set-group">
+        <h2 className="set-group-head">Gameplay</h2>
+
+      <div className="framed set-section">
         <div className="section-head">
           <div className="titles">
             <div className="kicker">How you play</div>
@@ -310,7 +314,7 @@ export function Settings() {
         </div>
       </div>
 
-      <div className="card set-section">
+      <div className="framed set-section">
         <div className="section-head">
           <div className="titles">
             <div className="kicker">Maturity</div>
@@ -376,7 +380,7 @@ export function Settings() {
       </div>
 
       {player && (
-        <div className="card set-section">
+        <div className="framed set-section">
           <div className="section-head">
             <div className="titles">
               <div className="kicker">Who you are</div>
@@ -432,6 +436,28 @@ export function Settings() {
           </div>
         </div>
       )}
+      </section>
+
+      <section className="set-group">
+        <h2 className="set-group-head">Model &amp; diagnostics</h2>
+
+      <Link to="/bench" className="set-bench-card framed">
+        <div className="set-bench-mark" aria-hidden="true">
+          <Icon name="refresh" size={22} />
+        </div>
+        <div className="set-bench-body">
+          <div className="kicker">Diagnostics</div>
+          <h2>Heartmorrow Benchmark</h2>
+          <p>
+            Benchmark how your model handles the real prompts this game runs — the rapport judges, date evaluator, and
+            generators — against a fixed sample. Score the judges against your own baseline, watch a date play out, and
+            track tokens, latency, and tokens/sec. Save runs to compare models.
+          </p>
+        </div>
+        <div className="set-bench-go">
+          Open <Icon name="date" size={15} />
+        </div>
+      </Link>
 
       {/* Signature element: the connection console — the technical heart of the
           page, presented as a chamfered instrument panel. */}
@@ -654,6 +680,7 @@ export function Settings() {
           </button>
         </div>
       </div>
+      </section>
 
       {health && (
         <Banner kind={health.ok ? 'ok' : 'error'}>
