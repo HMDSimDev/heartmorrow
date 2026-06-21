@@ -54,7 +54,7 @@ export function WeatherApp() {
     <div className="phone-app">
       <PhoneAppBar title="Weather" kicker="Today" icon="weather" />
       <div className="weather-app">
-        <div className="weather-today pl-sky">
+        <div className="weather-today pl-sky" data-weather={data.today.kind}>
           <div className="weather-today-icon">{data.today.icon}</div>
           <div className="pl-sky-meta">
             <div className="pl-sky-kicker">Today over the world</div>

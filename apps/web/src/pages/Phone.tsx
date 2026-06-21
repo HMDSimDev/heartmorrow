@@ -62,6 +62,25 @@ function deriveBattery(stamina: number | undefined, staminaMax: number | undefin
   return Math.round(20 + (stamina / staminaMax) * 75);
 }
 
+/** Battery fill level → tint class. Like a real phone: green when full, amber as
+ *  it drains, red when low — a non-numeric read on the day's remaining energy. */
+function batteryLevel(pct: number): 'is-high' | 'is-mid' | 'is-low' {
+  if (pct >= 55) return 'is-high';
+  if (pct >= 32) return 'is-mid';
+  return 'is-low';
+}
+
+/** A warm, phase-aware home greeting — the cover line of the almanac. */
+function greetingForPhase(phase: string | undefined): string {
+  switch (phase) {
+    case 'morning': return 'Good morning';
+    case 'afternoon': return 'Good afternoon';
+    case 'evening': return 'Good evening';
+    case 'night': return 'Still awake?';
+    default: return 'Good evening';
+  }
+}
+
 export function Phone() {
   const { worldState, activeWorldId, activeWorld, dayTick, theme } = useAppData();
   const [app, setApp] = useState<AppId>('home');
@@ -117,6 +136,17 @@ export function Phone() {
   const phaseLabel = worldState ? PHASE_LABELS[worldState.phase] : 'Twilight';
   const phaseIcon = worldState ? PHASE_ICONS[worldState.phase] : '🌙';
   const batteryPct = deriveBattery(worldState?.stamina, worldState?.staminaMax);
+  const greeting = worldState ? greetingForPhase(worldState.phase) : 'Welcome back';
+  // Footer hint reacts to what's actually waiting: unread mail/texts first, then a
+  // low-energy nudge, otherwise the ambient "letters arrive in time" line.
+  const totalUnread = inbox.unreadTexts + inbox.unreadEmails + inbox.landlordUnread + inbox.feedUnread;
+  const lowEnergy = batteryPct <= 30;
+  const homeHint =
+    totalUnread > 0
+      ? `${totalUnread} ${totalUnread === 1 ? 'thing is' : 'things are'} waiting for you.`
+      : lowEnergy
+        ? 'The lamp runs low — end the day to rest.'
+        : 'Texts and mail arrive as the days pass.';
 
   return (
     <div className="phone-wrap">
@@ -131,10 +161,10 @@ export function Phone() {
               <span className="ph-signal" aria-hidden="true">
                 <i /><i /><i /><i />
               </span>
-              <span className="ph-batt" aria-label={`Battery ${batteryPct}%`}>
+              <span className="ph-batt" aria-label={`Energy ${batteryPct}%`}>
                 <span className="ph-batt-pct">{batteryPct}</span>
                 <span className="ph-batt-body">
-                  <span className="ph-batt-fill" style={{ flex: `0 0 ${batteryPct}%` }} />
+                  <span className={`ph-batt-fill ${batteryLevel(batteryPct)}`} style={{ flex: `0 0 ${batteryPct}%` }} />
                 </span>
                 <span className="ph-batt-cap" />
               </span>
@@ -147,15 +177,15 @@ export function Phone() {
               <div className={`phone-home${theme.wallpaper ? ' has-wallpaper' : ''}`}>
                 <div className="ph-home">
                   <div className="ph-greeting">
-                    <div className="ph-greeting-eyebrow">{phaseLabel} · the almanac of the heart</div>
-                    <h1 className="ph-greeting-title">
-                      Pocket <span className="ph-amp">&</span> Lamplight
-                    </h1>
+                    <div className="ph-greeting-eyebrow">
+                      Pocket <span className="ph-amp">&</span> Lamplight · {phaseLabel}
+                    </div>
+                    <h1 className="ph-greeting-title">{greeting}</h1>
                   </div>
                   <div className="ph-grid">
                     {gridApps.map(renderAppIcon)}
                   </div>
-                  <div className="ph-hint">Texts and mail arrive as the days pass.</div>
+                  <div className="ph-hint">{homeHint}</div>
                 </div>
               </div>
               <div className="ph-dock">

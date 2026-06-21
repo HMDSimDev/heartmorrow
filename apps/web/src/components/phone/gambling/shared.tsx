@@ -24,6 +24,21 @@ export function clampBet(value: number, wallet: GamblingWallet): number {
   return Math.max(wallet.minBet, Math.min(top, Math.round(value)));
 }
 
+/** Why the player can't place a bet right now. Splits the ambiguous "limit or out
+ *  of cash" line into the daily-cap case vs the empty-wallet case, in the house's
+ *  voice, so the message stops reading like a generic system error. */
+export function CantBetNote({ wallet }: { wallet: GamblingWallet }) {
+  const capped = wallet.remainingToday < wallet.minBet;
+  const broke = wallet.money < wallet.minBet;
+  const msg =
+    capped && broke
+      ? "You're tapped out, and the house has you down for the day besides. Come back tomorrow."
+      : capped
+        ? 'The house has you down for the day. The tables reopen tomorrow.'
+        : 'Short of coin for the tables — earn a little more and the cage will see you.';
+  return <div className="gmb-muted">{msg}</div>;
+}
+
 // --- A single playing card (warm vellum) ------------------------------------
 
 export function PlayingCard({

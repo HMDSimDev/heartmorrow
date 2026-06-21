@@ -67,7 +67,12 @@
   flex: 0 0 78%;
   border-radius: 1px;
   background: var(--sage);
+  transition: background 0.4s ease;
 }
+/* Energy read: green when the day's stamina is full, amber as it drains, red low. */
+.ph-batt-fill.is-high { background: var(--sage); }
+.ph-batt-fill.is-mid { background: var(--brass); }
+.ph-batt-fill.is-low { background: var(--ember); }
 .ph-batt-cap {
   width: 2px;
   height: 5px;
@@ -86,7 +91,20 @@
   min-height: 100%;
 }
 .ph-greeting {
+  position: relative;
   margin: 2px 4px 18px;
+  padding-bottom: 12px;
+}
+/* A short brass rule under the greeting gives the home screen a masthead — the
+   cover of the almanac — echoing .page-head's signature underline. */
+.ph-greeting::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 54px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--brass), transparent);
 }
 .ph-greeting-eyebrow {
   font-family: var(--font-mono);

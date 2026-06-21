@@ -3,7 +3,7 @@ import type { BlackjackView } from '@dsim/shared';
 import { api } from '../../../lib/api';
 import { errorMessage } from '../../../lib/hooks';
 import { Banner } from '../../ui';
-import { PlayingCard, BetStepper, ResultBanner, clampBet, maxAffordable, type CasinoGameProps } from './shared';
+import { PlayingCard, BetStepper, CantBetNote, ResultBanner, clampBet, maxAffordable, type CasinoGameProps } from './shared';
 import './blackjack.css';
 
 type Props = CasinoGameProps & { resume?: BlackjackView | null };
@@ -107,7 +107,7 @@ export function BlackjackGame({ worldId, wallet, onSettled, resume }: Props) {
       {/* Controls */}
       {!hand || done ? (
         !canBet ? (
-          <div className="gmb-muted">You&apos;ve hit today&apos;s limit (or are out of cash). Come back tomorrow.</div>
+          <CantBetNote wallet={wallet} />
         ) : (
           <>
             <BetStepper wallet={wallet} value={bet} onChange={setBet} disabled={busy} />

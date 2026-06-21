@@ -74,6 +74,14 @@ export function WorkApp() {
         </div>
 
         <div className="pl-eyebrow">Shifts · earn ◈</div>
+        {worldState && (
+          <div className={`pl-energy-readout${noEnergy ? ' is-spent' : ''}`}>
+            <span>◆</span>
+            <span>
+              {worldState.stamina} of {worldState.staminaMax} energy left today
+            </span>
+          </div>
+        )}
         {work.map((a) => (
           <div className="pl-tile pl-work" key={a.id}>
             <div className="pl-tile-icon"><Icon name="work" size={18} /></div>
@@ -82,6 +90,7 @@ export function WorkApp() {
               <div className="pl-tile-desc">{a.description}</div>
             </div>
             <div className="pl-tile-action">
+              <span className="pl-tile-cost" title="Costs one action — a piece of the day">−1 ◆</span>
               <button className="btn sm primary" onClick={() => perform(a)} disabled={busy || noEnergy || onDate}>
                 <span className="pl-coin">◈ {a.money}</span>
               </button>

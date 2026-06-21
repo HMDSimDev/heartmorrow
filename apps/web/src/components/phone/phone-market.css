@@ -184,11 +184,29 @@
   letter-spacing: 0.01em;
 }
 
+/* The day's move is a glowing sentiment medallion (with the ▲/▼ glyph), not just
+   colored text — a lamplit ticker chip that reads at a glance and survives a
+   colorblind eye. */
 .mkt-pct {
+  display: inline-flex;
+  align-items: center;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.mkt-pct.mkt-up {
+  border-color: rgba(143, 207, 159, 0.4);
+  background: rgba(143, 207, 159, 0.1);
+  box-shadow: 0 0 10px rgba(143, 207, 159, 0.16);
+}
+.mkt-pct.mkt-down {
+  border-color: rgba(224, 122, 130, 0.42);
+  background: rgba(224, 122, 130, 0.1);
+  box-shadow: 0 0 10px rgba(224, 122, 130, 0.16);
 }
 
 /* Sentiment colors — never hardcoded; use token-mapped values */

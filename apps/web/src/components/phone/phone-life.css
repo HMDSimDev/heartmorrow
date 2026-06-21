@@ -87,16 +87,13 @@
   gap: 11px;
   padding: 11px 12px;
   margin-bottom: 8px;
-  background: var(--panel-2);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--border-soft);
-  border-left: 3px solid var(--brass-dim);
   border-radius: var(--radius-sm);
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.18s;
 }
-.pl-tile:hover { transform: translateX(2px); }
-.pl-tile.pl-work { border-left-color: var(--brass); }
-.pl-tile.pl-train { border-left-color: var(--rose); }
-.pl-tile.pl-together { border-left-color: var(--rose); align-items: flex-start; }
+.pl-tile:hover { transform: translateX(2px); border-color: var(--border-bright); box-shadow: var(--shadow-sm); }
+.pl-tile.pl-together { align-items: flex-start; }
 
 .pl-tile-icon {
   flex-shrink: 0;
@@ -108,10 +105,25 @@
   border-radius: var(--radius-sm);
   background: var(--ink-2);
   border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
-.pl-tile.pl-work .pl-tile-icon { color: var(--brass); }
-.pl-tile.pl-train .pl-tile-icon { color: var(--rose); }
-.pl-tile.pl-together .pl-tile-icon { color: var(--rose); font-size: 1.15rem; }
+/* Stamped, category-tinted icon plates replace the old flat 3px left-rail — each
+   tile now carries its color as a lamplit medallion, not a stripe shared with six
+   other apps. */
+.pl-tile.pl-work .pl-tile-icon {
+  color: var(--brass);
+  border-color: rgba(230, 177, 94, 0.42);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--brass) 18%, var(--ink-2)), var(--ink-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 10px rgba(230, 177, 94, 0.16);
+}
+.pl-tile.pl-train .pl-tile-icon,
+.pl-tile.pl-together .pl-tile-icon {
+  color: var(--rose);
+  border-color: rgba(232, 138, 166, 0.42);
+  background: linear-gradient(155deg, color-mix(in srgb, var(--rose) 18%, var(--ink-2)), var(--ink-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 10px rgba(232, 138, 166, 0.16);
+}
+.pl-tile.pl-together .pl-tile-icon { font-size: 1.15rem; }
 
 /* Together: a meta row of small read-at-a-glance chips (fit · risk · cost) */
 .pl-meta {
@@ -170,8 +182,29 @@
 
 /* the action button sits on the right; keep the existing .btn look but
    give the payout a confident mono ledger feel via a child span */
-.pl-tile-action { flex-shrink: 0; }
+.pl-tile-action { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .pl-coin { font-family: var(--font-mono); font-weight: 700; }
+/* What the shift costs you — one action of energy — shown beside its payout so the
+   full exchange (spend −1 ◆, earn ◈) reads at a glance. */
+.pl-tile-cost {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  color: var(--text-mute);
+}
+/* Remaining-energy readout on the board header. */
+.pl-energy-readout {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 2px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+.pl-energy-readout > span:first-child { color: var(--brass); }
+.pl-energy-readout.is-spent { color: var(--ember); }
+.pl-energy-readout.is-spent > span:first-child { color: var(--ember); }
 
 /* training partner picker — now uses PortraitPicker */
 .pl-partner-pick {
@@ -203,9 +236,41 @@
   border: 1px solid var(--border-bright);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm), var(--rim);
+  /* default sky; each weather kind re-paints this below */
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+/* The sky takes on the day's weather — every gradient is built from palette tokens
+   so it stays in the Nocturne key (warm lamplight, cool moonlight) rather than going
+   garish. Only the hero changes; the rest of the app keeps the breathing screen halo. */
+.weather-today.pl-sky[data-weather='sunny'] {
+  background: radial-gradient(120% 120% at 80% -20%, rgba(230, 177, 94, 0.34), transparent 60%), linear-gradient(180deg, #2b2a3d, var(--panel));
+}
+.weather-today.pl-sky[data-weather='clear'] {
+  background:
+    radial-gradient(120% 120% at 80% -20%, rgba(230, 177, 94, 0.2), transparent 58%),
+    radial-gradient(120% 120% at 8% 122%, rgba(157, 184, 222, 0.18), transparent 60%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+.weather-today.pl-sky[data-weather='cloudy'] {
+  background: radial-gradient(130% 120% at 50% -30%, rgba(157, 184, 222, 0.12), transparent 62%), linear-gradient(180deg, #232838, #1c2030);
+}
+.weather-today.pl-sky[data-weather='rainy'] {
+  background: radial-gradient(120% 120% at 70% -20%, rgba(157, 184, 222, 0.22), transparent 60%), linear-gradient(180deg, #1d2436, #171c2b);
+}
+.weather-today.pl-sky[data-weather='windy'] {
+  background: radial-gradient(120% 120% at 75% -20%, rgba(143, 207, 159, 0.18), transparent 60%), linear-gradient(180deg, var(--panel-2), var(--panel));
+}
+.weather-today.pl-sky[data-weather='foggy'] {
+  background: radial-gradient(130% 130% at 50% -10%, rgba(183, 178, 200, 0.2), transparent 66%), linear-gradient(180deg, #262a3a, #1e2230);
+}
+.weather-today.pl-sky[data-weather='snowy'] {
+  background: radial-gradient(120% 120% at 70% -20%, rgba(210, 227, 247, 0.22), transparent 62%), linear-gradient(180deg, #242a3d, #1b2030);
+}
+.weather-today.pl-sky[data-weather='stormy'] {
+  background: radial-gradient(120% 120% at 70% -25%, rgba(224, 122, 130, 0.2), transparent 55%), linear-gradient(180deg, #1a1c2c, #131524);
 }
 .weather-today.pl-sky::before {
-  /* lamplit halo behind the icon */
+  /* lamplit halo behind the icon — now breathing slowly, like the sky itself */
   content: "";
   position: absolute;
   top: -40%;
@@ -214,6 +279,14 @@
   height: 160px;
   background: radial-gradient(circle, var(--halo-1), transparent 68%);
   pointer-events: none;
+  animation: weather-sky-breathe 9s ease-in-out infinite;
+}
+@keyframes weather-sky-breathe {
+  0%, 100% { opacity: 0.72; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-today.pl-sky::before { animation: none; opacity: 0.85; }
 }
 .weather-today.pl-sky .weather-today-icon {
   font-size: 3.4rem;
@@ -251,10 +324,28 @@
   text-shadow: 0 0 8px rgba(230, 177, 94, 0.6);
 }
 
-/* mood rows: give the reaction state a colored rail */
-.weather-mood { border-left: 3px solid transparent; }
-.weather-mood.pl-loves { border-left-color: var(--sage); }
-.weather-mood.pl-dislikes { border-left-color: var(--ember); }
+/* Mood rows: the reaction now reads as a tinted icon chip (sage = loves, ember =
+   dislikes) rather than a left-rail shared with six other apps. */
+.weather-mood .weather-mood-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+}
+.weather-mood.pl-loves .weather-mood-icon {
+  border-color: rgba(143, 207, 159, 0.45);
+  background: color-mix(in srgb, var(--sage) 16%, var(--ink-2));
+  box-shadow: 0 0 9px rgba(143, 207, 159, 0.2);
+}
+.weather-mood.pl-dislikes .weather-mood-icon {
+  border-color: rgba(224, 122, 130, 0.45);
+  background: color-mix(in srgb, var(--ember) 16%, var(--ink-2));
+  box-shadow: 0 0 9px rgba(224, 122, 130, 0.2);
+}
 .weather-mood strong { font-family: var(--font-display); font-weight: 600; }
 
 /* player weather preferences grid (reactions summary) */
@@ -312,13 +403,31 @@
 
 /* ── Summary header: people/tie tally + the kind legend (also filters) ── */
 .sw-head { display: flex; flex-direction: column; gap: 9px; }
+/* The "who's in your life" tally, promoted from a bare line into a lamplit HUD
+   plate — a readout, with an inset brass glow and the quiet card hairline. */
 .sw-summary {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 8px;
+  padding: 9px 13px;
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--text-dim);
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 18px rgba(230, 177, 94, 0.05), var(--rim);
+}
+.sw-summary::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.45), transparent);
+  pointer-events: none;
 }
 .sw-summary b { color: var(--text); font-weight: 600; }
 .sw-stat-dot { color: var(--text-mute); }

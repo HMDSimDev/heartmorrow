@@ -631,7 +631,10 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
    only when genuinely too long — so short names ("Messages") never clip while the
    side action/back buttons are always protected. */
 .pbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; }
-.pbar-side { display: flex; align-items: center; min-width: 0; }
+/* Both side slots reserve an equal min width so a bar with only one button (a lone
+   Back or a lone action) still renders its title optically centered, not shoved
+   toward the empty side. */
+.pbar-side { display: flex; align-items: center; min-width: 38px; }
 .pbar-right { justify-content: flex-end; }
 .pbar-title { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
 .pbar-kicker {
@@ -875,7 +878,27 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
   display: flex; justify-content: space-between; align-items: center;
   padding: 11px 24px 6px; font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-dim); flex-shrink: 0;
 }
-.phone-screen { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.phone-screen { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+/* Ambient lamplight that breathes with the in-world hour & season — the phone's
+   signature, now carried INSIDE the device (home + every app), not just the page
+   margins. --halo-1/--halo-2 are already re-tinted per data-phase/data-season on
+   <html>, so this warms toward dusk and cools toward winter for free. The appbar
+   and cards paint over it; it glows through the gutters between them. */
+.phone-screen::before {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(125% 80% at 86% -10%, var(--halo-1), transparent 60%),
+    radial-gradient(115% 75% at -10% 110%, var(--halo-2), transparent 60%);
+  animation: phone-breathe 15s ease-in-out infinite;
+}
+.phone-home, .ph-dock, .phone-appwrap { position: relative; z-index: 1; }
+@keyframes phone-breathe {
+  0%, 100% { opacity: 0.62; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .phone-screen::before { animation: none; opacity: 0.82; }
+}
 .phone-home {
   flex: 1; height: 0; overflow-y: auto; padding: 20px 18px;
   background-image: var(--phone-wallpaper, none);
@@ -923,9 +946,20 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 .phone-appwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .phone-app { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .phone-appbar {
+  position: relative;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 11px 15px; border-bottom: 1px solid var(--border-soft); flex-shrink: 0;
-  background: var(--ink-2); box-shadow: 0 1px 0 rgba(230, 177, 94, 0.1);
+  /* A faint lamplight bloom behind the title (phase-tinted via --halo-1) lifts the
+     bar out of flatness without competing with the user's accent. */
+  background:
+    radial-gradient(72% 150% at 50% -54%, var(--halo-1), transparent 72%),
+    var(--ink-2);
+}
+/* The quiet signature: a brass hairline that fades at both ends, echoing .rule. */
+.phone-appbar::after {
+  content: ''; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brass-dim), transparent);
+  pointer-events: none;
 }
 .phone-appbar strong { font-family: var(--font-display); font-weight: 600; font-size: 1.02rem; }
 .phone-appbar h2, .phone-appbar h3 { margin: 0; }

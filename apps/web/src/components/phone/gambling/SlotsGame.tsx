@@ -11,7 +11,7 @@ import {
 import { api } from '../../../lib/api';
 import { errorMessage } from '../../../lib/hooks';
 import { Banner } from '../../ui';
-import { BetStepper, ResultBanner, clampBet, maxAffordable, type CasinoGameProps } from './shared';
+import { BetStepper, CantBetNote, ResultBanner, clampBet, maxAffordable, type CasinoGameProps } from './shared';
 import './slots.css';
 
 const CELL = 60; // px per reel cell — must match .slot-cell height
@@ -148,7 +148,7 @@ export function SlotsGame({ worldId, wallet, onSettled }: CasinoGameProps) {
       </div>
 
       {!canBet ? (
-        <div className="gmb-muted">You&apos;ve hit today&apos;s limit (or are out of cash). Come back tomorrow.</div>
+        <CantBetNote wallet={wallet} />
       ) : (
         <BetStepper wallet={wallet} value={bet} onChange={setBet} disabled={busy} />
       )}

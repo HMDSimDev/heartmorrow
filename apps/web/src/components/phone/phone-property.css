@@ -223,19 +223,29 @@
   color: var(--text-mute);
   margin-top: 3px;
 }
+/* The "Owned" badge reads as a stamped deed seal — filled brass with an inner
+   highlight and a lamplit glow, ✦-sealed — so buying a home feels as earned as a
+   keepsake, not like a settings toggle. */
 .prop-owned-badge {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-family: var(--font-mono);
   font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  padding: 2px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
-  color: var(--brass);
-  border: 1px solid rgba(230, 177, 94, 0.42);
-  background: color-mix(in srgb, var(--brass) 10%, transparent);
+  color: var(--on-accent);
+  border: 1px solid rgba(230, 177, 94, 0.6);
+  background: linear-gradient(135deg, var(--brass), var(--brass-dim));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 0 10px rgba(230, 177, 94, 0.28);
 }
+.prop-owned-badge::before { content: '✦'; }
+/* Tuck the corner brackets just inside the rounded card. */
+.prop-card.owned.bracketed::after { inset: 7px; opacity: 0.6; }
 .prop-card-desc {
   margin: 0;
   font-size: 0.82rem;

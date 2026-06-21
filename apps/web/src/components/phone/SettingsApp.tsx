@@ -88,6 +88,8 @@ export function SettingsApp() {
                     <button
                       key={p.name}
                       className={`pset-swatch ${active ? 'active' : ''}`}
+                      aria-pressed={active}
+                      aria-label={p.name}
                       onClick={() => setTheme({ ...theme, accent: p.accent, accent2: p.accent2 })}
                     >
                       <span
@@ -157,10 +159,10 @@ export function SettingsApp() {
                 Play mode hides creation/editing tools so you can just play. Creator mode shows them.
               </p>
               <div className="row">
-                <button className={`btn sm ${!creatorMode ? 'primary' : ''}`} onClick={() => setCreatorMode(false)}>
+                <button className={`btn sm ${!creatorMode ? 'primary' : ''}`} aria-pressed={!creatorMode} onClick={() => setCreatorMode(false)}>
                   <Icon name="play" size={14} /> Play mode
                 </button>
-                <button className={`btn sm ${creatorMode ? 'primary' : ''}`} onClick={() => setCreatorMode(true)}>
+                <button className={`btn sm ${creatorMode ? 'primary' : ''}`} aria-pressed={creatorMode} onClick={() => setCreatorMode(true)}>
                   <Icon name="settings" size={14} /> Creator mode
                 </button>
               </div>

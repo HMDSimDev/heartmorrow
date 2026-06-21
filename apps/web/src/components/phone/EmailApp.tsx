@@ -92,8 +92,10 @@ export function EmailApp() {
         kicker="Mail"
         icon="mail"
         right={
-          <button className="btn sm ghost pbar-iconbtn" onClick={load} aria-label="Refresh" title="Refresh">
-            <Icon name="refresh" size={18} />
+          <button className="btn sm ghost pbar-iconbtn" onClick={load} disabled={loading} aria-label="Refresh" title="Refresh">
+            <span className={loading ? 'is-spinning' : undefined}>
+              <Icon name="refresh" size={18} />
+            </span>
           </button>
         }
       />

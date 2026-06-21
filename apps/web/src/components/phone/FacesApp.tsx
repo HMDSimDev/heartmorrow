@@ -127,6 +127,9 @@ export function FacesApp() {
               disabled={posting}
             />
             <div className="fcs-compose-foot">
+              <span className={`fcs-compose-count${draft.length > 450 ? ' is-near' : ''}`} aria-hidden="true">
+                {draft.length}/500
+              </span>
               <button
                 className="btn primary sm fcs-post-btn"
                 onClick={submitPost}
@@ -213,6 +216,7 @@ function PostCard({
             disabled={busy}
             title={r.label}
             aria-label={r.label}
+            aria-pressed={post.playerReaction === r.kind}
           >
             <Icon name={r.icon} size={18} />
           </button>

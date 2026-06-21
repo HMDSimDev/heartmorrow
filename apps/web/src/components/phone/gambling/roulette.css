@@ -1,62 +1,99 @@
 /* roulette.css — stylized wheel + bet table. Classes prefixed .rl- ; Nocturne. */
 
+/* Fill the whole game area so the wheel can claim the leftover height. */
 .rl {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
 }
 
 /* ── Wheel ────────────────────────────────────────────────────────────────── */
+/* The stage grows to absorb all spare vertical space; the wheel fills it as a
+   square (capped), making it the dominant element on tall screens while never
+   dropping below a usable size on short ones. */
 .rl-stage {
+  flex: 1;
+  min-height: 168px;
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 18px 12px;
+  padding: 8px;
+  /* a size container, so the wheel can size to the largest square that fits. */
+  container-type: size;
 }
 .rl-wheel {
   position: relative;
-  width: 150px;
-  height: 150px;
+  /* largest square that fits the stage in BOTH axes — never distorts to an ellipse. */
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  max-width: 460px;
+  max-height: 460px;
   border-radius: 50%;
+  /* nested size container so the numbers, ball and centre scale WITH the wheel. */
+  container-type: size;
 }
 .rl-ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
+  /* The real 37 numbered wedges (in true roulette colors, real wheel order) are
+     painted inline from RouletteGame via `background`; this repeating fallback only
+     shows if that style is absent. 20° red/black pairs tile to exactly 360°. */
   background:
-    repeating-conic-gradient(from 0deg, var(--ember) 0 9.7deg, var(--ink) 9.7deg 19.4deg);
-  -webkit-mask: radial-gradient(circle, transparent 40%, #000 41%, #000 100%);
-  mask: radial-gradient(circle, transparent 40%, #000 41%, #000 100%);
+    repeating-conic-gradient(from -90deg, var(--ember) 0 10deg, var(--ink) 10deg 20deg);
+  -webkit-mask: radial-gradient(circle, transparent 38%, #000 39%, #000 100%);
+  mask: radial-gradient(circle, transparent 38%, #000 39%, #000 100%);
   box-shadow: 0 0 0 3px rgba(230, 177, 94, 0.6), 0 0 0 6px var(--ink-2), inset 0 0 20px rgba(0, 0, 0, 0.6);
-  opacity: 0.85;
+  opacity: 0.95;
 }
-/* the orbiting ball */
+/* The numbers around the wheel — upright, evenly spaced, so you can read where the
+   ball settles. Positioned by trig from RouletteGame (left/top %). */
+.rl-pips {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.rl-pip {
+  position: absolute;
+  /* transform (translate-to-center + radial rotate) is set inline per number. */
+  font-family: var(--font-mono);
+  font-weight: 700;
+  /* scales with the wheel; sits out near the rim. */
+  font-size: 5cqmin;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: rgba(245, 238, 222, 0.96);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+}
+/* The orbiting ball. The arm fills the wheel so its centre coincides with the wheel
+   centre; rotating it around 50% 50% sweeps the ball cleanly along the ring. The
+   long, hard ease-out makes it spin fast then coast to a stop (~7s). */
 .rl-ball {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   transform: rotate(var(--spin, 0deg));
-  transition: transform 2.7s cubic-bezier(0.12, 0.66, 0.16, 1);
-  transform-origin: 0 0;
-  margin: -75px 0 0 0;
+  transform-origin: 50% 50%;
+  transition: transform 7s cubic-bezier(0.08, 0.72, 0.04, 1);
   pointer-events: none;
+  z-index: 1;
 }
 .rl-ball::after {
   content: '';
   position: absolute;
-  top: 6px;
+  top: 2.5cqmin;
   left: 50%;
-  width: 9px;
-  height: 9px;
-  margin-left: -4.5px;
+  transform: translateX(-50%);
+  width: 5.5cqmin;
+  height: 5.5cqmin;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff, #c9c4b8);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 9px rgba(255, 255, 255, 0.8);
 }
 .rl-hub {
   position: absolute;
-  inset: 30%;
+  inset: 32%;
   border-radius: 50%;
   background: radial-gradient(circle at 40% 35%, var(--panel-2), var(--ink));
   border: 1px solid rgba(230, 177, 94, 0.4);
@@ -64,11 +101,12 @@
   align-items: center;
   justify-content: center;
   box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.6);
+  z-index: 2;
 }
 .rl-landed {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1.5rem;
+  font-size: clamp(1.4rem, 15cqmin, 3rem);
   color: var(--text);
 }
 .rl-landed.idle { color: rgba(230, 177, 94, 0.5); }
@@ -122,44 +160,63 @@
 }
 .rl-clear:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Number grid ──────────────────────────────────────────────────────────── */
-.rl-grid { display: flex; gap: 5px; }
+/* ── Number grid — standard 3 rows × 12, 0 down the side ──────────────────── */
+/* align-items:stretch lets the green "0" run the full height of the three rows as a
+   proper left-hand cell, instead of a stray square. */
+.rl-grid { display: flex; align-items: stretch; gap: 5px; }
 .rl-nums {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: repeat(3, 30px);
+  gap: 3px;
 }
 .rl-num {
   position: relative;
-  aspect-ratio: 1 / 1;
-  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
   border: 1px solid var(--border-soft);
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   color: #f3ead7;
   cursor: pointer;
   transition: filter 0.12s, box-shadow 0.12s;
 }
-.rl-num.is-green { background: linear-gradient(180deg, #2f5d44, #1e3d2d); flex: 0 0 30px; }
+/* The "0": a full-height left rail (stretched by the flex row). */
+.rl-num.is-green {
+  flex: 0 0 32px;
+  align-self: stretch;
+  font-size: 0.82rem;
+  background: linear-gradient(180deg, #2f5d44, #1e3d2d);
+}
 .rl-num.is-red { background: linear-gradient(180deg, #7c2b2b, #571d1d); }
 .rl-num.is-black { background: linear-gradient(180deg, #1b2036, #11152a); }
 .rl-num:hover:not(:disabled) { filter: brightness(1.2); }
-.rl-num.win { box-shadow: 0 0 0 2px var(--brass), 0 0 12px rgba(230, 177, 94, 0.5); }
+/* Where the ball landed — a pale marker, NOT a brass win (it just shows the number,
+   whether or not you bet it). */
+.rl-num.landed { box-shadow: inset 0 0 0 2px rgba(243, 236, 221, 0.92), 0 0 10px rgba(243, 236, 221, 0.32); z-index: 1; }
+/* A bet you actually placed and won — brass, takes precedence over the landed mark. */
+.rl-num.win { box-shadow: 0 0 0 2px var(--brass), 0 0 12px rgba(230, 177, 94, 0.5); z-index: 2; }
 
 /* ── Outside bet cells ────────────────────────────────────────────────────── */
 .rl-outside { display: flex; gap: 5px; }
 .rl-cell {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   flex: 1;
-  padding: 9px 4px;
+  min-height: 32px;
+  padding: 7px 5px;
   border-radius: 5px;
   border: 1px solid var(--border-soft);
   background: var(--ink-2);
   color: var(--text-dim);
   font-family: var(--font-body);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
   transition: filter 0.12s, box-shadow 0.12s, border-color 0.12s;
@@ -167,30 +224,46 @@
 .rl-cell:hover:not(:disabled) { border-color: var(--border-bright); color: var(--text); }
 .rl-cell.tone-red { background: linear-gradient(180deg, #7c2b2b, #4a1a1a); color: #f3ead7; }
 .rl-cell.tone-black { background: linear-gradient(180deg, #1b2036, #0f1326); color: #f3ead7; }
-.rl-cell.win { box-shadow: 0 0 0 2px var(--brass), 0 0 12px rgba(230, 177, 94, 0.5); }
+/* Only a bet you placed and won lights up brass. */
+.rl-cell.win { box-shadow: 0 0 0 2px var(--brass), 0 0 12px rgba(230, 177, 94, 0.5); z-index: 1; }
+/* A placed bet that lost — fade its chip so the outcome reads at a glance. */
+.rl-num.lost .rl-chip,
+.rl-cell.lost .rl-chip { opacity: 0.4; filter: grayscale(0.6); }
 .rl-cell:disabled,
 .rl-num:disabled { cursor: default; }
 
-/* placed-chip badge */
+/* Placed-chip badge — a small brass token tucked INSIDE the top-right corner so it
+   never overhangs the grid edge. The pale ring reads it as a chip on the cell. */
 .rl-chip {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  min-width: 17px;
-  height: 17px;
-  padding: 0 3px;
-  border-radius: 9px;
-  background: var(--brass);
+  top: 1px;
+  right: 1px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  border-radius: 8px;
+  background: radial-gradient(circle at 38% 32%, #ffe7a8, var(--brass) 70%);
+  border: 1.5px solid rgba(11, 15, 34, 0.55);
   color: #0b0f22;
   font-family: var(--font-mono);
   font-style: normal;
   font-weight: 800;
-  font-size: 0.56rem;
-  line-height: 17px;
+  font-size: 0.5rem;
+  line-height: 11px;
   text-align: center;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+/* Narrow phones: shrink the dense 12-wide grid so numbers + chips stay legible. */
+@media (max-width: 380px) {
+  .rl-nums { grid-template-rows: repeat(3, 26px); gap: 2px; }
+  .rl-num { font-size: 0.5rem; }
+  .rl-num.is-green { flex-basis: 26px; font-size: 0.7rem; }
+  .rl-cell { font-size: 0.62rem; padding: 7px 3px; }
+  .rl-chip { min-width: 12px; height: 12px; font-size: 0.46rem; line-height: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rl-ball { transition: transform 0.4s linear; }
+  .rl-ball { transition: transform 0.5s linear; }
 }

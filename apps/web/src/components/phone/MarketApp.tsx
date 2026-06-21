@@ -26,8 +26,10 @@ interface CompanyDraft {
 }
 
 function fmtPct(pct: number): string {
-  const sign = pct >= 0 ? '+' : '';
-  return `${sign}${(pct * 100).toFixed(1)}%`;
+  // ▲/▼ carries the direction without relying on color (colorblind-safe), so the
+  // magnitude itself reads unsigned.
+  const arrow = pct >= 0 ? '▲' : '▼';
+  return `${arrow} ${(Math.abs(pct) * 100).toFixed(1)}%`;
 }
 
 function pctClass(pct: number): string {
@@ -145,7 +147,7 @@ function PositionRow({ pos }: { pos: PortfolioPosition }) {
       </div>
       <div className="mkt-pos-detail">
         <span className="mkt-pos-basis">basis ◈ {pos.costBasis}</span>
-        <span className={`mkt-pos-pnl ${pnlClass(pos.pnl)}`}>{pos.pnl >= 0 ? '+' : ''}◈ {pos.pnl}</span>
+        <span className={`mkt-pos-pnl ${pnlClass(pos.pnl)}`}>{pos.pnl >= 0 ? '▲' : '▼'} ◈ {Math.abs(pos.pnl)}</span>
       </div>
     </div>
   );

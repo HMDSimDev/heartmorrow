@@ -239,9 +239,16 @@ function ThreadList({
                   <span className="pcom-name">{t.characterName}</span>
                   {t.lastAt != null && <span className="pcom-when">{new Date(t.lastAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>}
                 </span>
-                <span className="pcom-preview">
-                  {!t.available ? (t.unavailableReason ?? 'is unavailable today') : (t.lastBody ?? 'Tap to start texting')}
-                </span>
+                {!t.available ? (
+                  <span className="pcom-preview">{t.unavailableReason ?? 'is unavailable today'}</span>
+                ) : t.lastBody ? (
+                  <span className="pcom-preview">
+                    {t.lastFromPlayer && <span className="pcom-preview-you">You: </span>}
+                    {t.lastBody}
+                  </span>
+                ) : (
+                  <span className="pcom-preview pcom-preview-empty">Tap to start texting</span>
+                )}
               </span>
             </button>
           ))}
@@ -328,7 +335,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
-  const [feeling, setFeeling] = useState<string | null>(null);
+  const [feeling, setFeeling] = useState<{ text: string; warm: boolean } | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   // A downscaled photo staged to send with the next text (uploaded already so the
   // asset exists; the vision model reads it server-side).
@@ -458,7 +465,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       const net =
         (d.affection ?? 0) + (d.comfort ?? 0) + (d.chemistry ?? 0) + (d.trust ?? 0) + (d.respect ?? 0) - (d.tension ?? 0);
       if (net !== 0) {
-        setFeeling(net > 0 ? '— a little warmer' : '— a little cooler');
+        setFeeling({ text: net > 0 ? 'a little warmer' : 'a little cooler', warm: net > 0 });
         setTimeout(() => setFeeling(null), 2200);
       }
     } catch (e) {
@@ -554,7 +561,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
         )}
         <div ref={endRef} />
       </div>
-      {feeling && <div className="pcom-feeling">{feeling}</div>}
+      {feeling && <div className={`pcom-feeling ${feeling.warm ? 'is-warm' : 'is-cool'}`}>{feeling.text}</div>}
       {pendingImage && (
         <div className="pcom-attach">
           <img className="pcom-attach-thumb" src={pendingImage.url} alt="Attachment preview" />

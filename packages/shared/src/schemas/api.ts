@@ -895,6 +895,9 @@ export const PhoneThreadSummarySchema = z.object({
   portraitAssetId: z.string().nullable(),
   lastBody: z.string().nullable(),
   lastAt: z.number().nullable(),
+  /** Whether the last delivered text was sent by the player — lets the inbox
+   *  preview prefix "You:" so an outgoing-but-unanswered thread reads clearly. */
+  lastFromPlayer: z.boolean().default(false),
   unread: z.number().int().nonnegative(),
   /** Current-day availability, so the inbox can flag a busy contact up front
    *  (without the player having to attempt a text to find out). */

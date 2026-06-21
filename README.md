@@ -237,6 +237,28 @@ The Vite dev server proxies `/api` and `/uploads` to the API server on
 > (a separate save), and `pnpm dev:mock` runs against it — handy for screenshots without
 > touching your real game.
 
+### Run only the API (no frontend)
+
+If you just want the backend — to drive it from your own client, hit the HTTP API
+directly, or run headless — start the server package on its own:
+
+```bash
+# API with auto-reload (tsx watch), the way `pnpm dev` runs it
+pnpm --filter @dsim/server run dev
+
+# API once, no file watching (good for scripts / production-ish runs)
+pnpm --filter @dsim/server run start
+
+# Against the mock showcase world
+pnpm --filter @dsim/server run dev:mock     # watch
+pnpm --filter @dsim/server run start:mock   # no watch
+```
+
+The API listens on **http://localhost:8787** by default (`PORT` / `HOST` in `.env`). No
+build step is needed — everything runs straight from TypeScript source via `tsx`. Without
+the Vite dev server you won't get its `/api` and `/uploads` proxy, so call the API at its
+own origin and set `CORS_ORIGINS` to match wherever your client is served from.
+
 ---
 
 ## Connecting your model
@@ -327,6 +349,8 @@ I also recommend turning *OFF* reasoning. Reasoning, in my experience with Gemma
 | ---------------- | --------------------------------------------------------------------------------- |
 | `pnpm install`   | Install all workspace dependencies.                                                |
 | `pnpm dev`       | Run the API server (tsx watch) **and** the web client (Vite) in parallel.         |
+| `pnpm --filter @dsim/server run dev` | Run **only** the API server (tsx watch), no frontend.                 |
+| `pnpm --filter @dsim/server run start` | Run **only** the API server once, without file watching.            |
 | `pnpm seed`      | Seed the database with a sample world, characters, shop items, properties & stocks.|
 | `pnpm mock`      | Build the isolated showcase world (separate `data/mock` save).                     |
 | `pnpm dev:mock`  | Run the app against the mock showcase world.                                       |

@@ -158,6 +158,7 @@ export function listThreadSummaries(
       portraitAssetId: character?.portraitAssetId ?? null,
       lastBody: last?.body ?? null,
       lastAt: last ? last.deliveredAt ?? last.createdAt : thread.lastMessageAt,
+      lastFromPlayer: last?.sender === 'player',
       unread: thread.unreadCount,
       available: a?.available ?? true,
       unavailableReason: a?.reason ?? null,

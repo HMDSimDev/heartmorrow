@@ -56,6 +56,7 @@
 
 /* --- Icon-only button used in PhoneAppBar left/right slots ------------- */
 .pbar-iconbtn {
+  position: relative;
   flex-shrink: 0;
   width: 34px;
   height: 34px;
@@ -64,6 +65,18 @@
   justify-content: center;
   padding: 0;
   border-radius: 999px;
+}
+/* Invisible hit-slop so the effective touch target clears the 44px floor without
+   inflating the visible 34px circle (these corner buttons sit in every comms bar). */
+.pbar-iconbtn::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+}
+/* Spinning refresh affordance while the inbox reloads. */
+.pbar-iconbtn .is-spinning {
+  display: inline-flex;
+  animation: spin 0.8s linear infinite;
 }
 
 /* Mail reader: when/date shown inline next to sender meta. */
@@ -164,6 +177,10 @@
   white-space: nowrap;
 }
 .pcom-unread .pcom-preview { color: var(--text-dim); }
+/* "You:" lead on an outgoing-last preview, and the never-started placeholder
+   (italic + dimmer so it reads as a prompt, not a real message). */
+.pcom-preview-you { color: var(--text-dim); font-weight: 600; }
+.pcom-preview-empty { font-style: italic; color: var(--text-mute); opacity: 0.85; }
 
 /* --- Unavailable ("Do Not Disturb") cues ----------------------------- */
 /* Moon badge on the avatar, mirroring the unread count's corner placement. */
@@ -361,6 +378,10 @@
   border: 1px solid var(--border-soft);
   animation: pcom-feeling-rise 2.2s ease-out forwards;
 }
+/* Tint the cue by valence — warmer toward rose, cooler toward moonlight — so the
+   read isn't carried by the words alone. */
+.pcom-feeling.is-warm { color: var(--rose); border-color: rgba(232, 138, 166, 0.4); }
+.pcom-feeling.is-cool { color: var(--moon); border-color: rgba(157, 184, 222, 0.4); }
 @keyframes pcom-feeling-rise {
   0% { opacity: 0; transform: translateY(6px); }
   15% { opacity: 1; transform: translateY(0); }

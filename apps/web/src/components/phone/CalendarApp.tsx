@@ -215,6 +215,18 @@ export function CalendarApp() {
             ]
               .filter(Boolean)
               .join(' ');
+            // Fold every aria-hidden cell signal (weather, holiday, event dots)
+            // into one spoken label so AT users get what sighted users see.
+            const ariaLabel = [
+              `Day ${d}`,
+              cal.dayOfWeek,
+              entry?.weather.label,
+              cal.holiday ? `holiday: ${cal.holiday.name}` : null,
+              beatCount > 0 ? `${beatCount} ${beatCount === 1 ? 'event' : 'events'}` : null,
+              isToday ? 'today' : isFuture ? 'upcoming' : null,
+            ]
+              .filter(Boolean)
+              .join(', ');
             return (
               <button
                 key={d}
@@ -222,6 +234,7 @@ export function CalendarApp() {
                 style={{ animationDelay: `${Math.min(i * 11, 260)}ms` }}
                 disabled={isFuture}
                 onClick={() => !isFuture && openDay(d)}
+                aria-label={ariaLabel}
                 title={`Day ${d} · ${cal.dayOfWeek}${cal.holiday ? ` · ${cal.holiday.name}` : ''}`}
               >
                 <span className="pal-cell-day">{d}</span>
@@ -233,7 +246,7 @@ export function CalendarApp() {
                     ✦
                   </span>
                 )}
-                {beatCount > 0 && !isToday && (
+                {beatCount > 0 && (
                   <span className="pal-cell-dots" aria-hidden="true">
                     {rec!.beats.slice(0, 3).map((b, bi) => (
                       <i key={bi} className={`tone-${b.tone}`} />

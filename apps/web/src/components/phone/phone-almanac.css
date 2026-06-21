@@ -173,6 +173,7 @@
   font-weight: 600;
   color: var(--text-mute);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .pal-cell-wx {
   font-size: 1.18rem;
@@ -226,9 +227,13 @@
   animation: pal-cell-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both, pal-today-pulse 3.2s ease-in-out 0.5s infinite;
 }
 .pal-cell.is-today .pal-cell-day { color: var(--brass); }
+/* Today keeps its event dots now; reserve room at the bottom so the absolutely
+   positioned "Today" marker doesn't overlap them. */
+.pal-cell.is-today { padding-bottom: 11px; }
 .pal-cell-today {
   position: absolute;
   bottom: 1px;
+  font-size: 0.5rem;
   font-family: var(--font-mono);
   letter-spacing: 0.06em;
   text-transform: uppercase;

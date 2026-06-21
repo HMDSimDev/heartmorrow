@@ -52,12 +52,25 @@
   gap: 10px;
 }
 
+/* The compose box leads the feed — give it the card signature (a brass top
+   hairline + a touch of depth) so it reads as the place you speak from. */
 .fcs-compose {
-  background: var(--panel);
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--border);
   border-radius: var(--radius-md, 12px);
-  padding: 10px 11px 9px;
-  box-shadow: var(--shadow-sm);
+  padding: 12px 12px 9px;
+  box-shadow: var(--shadow-sm), var(--rim);
+}
+.fcs-compose::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.45), transparent);
+  pointer-events: none;
 }
 .fcs-compose-input {
   width: 100%;
@@ -73,11 +86,21 @@
 .fcs-compose-input::placeholder { color: var(--text-mute); }
 .fcs-compose-foot {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   margin-top: 6px;
   padding-top: 7px;
   border-top: 1px solid var(--border-soft);
 }
+.fcs-compose-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.02em;
+  color: var(--text-mute);
+}
+/* Warm toward brass as the 500-char cap approaches. */
+.fcs-compose-count.is-near { color: var(--brass); }
 .fcs-post-btn { min-width: 70px; }
 
 /* --- Feed + cards ----------------------------------------------------- */
