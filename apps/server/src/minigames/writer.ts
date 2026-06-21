@@ -37,16 +37,26 @@ const INFO: MinigameInfo = {
   description: 'Freelance copy for the world’s broadsheet — transcribe the day’s dispatch cleanly before the press run. Paid by precision and pace.',
   targetStats: [],
   rewardsCharacter: false,
+  mode: 'job',
+  skill: 'knowledge',
+  skillXp: 50,
 };
 
 /** Words-per-minute that earns the full speed bonus (a steady, attainable pace). */
 const TARGET_WPM = 45;
+/** No human reads AND types faster than this; a run above it is a paste/automation
+ *  and earns nothing. Set well above elite typing (~150 wpm) so it never trips a real
+ *  player, yet far below the thousands-of-wpm an instant paste implies. */
+const MAX_PLAUSIBLE_WPM = 220;
 /** Base pay for a flawless commission; the service caps money at 100, so an S lands there. */
 const BASE_PAY = 100;
 
 interface WriterState {
   /** The authoritative passage the submission is scored against. */
   passage: string;
+  /** Server clock at the moment the copy was issued — the run is timed from here, so a
+   *  pasted/instant submission can't fake a human pace (anti-cheat). */
+  startedAt: number;
 }
 
 /** Collapse whitespace so the transcription target is unambiguous (no stray newlines
@@ -136,12 +146,12 @@ export const writerModule: MinigameModule = {
     }
 
     const config = WriterConfigSchema.parse({ headline, passage, source });
-    return { config, state: { passage } satisfies WriterState };
+    return { config, state: { passage, startedAt: Date.now() } satisfies WriterState };
   },
 
   resolve(submission: unknown, state: unknown): ResolveResult {
     const sub = WriterSubmissionSchema.parse(submission);
-    const { passage } = state as WriterState;
+    const { passage, startedAt } = state as WriterState;
     const n = passage.length;
 
     // Character-level precision against the held answer key. Extra characters past
@@ -153,16 +163,22 @@ export const writerModule: MinigameModule = {
     }
     const accuracy = n > 0 ? correct / n : 0;
 
-    // Net WPM from CORRECT characters (the standard 5-char "word"), guarding a
-    // zero/implausible clock. The speed factor is clamped to [0,1], so a paste can't
-    // farm an outsized bonus and precision stays the dominant term.
-    const elapsedSec = Math.max(1, sub.elapsedMs / 1000);
+    // Net WPM from CORRECT characters (the standard 5-char "word"), timed from the
+    // SERVER clock — the client never supplies the elapsed time, so a copy-paste (which
+    // submits in milliseconds) reads as an impossible speed and can't game the score.
+    const elapsedSec = Math.max(0.001, (Date.now() - startedAt) / 1000);
     const wpm = correct / 5 / (elapsedSec / 60);
-    const speedFactor = clamp01(wpm / TARGET_WPM);
 
-    // Precision IS the job; speed only sweetens an already-accurate transcription, so
-    // mashing (low accuracy) can never grade well — and a blank submission earns F.
-    const score = Math.round(accuracy * (0.75 + 0.25 * speedFactor) * 100);
+    let score: number;
+    if (wpm > MAX_PLAUSIBLE_WPM) {
+      // Superhuman pace ⇒ a paste/automation, not a transcription. Void it.
+      score = 0;
+    } else {
+      // Precision IS the job; speed only sweetens an already-accurate transcription, so
+      // mashing (low accuracy) can never grade well — and a blank submission earns F.
+      const speedFactor = clamp01(wpm / TARGET_WPM);
+      score = Math.round(accuracy * (0.75 + 0.25 * speedFactor) * 100);
+    }
     const grade = scoreToGrade(score);
 
     const base = MinigameRewardSchema.parse({ dating: {}, relationship: {}, money: BASE_PAY });

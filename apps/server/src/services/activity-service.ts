@@ -1,8 +1,12 @@
 import {
   ACTIVITIES,
+  CAREER,
+  CAREER_SKILL_LABELS,
   HARSH_WEATHER,
   PLEASANT_WEATHER,
   PerformActivitySchema,
+  isCareerSkill,
+  masteryMult,
   resolveTogether,
   type ActivityDef,
   type Character,
@@ -16,7 +20,7 @@ import { getDb } from '../db/index';
 import { assertCanAct, ensureWorldState, spendStamina } from './world-clock-service';
 import { getCharacterAvailability } from './availability-service';
 import { weatherForDay } from './ambiance-service';
-import { addMoney, spendMoney } from './player-service';
+import { addMoney, grantCareerXp, getSkillLevel, spendMoney } from './player-service';
 import { applyRelationshipChange, setRelationshipFlag, stampLastDate } from './stat-service';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
@@ -39,6 +43,12 @@ export interface ActivityResult {
   /** Together: the structured read of how the outing landed (null for work). */
   together: TogetherResult | null;
   state: WorldState;
+  /** Work: the career skill this shift built (null for together / unskilled work). */
+  skill: string | null;
+  /** Work: the skill's level after this shift. */
+  skillLevel: number;
+  /** Work: true if this shift pushed the skill up a level (for a celebration). */
+  skillLeveledUp: boolean;
 }
 
 /**
@@ -79,16 +89,43 @@ export function performActivity(input: PerformActivity): ActivityResult {
     );
   }
 
+  const playerId = playerIdForWorld(worldId);
+
+  // A career-gated shift stays locked until the required skill is high enough. The
+  // client also hides it, but the server is the authority.
+  if (activity.kind === 'work' && isCareerSkill(activity.requiresSkill)) {
+    const have = getSkillLevel(activity.requiresSkill, playerId);
+    const need = activity.requiresLevel ?? 0;
+    if (have < need) {
+      throw badRequest(
+        `That work isn't open to you yet — reach ${CAREER_SKILL_LABELS[activity.requiresSkill]} level ${need} first.`,
+      );
+    }
+  }
+
   // Apply the reward and spend the action in ONE transaction, so a failure
-  // can't leave a free reward (or a spent action with no reward).
+  // can't leave a free reward (or a spent action with no reward) — and so a shift's
+  // pay and the XP it earns can never desync.
   return getDb().transaction<ActivityResult>(() => {
     let money = 0;
     let relationship: Relationship | null = null;
     let together: TogetherResult | null = null;
+    let skill: string | null = null;
+    let skillLevel = 0;
+    let skillLeveledUp = false;
     if (activity.kind === 'work') {
-      // Pay can vary by the day's weather + a deterministic spread (see computeWorkPay).
-      money = computeWorkPay(activity, worldId, preState.day, preState.actionsToday);
-      addMoney(money, playerIdForWorld(worldId));
+      // Pay varies by the day's weather + a deterministic spread, then scales with the
+      // skill's mastery (capped) — see computeWorkPay.
+      const level = isCareerSkill(activity.skill) ? getSkillLevel(activity.skill, playerId) : 0;
+      money = computeWorkPay(activity, worldId, preState.day, preState.actionsToday, level);
+      addMoney(money, playerId);
+      // A shift always teaches you a little: grant the skill's XP.
+      if (isCareerSkill(activity.skill) && activity.skillXp) {
+        const res = grantCareerXp(activity.skill, activity.skillXp, playerId);
+        skill = activity.skill;
+        skillLevel = res.level;
+        skillLeveledUp = res.leveledUp;
+      }
     } else {
       const out = performTogether(activity, worldId, character!, ensureWorldState(worldId).day);
       relationship = out.relationship;
@@ -96,7 +133,7 @@ export function performActivity(input: PerformActivity): ActivityResult {
     }
     const state = spendStamina(worldId, staminaCost);
     recordEvent('activity', { worldId, activityId: activity.id, kind: activity.kind, characterId: data.characterId, money });
-    return { activityId: activity.id, kind: activity.kind, money, relationship, together, state };
+    return { activityId: activity.id, kind: activity.kind, money, relationship, together, state, skill, skillLevel, skillLeveledUp };
   });
 }
 
@@ -113,7 +150,13 @@ const PLEASANT_WEATHER_PAY_MULT = 0.85;
  * The spread is seeded by (world, day, activity, actionsToday) so it's stable for the
  * Nth shift of a given day and fully replay-safe — never a fresh Math.random roll.
  */
-function computeWorkPay(activity: ActivityDef, worldId: string, day: number, actionsToday: number): number {
+function computeWorkPay(
+  activity: ActivityDef,
+  worldId: string,
+  day: number,
+  actionsToday: number,
+  masteryLevel: number,
+): number {
   let pay = activity.money ?? 0;
   if (activity.weatherPriced) {
     const kind = weatherForDay(worldId, day).kind;
@@ -125,7 +168,10 @@ function computeWorkPay(activity: ActivityDef, worldId: string, day: number, act
     const roll = hashFloat(`${worldId}|${day}|${activity.id}|work|${actionsToday}`);
     pay *= 1 - variance + roll * 2 * variance; // uniform in [base·(1−v), base·(1+v)]
   }
-  return Math.max(0, Math.round(pay));
+  // Mastery rewards experience (flat-capped), then a hard per-shift ceiling keeps even
+  // a maxed, lucky, stormy shift from runaway-inflating the economy.
+  pay *= masteryMult(masteryLevel);
+  return Math.max(0, Math.min(CAREER.ABSOLUTE_MAX_PAY, Math.round(pay)));
 }
 
 /**

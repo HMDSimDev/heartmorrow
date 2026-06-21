@@ -37,6 +37,16 @@ export interface ActivityDef {
   /** Work: when true, the day's weather scales pay — harsh weather pays a salvage
    *  premium, fair weather pays less (the almanac "prices the work by the sky"). */
   weatherPriced?: boolean;
+  /** Work: the career skill this shift builds (see shared `career.ts`). Its level
+   *  scales the pay via masteryMult. */
+  skill?: string;
+  /** Work: XP granted to {@link skill} per shift. */
+  skillXp?: number;
+  /** Work: skill this shift is gated behind — locked until that skill reaches
+   *  {@link requiresLevel}. Omitted = always available. */
+  requiresSkill?: string;
+  /** Work: minimum level of {@link requiresSkill} needed to unlock this shift. */
+  requiresLevel?: number;
   /** Together: the primary relationship stat this nurtures. */
   relationshipStat?: RelationshipStatKey;
   /** Together: base delta to the primary stat at the easy end of the curve. */
@@ -58,20 +68,32 @@ export interface ActivityDef {
 
 export const ACTIVITIES: readonly ActivityDef[] = [
   // The steady FLOOR: low pay, zero variance, one action. The number you can count
-  // on when rent is due tonight — every other job is measured against this.
-  { id: 'work_shift', kind: 'work', label: 'Work a shift', description: 'Steady hours for steady pay. No surprises.', money: 50 },
-  // The GAMBLE: higher expected pay than a steady shift, but the cut is uneven — some
-  // days it beats the floor handily, some days it comes in under it.
+  // on when rent is due tonight — every other job is measured against this. Builds Service.
+  {
+    id: 'work_shift',
+    kind: 'work',
+    label: 'Work a shift',
+    description: 'Steady hours for steady pay. No surprises — and you get a little better at the work each time.',
+    money: 50,
+    skill: 'service',
+    skillXp: 30,
+  },
+  // The GAMBLE: the SAME money on average as a steady shift, but a wild swing — some
+  // days you clean up well past it, some days you come in well under. The steady shift
+  // keeps the higher guaranteed floor, so neither strictly beats the other. Builds Hustle.
   {
     id: 'odd_jobs',
     kind: 'work',
     label: 'Hustle odd jobs',
     description: 'Grittier work, an uneven cut — clean up on a good day, scrape by on a bad one.',
-    money: 68,
+    money: 50,
     moneyVariance: 0.6,
+    skill: 'hustle',
+    skillXp: 30,
   },
-  // The HEAVY shift: the most money in a single go, but it eats two pieces of the
-  // day and the sky sets the price (storms pay a salvage premium, fair days less).
+  // The HEAVY shift: the most money in a single go, but it eats two pieces of the day
+  // and the sky sets the price. Gated behind some Craft (prove yourself at the Woodlot
+  // first); builds Craft further.
   {
     id: 'job_weatherwork',
     kind: 'work',
@@ -81,6 +103,10 @@ export const ACTIVITIES: readonly ActivityDef[] = [
     moneyVariance: 0.3,
     staminaCost: 2,
     weatherPriced: true,
+    skill: 'craft',
+    skillXp: 45,
+    requiresSkill: 'craft',
+    requiresLevel: 1,
   },
   {
     id: 'tg_in',

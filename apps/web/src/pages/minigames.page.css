@@ -497,6 +497,9 @@
   letter-spacing: 0.01em;
   white-space: pre-wrap;
   word-break: break-word;
+  /* You have to type it, not copy it — don't let the source be selected/copied. */
+  -webkit-user-select: none;
+  user-select: none;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   background: var(--vellum, var(--ink-2));

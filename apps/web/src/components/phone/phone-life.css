@@ -192,6 +192,57 @@
   padding: 1px 6px;
   white-space: nowrap;
 }
+.pl-work-tag.locked { color: var(--text-mute); border-color: var(--border); }
+.pl-tile.is-locked { opacity: 0.62; }
+
+/* --- Career skills bar (Work app) --------------------------------------- */
+.pl-skills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 4px 0 10px;
+}
+@media (max-width: 360px) {
+  .pl-skills { grid-template-columns: 1fr; }
+}
+.pl-skill { display: flex; flex-direction: column; gap: 4px; }
+.pl-skill-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pl-skill-name {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.pl-skill-lv {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+.pl-skill-bar {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+.pl-skill-bar > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--sage), var(--brass));
+  transition: width 0.4s ease;
+}
+
+/* --- On-shift play stage (job minigame inside the Work app) ------------- */
+.pl-job-stage-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.pl-job .pl-tile-icon { color: var(--sage); }
 
 /* the action button sits on the right; keep the existing .btn look but
    give the payout a confident mono ledger feel via a child span */

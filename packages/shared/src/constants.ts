@@ -233,6 +233,26 @@ export const GAMBLING = {
   BLACKJACK_DENOMINATOR: 2,
 } as const;
 
+// --- Career / job skills ----------------------------------------------------
+
+/**
+ * Tunables for the work-system's per-world job mastery (see `career.ts`). A job
+ * grants XP to its skill; the skill level scales that job's pay via masteryMult.
+ * Progression is deliberately FLAT-capped (never scales with wealth) so leveling
+ * speeds the grind but can't runaway-inflate — the 3-action stamina budget stays
+ * the real throttle, and `ABSOLUTE_MAX_PAY` caps any single shift.
+ */
+export const CAREER = {
+  /** Highest level any skill can reach. */
+  MAX_LEVEL: 5,
+  /** Pay multiplier per level: 1 + STEP·level (L0 = 1.0 … L5 = 1.75). */
+  MASTERY_STEP: 0.15,
+  /** Base of the cumulative XP curve: xpToReach(L) = XP_BASE·L·(L+1)/2 (L1=100 … L5=1500). */
+  XP_BASE: 100,
+  /** Flat, wealth-independent ceiling on any single work shift's pay (post-mastery). */
+  ABSOLUTE_MAX_PAY: 250,
+} as const;
+
 // --- Availability (Do Not Disturb) ------------------------------------------
 
 /** Per-day chance a given character is unavailable (busy) and can't be dated/texted. */

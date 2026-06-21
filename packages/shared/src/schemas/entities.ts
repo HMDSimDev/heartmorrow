@@ -228,6 +228,13 @@ export type Relationship = z.infer<typeof RelationshipSchema>;
 
 // --- Player -----------------------------------------------------------------
 
+/** One job-skill's stored progress on the player (see shared `career.ts`). */
+export const CareerSkillEntrySchema = z.object({
+  xp: z.number().int().nonnegative().default(0),
+  level: z.number().int().min(0).default(0),
+});
+export type CareerSkillEntry = z.infer<typeof CareerSkillEntrySchema>;
+
 export const PlayerProfileSchema = z.object({
   id,
   name: z.string().min(1).default('Player'),
@@ -238,6 +245,9 @@ export const PlayerProfileSchema = z.object({
   sexuality: SexualitySchema.default('unspecified'),
   personaNotes: z.string().default(''),
   money: z.number().int().nonnegative().default(0),
+  /** Per-world job mastery, keyed by career skill id. Server-authoritative — only the
+   *  work/minigame resolvers write it (never client-supplied via PlayerUpdate). */
+  career: z.record(z.string(), CareerSkillEntrySchema).default({}),
   createdAt: ts,
   updatedAt: ts,
 });

@@ -28,7 +28,11 @@ function isAllowedMime(mime: string): mime is AllowedImageMimeType {
  */
 export function safeUploadsPath(relativePath: string): string {
   const root = path.resolve(config.uploadsDir);
-  const target = path.resolve(root, relativePath);
+  // Normalize backslashes to forward slashes so traversal segments are caught
+  // consistently on POSIX, where `path.resolve` treats `\` as a literal
+  // filename character rather than a separator.
+  const normalized = relativePath.replace(/\\/g, '/');
+  const target = path.resolve(root, normalized);
   if (target !== root && !target.startsWith(root + path.sep)) {
     throw badRequest('Resolved path escapes the uploads directory.');
   }

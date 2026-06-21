@@ -17,7 +17,6 @@ export function WriterGame({
 }) {
   const target = config.passage;
   const [typed, setTyped] = useState('');
-  const startRef = useRef<number | null>(null);
   const doneRef = useRef(false);
 
   const chars = useMemo(() => target.split(''), [target]);
@@ -35,17 +34,16 @@ export function WriterGame({
 
   const onChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (doneRef.current) return;
-    const val = e.target.value;
-    if (startRef.current === null && val.length > 0) startRef.current = performance.now();
     // Cap at the passage length: over-typing earns nothing and this ends the line cleanly.
-    setTyped(val.slice(0, target.length));
+    setTyped(e.target.value.slice(0, target.length));
   };
 
   const submit = () => {
     if (doneRef.current || typed.length === 0) return;
     doneRef.current = true;
-    const elapsedMs = startRef.current === null ? 0 : Math.round(performance.now() - startRef.current);
-    onComplete({ typed, elapsedMs });
+    // The server times the run from its own clock and scores against its held copy —
+    // we only send what was typed.
+    onComplete({ typed });
   };
 
   return (
@@ -70,6 +68,8 @@ export function WriterGame({
           className="wr-input"
           value={typed}
           onChange={onChange}
+          onPaste={(e) => e.preventDefault()}
+          onDrop={(e) => e.preventDefault()}
           placeholder="Set the copy above, exactly as written…"
           rows={3}
           autoFocus

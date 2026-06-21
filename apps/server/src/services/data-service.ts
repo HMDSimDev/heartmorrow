@@ -12,6 +12,7 @@ import {
   inventoryRepo,
   memoriesRepo,
   minigameResultsRepo,
+  playersRepo,
   relationshipsRepo,
   shopItemsRepo,
   worldNotesRepo,
@@ -247,11 +248,9 @@ export function importAll(bundle: ExportBundle): { imported: true } {
       else prunedDerived += 1;
     });
     data.players.forEach((p) => {
-      // Players use INSERT; table was cleared above.
-      getDb().run(
-        `INSERT INTO players (id,name,pronouns,gender,sexuality,persona_notes,money,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
-        p.id, p.name, p.pronouns, p.gender, p.sexuality, p.personaNotes, p.money, p.createdAt, p.updatedAt,
-      );
+      // Players use INSERT (table was cleared above). Go through the repo so the column
+      // list stays in one place — a hand-written INSERT here previously dropped `career`.
+      playersRepo.insert(p);
     });
     data.shopItems.forEach((s) => shopItemsRepo.insert(s));
     data.inventory.forEach((i) => inventoryRepo.insert(i));

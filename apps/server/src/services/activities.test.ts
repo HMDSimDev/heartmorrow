@@ -5,7 +5,7 @@ import { createCharacter } from './character-service';
 import { getWorldAvailability } from './availability-service';
 import { performActivity } from './activity-service';
 import { ensureWorldState } from './world-clock-service';
-import { getOrCreatePlayer } from './player-service';
+import { getOrCreatePlayer, grantCareerXp, getSkillLevel } from './player-service';
 import { getRelationship } from './relationship-service';
 import { applyRelationshipChange } from './stat-service';
 import { playerIdForWorld } from '../lib/ids';
@@ -106,6 +106,7 @@ describe('activities (work / together)', () => {
 describe('work jobs: stamina cost + variable pay', () => {
   it('a heavy shift spends two actions and is refused when the day cannot afford it', () => {
     const { world } = seedWorldAndCharacter();
+    grantCareerXp('craft', 100, playerIdForWorld(world.id)); // unlock the craft-gated heavy shift (Lv1)
     const before = ensureWorldState(world.id).stamina; // 3 on a fresh weekday
     const res = performActivity({ activityId: 'job_weatherwork', worldId: world.id, characterId: null });
     expect(res.money).toBeGreaterThan(0);
@@ -118,12 +119,55 @@ describe('work jobs: stamina cost + variable pay', () => {
 
   it('a gig pays an uneven cut, always within its variance band', () => {
     const { world } = seedWorldAndCharacter();
-    const lo = Math.round(68 * (1 - 0.6)); // floor can dip below a steady shift
-    const hi = Math.round(68 * (1 + 0.6)); // ceiling beats it
+    // Same base as a steady shift (50), ±60% — floor dips below it, ceiling beats it.
+    const lo = Math.round(50 * (1 - 0.6));
+    const hi = Math.round(50 * (1 + 0.6));
     for (let i = 0; i < 3; i += 1) {
       const pay = performActivity({ activityId: 'odd_jobs', worldId: world.id, characterId: null }).money;
       expect(pay).toBeGreaterThanOrEqual(lo);
       expect(pay).toBeLessThanOrEqual(hi);
     }
+  });
+});
+
+describe('career: skill XP, mastery pay, and unlocks', () => {
+  it('a shift grants its skill XP and reports a level-up when it crosses one', () => {
+    const { world } = seedWorldAndCharacter();
+    const wallet = playerIdForWorld(world.id);
+    expect(getSkillLevel('service', wallet)).toBe(0);
+
+    // A plain shift from zero grants XP but doesn't level yet (30 < 100).
+    const first = performActivity({ activityId: 'work_shift', worldId: world.id, characterId: null });
+    expect(first.skill).toBe('service');
+    expect(first.skillLeveledUp).toBe(false);
+    expect(getOrCreatePlayer(wallet).career.service?.xp).toBe(30);
+
+    // Nudge to the brink, then the next shift crosses into level 1 and says so.
+    grantCareerXp('service', 65, wallet); // 30 + 65 = 95 (< 100)
+    const crossed = performActivity({ activityId: 'work_shift', worldId: world.id, characterId: null });
+    expect(crossed.skillLeveledUp).toBe(true);
+    expect(crossed.skillLevel).toBe(1);
+  });
+
+  it('pay scales with mastery (flat-capped)', () => {
+    const { world } = seedWorldAndCharacter();
+    const wallet = playerIdForWorld(world.id);
+    const atZero = performActivity({ activityId: 'work_shift', worldId: world.id, characterId: null }).money;
+    expect(atZero).toBe(50); // masteryMult(0) = 1.0
+    grantCareerXp('service', 10_000, wallet); // jump to max level
+    expect(getSkillLevel('service', wallet)).toBe(5);
+    const atMax = performActivity({ activityId: 'work_shift', worldId: world.id, characterId: null }).money;
+    expect(atMax).toBe(Math.round(50 * 1.75)); // masteryMult(5) = 1.75 → 88
+  });
+
+  it('a craft-gated heavy shift is locked until the skill is high enough', () => {
+    const { world } = seedWorldAndCharacter();
+    const wallet = playerIdForWorld(world.id);
+    // craft 0 → weatherwork refused.
+    expect(() => performActivity({ activityId: 'job_weatherwork', worldId: world.id, characterId: null })).toThrow();
+    grantCareerXp('craft', 100, wallet); // craft Lv1
+    expect(getSkillLevel('craft', wallet)).toBe(1);
+    const res = performActivity({ activityId: 'job_weatherwork', worldId: world.id, characterId: null });
+    expect(res.money).toBeGreaterThan(0);
   });
 });

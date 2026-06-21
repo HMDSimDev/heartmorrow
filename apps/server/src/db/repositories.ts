@@ -378,6 +378,7 @@ function rowToPlayer(r: Row): PlayerProfile {
     sexuality: r.sexuality ?? 'unspecified',
     personaNotes: r.persona_notes,
     money: Number(r.money),
+    career: fromJson(r.career, {}),
     createdAt: Number(r.created_at),
     updatedAt: Number(r.updated_at),
   });
@@ -390,15 +391,15 @@ export const playersRepo = {
   },
   insert(p: PlayerProfile): PlayerProfile {
     getDb().run(
-      `INSERT INTO players (id,name,pronouns,gender,sexuality,persona_notes,money,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)`,
-      p.id, p.name, p.pronouns, p.gender, p.sexuality, p.personaNotes, p.money, p.createdAt, p.updatedAt,
+      `INSERT INTO players (id,name,pronouns,gender,sexuality,persona_notes,money,career,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      p.id, p.name, p.pronouns, p.gender, p.sexuality, p.personaNotes, p.money, j(p.career), p.createdAt, p.updatedAt,
     );
     return p;
   },
   update(p: PlayerProfile): PlayerProfile {
     getDb().run(
-      `UPDATE players SET name=?,pronouns=?,gender=?,sexuality=?,persona_notes=?,money=?,updated_at=? WHERE id=?`,
-      p.name, p.pronouns, p.gender, p.sexuality, p.personaNotes, p.money, p.updatedAt, p.id,
+      `UPDATE players SET name=?,pronouns=?,gender=?,sexuality=?,persona_notes=?,money=?,career=?,updated_at=? WHERE id=?`,
+      p.name, p.pronouns, p.gender, p.sexuality, p.personaNotes, p.money, j(p.career), p.updatedAt, p.id,
     );
     return p;
   },

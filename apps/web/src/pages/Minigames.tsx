@@ -1,26 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  LoreQuizConfigSchema,
-  MemoryMatchConfigSchema,
-  TimingMeterConfigSchema,
-  SweetAndSourConfigSchema,
-  TwoTruthsConfigSchema,
-  RhythmSerenadeConfigSchema,
-  LumberjackConfigSchema,
-  WriterConfigSchema,
   type Character,
-  type LoreQuizSubmission,
-  type LumberjackSubmission,
-  type WriterSubmission,
-  type MemoryMatchSubmission,
   type MinigameFinishResponse,
   type MinigameId,
   type MinigameInfo,
   type MinigameSubmission,
-  type RhythmSerenadeSubmission,
-  type SweetAndSourSubmission,
-  type TimingMeterSubmission,
-  type TwoTruthsSubmission,
   RELATIONSHIP_STAT_LABELS,
   DATING_STAT_LABELS,
 } from '@dsim/shared';
@@ -30,21 +14,8 @@ import { useAppData } from '../state/app-context';
 import { Banner, Empty, Modal, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { PortraitPicker } from '../components/PortraitPicker';
-import { MemoryMatchGame } from '../components/minigames/MemoryMatchGame';
-import { TimingMeterGame } from '../components/minigames/TimingMeterGame';
-import { LoreQuizGame } from '../components/minigames/LoreQuizGame';
-import { SweetAndSourGame } from '../components/minigames/SweetAndSourGame';
-import { TwoTruthsGame } from '../components/minigames/TwoTruthsGame';
-import { RhythmSerenade } from '../components/minigames/RhythmSerenade';
-import { LumberjackGame } from '../components/minigames/LumberjackGame';
-import { WriterGame } from '../components/minigames/WriterGame';
+import { GameView, type ActiveGame } from '../components/minigames/GameView';
 import './minigames.page.css';
-
-interface ActiveGame {
-  minigameId: MinigameId;
-  runId: string;
-  config: unknown;
-}
 
 export function Minigames() {
   const { reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate } = useAppData();
@@ -64,7 +35,8 @@ export function Minigames() {
     void (async () => {
       try {
         const [g, c] = await Promise.all([api.listMinigames(), api.listCharacters(activeWorldId ?? undefined)]);
-        setGames(g);
+        // Job games (paid skill work) live in the Work app, not the dating arcade.
+        setGames(g.filter((x) => x.mode !== 'job'));
         setCharacters(c);
         // Keep a still-valid partner across a day change; re-pick when the
         // current one isn't in the (possibly switched) world's roster.
@@ -146,7 +118,7 @@ export function Minigames() {
       <div className="page-head">
         <span className="kicker">The Arcade Almanac</span>
         <h1>Minigames</h1>
-        <p>Play together to grow closer — or pick up skill work, like a shift at the Woodlot, for honest coin.</p>
+        <p>Play together to grow closer — and earn a little money.</p>
       </div>
       {error && <Banner kind="error">{error}</Banner>}
       {outOfEnergy && !active && (
@@ -242,78 +214,6 @@ export function Minigames() {
       )}
     </div>
   );
-}
-
-function GameView({
-  active,
-  partner,
-  onComplete,
-}: {
-  active: ActiveGame;
-  partner: Character | null;
-  onComplete: (s: MinigameSubmission) => void;
-}) {
-  switch (active.minigameId) {
-    case 'memory_match':
-      return (
-        <MemoryMatchGame
-          config={MemoryMatchConfigSchema.parse(active.config)}
-          onComplete={(submission: MemoryMatchSubmission) => onComplete({ minigameId: 'memory_match', submission })}
-        />
-      );
-    case 'timing_meter':
-      return (
-        <TimingMeterGame
-          config={TimingMeterConfigSchema.parse(active.config)}
-          onComplete={(submission: TimingMeterSubmission) => onComplete({ minigameId: 'timing_meter', submission })}
-        />
-      );
-    case 'lore_quiz':
-      return (
-        <LoreQuizGame
-          config={LoreQuizConfigSchema.parse(active.config)}
-          partner={partner ?? undefined}
-          onComplete={(submission: LoreQuizSubmission) => onComplete({ minigameId: 'lore_quiz', submission })}
-        />
-      );
-    case 'sweet_and_sour':
-      return (
-        <SweetAndSourGame
-          config={SweetAndSourConfigSchema.parse(active.config)}
-          onComplete={(submission: SweetAndSourSubmission) => onComplete({ minigameId: 'sweet_and_sour', submission })}
-        />
-      );
-    case 'two_truths_a_lie':
-      return (
-        <TwoTruthsGame
-          config={TwoTruthsConfigSchema.parse(active.config)}
-          onComplete={(submission: TwoTruthsSubmission) => onComplete({ minigameId: 'two_truths_a_lie', submission })}
-        />
-      );
-    case 'rhythm_serenade':
-      return (
-        <RhythmSerenade
-          config={RhythmSerenadeConfigSchema.parse(active.config)}
-          onComplete={(submission: RhythmSerenadeSubmission) => onComplete({ minigameId: 'rhythm_serenade', submission })}
-        />
-      );
-    case 'lumberjack':
-      return (
-        <LumberjackGame
-          config={LumberjackConfigSchema.parse(active.config)}
-          onComplete={(submission: LumberjackSubmission) => onComplete({ minigameId: 'lumberjack', submission })}
-        />
-      );
-    case 'writer':
-      return (
-        <WriterGame
-          config={WriterConfigSchema.parse(active.config)}
-          onComplete={(submission: WriterSubmission) => onComplete({ minigameId: 'writer', submission })}
-        />
-      );
-    default:
-      return null;
-  }
 }
 
 function ResultCard({ result, onClose }: { result: MinigameFinishResponse; onClose: () => void }) {

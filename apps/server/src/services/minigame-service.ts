@@ -1,9 +1,13 @@
 import {
+  CAREER,
+  CAREER_SKILL_LABELS,
   MinigameResultSchema,
   MinigameRewardSchema,
   MinigameStartSchema,
   DATING_STAT_KEYS,
   RELATIONSHIP_STAT_KEYS,
+  isCareerSkill,
+  masteryMult,
   type Milestone,
   type MinigameFinish,
   type MinigameFinishResponse,
@@ -22,7 +26,7 @@ import { getRelationship } from './relationship-service';
 import { getLlmSettings } from './settings-service';
 import { applyCharacterDatingChange, applyRelationshipChange, stampLastDate } from './stat-service';
 import { assertCanAct, ensureWorldState, spendStamina } from './world-clock-service';
-import { addMoney } from './player-service';
+import { addMoney, getSkillLevel, grantCareerXp } from './player-service';
 import { addMemoriesFromEvaluation } from './memory-service';
 import { appendChronicleLine } from './chronicle-service';
 import { detectMilestoneCrossing } from './milestone-service';
@@ -87,6 +91,17 @@ export async function startMinigame(input: MinigameStart): Promise<MinigameStart
   // Minigames cost a daily action when tied to a world; block at 0 stamina.
   if (world) assertCanAct(world.id);
 
+  // A career-gated job stays locked until the required skill is high enough.
+  if (world && isCareerSkill(module.info.requiresSkill)) {
+    const have = getSkillLevel(module.info.requiresSkill, playerIdForWorld(world.id));
+    const need = module.info.requiresLevel ?? 0;
+    if (have < need) {
+      throw badRequest(
+        `That work isn't open to you yet — reach ${CAREER_SKILL_LABELS[module.info.requiresSkill]} level ${need} first.`,
+      );
+    }
+  }
+
   const built = await module.build({ character, relationship, world, worldNotes, settings });
   const runId = newId('run');
   runs.set(runId, {
@@ -117,6 +132,16 @@ export function finishMinigame(input: MinigameFinish): MinigameFinishResponse {
   // character entirely for such games (money + best-score still key off the world).
   const characterId = module.info.rewardsCharacter ? run.characterId : null;
   const character = characterId ? getCharacter(characterId) : null;
+
+  // A money-only JOB scales its pay with the skill's mastery (flat-capped) and grants
+  // career XP; a bonding game keeps the standard bounded reward and touches no skill.
+  const isJob = !module.info.rewardsCharacter;
+  let paidMoney = reward.money;
+  if (isJob && run.worldId && isCareerSkill(module.info.skill)) {
+    const level = getSkillLevel(module.info.skill, playerIdForWorld(run.worldId));
+    paidMoney = Math.min(CAREER.ABSOLUTE_MAX_PAY, Math.round(reward.money * masteryMult(level)));
+  }
+  const paidReward = paidMoney === reward.money ? reward : MinigameRewardSchema.parse({ ...reward, money: paidMoney });
   const playedFavorite = !!character && favoriteMinigameFor(character) === run.minigameId;
 
   // Warmth BEFORE any deltas, so we can detect a band crossing this play caused.
@@ -139,7 +164,13 @@ export function finishMinigame(input: MinigameFinish): MinigameFinishResponse {
     }
   }
   // Reward goes to THIS world's wallet (a world-less solo run earns nothing).
-  if (reward.money > 0 && run.worldId) addMoney(reward.money, playerIdForWorld(run.worldId));
+  if (paidReward.money > 0 && run.worldId) addMoney(paidReward.money, playerIdForWorld(run.worldId));
+
+  // A job shift builds its skill — XP scales with how well it went (an F earns ~none).
+  if (isJob && run.worldId && isCareerSkill(module.info.skill) && module.info.skillXp) {
+    const gainedXp = Math.round(module.info.skillXp * (resolved.score / 100));
+    if (gainedXp > 0) grantCareerXp(module.info.skill, gainedXp, playerIdForWorld(run.worldId));
+  }
 
   // Personal best — read the prior best (within this world) BEFORE persisting.
   const priorBest = minigameResultsRepo.bestScore(run.minigameId, characterId, run.worldId);
@@ -152,7 +183,7 @@ export function finishMinigame(input: MinigameFinish): MinigameFinishResponse {
     worldId: run.worldId,
     score: resolved.score,
     grade: resolved.grade,
-    reward,
+    reward: paidReward,
     createdAt: Date.now(),
   });
   minigameResultsRepo.insert(result);

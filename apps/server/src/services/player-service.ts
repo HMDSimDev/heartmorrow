@@ -2,6 +2,8 @@ import {
   DEFAULT_PLAYER_ID,
   DEFAULT_STARTING_MONEY,
   PlayerProfileSchema,
+  levelForXp,
+  type CareerSkill,
   type PlayerProfile,
   type PlayerUpdate,
 } from '@dsim/shared';
@@ -48,6 +50,40 @@ export function addMoney(amount: number, id: string = DEFAULT_PLAYER_ID): Player
   const saved = playersRepo.update(next);
   recordEvent('player_money_change', { playerId: id, delta: saved.money - player.money, money: saved.money });
   return saved;
+}
+
+/** Current level of a career skill for a player (0 if never worked it). */
+export function getSkillLevel(skill: CareerSkill, id: string = DEFAULT_PLAYER_ID): number {
+  return getOrCreatePlayer(id).career[skill]?.level ?? 0;
+}
+
+/**
+ * Grant career XP to a skill (server-authoritative; the client never supplies XP or
+ * levels — only the work/minigame resolvers call this). Recomputes the level from the
+ * new cumulative XP and persists. Returns the updated level and whether it advanced
+ * (so callers can celebrate a level-up).
+ */
+export function grantCareerXp(
+  skill: CareerSkill,
+  xp: number,
+  id: string = DEFAULT_PLAYER_ID,
+): { level: number; leveledUp: boolean } {
+  const player = getOrCreatePlayer(id);
+  const prev = player.career[skill] ?? { xp: 0, level: 0 };
+  const amount = Math.max(0, Math.round(xp));
+  if (amount <= 0) return { level: prev.level, leveledUp: false };
+  const nextXp = prev.xp + amount;
+  const nextLevel = levelForXp(nextXp);
+  const next = PlayerProfileSchema.parse({
+    ...player,
+    career: { ...player.career, [skill]: { xp: nextXp, level: nextLevel } },
+    updatedAt: Date.now(),
+  });
+  playersRepo.update(next);
+  if (nextLevel > prev.level) {
+    recordEvent('career_level_up', { playerId: id, skill, level: nextLevel });
+  }
+  return { level: nextLevel, leveledUp: nextLevel > prev.level };
 }
 
 /** Spend money. Throws if the amount is invalid or funds are insufficient. */

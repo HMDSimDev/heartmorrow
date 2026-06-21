@@ -32,6 +32,9 @@ const INFO: MinigameInfo = {
   description: 'Dawn shift at the woodlot — read the grain, swing on the beat, and fell each log before your arms give out. Pure skill, paid in coin.',
   targetStats: [],
   rewardsCharacter: false,
+  mode: 'job',
+  skill: 'craft',
+  skillXp: 55,
 };
 
 /** Logs to fell in one shift. */

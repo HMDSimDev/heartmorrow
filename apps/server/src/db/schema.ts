@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS players (
   pronouns     TEXT NOT NULL DEFAULT 'they/them',
   persona_notes TEXT NOT NULL DEFAULT '',
   money        INTEGER NOT NULL DEFAULT 0,
+  career       TEXT NOT NULL DEFAULT '{}',
   created_at   INTEGER NOT NULL,
   updated_at   INTEGER NOT NULL
 );
@@ -665,6 +666,11 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
     table: 'players',
     column: 'sexuality',
     ddl: `ALTER TABLE players ADD COLUMN sexuality TEXT NOT NULL DEFAULT 'unspecified'`,
+  },
+  {
+    table: 'players',
+    column: 'career',
+    ddl: `ALTER TABLE players ADD COLUMN career TEXT NOT NULL DEFAULT '{}'`,
   },
   {
     // Player-sent photo on a text (uploaded asset id; vision model reads it).

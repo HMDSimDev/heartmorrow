@@ -542,6 +542,9 @@ export const api = {
       relationship: Relationship | null;
       together: TogetherResult | null;
       state: WorldState;
+      skill: string | null;
+      skillLevel: number;
+      skillLeveledUp: boolean;
     }>('/activities/perform', input),
 
   // share files (export/import of characters + worlds as .hmchr/.hmwrld/.hmpack)

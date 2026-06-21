@@ -255,11 +255,11 @@ export const LumberjackSubmissionSchema = z.object({
 export type LumberjackSubmission = z.infer<typeof LumberjackSubmissionSchema>;
 
 export const WriterSubmissionSchema = z.object({
-  /** Exactly what the player typed. The SERVER scores it against its held copy of
-   *  the passage (the answer key), so the client never claims an accuracy or score. */
+  /** Exactly what the player typed. The SERVER scores it against its held copy of the
+   *  passage (the answer key) AND times the run from its own clock, so the client can
+   *  neither claim an accuracy/score nor fake how long it took — a paste is instant, so
+   *  it can't forge a human typing pace. */
   typed: z.string().max(4000),
-  /** Elapsed time from first keystroke to submit, in ms (drives words-per-minute). */
-  elapsedMs: z.number().int().min(0),
 });
 export type WriterSubmission = z.infer<typeof WriterSubmissionSchema>;
 
@@ -282,5 +282,16 @@ export const MinigameInfoSchema = z.object({
   description: z.string(),
   targetStats: z.array(z.string()),
   rewardsCharacter: z.boolean(),
+  /** Where this surfaces: a bonding game lives in the Arcade; a `job` is paid skill
+   *  work and lives in the Work app. Omitted = 'date' (bonding). */
+  mode: z.enum(['date', 'job']).optional(),
+  /** Job games only: the career skill this builds (see shared `career.ts`). */
+  skill: z.string().optional(),
+  /** Job games only: XP granted to {@link skill}, scaled by the play's score. */
+  skillXp: z.number().int().nonnegative().optional(),
+  /** Job games only: skill this is gated behind (locked until {@link requiresLevel}). */
+  requiresSkill: z.string().optional(),
+  /** Job games only: minimum level of {@link requiresSkill} to unlock. */
+  requiresLevel: z.number().int().min(0).optional(),
 });
 export type MinigameInfo = z.infer<typeof MinigameInfoSchema>;
