@@ -489,7 +489,9 @@ export async function generateCharacterFromImage(
     const res = await getAdapter(visionSettings).chat({
       messages: buildImageDescriptionMessages(imageDataUrl),
       temperature: 0.3, // a factual description, not creative writing
-      maxTokens: 400,
+      // Headroom for a richer, more detailed description (the guardrails ask for
+      // 4-8 detailed sentences) — a tight cap here would clip mid-sentence.
+      maxTokens: 800,
     });
     description = stripThink(res.content).trim();
   } catch (err) {

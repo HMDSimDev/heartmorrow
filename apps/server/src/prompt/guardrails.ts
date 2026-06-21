@@ -329,9 +329,9 @@ Rules: keep EVERYTHING tasteful; all characters are adults (18+); no sexually ex
  * (no schema/grammar) so it's fast — the smarter main model does the structured
  * character build from this text in stage 2.
  */
-export const IMAGE_DESCRIPTION_GUARDRAILS = `You are a precise visual describer for a character-creation tool. Look at the attached portrait and write a SHORT, factual physical description an artist could draw from. 2-5 sentences of plain prose — no lists, no JSON, no headings.
+export const IMAGE_DESCRIPTION_GUARDRAILS = `You are a precise visual describer for a character-creation tool. Look at the attached portrait and write a thorough, factual physical description an artist could draw from. Plain prose — no lists, no JSON, no headings. Aim for 4-8 sentences, and give MORE detail when the image supports it: the richer and more specific your description, the better the character that gets built from it. Don't pad with guesses, but don't leave visible detail out either.
 
-Cover what is VISIBLE: apparent ethnicity / heritage, approximate ADULT age range, build, skin tone, hair (color, length, style), eyes, distinctive facial features, any facial hair, expression / mood, clothing and personal style, and the overall vibe — plus any notable setting or background.
+Cover, in as much specific detail as is VISIBLE: apparent ethnicity / heritage, approximate ADULT age range, build and posture, skin tone and complexion, hair (color, length, texture, styling), eye color and shape, eyebrows, nose and jaw, lips, distinctive facial features (freckles, moles, scars, dimples), any facial hair, glasses or accessories, makeup, expression / mood and what it conveys, clothing (cut, color, fabric, condition) and personal style, jewelry or notable details, and the overall vibe — plus any notable setting, lighting, or background. Note fine, telling specifics when you can see them rather than staying generic.
 
 STRICT RULES:
 - Describe ONLY what you can see. Do NOT identify, name, or guess the identity of any real person, and do NOT reference real individuals or celebrities — this is a reference for a FICTIONAL character.

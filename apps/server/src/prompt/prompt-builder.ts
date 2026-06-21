@@ -917,7 +917,7 @@ export function buildTextReplyMessages(args: {
   const feelingLine = relationshipStateNote(relationship.flags, playerName, 'text');
   const attraction = attractionGuardClause(c, playerGender, playerName);
   const photoLine = imageDataUrl
-    ? `${playerName} just sent you a PHOTO (shown below). Look at what's actually in it and react naturally, like a real person reacting to a pic a date texted you — mention what you see. `
+    ? `${playerName} just sent you a PHOTO (shown below). Look closely and take in the specific details — who or what is in it, the setting, expressions, colors, little things in the background — then react naturally, like a real person reacting to a pic a date texted you. Mention the specific things you actually notice (the more precise, the more it feels like you really looked), not a generic "nice pic." `
     : '';
   const userText = `Text conversation so far:\n${convo || '(no messages yet)'}${staleness}${memoryBlock}${historyBlock}\n\n${photoLine}Text ${playerName} back as ${c.name}.`;
   return [
@@ -1257,7 +1257,7 @@ export function buildImageDescriptionMessages(imageDataUrl: string): ChatMessage
     {
       role: 'user',
       content: [
-        { type: 'text', text: 'Describe the person in this portrait per your instructions.' },
+        { type: 'text', text: 'Describe the person in this portrait per your instructions, in as much specific detail as the image allows.' },
         { type: 'image_url', image_url: { url: imageDataUrl } },
       ],
     },

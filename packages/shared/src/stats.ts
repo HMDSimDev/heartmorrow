@@ -48,6 +48,33 @@ export const DATING_STAT_LABELS: Record<DatingStatKey, string> = {
   style: 'Style',
 };
 
+/**
+ * What each dating stat actually does in play. Surfaced in the Character
+ * editor so authors understand the mechanical effect, not just the flavor.
+ *
+ * Today, dating stats feed three systems:
+ *  - Together activities: each activity has "fit" stats; higher fit means
+ *    bigger relationship gains (and fewer tension hits) from that activity.
+ *  - Minigames: a character's highest stat picks their favorite minigame,
+ *    which earns a small bonus and a warmer reaction when played.
+ *  - Date conversations: the effective stats are shown to the model so it can
+ *    color how the character talks (this is flavor, not a hard score).
+ *
+ * They may also drive additional systems in the future.
+ */
+export const DATING_STAT_DESCRIPTIONS: Record<DatingStatKey, string> = {
+  charm: 'Attractiveness and social spark. Favors the timing-meter minigame.',
+  empathy:
+    'Emotional attunement. Boosts quiet/heart-to-heart Together activities; favors the sweet-and-sour minigame.',
+  humor: 'Wit and playfulness. Boosts goofing-off Together activities; favors the two-truths-and-a-lie minigame.',
+  confidence:
+    'Self-assurance and boldness. Boosts active outings; favors the rhythm-serenade minigame.',
+  intellect:
+    'Depth and curiosity. Boosts deep-talk and culture Together activities; favors the lore-quiz minigame.',
+  style:
+    'Aesthetic sense and refinement. Boosts outings and culture activities; favors the memory-match minigame.',
+};
+
 export const RELATIONSHIP_STAT_LABELS: Record<RelationshipStatKey, string> = {
   affection: 'Affection',
   trust: 'Trust',

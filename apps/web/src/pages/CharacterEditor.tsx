@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   DATING_STAT_KEYS,
   DATING_STAT_LABELS,
+  DATING_STAT_DESCRIPTIONS,
   DEFAULT_DATING_STATS,
   GUARDEDNESS_DEFAULT,
   guardednessDescriptor,
@@ -977,8 +978,18 @@ export function CharacterEditor() {
                   {generatingStats ? 'Generating…' : 'Generate from description'}
                 </button>
               </div>
+              <p className="creator-note">
+                These six traits define the character's dating persona. They shape how much relationship progress
+                Together activities yield (each activity favors certain stats), pick the character's favorite minigame
+                (their highest stat), and color how they talk on dates. They may also drive additional systems in the
+                future.
+              </p>
               {DATING_STAT_KEYS.map((k) => (
-                <Field key={k} label={`${DATING_STAT_LABELS[k]}: ${form.datingStats[k]}`}>
+                <Field
+                  key={k}
+                  label={`${DATING_STAT_LABELS[k]}: ${form.datingStats[k]}`}
+                  hint={DATING_STAT_DESCRIPTIONS[k]}
+                >
                   <input
                     type="range"
                     min={0}
