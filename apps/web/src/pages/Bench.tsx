@@ -861,7 +861,7 @@ export function Bench() {
     <div className="stack bench-page">
       <div className="page-head">
         <div className="kicker">Diagnostics · the proving bench</div>
-        <h1>Heartmorrow Bench</h1>
+        <h1>Heartmorrow Benchmark</h1>
         <p>
           Run the real prompts this game asks of your model — the rapport judges, the date evaluator, the texting
           replies, the world &amp; creator generators — against a fixed sample cast in <strong>Lanternford</strong>.

@@ -10,10 +10,23 @@
    =========================================================================== */
 
 /* --- Main page: section scaffolding -------------------------------------- */
-.set-page { gap: 18px; max-width: 860px; margin-inline: auto; }
+.set-page { gap: 30px; max-width: 860px; margin-inline: auto; }
 /* On very large monitors give the technical settings (form rows + console)
    a touch more room; kept modest so line length stays readable. */
 @media (min-width: 1900px) { .set-page { max-width: 1040px; } }
+
+/* Group dividers — cluster the framed sections under mono brass headers so the
+   page reads as a few labelled groups rather than one undifferentiated stack. */
+.set-group { display: flex; flex-direction: column; gap: 16px; }
+.set-group-head {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 2px; padding: 0 2px;
+  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--brass);
+}
+.set-group-head::after {
+  content: ''; flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border-bright), transparent);
+}
 
 /* A labelled section block. Quieter than .card so the one framed console
    below carries the boldness. */
