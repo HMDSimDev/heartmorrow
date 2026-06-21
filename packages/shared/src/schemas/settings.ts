@@ -35,6 +35,22 @@ export const LlmSettingsSchema = z.object({
   visionModel: z.string().default(''),
   temperature: z.number().min(0).max(2).default(0.8),
   maxTokens: z.number().int().positive().max(32_000).default(2048),
+  /**
+   * Advanced sampling knobs. Each is nullable and defaults to `null`, which means
+   * "leave it out of the request" — so the endpoint applies its own default and
+   * strict OpenAI-proper servers (which reject `top_k`/`min_p`/`repeat_penalty`)
+   * keep working unless the user opts in. When set, the server sends the matching
+   * OpenAI-compatible field (`top_p`, `top_k`, `min_p`, `frequency_penalty`,
+   * `presence_penalty`, `repeat_penalty`). Support varies by backend: top_k/min_p/
+   * repeat_penalty are honored by llama.cpp / LM Studio / Ollama / vLLM but ignored
+   * (or rejected) by the official OpenAI API.
+   */
+  topP: z.number().min(0).max(1).nullable().default(null),
+  topK: z.number().int().min(0).max(500).nullable().default(null),
+  minP: z.number().min(0).max(1).nullable().default(null),
+  frequencyPenalty: z.number().min(-2).max(2).nullable().default(null),
+  presencePenalty: z.number().min(-2).max(2).nullable().default(null),
+  repeatPenalty: z.number().min(0).max(2).nullable().default(null),
   structuredMode: StructuredOutputModeSchema.default('json_schema'),
   /**
    * When true AND structuredMode is 'json_schema', skip dumping the JSON schema

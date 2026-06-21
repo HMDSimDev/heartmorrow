@@ -24,6 +24,12 @@ interface Form {
   visionModel: string;
   temperature: number;
   maxTokens: number;
+  topP: number | null;
+  topK: number | null;
+  minP: number | null;
+  frequencyPenalty: number | null;
+  presencePenalty: number | null;
+  repeatPenalty: number | null;
   structuredMode: StructuredOutputMode;
   omitSchemaInPrompt: boolean;
   endpointMode: EndpointMode;
@@ -88,6 +94,12 @@ export function Settings() {
           visionModel: s.visionModel,
           temperature: s.temperature,
           maxTokens: s.maxTokens,
+          topP: s.topP,
+          topK: s.topK,
+          minP: s.minP,
+          frequencyPenalty: s.frequencyPenalty,
+          presencePenalty: s.presencePenalty,
+          repeatPenalty: s.repeatPenalty,
           structuredMode: s.structuredMode,
           omitSchemaInPrompt: s.omitSchemaInPrompt,
           endpointMode: s.endpointMode,
@@ -107,6 +119,14 @@ export function Settings() {
 
   if (!form) return <Spinner />;
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
+  // Nullable sampling inputs: blank → null (field omitted from the request);
+  // any other value parses to a number (NaN guarded so partial typing is kept null).
+  const setNullable = (k: 'topP' | 'topK' | 'minP' | 'frequencyPenalty' | 'presencePenalty' | 'repeatPenalty', raw: string) => {
+    const trimmed = raw.trim();
+    if (trimmed === '') return set(k, null);
+    const n = Number(trimmed);
+    set(k, Number.isFinite(n) ? n : null);
+  };
 
   const buildUpdate = () => {
     const update: Record<string, unknown> = {
@@ -115,6 +135,12 @@ export function Settings() {
       visionModel: form.visionModel,
       temperature: form.temperature,
       maxTokens: form.maxTokens,
+      topP: form.topP,
+      topK: form.topK,
+      minP: form.minP,
+      frequencyPenalty: form.frequencyPenalty,
+      presencePenalty: form.presencePenalty,
+      repeatPenalty: form.repeatPenalty,
       structuredMode: form.structuredMode,
       omitSchemaInPrompt: form.omitSchemaInPrompt,
       endpointMode: form.endpointMode,
@@ -228,10 +254,20 @@ export function Settings() {
   const loadModels = async () => {
     if (loadingModels) return;
     setLoadingModels(true);
+    setError(undefined);
+    setSavedNote(undefined);
     try {
-      const res = await api.listModels();
+      // Use the values currently typed into the form (like Test connection) so the
+      // user doesn't have to Save first to list against a freshly-entered endpoint.
+      const res = await api.listModels(buildUpdate());
       setModels(res.models);
-      if (!res.ok && res.error) setError(res.error);
+      if (!res.ok && res.error) {
+        setError(res.error);
+      } else if (res.models.length === 0) {
+        setSavedNote('Connected, but the endpoint returned no models.');
+      } else {
+        setSavedNote(`Loaded ${res.models.length} model${res.models.length === 1 ? '' : 's'} — pick one in the Model field.`);
+      }
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -422,8 +458,22 @@ export function Settings() {
                 onChange={(e) => set('apiKey', e.target.value)}
               />
             </Field>
-            <Field label="Model">
+            <Field label="Model" hint="Type any model name, or pick from the loaded list below.">
               <input value={form.model} onChange={(e) => set('model', e.target.value)} list="model-list" />
+              {models.length > 0 && (
+                <select
+                  className="set-model-picker"
+                  value={models.includes(form.model) ? form.model : ''}
+                  onChange={(e) => e.target.value && set('model', e.target.value)}
+                >
+                  <option value="">{`Pick from ${models.length} loaded model${models.length === 1 ? '' : 's'}…`}</option>
+                  {models.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              )}
               <datalist id="model-list">
                 {models.map((m) => (
                   <option key={m} value={m} />
@@ -432,7 +482,7 @@ export function Settings() {
             </Field>
             <Field
               label="Vision model"
-              hint="Optional — used for image-based generation (e.g. drafting a character from a portrait). Leave blank to reuse the model above."
+              hint="Optional - used for image-based generation (e.g. drafting a character from a portrait or for a character to respond to an image text). Leave blank to reuse the model above."
             >
               <input
                 value={form.visionModel}
@@ -440,6 +490,20 @@ export function Settings() {
                 list="model-list"
                 placeholder="(same as model)"
               />
+              {models.length > 0 && (
+                <select
+                  className="set-model-picker"
+                  value={models.includes(form.visionModel) ? form.visionModel : ''}
+                  onChange={(e) => e.target.value && set('visionModel', e.target.value)}
+                >
+                  <option value="">Pick a loaded model…</option>
+                  {models.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              )}
             </Field>
             <button className="btn sm" onClick={loadModels} disabled={loadingModels}>
               {loadingModels ? 'Loading…' : 'Load models from /v1/models'}
@@ -460,6 +524,85 @@ export function Settings() {
             </Field>
             <Field label="Max tokens">
               <input type="number" value={form.maxTokens} onChange={(e) => set('maxTokens', Number(e.target.value))} />
+            </Field>
+            <Field
+              label="Advanced sampling"
+              hint="Optional. Leave a field blank to let the endpoint use its own default. top_k / min_p / repeat penalty are honored by llama.cpp, LM Studio, Ollama, and vLLM but ignored or rejected by the official OpenAI API."
+            >
+              <div className="set-sampling-grid">
+                <label className="set-sampling-cell">
+                  <span>Top P</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    placeholder="default"
+                    value={form.topP ?? ''}
+                    onChange={(e) => setNullable('topP', e.target.value)}
+                  />
+                </label>
+                <label className="set-sampling-cell">
+                  <span>Top K</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={500}
+                    step={1}
+                    placeholder="default"
+                    value={form.topK ?? ''}
+                    onChange={(e) => setNullable('topK', e.target.value)}
+                  />
+                </label>
+                <label className="set-sampling-cell">
+                  <span>Min P</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    placeholder="default"
+                    value={form.minP ?? ''}
+                    onChange={(e) => setNullable('minP', e.target.value)}
+                  />
+                </label>
+                <label className="set-sampling-cell">
+                  <span>Frequency penalty</span>
+                  <input
+                    type="number"
+                    min={-2}
+                    max={2}
+                    step={0.1}
+                    placeholder="default"
+                    value={form.frequencyPenalty ?? ''}
+                    onChange={(e) => setNullable('frequencyPenalty', e.target.value)}
+                  />
+                </label>
+                <label className="set-sampling-cell">
+                  <span>Presence penalty</span>
+                  <input
+                    type="number"
+                    min={-2}
+                    max={2}
+                    step={0.1}
+                    placeholder="default"
+                    value={form.presencePenalty ?? ''}
+                    onChange={(e) => setNullable('presencePenalty', e.target.value)}
+                  />
+                </label>
+                <label className="set-sampling-cell">
+                  <span>Repeat penalty</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    placeholder="default"
+                    value={form.repeatPenalty ?? ''}
+                    onChange={(e) => setNullable('repeatPenalty', e.target.value)}
+                  />
+                </label>
+              </div>
             </Field>
             <Field label="Structured output mode" hint="json_object works with most local servers.">
               <select value={form.structuredMode} onChange={(e) => set('structuredMode', e.target.value as StructuredOutputMode)}>

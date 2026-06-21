@@ -13,6 +13,20 @@ export interface OpenAiAdapterConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  /**
+   * Optional advanced sampling knobs, applied to every request when set. Each is
+   * omitted from the payload when null/undefined so the endpoint keeps its own
+   * default (and strict OpenAI-proper servers aren't sent fields they reject).
+   * Per-request `temperature`/`maxTokens` still come from the ChatRequest.
+   */
+  sampling?: {
+    topP?: number | null;
+    topK?: number | null;
+    minP?: number | null;
+    frequencyPenalty?: number | null;
+    presencePenalty?: number | null;
+    repeatPenalty?: number | null;
+  };
 }
 
 function joinUrl(baseUrl: string, path: string): string {
@@ -40,6 +54,18 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
     };
     if (req.responseFormat && req.responseFormat.type !== 'text') {
       payload.response_format = req.responseFormat;
+    }
+    // Advanced sampling knobs: send each only when explicitly set, under its
+    // OpenAI-compatible field name. Omitting null/undefined keeps the endpoint's
+    // own default and avoids tripping strict servers that reject these fields.
+    const s = this.cfg.sampling;
+    if (s) {
+      if (s.topP != null) payload.top_p = s.topP;
+      if (s.topK != null) payload.top_k = s.topK;
+      if (s.minP != null) payload.min_p = s.minP;
+      if (s.frequencyPenalty != null) payload.frequency_penalty = s.frequencyPenalty;
+      if (s.presencePenalty != null) payload.presence_penalty = s.presencePenalty;
+      if (s.repeatPenalty != null) payload.repeat_penalty = s.repeatPenalty;
     }
     return JSON.stringify(payload);
   }

@@ -28,8 +28,17 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     return runHealthCheck(effective);
   });
 
-  app.get('/settings/models', async () => {
-    const settings = getLlmSettings();
+  // List models from the endpoint. Accepts an optional override body (same shape
+  // as the test route) so the UI can list against the values currently typed into
+  // the form WITHOUT having to save them first. POST (not GET) so a body is allowed.
+  app.post('/settings/models', async (req) => {
+    const current = getLlmSettings();
+    const patch = req.body ? parseInput(LlmSettingsUpdateSchema, req.body) : {};
+    const settings = LlmSettingsSchema.parse({
+      ...current,
+      ...patch,
+      apiKey: patch.apiKey && patch.apiKey.length > 0 ? patch.apiKey : current.apiKey,
+    });
     try {
       const models = await getAdapter(settings).listModels(AbortSignal.timeout(10_000));
       return { ok: true, models };

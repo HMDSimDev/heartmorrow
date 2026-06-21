@@ -81,6 +81,24 @@
   background: linear-gradient(90deg, var(--border-bright), transparent);
 }
 
+/* Real dropdown for picking among loaded models — sits under the free-text input
+   (the native <datalist> is unreliable: clicking often shows nothing). */
+.set-model-picker { margin-top: 6px; width: 100%; }
+
+/* Advanced sampling knobs: a compact two-up grid of labelled number inputs. */
+.set-sampling-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px;
+}
+.set-sampling-cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.set-sampling-cell > span {
+  font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--moon);
+}
+.set-sampling-cell > input { width: 100%; }
+@media (max-width: 520px) {
+  .set-sampling-grid { grid-template-columns: 1fr; }
+}
+
 /* The console's action footer + health readout. */
 .set-console-foot {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;

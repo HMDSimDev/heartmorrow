@@ -318,7 +318,8 @@ export const api = {
   getSettings: () => get<SettingsResponse>('/settings'),
   updateSettings: (update: LlmSettingsUpdate) => patch<SettingsResponse>('/settings', update),
   testLlm: (override?: LlmSettingsUpdate) => post<LlmHealthResult>('/settings/test', override ?? {}),
-  listModels: () => get<{ ok: boolean; models: string[]; error?: string }>('/settings/models'),
+  listModels: (override?: LlmSettingsUpdate) =>
+    post<{ ok: boolean; models: string[]; error?: string }>('/settings/models', override ?? {}),
   estimatePrompts: (input: Partial<PromptEstimateRequest>) =>
     post<PromptEstimateResult>('/settings/prompt-estimate', input),
 

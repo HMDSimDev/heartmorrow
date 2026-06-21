@@ -24,21 +24,26 @@ export function setAdapterOverride(adapter: ChatAdapter | null): void {
  */
 export function getAdapter(settings: LlmSettings): ChatAdapter {
   if (adapterOverride) return adapterOverride;
+  const cfg = {
+    baseUrl: settings.baseUrl,
+    apiKey: settings.apiKey,
+    model: settings.model,
+    sampling: {
+      topP: settings.topP,
+      topK: settings.topK,
+      minP: settings.minP,
+      frequencyPenalty: settings.frequencyPenalty,
+      presencePenalty: settings.presencePenalty,
+      repeatPenalty: settings.repeatPenalty,
+    },
+  };
   switch (settings.endpointMode) {
     case 'responses':
       // Not yet implemented. Fall back to chat/completions so the app keeps
       // working; swap in a ResponsesAdapter here when ready.
-      return new OpenAiCompatibleAdapter({
-        baseUrl: settings.baseUrl,
-        apiKey: settings.apiKey,
-        model: settings.model,
-      });
+      return new OpenAiCompatibleAdapter(cfg);
     case 'chat_completions':
     default:
-      return new OpenAiCompatibleAdapter({
-        baseUrl: settings.baseUrl,
-        apiKey: settings.apiKey,
-        model: settings.model,
-      });
+      return new OpenAiCompatibleAdapter(cfg);
   }
 }
