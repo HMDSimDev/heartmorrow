@@ -494,6 +494,15 @@ export function Chat() {
             setLeftEarly(true);
             setVibe(null);
           },
+          onFarewell: (m, expr) => {
+            // The player ended the date by chatting (a natural goodbye). Show the
+            // character's send-off, then run the normal end-and-evaluate flow so the
+            // date is scored in full — no need to click "End & evaluate".
+            setMessages((prev) => [...prev, m]);
+            setStreaming({ active: false, text: '' });
+            if (expr) setExpression(expr);
+            void endDate();
+          },
         },
         controller.signal,
         chosenIntent,

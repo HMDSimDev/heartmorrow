@@ -124,6 +124,25 @@ export const PlayerBreakupReactionSchema = z.object({
 });
 export type PlayerBreakupReaction = z.infer<typeof PlayerBreakupReactionSchema>;
 
+/**
+ * Decision when the PLAYER winds the date down to a natural close ("I should get
+ * going") — NOT a breakup, NOT hostility, just an amicable end. The model first
+ * judges whether the player GENUINELY means to leave the date now (vs stepping
+ * away briefly, proposing the next thing to do together, or just musing about the
+ * time), then voices the character's send-off and a portrait expression. The
+ * SERVER ends + scores the date in full via the normal evaluator once the client
+ * runs the end-and-evaluate flow — this only produces the goodbye.
+ */
+export const PlayerFarewellReactionSchema = z.object({
+  /** Is the player genuinely ending/leaving the date right now? */
+  ending: z.boolean(),
+  /** Canonical expression for the live portrait; off-list → neutral. */
+  expression: ExpressionSchema.catch(DEFAULT_EXPRESSION),
+  /** The character's short, in-character goodbye line. */
+  farewellLine: z.string().min(1).max(280),
+});
+export type PlayerFarewellReaction = z.infer<typeof PlayerFarewellReactionSchema>;
+
 /** Compact rolling summary of a session, used to bound prompt growth. */
 export const SessionSummarySchema = z.object({
   summary: z.string().min(1).max(1200),

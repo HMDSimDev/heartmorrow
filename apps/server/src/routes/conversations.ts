@@ -4,6 +4,7 @@ import { parseInput } from '../lib/validate';
 import {
   addPlayerMessage,
   attemptPlayerBreakupIntent,
+  attemptPlayerFarewell,
   attemptWalkout,
   confirmPlayerBreakup,
   createSession,
@@ -110,6 +111,23 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       }
     } catch {
       /* breakup-intent check is best-effort; fall through to a normal reply */
+    }
+
+    // The player may be winding the date down to a natural close ("I should get
+    // going"). If so, voice the character's goodbye and tell the client to run the
+    // normal end-and-evaluate flow — the date is scored in full, exactly as if the
+    // player had clicked "End & evaluate". Best-effort: falls through on any miss.
+    try {
+      const farewell = await attemptPlayerFarewell(id, text, ac.signal);
+      if (farewell) {
+        send('farewell', { message: farewell.message, expression: farewell.expression });
+        finished = true;
+        raw.off('close', onClose);
+        raw.end();
+        return;
+      }
+    } catch {
+      /* farewell check is best-effort; fall through to a normal reply */
     }
 
     // Judge how the player's LATEST message landed BEFORE writing the reply, so the

@@ -7,6 +7,7 @@ import {
   WalkoutReactionSchema,
   TurnReactionSchema,
   PlayerBreakupReactionSchema,
+  PlayerFarewellReactionSchema,
   PROMPT_LIMITS,
   DEFAULT_PLAYER_ID,
   LAST_SEEN_FLAG,
@@ -95,6 +96,7 @@ import {
   buildWalkoutReactionMessages,
   buildTurnReactionMessages,
   buildPlayerBreakupMessages,
+  buildPlayerFarewellMessages,
   estimatePromptChars,
   messageText,
   type PromptContext,
@@ -884,6 +886,62 @@ export async function attemptPlayerBreakupIntent(
 
   const message = addCharacterMessage(sessionId, result.data.line.trim(), { breakupIntent: true });
   return { message, reaction: result.data.reaction };
+}
+
+// --- Player-initiated farewell (natural end of date) ------------------------
+
+/** Cheap no-LLM screen for a player message that reads like winding the date down. */
+const FAREWELL_INTENT_RE =
+  /\b(i\s*(?:should|gotta|have\s*to|need\s*to|better|ought\s*to|'?ll)\s+(?:get\s*going|get\s*home|head(?:ing)?\s*(?:out|home|off|back)|take\s*off|leave|go|run|call\s*it)|i'?m\s+(?:gonna|going\s*to)\s+(?:get\s*going|head(?:ing)?\s*(?:out|home)|take\s*off|call\s*it|go|leave)|head(?:ing)?\s+(?:out|home|off)\s*(?:now)?|get\s*going|call\s*it\s+(?:a\s+night|a\s+day|here|quits)|wrap(?:ping)?\s+(?:this|it)\s+up|let'?s\s+call\s+it|that'?s\s+my\s+cue|time\s+(?:for\s+me\s+)?to\s+(?:go|head\s*out|leave)|see\s+you\s+(?:around|later|next\s+time|soon)|good\s*night|i'?d\s+better\s+(?:go|get\s*going|head|run)|gotta\s+(?:run|go|head\s*out)|getting\s+late)\b/i;
+
+export interface FarewellOutcome {
+  /** The character's send-off, persisted as a character message. */
+  message: Message;
+  /** Expression for the live portrait as they say goodbye. */
+  expression: string;
+}
+
+/**
+ * If the player's latest message reads like an AMICABLE end to the date ("I
+ * should get going") — not a breakup, not hostility — ask the model (structured)
+ * whether they genuinely mean to leave now and, if so, voice the character's
+ * goodbye. Unlike a walkout or a lost-interest exit, this does NOT end the
+ * session itself: it persists the send-off and lets the CLIENT run the normal
+ * end-and-evaluate flow, so a date the player chose to end naturally is scored in
+ * full (deltas, memories, milestones). Returns the farewell + portrait
+ * expression, or null (→ fall through to a normal reply) when there's no farewell
+ * intent, the model judges it non-genuine (a bathroom break, proposing the next
+ * thing, just musing about the time), or the structured call fails.
+ */
+export async function attemptPlayerFarewell(
+  sessionId: string,
+  playerText: string,
+  signal?: AbortSignal,
+): Promise<FarewellOutcome | null> {
+  const session = getSession(sessionId);
+  if (session.ended || session.mode === 'chat') return null;
+  if (!FAREWELL_INTENT_RE.test(playerText)) return null;
+
+  const character = getCharacter(session.characterId);
+  const relationship = getRelationship(character.id);
+  const settings = getLlmSettings();
+  const recent = messagesRepo.listBySession(sessionId).slice(-12);
+  const result = await callStructuredLlm(
+    PlayerFarewellReactionSchema,
+    buildPlayerFarewellMessages({
+      character,
+      relationship,
+      vibe: rapportLabel(getRapport(sessionId)),
+      recentMessages: recent,
+      playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name,
+    }),
+    { settings, task: 'Decide whether the player is ending the date, and voice the goodbye.', schemaName: 'PlayerFarewellReaction', signal },
+  );
+  // Not genuine (stepping away / proposing more / musing) or a failed call → normal reply.
+  if (!result.ok || !result.data.ending) return null;
+
+  const message = addCharacterMessage(sessionId, result.data.farewellLine.trim(), { farewell: true });
+  return { message, expression: result.data.expression.trim() };
 }
 
 /**

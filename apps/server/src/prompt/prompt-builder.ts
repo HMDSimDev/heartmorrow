@@ -57,6 +57,7 @@ import {
   DTR_GUARDRAILS,
   GIFT_GUARDRAILS,
   PLAYER_BREAKUP_GUARDRAILS,
+  PLAYER_FAREWELL_GUARDRAILS,
   GOSSIP_GUARDRAILS,
   RELATIONSHIP_BEAT_GUARDRAILS,
   ROOM_GEN_GUARDRAILS,
@@ -1522,6 +1523,30 @@ export function buildPlayerBreakupMessages(args: {
         `Your relationship with ${playerName}: stage ${stage.label}.${statusLine} ${relationshipStatLine(relationship)}.\n` +
         `Recent exchange:\n${convo || '(no messages yet)'}\n\n` +
         `Based on ${playerName}'s most recent message, is ${playerName} genuinely breaking up with you right now? Decide \`genuine\`, then react in character.`,
+    },
+  ];
+}
+
+/** Messages for the player-winds-down-the-date decision (ending? + goodbye line). */
+export function buildPlayerFarewellMessages(args: {
+  character: Character;
+  relationship: Relationship;
+  /** Qualitative read of how the date has gone so far (e.g. "enjoying this"). */
+  vibe: string;
+  recentMessages: Message[];
+  playerName: string;
+}): ChatMessage[] {
+  const { character: c, relationship, vibe, recentMessages, playerName } = args;
+  const convo = transcript(recentMessages.slice(-12), c.name);
+  return [
+    { role: 'system', content: `${PLAYER_FAREWELL_GUARDRAILS}\n\nYou are ${characterBrief(c, 'speech')}` },
+    {
+      role: 'user',
+      content:
+        `Your relationship with ${playerName}: ${relationshipStatLine(relationship)}.\n` +
+        `So far this date feels: ${vibe}.\n` +
+        `Recent exchange:\n${convo || '(no messages yet)'}\n\n` +
+        `Based on ${playerName}'s most recent message, is ${playerName} genuinely wrapping up and leaving the date now? Decide \`ending\`, then voice your goodbye.`,
     },
   ];
 }

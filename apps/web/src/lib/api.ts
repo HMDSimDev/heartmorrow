@@ -219,6 +219,9 @@ export interface StreamHandlers {
   onRapport?: (vibe: string, expression: string, rapport: number, delta: number) => void;
   /** The character lost interest and ended the date early (a soft exit). */
   onLeft?: (message: Message, reason: string) => void;
+  /** The player wound the date down to a natural close; the character said
+   *  goodbye. The client should run the normal end-and-evaluate flow. */
+  onFarewell?: (message: Message, expression?: string) => void;
 }
 
 /** Stream a chat reply via SSE (POST + ReadableStream reader). */
@@ -291,6 +294,11 @@ export async function streamChat(
       case 'left': {
         const p = payload as { message: Message; reason: string };
         handlers.onLeft?.(p.message, p.reason);
+        break;
+      }
+      case 'farewell': {
+        const p = payload as { message: Message; expression?: string };
+        handlers.onFarewell?.(p.message, p.expression);
         break;
       }
     }

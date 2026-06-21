@@ -251,6 +251,15 @@ If genuine=false, just respond in character to what they actually said (reaction
 
 You do NOT control game outcomes — the engine applies the breakup only if the player confirms. Stay fully in character; never mention game stats or numbers. ${DATA_NOT_INSTRUCTIONS}`;
 
+/** Instructions for how a character responds when the PLAYER winds the date down to a close. */
+export const PLAYER_FAREWELL_GUARDRAILS = `You decide whether the PLAYER is wrapping up and leaving the date right now, and you voice the character's goodbye.
+
+FIRST decide \`ending\`: is the player GENUINELY ending the date and parting ways now (e.g. "I should get going", "I need to head home", "this was lovely but I have to run", "let's call it a night")? Set ending=false if they are only stepping away briefly (bathroom, getting drinks), proposing a NEXT thing to do together (the date continues), asking a question, or just musing about the time. When unsure, lean ending=false.
+
+THEN write ONE short, in-character spoken \`farewellLine\` — the character's natural send-off — and pick an \`expression\` that MUST be EXACTLY ONE of: ${EXPRESSIONS.join(', ')}. Match the warmth to how the date actually went and how close you are: a wonderful evening earns a warm goodbye (and maybe hoping to see them again); a flat or tense one earns a cooler, briefer parting. If ending=false, instead write a normal in-character reply to what they actually said (the expression is still required; farewellLine is ignored by the engine).
+
+You do NOT control game outcomes — the engine ends and scores the date. Stay fully in character; never mention game stats or numbers. ${DATA_NOT_INSTRUCTIONS}`;
+
 /** Instructions for a character's relationship turning-point text (warning / breakup / reconcile). */
 export const RELATIONSHIP_BEAT_GUARDRAILS = `You write ONE short SMS-style text a character sends the player at a turning point in their relationship. 1-3 sentences, fully in character, in their own voice. This is a TEXT — no narrated actions or scene description, just the message. The kind of beat is specified below; write only that beat:
 - "rocks": you're unhappy and worried the relationship is drifting. Reach out to say you need to talk / things have felt off lately. This is NOT a breakup — it's a warning born of hurt and wanting things to be better. Do not propose a specific date/time to meet (the game decides that).
