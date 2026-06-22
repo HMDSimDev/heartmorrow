@@ -71,6 +71,10 @@
   --rim: inset 0 1px 0 rgba(243, 236, 221, 0.05);
   --glow-warm: 0 0 26px rgba(230, 177, 94, 0.32);
   --glow-rose: 0 0 24px rgba(232, 138, 166, 0.34);
+  /* Glow keyed to the user's accent (defaults to brass, so the default look is
+     unchanged). Re-resolves wherever it's used because --accent-2 is set on
+     <html> by the theme. */
+  --glow-accent: 0 0 24px color-mix(in oklab, var(--accent-2) 42%, transparent);
   --gap: 16px;
   --nav-w: 256px;
   --maxw: 1320px;
@@ -105,6 +109,12 @@ html, body, #root { height: 100%; margin: 0; }
 html, body { overflow-x: hidden; }
 body {
   background:
+    /* The accent ambient bloom — a soft pool of the user's chosen tint that
+       breathes behind every screen. Defaults to brass (so the stock look is
+       unchanged); pick another accent and the whole app's mood lighting shifts.
+       Two pools (top-right warm side, bottom-left cool side) echo the halos. */
+    radial-gradient(960px 620px at 88% -10%, color-mix(in oklab, var(--accent-2) 20%, transparent), transparent 60%),
+    radial-gradient(880px 600px at 6% 108%, color-mix(in oklab, var(--accent) 15%, transparent), transparent 60%),
     radial-gradient(820px 520px at var(--halo-pos-1), var(--halo-1), transparent 60%),
     radial-gradient(760px 520px at var(--halo-pos-2), var(--halo-2), transparent 58%),
     var(--ink);
@@ -133,7 +143,7 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
 
 /* Visible keyboard focus everywhere (accessibility floor). */
 :focus-visible { outline: 2px solid var(--moon); outline-offset: 2px; }
-.btn:focus-visible, .phone-icon:focus-visible { outline-color: var(--brass); }
+.btn:focus-visible, .phone-icon:focus-visible { outline-color: var(--accent-2); }
 
 /* ===========================================================================
    BOLD VOCABULARY — the game-UI primitives every page draws from.
@@ -292,7 +302,7 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
 .bottomnav a.active .ico { opacity: 1; }
 .bottomnav a.active::before {
   content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-  width: 22px; height: 3px; border-radius: 999px; background: var(--brass); box-shadow: var(--glow-warm);
+  width: 22px; height: 3px; border-radius: 999px; background: var(--accent-2); box-shadow: var(--glow-accent);
 }
 /* Items flex evenly now (no min-width floor), so these only tighten padding and
    shrink the label so it stays legible as the cells get narrower. */
@@ -342,9 +352,12 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
   .sidebar a .ico { width: 22px; text-align: center; font-size: 1.05rem; opacity: 0.8; }
   .sidebar a:hover { background: var(--panel); color: var(--text); }
   .sidebar a.active {
-    background: linear-gradient(135deg, rgba(230, 177, 94, 0.16), rgba(232, 138, 166, 0.12));
+    background: linear-gradient(135deg,
+      color-mix(in oklab, var(--accent-2) 18%, transparent),
+      color-mix(in oklab, var(--accent) 13%, transparent));
     color: var(--text);
-    box-shadow: inset 3px 0 0 var(--brass), inset 0 0 0 1px rgba(230, 177, 94, 0.2);
+    box-shadow: inset 3px 0 0 var(--accent-2),
+      inset 0 0 0 1px color-mix(in oklab, var(--accent-2) 22%, transparent);
   }
   .sidebar a.active .ico { opacity: 1; }
   .sidebar .money-pill { margin-top: auto; align-self: stretch; justify-content: center; }
@@ -493,11 +506,11 @@ input, textarea, select {
 input::placeholder, textarea::placeholder { color: var(--text-mute); }
 input[type="checkbox"], input[type="radio"] {
   width: 16px; height: 16px; flex: none; padding: 0; margin: 0;
-  accent-color: var(--brass); cursor: pointer;
+  accent-color: var(--accent-2); cursor: pointer;
 }
 input:focus, textarea:focus, select:focus {
-  outline: none; border-color: var(--brass);
-  box-shadow: 0 0 0 3px rgba(230, 177, 94, 0.2);
+  outline: none; border-color: var(--accent-2);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-2) 24%, transparent);
 }
 textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 .inline-fields { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
