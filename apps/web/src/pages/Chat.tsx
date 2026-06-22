@@ -349,6 +349,10 @@ export function Chat() {
       setSession(sm.session);
       setCharacter(c);
       setMessages(sm.messages);
+      // Re-derive the retry bar from server truth so it survives a refresh / resume:
+      // a transcript ending in an unanswered player turn means the reply never came.
+      const lastMsg = sm.messages[sm.messages.length - 1];
+      if (lastMsg && lastMsg.role === 'player') setFailed({ kind: 'reply' });
       setRelationship(await api.getRelationship(c.id));
       setExpression(null);
       setVibe(ad.vibe);

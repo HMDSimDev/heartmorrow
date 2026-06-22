@@ -385,7 +385,16 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
   };
 
   useEffect(() => {
-    void load();
+    void (async () => {
+      const data = await load();
+      // Re-derive the retry bar from server truth so it survives a page refresh /
+      // re-open: a thread ending in an unanswered player text means its reply never
+      // landed. (The server only leaves a trailing player text when a reply failed.)
+      if (data) {
+        const last = data.messages[data.messages.length - 1];
+        if (last && last.sender === 'player') setFailed({ kind: 'reply' });
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characterId, dayTick]);
 
