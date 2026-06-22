@@ -5,6 +5,7 @@ import {
   DTR_COOLDOWN_DAYS,
   RELATIONSHIP_STATUS_LABELS,
   currentStatus,
+  isBrokenUp,
   nextDtrRung,
   type DtrResponse,
   type RelationshipStatus,
@@ -72,6 +73,15 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
 
   const character = getCharacter(session.characterId);
   const relationship = getRelationship(character.id);
+
+  // A broken-up relationship can ONLY come back through reconciliation (which
+  // requires warmth >= RECONCILE_WARMTH and clears state:brokenUp). Re-running the
+  // DTR ladder here would set status:'dating' while leaving state:brokenUp=true — an
+  // impossible combined state that also skips the warmth floor and can permanently
+  // block the happy ending. Guard it like createSession / sendChatMessage do.
+  if (isBrokenUp(relationship)) {
+    throw badRequest("You've broken up — you'll have to win them back before you can define things again.");
+  }
 
   const next = nextDtrRung(relationship);
   if (!next) throw badRequest("You're already as committed as it gets.");

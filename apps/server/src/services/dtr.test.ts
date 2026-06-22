@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { getRelationship } from './relationship-service';
-import { applyRelationshipChange } from './stat-service';
+import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
 import { listMemories } from './memory-service';
 import { addPlayerMessage, createSession } from './conversation-service';
 import { attemptDtr } from './dtr-service';
@@ -74,6 +74,25 @@ describe('define-the-relationship', () => {
     addPlayerMessage(session.id, 'Will you be my partner?');
     setAdapterOverride(reply({ decision: 'accept', line: 'sure', reason: '' }));
     await expect(attemptDtr(session.id)).rejects.toThrow(/too soon|closer/i);
+  });
+
+  it('refuses to define the relationship while broken up (reconciliation is the only way back)', async () => {
+    // Regression: DTR didn't check isBrokenUp, so it could re-commit a broken-up
+    // character into an impossible status:'dating' + state:brokenUp, skipping the
+    // reconcile warmth floor and potentially blocking the happy ending.
+    const { character } = seedWorldAndCharacter();
+    makeWarm(character.id, 50); // warm enough that the 'dating' rung would otherwise unlock
+    setRelationshipFlag(character.id, 'state:brokenUp', true, { source: 'test' });
+    // chat mode sidesteps the createSession date gating; the DTR guard is mode-agnostic.
+    const session = createSession({ characterId: character.id, mode: 'chat', locationId: null });
+    addPlayerMessage(session.id, 'Can we make this official again?');
+    setAdapterOverride(reply({ decision: 'accept', line: 'Yes!', reason: 'ready' }));
+
+    await expect(attemptDtr(session.id)).rejects.toThrow(/broken up|win them back/i);
+    // Nothing committed: no status, still broken up, no milestone memory.
+    expect(getRelationship(character.id).flags['status']).toBeUndefined();
+    expect(getRelationship(character.id).flags['state:brokenUp']).toBe(true);
+    expect(listMemories(character.id).filter((m) => m.tags.includes('milestone'))).toHaveLength(0);
   });
 
   it('a concurrent second DTR is rejected so the accept commits exactly once', async () => {

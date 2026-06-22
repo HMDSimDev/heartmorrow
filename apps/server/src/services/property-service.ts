@@ -217,15 +217,19 @@ export function endLease(worldId: string, propertyId: string): { money: number }
   return { money: getOrCreatePlayer(playerId).money };
 }
 
-/** Sell an owned property. Flat refund = current buy price (property is a steady asset). */
+/** Sell an owned property. Flat refund = the price actually PAID (a steady asset
+ *  round-trips to what you spent). Refunding the live, author-editable
+ *  `property.buyPrice` instead let a creator buy cheap, raise buyPrice, then sell for
+ *  a profit — minting money from nothing — so we use the persisted purchasePrice. */
 export function sellProperty(worldId: string, propertyId: string): SellPropertyResponse {
   const property = getProperty(propertyId);
   const playerId = playerIdForWorld(worldId);
-  if (!propertyOwnershipRepo.getByPlayerAndProperty(worldId, playerId, propertyId)) {
+  const ownership = propertyOwnershipRepo.getByPlayerAndProperty(worldId, playerId, propertyId);
+  if (!ownership) {
     throw badRequest('You do not own this property.');
   }
   return getDb().transaction<SellPropertyResponse>(() => {
-    const refund = property.buyPrice;
+    const refund = ownership.purchasePrice;
     const player = addMoney(refund, playerId);
     propertyOwnershipRepo.delete(worldId, playerId, propertyId);
     recordEvent('property_sale', { worldId, playerId, propertyId, name: property.name, refund });

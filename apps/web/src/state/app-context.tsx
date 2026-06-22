@@ -74,6 +74,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [worlds, setWorlds] = useState<World[]>([]);
   const [worldsLoaded, setWorldsLoaded] = useState(false);
+  // Whether the most recent world-list fetch actually SUCCEEDED. The stale-active-world
+  // purge below must run only against a real list — a transient fetch failure leaves
+  // `worlds` empty, which must NOT look like "the active world was deleted".
+  const [worldsFetchedOk, setWorldsFetchedOk] = useState(false);
   const [activeWorldId, setActiveWorldId] = useState<string | null>(() => localStorage.getItem(ACTIVE_WORLD_KEY));
   const [worldState, setWorldState] = useState<WorldState | null>(null);
   const [dayTick, setDayTick] = useState(0);
@@ -101,8 +105,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const reloadWorlds = useCallback(async () => {
     try {
       setWorlds(await api.listWorlds());
+      setWorldsFetchedOk(true);
     } catch {
-      /* ignore */
+      // Keep the last-known list and mark the fetch as failed so the stale-world
+      // purge stays disabled — a server hiccup must never erase the saved active world.
+      setWorldsFetchedOk(false);
     } finally {
       setWorldsLoaded(true);
     }
@@ -148,15 +155,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   // World selection is DELIBERATE — we never silently drop the player into worlds[0].
   // Once the world list is known, only clear a STALE active id (a world that was
-  // deleted), which routes the app back to the selector.
+  // deleted), which routes the app back to the selector. Gate on a SUCCESSFUL fetch
+  // so a transient list-fetch failure (empty `worlds`) can't masquerade as a deletion
+  // and wipe the persisted active world.
   useEffect(() => {
-    if (!worldsLoaded) return;
+    if (!worldsLoaded || !worldsFetchedOk) return;
     setActiveWorldId((cur) => {
       if (cur && worlds.some((w) => w.id === cur)) return cur;
       if (cur) localStorage.removeItem(ACTIVE_WORLD_KEY); // forget a deleted world
       return null;
     });
-  }, [worldsLoaded, worlds]);
+  }, [worldsLoaded, worldsFetchedOk, worlds]);
 
   const setActiveWorld = useCallback((id: string) => {
     localStorage.setItem(ACTIVE_WORLD_KEY, id);

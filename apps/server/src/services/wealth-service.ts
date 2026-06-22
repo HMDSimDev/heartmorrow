@@ -175,13 +175,33 @@ function chargeDueLeases(worldId: string, playerId: string, newDay: number): num
     }
     const days = rentCadenceDays(property.rentCadence);
     let cur: PropertyLease = lease;
-
-    // 1. Catch up EVERY period that has come due, anchored to the schedule (so an
-    //    N-period gap — e.g. after the property feature was toggled off then on —
-    //    costs N payments, never collapsing into a single forgiven charge). The loop
-    //    stops at the first unaffordable period, flipping the lease to overdue + a
-    //    grace clock + one landlord text. Bounded against a pathological gap.
     let guard = 0;
+
+    // 1. A lease left overdue on a PRIOR tick whose grace deadline has now passed is
+    //    at its last chance: pay the oldest overdue period (recover) or be EVICTED.
+    //    Recovery advances the schedule by exactly ONE period (NOT to newDay), so any
+    //    further periods that fell due while overdue are still billed by the catch-up
+    //    loop below — previously this reset nextDueDay to newDay+days and silently
+    //    forgave every overdue period but one.
+    if (cur.status === 'overdue' && cur.graceUntilDay != null && newDay >= cur.graceUntilDay) {
+      if (!tryPay(property.rentAmount, playerId)) {
+        propertyLeasesRepo.delete(worldId, playerId, property.id);
+        sendLandlordNotice({ worldId, playerId, propertyId: property.id, propertyName: property.name, kind: 'eviction', amount: property.rentAmount, graceDay: cur.graceUntilDay, day: newDay });
+        recordEvent('property_evicted', { worldId, playerId, propertyId: property.id, name: property.name });
+        continue;
+      }
+      cur = propertyLeasesRepo.upsert(
+        PropertyLeaseSchema.parse({ ...cur, nextDueDay: cur.nextDueDay + days, status: 'active', graceUntilDay: null }),
+      );
+      paid += property.rentAmount;
+      recordEvent('rent_paid', { worldId, playerId, propertyId: property.id, name: property.name, amount: property.rentAmount });
+    }
+
+    // 2. Catch up EVERY period that has come due, anchored to the schedule (so an
+    //    N-period gap — a multi-day jump, or a lease that just recovered above — costs
+    //    N payments, never collapsing into a single forgiven charge). Stops at the
+    //    first unaffordable period, flipping the lease to overdue + a grace clock + one
+    //    landlord text. Bounded against a pathological gap.
     while (cur.status === 'active' && newDay >= cur.nextDueDay && guard++ < 512) {
       if (tryPay(property.rentAmount, playerId)) {
         cur = propertyLeasesRepo.upsert(
@@ -194,21 +214,6 @@ function chargeDueLeases(worldId: string, playerId: string, newDay: number): num
         cur = propertyLeasesRepo.upsert(PropertyLeaseSchema.parse({ ...cur, status: 'overdue', graceUntilDay: graceDay }));
         sendLandlordNotice({ worldId, playerId, propertyId: property.id, propertyName: property.name, kind: 'overdue', amount: property.rentAmount, graceDay, day: newDay });
         recordEvent('rent_overdue', { worldId, playerId, propertyId: property.id, name: property.name, amount: property.rentAmount, graceDay });
-      }
-    }
-
-    // 2. Grace period elapsed while still overdue → last chance, else EVICT.
-    if (cur.status === 'overdue' && cur.graceUntilDay != null && newDay >= cur.graceUntilDay) {
-      if (tryPay(property.rentAmount, playerId)) {
-        propertyLeasesRepo.upsert(
-          PropertyLeaseSchema.parse({ ...cur, nextDueDay: newDay + days, status: 'active', graceUntilDay: null }),
-        );
-        paid += property.rentAmount;
-        recordEvent('rent_paid', { worldId, playerId, propertyId: property.id, name: property.name, amount: property.rentAmount });
-      } else {
-        propertyLeasesRepo.delete(worldId, playerId, property.id);
-        sendLandlordNotice({ worldId, playerId, propertyId: property.id, propertyName: property.name, kind: 'eviction', amount: property.rentAmount, graceDay: cur.graceUntilDay, day: newDay });
-        recordEvent('property_evicted', { worldId, playerId, propertyId: property.id, name: property.name });
       }
     }
   }

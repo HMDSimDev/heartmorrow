@@ -57,6 +57,22 @@ describe('property ownership', () => {
     expect(propertyVenueInfo(`prop:${prop.id}`, world.id)).toBeNull(); // no tenure → can't date
   });
 
+  it('sell refunds the price PAID, not a later-edited buy price (no free-money exploit)', () => {
+    // Regression: sellProperty refunded the live, author-editable property.buyPrice,
+    // so a creator could buy cheap, raise buyPrice, then sell for a profit. The refund
+    // must come from the persisted ownership.purchasePrice instead.
+    const world = richWorld(20_000);
+    const prop = createProperty({ worldId: world.id, name: 'Loft', buyPrice: 6800 });
+    const before = moneyOf(world.id);
+
+    buyProperty(world.id, prop.id); // pays 6800; purchasePrice persisted = 6800
+    updateProperty(prop.id, { buyPrice: 50_000 }); // author bumps the price AFTER buying
+
+    const sell = sellProperty(world.id, prop.id);
+    expect(sell.refund).toBe(6800); // what was paid — NOT the inflated 50000
+    expect(moneyOf(world.id)).toBe(before); // net zero: no money minted
+  });
+
   it('rejects buying with insufficient funds and double-buying', () => {
     const world = createWorld({ name: 'Poor', featureFlags: { property: true, stockMarket: false } });
     ensureWorldState(world.id);
@@ -195,6 +211,29 @@ describe('leasing: recurring rent, overdue warnings, eviction', () => {
     const r = runDailyWealth(world.id, 16, []);
     expect(r.rentPaid).toBe(140); // 2 periods
     expect(moneyOf(world.id)).toBe(afterLease - 140);
+  });
+
+  it('grace-period recovery still bills EVERY overdue period (a multi-period gap is not forgiven)', () => {
+    // Regression: when an overdue lease was paid at its grace deadline, the code
+    // charged ONE period and reset nextDueDay to newDay+days, silently forgiving every
+    // other period that had come due while overdue.
+    const world = richWorld(250);
+    const playerId = playerIdForWorld(world.id);
+    const prop = createProperty({ worldId: world.id, name: 'Loft', buyPrice: 9000, rentAmount: 70, rentCadence: 'weekly' });
+    leaseProperty(world.id, prop.id); // day 1, due day 8; wallet 250 - 70 = 180
+    spendMoney(150, playerId); // 30 left → can't afford the day-8 charge
+
+    runDailyWealth(world.id, 8, []); // due, unaffordable → overdue (grace until day 11)
+    expect(propertyLeasesRepo.getByPlayerAndProperty(world.id, playerId, prop.id)!.status).toBe('overdue');
+
+    addMoney(2_000, playerId); // now flush
+    // Jump to day 30 (e.g. the property feature was toggled off then on): the periods
+    // due on days 8, 15, 22, and 29 must ALL be charged, not collapsed into one.
+    const r = runDailyWealth(world.id, 30, []);
+    expect(r.rentPaid).toBe(280); // 4 periods
+    const lease = propertyLeasesRepo.getByPlayerAndProperty(world.id, playerId, prop.id)!;
+    expect(lease.status).toBe('active');
+    expect(lease.nextDueDay).toBe(36); // 8 + 4 * 7, anchored to the schedule
   });
 
   it('a disabled property feature stops an owned property from acting as a free/buffed venue', () => {
