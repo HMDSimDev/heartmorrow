@@ -20,6 +20,7 @@ import type {
   WorldGenDraft,
   GenerateProfileInput,
   GenerateCharacterFromImageInput,
+  GenerateCharacterFromSourcesInput,
   GenerateShopItemsInput,
   CharacterTemplateDraft,
   ProfileGeneration,
@@ -409,6 +410,9 @@ export const api = {
     post<StructuredResult<ProfileGeneration>>('/characters/generate-profile', input),
   generateCharacterFromImage: (input: GenerateCharacterFromImageInput) =>
     post<StructuredResult<CharacterTemplateDraft>>('/characters/generate-from-image', input),
+  /** Unified generator: from a portrait, pasted/uploaded text, or both. */
+  generateCharacter: (input: GenerateCharacterFromSourcesInput) =>
+    post<StructuredResult<CharacterTemplateDraft>>('/characters/generate', input),
   updateCharacter: (id: string, patchInput: CharacterUpdate) =>
     patch<Character>(`/characters/${id}`, patchInput),
   deleteCharacter: (id: string) => del<{ ok: true }>(`/characters/${id}`),

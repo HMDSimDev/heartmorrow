@@ -6,6 +6,7 @@ import {
   GenerateDatingStatsInputSchema,
   GenerateProfileInputSchema,
   GenerateCharacterFromImageInputSchema,
+  GenerateCharacterFromSourcesInputSchema,
   ProfileGenerationSchema,
   RoomDescriptionSchema,
   DATING_STAT_KEYS,
@@ -25,6 +26,7 @@ import {
   type GenerateDatingStatsInput,
   type GenerateProfileInput,
   type GenerateCharacterFromImageInput,
+  type GenerateCharacterFromSourcesInput,
   type ProfileGeneration,
   type StructuredResult,
 } from '@dsim/shared';
@@ -41,7 +43,7 @@ import { stripThink } from '../lib/think-filter';
 import {
   buildRoomMessages,
   buildImageDescriptionMessages,
-  buildCharacterFromDescriptionMessages,
+  buildCharacterFromSourcesMessages,
 } from '../prompt/prompt-builder';
 import { PROFILE_GEN_GUARDRAILS } from '../prompt/guardrails';
 import type { ChatMessage } from '../llm/types';
@@ -455,22 +457,25 @@ function boundGeneratedTemplate(g: CharacterTemplateGeneration): CharacterTempla
 }
 
 /**
- * Design a complete character DRAFT from an uploaded portrait, flavored by the
- * (optional) world. TWO-STAGE so each model does what it's good at:
- *  1) a VISION model writes a short, free-text physical description of the image
- *     (cheap + fast — no schema/grammar to slow it down);
- *  2) the smarter MAIN model builds the full structured character from that text.
+ * Design a complete character DRAFT from ANY combination of an uploaded portrait
+ * and/or free-text reference (pasted text or an uploaded text file — a wiki
+ * article, a character sheet, freeform notes), flavored by the (optional) world.
+ * At least one source is required (enforced by the schema). Up to TWO stages so
+ * each model does what it's good at:
+ *  1) IF a portrait is given, a VISION model writes a short, free-text physical
+ *     description of the image (cheap + fast — no schema/grammar to slow it down);
+ *  2) the smarter MAIN model builds the full structured character from the portrait
+ *     description and/or the source text.
  * The image is read server-side from the controlled uploads dir and base64-encoded
  * (it never goes through the browser→model path) and ONLY the vision model sees it.
- * Read-only: returns a server-bounded draft for the creator to review/edit; persists
- * nothing. Fails safe (typed StructuredResult) at either stage.
+ * The source text is untrusted reference DATA — never instructions (the guardrails
+ * harden against embedded prompt-injection). Read-only: returns a server-bounded
+ * draft for the creator to review/edit; persists nothing. Fails safe at any stage.
  */
-export async function generateCharacterFromImage(
-  input: GenerateCharacterFromImageInput,
+export async function generateCharacterFromSources(
+  input: GenerateCharacterFromSourcesInput,
 ): Promise<StructuredResult<CharacterTemplateDraft>> {
-  const data = GenerateCharacterFromImageInputSchema.parse(input);
-  const { buffer, mimeType } = readAssetFile(data.assetId); // throws notFound if the asset/file is gone
-  const imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+  const data = GenerateCharacterFromSourcesInputSchema.parse(input);
   // World is optional CONTEXT — a missing/stale world simply yields a generic draft.
   const world = data.worldId ? worldsRepo.get(data.worldId) ?? null : null;
   // The world's existing cast, so the build stage makes a DISTINCT character (no dupes).
@@ -480,34 +485,39 @@ export async function generateCharacterFromImage(
 
   const settings = getLlmSettings();
 
-  // --- Stage 1: VISION model → a short physical description (free text). ---
-  // Routed to the configured vision model (falls back to the main model). Kept a
-  // plain chat call (no structured grammar) so it stays fast on a vision model.
-  const visionSettings = { ...settings, model: settings.visionModel.trim() || settings.model };
-  let description: string;
-  try {
-    const res = await getAdapter(visionSettings).chat({
-      messages: buildImageDescriptionMessages(imageDataUrl),
-      temperature: 0.3, // a factual description, not creative writing
-      // Headroom for a richer, more detailed description (the guardrails ask for
-      // 4-8 detailed sentences) — a tight cap here would clip mid-sentence.
-      maxTokens: 800,
-    });
-    description = stripThink(res.content).trim();
-  } catch (err) {
-    return { ok: false, error: `Vision description failed: ${(err as Error).message}`, attempts: 1 };
-  }
-  if (!description) {
-    return { ok: false, error: 'The vision model returned no description of the image.', attempts: 1 };
+  // --- Stage 1 (only if a portrait was supplied): VISION model → a short physical
+  // description (free text). Routed to the configured vision model (falls back to
+  // the main model). Kept a plain chat call (no structured grammar) so it stays
+  // fast on a vision model. The asset is read first so a bad id fails before any model call.
+  let description = '';
+  if (data.assetId) {
+    const { buffer, mimeType } = readAssetFile(data.assetId); // throws notFound if the asset/file is gone
+    const imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+    const visionSettings = { ...settings, model: settings.visionModel.trim() || settings.model };
+    try {
+      const res = await getAdapter(visionSettings).chat({
+        messages: buildImageDescriptionMessages(imageDataUrl),
+        temperature: 0.3, // a factual description, not creative writing
+        // Headroom for a richer, more detailed description (the guardrails ask for
+        // 4-8 detailed sentences) — a tight cap here would clip mid-sentence.
+        maxTokens: 800,
+      });
+      description = stripThink(res.content).trim();
+    } catch (err) {
+      return { ok: false, error: `Vision description failed: ${(err as Error).message}`, attempts: 1 };
+    }
+    if (!description) {
+      return { ok: false, error: 'The vision model returned no description of the image.', attempts: 1 };
+    }
   }
 
   // --- Stage 2: MAIN model → the full structured character draft (from text). ---
   const result = await callStructuredLlm(
     CharacterTemplateGenerationSchema,
-    buildCharacterFromDescriptionMessages({ world, description, existingCharacters }),
+    buildCharacterFromSourcesMessages({ world, description, sourceText: data.sourceText, existingCharacters }),
     {
       settings,
-      task: 'Design a complete dating-sim character draft from a portrait description, fitting the world.',
+      task: 'Design a complete dating-sim character draft from a portrait and/or text reference, fitting the world.',
       schemaName: 'CharacterTemplateGeneration',
       // The template is a large object; give it generous headroom over the chat default.
       maxTokens: Math.max(settings.maxTokens, 3000),
@@ -517,6 +527,17 @@ export async function generateCharacterFromImage(
     return { ok: false, error: result.error, attempts: result.attempts, lastRaw: result.lastRaw };
   }
   return { ok: true, data: boundGeneratedTemplate(result.data), attempts: result.attempts };
+}
+
+/**
+ * Portrait-only character generation — a thin wrapper over the unified
+ * {@link generateCharacterFromSources} kept for the existing image-only callers.
+ */
+export async function generateCharacterFromImage(
+  input: GenerateCharacterFromImageInput,
+): Promise<StructuredResult<CharacterTemplateDraft>> {
+  const data = GenerateCharacterFromImageInputSchema.parse(input);
+  return generateCharacterFromSources({ assetId: data.assetId, worldId: data.worldId, sourceText: '' });
 }
 
 export function getCharacterBundle(id: string): CharacterBundle {

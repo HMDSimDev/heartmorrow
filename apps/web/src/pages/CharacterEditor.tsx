@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -42,7 +42,7 @@ import {
   weekdayLabel,
   guardednessDescriptorLabel,
 } from '../i18n/labels';
-import { Banner, ConfirmDialog, Field, TagInput } from '../components/ui';
+import { Banner, Field, Modal, TagInput } from '../components/ui';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
 import { useDraft } from '../lib/useDraft';
 import { draftKey, NEW_CHAR_SCOPE } from '../lib/drafts';
@@ -179,8 +179,12 @@ export function CharacterEditor() {
   const [deletingMemoryId, setDeletingMemoryId] = useState<string | null>(null);
   const [generatingStats, setGeneratingStats] = useState(false);
   const [generatingProfile, setGeneratingProfile] = useState(false);
-  const [generatingFromImage, setGeneratingFromImage] = useState(false);
-  const [imageConfirmOpen, setImageConfirmOpen] = useState(false);
+  // Unified "Generate" flow: a modal that drafts a whole character from a portrait,
+  // pasted/uploaded reference text, or both.
+  const [generating, setGenerating] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
+  const [genText, setGenText] = useState('');
+  const [genFileName, setGenFileName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('identity');
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
@@ -466,20 +470,41 @@ export function CharacterEditor() {
     }
   };
 
-  // True when the draft already has enough content that regenerating from a photo
-  // would clobber real work — used to gate the overwrite confirmation.
+  // True when the draft already has enough content that generating would clobber
+  // real work — used to warn before overwriting.
   const hasContent = Boolean(
     form.name.trim() || form.shortDescription.trim() || form.personality.trim() || form.appearance.trim(),
   );
 
-  const runImageGeneration = async () => {
-    if (!form.portraitAssetId) return;
-    setGeneratingFromImage(true);
+  // At least one source must be present for the unified generator to run.
+  const canGenerate = Boolean(form.portraitAssetId) || genText.trim().length > 0;
+
+  // Read an uploaded file STRICTLY as UTF-8 text — its bytes are never executed or
+  // parsed as anything else (any file type is accepted but treated as plain text).
+  const MAX_SOURCE_CHARS = 40000;
+  const onPickSourceFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // let the same file be re-picked later
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? '');
+      setGenText(text.length > MAX_SOURCE_CHARS ? text.slice(0, MAX_SOURCE_CHARS) : text);
+      setGenFileName(file.name);
+    };
+    reader.onerror = () => setError(t('pages:characterEditor.genFileError'));
+    reader.readAsText(file);
+  };
+
+  const runGeneration = async () => {
+    if (!canGenerate) return;
+    setGenerating(true);
     setError(undefined);
     setSavedNote(undefined);
     try {
-      const res = await api.generateCharacterFromImage({
+      const res = await api.generateCharacter({
         assetId: form.portraitAssetId,
+        sourceText: genText.trim().slice(0, MAX_SOURCE_CHARS),
         worldId: form.worldId,
       });
       if (res.ok) {
@@ -515,23 +540,17 @@ export function CharacterEditor() {
           datingStats: d.datingStats,
         }));
         setActiveTab('identity');
-        setSavedNote(t('pages:characterEditor.imageGenerated'));
+        setSavedNote(t('pages:characterEditor.characterGenerated'));
         draft.dismissFound();
+        setGenOpen(false);
       } else {
-        setError(t('pages:characterEditor.imageGenFailed', { error: res.error }));
+        setError(t('pages:characterEditor.characterGenFailed', { error: res.error }));
       }
     } catch (e) {
       setError(errorMessage(e));
     } finally {
-      setGeneratingFromImage(false);
+      setGenerating(false);
     }
-  };
-
-  // Confirm before overwriting an already-filled draft; otherwise generate now.
-  const generateFromImage = () => {
-    if (!form.portraitAssetId) return;
-    if (hasContent) setImageConfirmOpen(true);
-    else void runImageGeneration();
   };
 
   const showPreview = async () => {
@@ -587,6 +606,10 @@ export function CharacterEditor() {
               {t('pages:characterEditor.previewPrompt')}
             </button>
           )}
+          <button className="btn ghost" onClick={() => setGenOpen(true)}>
+            <Icon name="generate" size={14} />
+            {t('pages:characterEditor.generate')}
+          </button>
           <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />
           <button className="btn primary" onClick={save} disabled={saving || !form.name.trim()}>
             <Icon name="save" size={14} />
@@ -738,21 +761,11 @@ export function CharacterEditor() {
                 </div>
                 <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} />
                 <div className="ce-image-gen">
-                  <button
-                    className="btn sm primary"
-                    onClick={generateFromImage}
-                    disabled={generatingFromImage || !form.portraitAssetId}
-                  >
+                  <button className="btn sm primary" onClick={() => setGenOpen(true)}>
                     <Icon name="generate" size={13} />
-                    {generatingFromImage
-                      ? t('pages:characterEditor.readingPortrait')
-                      : t('pages:characterEditor.genFromPortrait')}
+                    {t('pages:characterEditor.generate')}
                   </button>
-                  <p className="creator-note">
-                    {form.portraitAssetId
-                      ? t('pages:characterEditor.portraitNoteHas')
-                      : t('pages:characterEditor.portraitNoteEmpty')}
-                  </p>
+                  <p className="creator-note">{t('pages:characterEditor.portraitGenNote')}</p>
                 </div>
                 <div className="divider" />
                 <div
@@ -1280,20 +1293,62 @@ export function CharacterEditor() {
         </details>
       )}
 
-      {imageConfirmOpen && (
-        <ConfirmDialog
-          title={t('pages:characterEditor.imageConfirmTitle')}
-          kicker={t('pages:characterEditor.imageConfirmKicker')}
-          confirmLabel={generatingFromImage ? t('pages:characterEditor.generating') : t('pages:characterEditor.imageConfirmConfirm')}
-          danger
-          busy={generatingFromImage}
-          body={t('pages:characterEditor.imageConfirmBody')}
-          onCancel={() => setImageConfirmOpen(false)}
-          onConfirm={async () => {
-            await runImageGeneration();
-            setImageConfirmOpen(false);
-          }}
-        />
+      {genOpen && (
+        <Modal onClose={() => !generating && setGenOpen(false)}>
+          <div className="kicker">{t('pages:characterEditor.genKicker')}</div>
+          <h2 style={{ marginTop: 0 }}>{t('pages:characterEditor.genTitle')}</h2>
+          <p className="hint">{t('pages:characterEditor.genIntro')}</p>
+
+          <div className="stack" style={{ gap: 14 }}>
+            <Field label={t('pages:characterEditor.genPortrait')} hint={t('pages:characterEditor.genPortraitHint')}>
+              <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} />
+            </Field>
+
+            <Field label={t('pages:characterEditor.genText')} hint={t('pages:characterEditor.genTextHint')}>
+              <textarea
+                value={genText}
+                rows={8}
+                placeholder={t('pages:characterEditor.genTextPlaceholder')}
+                onChange={(e) => {
+                  setGenText(e.target.value.slice(0, MAX_SOURCE_CHARS));
+                  setGenFileName(null);
+                }}
+              />
+              <div className="row" style={{ gap: 8, alignItems: 'center', marginTop: 6, flexWrap: 'wrap' }}>
+                <label className="btn sm ghost" style={{ cursor: 'pointer', margin: 0 }}>
+                  <Icon name="upload" size={13} />
+                  {t('pages:characterEditor.genUpload')}
+                  <input type="file" style={{ display: 'none' }} onChange={onPickSourceFile} />
+                </label>
+                {genFileName && <span className="hint">{genFileName}</span>}
+                {genText && (
+                  <button
+                    type="button"
+                    className="btn sm ghost"
+                    onClick={() => {
+                      setGenText('');
+                      setGenFileName(null);
+                    }}
+                  >
+                    {t('pages:characterEditor.genClearText')}
+                  </button>
+                )}
+              </div>
+            </Field>
+
+            {hasContent && <Banner kind="info">{t('pages:characterEditor.genOverwriteWarn')}</Banner>}
+          </div>
+
+          <div className="row end" style={{ flexWrap: 'wrap', marginTop: 16 }}>
+            <button className="btn ghost" onClick={() => setGenOpen(false)} disabled={generating}>
+              {t('common:cancel')}
+            </button>
+            <button className="btn primary" onClick={runGeneration} disabled={generating || !canGenerate} autoFocus>
+              <Icon name="generate" size={14} />
+              {generating ? t('pages:characterEditor.generating') : t('pages:characterEditor.genRun')}
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   );

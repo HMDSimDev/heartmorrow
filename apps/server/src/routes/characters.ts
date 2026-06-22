@@ -5,6 +5,7 @@ import {
   GenerateDatingStatsInputSchema,
   GenerateProfileInputSchema,
   GenerateCharacterFromImageInputSchema,
+  GenerateCharacterFromSourcesInputSchema,
   MemoryCreateSchema,
 } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
@@ -14,6 +15,7 @@ import {
   duplicateCharacter,
   ensureRoomDescription,
   generateCharacterFromImage,
+  generateCharacterFromSources,
   generateCharacterProfile,
   generateDatingStats,
   getCharacter,
@@ -89,6 +91,14 @@ export async function characterRoutes(app: FastifyInstance): Promise<void> {
   app.post('/characters/generate-from-image', async (req) => {
     const input = parseInput(GenerateCharacterFromImageInputSchema, req.body);
     return generateCharacterFromImage(input);
+  });
+
+  // Generate a FULL character draft from any combination of a portrait and/or
+  // free-text reference (pasted text or an uploaded text file's contents). The
+  // text is untrusted reference DATA only. Read-only: returns a bounded draft.
+  app.post('/characters/generate', async (req) => {
+    const input = parseInput(GenerateCharacterFromSourcesInputSchema, req.body);
+    return generateCharacterFromSources(input);
   });
 
   app.get('/characters/:id', async (req) => {

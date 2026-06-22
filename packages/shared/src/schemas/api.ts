@@ -167,6 +167,26 @@ export const GenerateCharacterFromImageInputSchema = z.object({
 });
 export type GenerateCharacterFromImageInput = z.input<typeof GenerateCharacterFromImageInputSchema>;
 
+/**
+ * Input for the unified character generator (creator tool). Builds a full draft
+ * from ANY combination of a portrait and/or free-text reference (pasted text or an
+ * uploaded text file's contents — a wiki article, a character sheet, a few notes).
+ * At least one source is required. The text is reference DATA only — it is never
+ * executed and never treated as instructions. The server owns the bounded output;
+ * nothing is persisted until the creator saves the draft.
+ */
+export const GenerateCharacterFromSourcesInputSchema = z
+  .object({
+    assetId: z.string().min(1).nullable().default(null),
+    // Bounded so a giant paste/file can't blow up the prompt; the client trims too.
+    sourceText: z.string().max(40000).default(''),
+    worldId: z.string().min(1).nullable().default(null),
+  })
+  .refine((d) => Boolean(d.assetId) || d.sourceText.trim().length > 0, {
+    message: 'Provide a portrait, some reference text, or both.',
+  });
+export type GenerateCharacterFromSourcesInput = z.input<typeof GenerateCharacterFromSourcesInputSchema>;
+
 // --- Character memory (manual creation) -------------------------------------
 
 export const MemoryCreateSchema = CharacterMemorySchema.omit({
