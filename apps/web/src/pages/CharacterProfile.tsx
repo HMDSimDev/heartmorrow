@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   effectiveDatingStats,
   isInternalFlagKey,
@@ -10,16 +11,9 @@ import {
   isMemorialized,
   isOnTheRocks,
   RECONCILE_COOLDOWN_DAYS,
-  RELATIONSHIP_STATUS_LABELS,
-  RELATIONSHIP_STYLE_LABELS,
-  CHARACTER_LINK_LABELS,
-  GENDER_LABELS,
-  SEXUALITY_LABELS,
   DAYS_OF_WEEK,
-  WEATHER_LABELS,
   WEATHER_ICONS,
   listActiveBuffs,
-  DATING_STAT_LABELS,
   type CharacterMemory,
   type ConversationSession,
   type Relationship,
@@ -27,6 +21,17 @@ import {
 import { api } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
+import {
+  characterLinkLabel,
+  datingStatLabel,
+  genderLabel,
+  relationshipStatusLabel,
+  relationshipStyleLabel,
+  relativeTime,
+  sexualityLabel,
+  weatherLabel,
+  weekdayAbbr,
+} from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
 import { CrisisResources } from '../components/CrisisResources';
@@ -34,25 +39,16 @@ import { DatingBars, RelationshipBars } from '../components/StatBars';
 import { Banner, Empty, Loader, ConfirmDialog } from '../components/ui';
 import './profile.page.css';
 
-function ago(ts: number): string {
-  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
 /** A friendly summary of where the relationship stands — uses the shared band
  *  labels (single source of truth in social.ts) so it never drifts. */
-function relationshipStatus(rel: Relationship): string {
+function relationshipStatus(rel: Relationship, t: TFn): string {
   const label = relationshipStage(rel).label;
   const display = label.charAt(0).toUpperCase() + label.slice(1);
-  return rel.tension >= 60 ? `${display} · tense` : display;
+  return rel.tension >= 60 ? `${display}${t('profile.tenseSuffix')}` : display;
 }
 
-const weatherLabel = (k: string) => WEATHER_LABELS[k as keyof typeof WEATHER_LABELS] ?? k;
 const weatherIcon = (k: string) => WEATHER_ICONS[k as keyof typeof WEATHER_ICONS] ?? '';
 
 // ---------------------------------------------------------------------------
@@ -61,15 +57,10 @@ const weatherIcon = (k: string) => WEATHER_ICONS[k as keyof typeof WEATHER_ICONS
 
 type TabId = 'overview' | 'about' | 'profile' | 'history' | 'memories';
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'about',    label: 'About' },
-  { id: 'profile',  label: 'Profile' },
-  { id: 'history',  label: 'History' },
-  { id: 'memories', label: 'Memories' },
-];
+const TAB_IDS: TabId[] = ['overview', 'about', 'profile', 'history', 'memories'];
 
 export function CharacterProfile() {
+  const { t } = useTranslation(['pages', 'common']);
   const { id = '' } = useParams();
   const nav = useNavigate();
   const { creatorMode, dayTick } = useAppData();
@@ -144,16 +135,16 @@ export function CharacterProfile() {
           worldDay != null &&
           worldDay - breakupDay < RECONCILE_COOLDOWN_DAYS;
 
-        const nameOf = (cid: string) => (characters.data ?? []).find((c) => c.id === cid)?.name ?? 'Someone';
+        const nameOf = (cid: string) => (characters.data ?? []).find((c) => c.id === cid)?.name ?? t('profile.someone');
         const connections = character.links.filter((l) => l.targetId);
 
         const dates = chronicle.data?.sessionCount ?? 0;
         const toolTag = memorial
-          ? 'in memoriam'
+          ? t('profile.inMemoriam2')
           : brokenUp
-            ? 'parted'
+            ? t('profile.parted')
             : status !== 'none'
-              ? RELATIONSHIP_STATUS_LABELS[status].toLowerCase()
+              ? relationshipStatusLabel(status).toLowerCase()
               : relationshipStage(relationship).label;
 
         const hasAbout =
@@ -190,7 +181,7 @@ export function CharacterProfile() {
             <div className="framed prof-mast">
               <div className="prof-mast-titles">
                 <div className="prof-mast-meta">
-                  <span className="kicker">Character dossier</span>
+                  <span className="kicker">{t('profile.dossier')}</span>
                   <span className="prof-mast-tag">{toolTag}</span>
                 </div>
                 <h1>{character.name}</h1>
@@ -201,16 +192,16 @@ export function CharacterProfile() {
                   {character.gender !== 'unspecified' && (
                     <>
                       <span className="sep">·</span>
-                      {GENDER_LABELS[character.gender]}
+                      {genderLabel(character.gender)}
                     </>
                   )}
                   <span className="sep">·</span>
-                  {RELATIONSHIP_STYLE_LABELS[character.relationshipStyle]}
+                  {relationshipStyleLabel(character.relationshipStyle)}
                   {character.sexuality !== 'unspecified' &&
                     (creatorMode || relationship.flags['state:orientationRevealed'] === true) && (
                       <>
                         <span className="sep">·</span>
-                        {SEXUALITY_LABELS[character.sexuality]}
+                        {sexualityLabel(character.sexuality)}
                       </>
                     )}
                 </div>
@@ -219,19 +210,19 @@ export function CharacterProfile() {
               <div className="prof-mast-actions">
                 {!memorial && (
                   <Link className="btn primary" to={`/chat?character=${character.id}`}>
-                    <Icon name="date" size={16} /> Date
+                    <Icon name="date" size={16} /> {t('profile.date')}
                   </Link>
                 )}
                 {creatorMode && (
                   <>
                     <Link className="btn" to={`/characters/${character.id}/edit`}>
-                      <Icon name="edit" size={16} /> Edit
+                      <Icon name="edit" size={16} /> {t('profile.edit')}
                     </Link>
                     <button className="btn ghost" onClick={() => setConfirmDuplicate(true)} disabled={busy}>
-                      <Icon name="duplicate" size={16} /> Duplicate
+                      <Icon name="duplicate" size={16} /> {t('profile.duplicate')}
                     </button>
                     <button className="btn danger ghost" onClick={() => setConfirmDelete(true)} disabled={busy}>
-                      <Icon name="trash" size={16} /> Delete
+                      <Icon name="trash" size={16} /> {t('profile.delete')}
                     </button>
                   </>
                 )}
@@ -242,24 +233,22 @@ export function CharacterProfile() {
             {memorial && (
               <>
                 <Banner kind="error">
-                  {character.name} is gone. They're remembered here — your history together remains, but you can't reach
-                  them anymore.
+                  {t('profile.memorialBanner', { name: character.name })}
                 </Banner>
                 <CrisisResources />
               </>
             )}
             {!memorial && brokenUp && (
               <Banner kind="error">
-                You two broke up.{' '}
+                {t('profile.brokeUp')}{' '}
                 {needsSpace
-                  ? `${character.name} needs some space — you can't go on a date yet, but you can still text them.`
-                  : `${character.name} is open to seeing you again — keep reaching out (texts + a date) and you may rekindle things.`}
+                  ? t('profile.needsSpace', { name: character.name })
+                  : t('profile.openToReconcile', { name: character.name })}
               </Banner>
             )}
             {!memorial && !brokenUp && onTheRocks && (
               <Banner kind="info">
-                Things are on the rocks with {character.name}. Turn it around soon — a few good dates — or the
-                relationship could end.
+                {t('profile.onTheRocksBanner', { name: character.name })}
               </Banner>
             )}
 
@@ -275,21 +264,21 @@ export function CharacterProfile() {
                   </div>
                   <div className="prof-rail-badges">
                     {memorial ? (
-                      <span className="badge danger"><Icon name="remember" size={13} /> In memoriam</span>
+                      <span className="badge danger"><Icon name="remember" size={13} /> {t('profile.inMemoriamBadge')}</span>
                     ) : brokenUp ? (
                       <>
-                        <span className="badge danger"><Icon name="breakup" size={13} /> Broken up</span>
-                        <span className="badge warn">{needsSpace ? 'Needs space' : 'Open to reconciling'}</span>
+                        <span className="badge danger"><Icon name="breakup" size={13} /> {t('profile.brokenUpBadge')}</span>
+                        <span className="badge warn">{needsSpace ? t('profile.needsSpaceBadge') : t('profile.openBadge')}</span>
                       </>
                     ) : (
                       <>
-                        <span className="badge accent">{relationshipStatus(relationship)}</span>
+                        <span className="badge accent">{relationshipStatus(relationship, t as unknown as TFn)}</span>
                         {status !== 'none' && (
                           <span className="badge accent">
-                            <Icon name="affection" size={13} /> {RELATIONSHIP_STATUS_LABELS[status]}
+                            <Icon name="affection" size={13} /> {relationshipStatusLabel(status)}
                           </span>
                         )}
-                        {onTheRocks && <span className="badge warn"><Icon name="warn" size={13} /> On the rocks</span>}
+                        {onTheRocks && <span className="badge warn"><Icon name="warn" size={13} /> {t('profile.onTheRocksBadge')}</span>}
                       </>
                     )}
                   </div>
@@ -299,15 +288,15 @@ export function CharacterProfile() {
                   <div className="prof-rail-figs">
                     <div className="prof-rail-fig">
                       <span className="prof-rail-fig-n">{convoCount}</span>
-                      <span className="prof-rail-fig-l">chats</span>
+                      <span className="prof-rail-fig-l">{t('profile.chats')}</span>
                     </div>
                     <div className="prof-rail-fig">
                       <span className="prof-rail-fig-n">{dates}</span>
-                      <span className="prof-rail-fig-l">dates</span>
+                      <span className="prof-rail-fig-l">{t('profile.dates')}</span>
                     </div>
                     <div className="prof-rail-fig">
                       <span className="prof-rail-fig-n">{memories.length}</span>
-                      <span className="prof-rail-fig-l">memories</span>
+                      <span className="prof-rail-fig-l">{t('profile.memoriesShort')}</span>
                     </div>
                   </div>
                 </div>
@@ -316,15 +305,15 @@ export function CharacterProfile() {
               {/* Content column */}
               <div className="prof-main stack">
                 {/* Tab nav */}
-                <nav className="prof-tabs" aria-label="Profile sections">
-                  {TABS.map((t) => (
+                <nav className="prof-tabs" aria-label={t('profile.sectionsAria')}>
+                  {TAB_IDS.map((tab) => (
                     <button
-                      key={t.id}
+                      key={tab}
                       type="button"
-                      className={`prof-tab ${activeTab === t.id ? 'prof-tab-active' : ''}`}
-                      onClick={() => setActiveTab(t.id)}
+                      className={`prof-tab ${activeTab === tab ? 'prof-tab-active' : ''}`}
+                      onClick={() => setActiveTab(tab)}
                     >
-                      {t.label}
+                      {t(`profile.tabs.${tab}`)}
                     </button>
                   ))}
                 </nav>
@@ -334,8 +323,8 @@ export function CharacterProfile() {
                   <div className="card">
                     <div className="section-head">
                       <div className="titles">
-                        <span className="kicker">Between you two</span>
-                        <h2>Your relationship</h2>
+                        <span className="kicker">{t('profile.betweenYou')}</span>
+                        <h2>{t('profile.yourRelationship')}</h2>
                       </div>
                       <span className="trail" />
                     </div>
@@ -346,12 +335,12 @@ export function CharacterProfile() {
                       <div className="prof-meta-row">
                         {buffs.length > 0 && (
                           <div>
-                            <div className="prof-subhead">Active buffs</div>
+                            <div className="prof-subhead">{t('profile.activeBuffs')}</div>
                             <div className="tags">
                               {buffs.map((b) => (
                                 <span className={`badge prof-buff${b.delta < 0 ? ' down' : ''}`} key={b.stat}>
                                   {b.delta >= 0 ? '+' : ''}
-                                  {b.delta} {DATING_STAT_LABELS[b.stat]} <span className="left">· {b.remaining} left</span>
+                                  {b.delta} {datingStatLabel(b.stat)} <span className="left">{t('profile.buffLeft', { remaining: b.remaining })}</span>
                                 </span>
                               ))}
                             </div>
@@ -359,7 +348,7 @@ export function CharacterProfile() {
                         )}
                         {storyFlags.length > 0 && (
                           <div>
-                            <div className="prof-subhead">Your story</div>
+                            <div className="prof-subhead">{t('profile.yourStory')}</div>
                             <div className="tags">
                               {storyFlags.map(([k, label]) => (
                                 <span className="tag prof-flag" key={k}>
@@ -376,11 +365,11 @@ export function CharacterProfile() {
                   <div className="card">
                     <div className="section-head">
                       <div className="titles">
-                        <span className="kicker">How they date</span>
-                        <h2>Dating stats</h2>
+                        <span className="kicker">{t('profile.howTheyDate')}</span>
+                        <h2>{t('profile.datingStats')}</h2>
                       </div>
                       <span className="trail" />
-                      {buffs.length > 0 && <span className="muted">with buffs</span>}
+                      {buffs.length > 0 && <span className="muted">{t('profile.withBuffs')}</span>}
                     </div>
                     <div className="prof-gaugegrid">
                       <DatingBars stats={effective} />
@@ -391,15 +380,15 @@ export function CharacterProfile() {
                     <div className="card">
                       <div className="section-head">
                         <div className="titles">
-                          <span className="kicker">Their social web</span>
-                          <h2>Connections</h2>
+                          <span className="kicker">{t('profile.theirWeb')}</span>
+                          <h2>{t('profile.connections')}</h2>
                         </div>
                         <span className="trail" />
                       </div>
                       <div className="prof-conns">
                         {connections.map((l, i) => (
                           <Link className="prof-conn" to={`/characters/${l.targetId}`} key={i}>
-                            <span className="prof-conn-kind">{CHARACTER_LINK_LABELS[l.kind]}</span>
+                            <span className="prof-conn-kind">{characterLinkLabel(l.kind)}</span>
                             <span className="prof-conn-name flex-fill">{nameOf(l.targetId)}</span>
                             <Icon name="chevronRight" size={15} />
                           </Link>
@@ -416,14 +405,14 @@ export function CharacterProfile() {
                       <div className="card">
                         <div className="section-head">
                           <div className="titles">
-                            <span className="kicker">Who they are</span>
-                            <h2>Personality & voice</h2>
+                            <span className="kicker">{t('profile.whoTheyAre')}</span>
+                            <h2>{t('profile.personalityVoice')}</h2>
                           </div>
                           <span className="trail" />
                         </div>
                         {character.personality && <p className="prof-personality">{character.personality}</p>}
-                        <Prose label="Speech style" value={character.speechStyle} />
-                        <Prose label="What they want" value={character.relationshipPreferences} />
+                        <Prose label={t('profile.speechStyle')} value={character.speechStyle} />
+                        <Prose label={t('profile.whatTheyWant')} value={character.relationshipPreferences} />
                       </div>
 
                       {(character.likes.length > 0 ||
@@ -433,24 +422,24 @@ export function CharacterProfile() {
                         <div className="card">
                           <div className="section-head">
                             <div className="titles">
-                              <span className="kicker">Tastes & limits</span>
-                              <h2>Traits & boundaries</h2>
+                              <span className="kicker">{t('profile.tastesLimits')}</span>
+                              <h2>{t('profile.traitsBoundaries')}</h2>
                             </div>
                             <span className="trail" />
                           </div>
                           <div className="prof-taxons">
-                            <TagRow label="♥ Likes" items={character.likes} variant="like" />
-                            <TagRow label="✕ Dislikes" items={character.dislikes} variant="dislike" />
-                            <TagRow label="Goals" items={character.goals} />
-                            <TagRow label="Boundaries" items={character.boundaries} />
+                            <TagRow label={t('profile.likes')} items={character.likes} variant="like" />
+                            <TagRow label={t('profile.dislikes')} items={character.dislikes} variant="dislike" />
+                            <TagRow label={t('profile.goals')} items={character.goals} />
+                            <TagRow label={t('profile.boundaries')} items={character.boundaries} />
                           </div>
                         </div>
                       )}
                     </>
                   ) : (
                     <div className="card">
-                      <Empty icon={<Icon name="people" size={34} />} title="Nothing written yet">
-                        <p className="muted">No personality or traits have been filled in for {character.name}.</p>
+                      <Empty icon={<Icon name="people" size={34} />} title={t('profile.nothingWritten')}>
+                        <p className="muted">{t('profile.noPersonality', { name: character.name })}</p>
                       </Empty>
                     </div>
                   )}
@@ -468,23 +457,22 @@ export function CharacterProfile() {
                         <div className="card">
                           <div className="section-head">
                             <div className="titles">
-                              <span className="kicker">Presence</span>
-                              <h2>Profile & presence</h2>
+                              <span className="kicker">{t('profile.presence')}</span>
+                              <h2>{t('profile.profilePresence')}</h2>
                             </div>
                             <span className="trail" />
                           </div>
-                          <Prose label="Appearance" value={character.appearance} />
-                          <Prose label="Texting style" value={character.textingStyle} />
-                          <Prose label="Online persona" value={character.onlinePersona} />
-                          <Prose label="Love language" value={character.loveLanguage} />
+                          <Prose label={t('profile.appearance')} value={character.appearance} />
+                          <Prose label={t('profile.textingStyle')} value={character.textingStyle} />
+                          <Prose label={t('profile.onlinePersona')} value={character.onlinePersona} />
+                          <Prose label={t('profile.loveLanguage')} value={character.loveLanguage} />
                           {character.employment && (
                             <div className="prof-detail">
-                              <div className="prof-detail-label">Work</div>
+                              <div className="prof-detail-label">{t('profile.work')}</div>
                               <p className="prof-detail-text">
-                                {character.employment.title} at {character.employment.place} · {character.employment.shiftPhase}{' '}
-                                shift
+                                {t('profile.workLine', { title: character.employment.title, place: character.employment.place, phase: character.employment.shiftPhase })}
                                 {character.employment.workdays.length > 0 &&
-                                  ` · ${character.employment.workdays.map((d) => DAYS_OF_WEEK[d]?.slice(0, 3)).join(' ')}`}
+                                  ` · ${character.employment.workdays.map((d) => weekdayAbbr(DAYS_OF_WEEK[d] ?? '')).join(' ')}`}
                               </p>
                             </div>
                           )}
@@ -499,17 +487,17 @@ export function CharacterProfile() {
                         <div className="card">
                           <div className="section-head">
                             <div className="titles">
-                              <span className="kicker">The little things</span>
-                              <h2>Chemistry & quirks</h2>
+                              <span className="kicker">{t('profile.littleThings')}</span>
+                              <h2>{t('profile.chemistryQuirks')}</h2>
                             </div>
                             <span className="trail" />
                           </div>
                           <div className="prof-taxons">
-                            <TagRow label="Physical needs" items={character.physicalNeeds} />
-                            <TagRow label="Physical desires" items={character.physicalDesires} variant="like" />
-                            <TagRow label="Physical dislikes" items={character.physicalDislikes} variant="dislike" />
-                            <TagRow label="Insecurities" items={character.insecurities} />
-                            <TagRow label="Quirks" items={character.quirks} />
+                            <TagRow label={t('profile.physicalNeeds')} items={character.physicalNeeds} />
+                            <TagRow label={t('profile.physicalDesires')} items={character.physicalDesires} variant="like" />
+                            <TagRow label={t('profile.physicalDislikes')} items={character.physicalDislikes} variant="dislike" />
+                            <TagRow label={t('profile.insecurities')} items={character.insecurities} />
+                            <TagRow label={t('profile.quirks')} items={character.quirks} />
                           </div>
                         </div>
                       )}
@@ -518,8 +506,8 @@ export function CharacterProfile() {
                         <div className="card">
                           <div className="section-head">
                             <div className="titles">
-                              <span className="kicker">Under what skies</span>
-                              <h2>Weather</h2>
+                              <span className="kicker">{t('profile.underSkies')}</span>
+                              <h2>{t('profile.weather')}</h2>
                             </div>
                             <span className="trail" />
                           </div>
@@ -542,8 +530,8 @@ export function CharacterProfile() {
                         <div className="card">
                           <div className="section-head">
                             <div className="titles">
-                              <span className="kicker">Where they live</span>
-                              <h2>Their space</h2>
+                              <span className="kicker">{t('profile.whereTheyLive')}</span>
+                              <h2>{t('profile.theirSpace')}</h2>
                             </div>
                             <span className="trail" />
                           </div>
@@ -553,9 +541,9 @@ export function CharacterProfile() {
                     </>
                   ) : (
                     <div className="card">
-                      <Empty icon={<Icon name="phone" size={34} />} title="No profile yet">
+                      <Empty icon={<Icon name="phone" size={34} />} title={t('profile.noProfileTitle')}>
                         <p className="muted">
-                          Flavor like appearance, texting style, and quirks hasn't been added — generate it in the editor.
+                          {t('profile.noProfileBody')}
                         </p>
                       </Empty>
                     </div>
@@ -568,12 +556,12 @@ export function CharacterProfile() {
                     <div className="card">
                       <div className="section-head">
                         <div className="titles">
-                          <span className="kicker">The story so far</span>
-                          <h2>Your history</h2>
+                          <span className="kicker">{t('profile.storySoFar')}</span>
+                          <h2>{t('profile.yourHistory')}</h2>
                         </div>
                         <span className="trail" />
                         <span className="readout">
-                          <span className="num">{chronicle.data!.sessionCount}</span> dates
+                          <span className="num">{chronicle.data!.sessionCount}</span> {t('profile.datesReadout')}
                         </span>
                       </div>
                       {chronicle.data!.chronicle && <div className="prof-chronicle">{chronicle.data!.chronicle}</div>}
@@ -581,7 +569,7 @@ export function CharacterProfile() {
                         <ul className="prof-log">
                           {chronicle.data!.recentLines.map((l, i) => (
                             <li key={i} className="prof-log-line">
-                              <span className="prof-log-day">Day {l.day}</span>
+                              <span className="prof-log-day">{t('profile.day', { day: l.day })}</span>
                               <span>{l.line}</span>
                             </li>
                           ))}
@@ -590,8 +578,8 @@ export function CharacterProfile() {
                     </div>
                   ) : (
                     <div className="card">
-                      <Empty icon={<Icon name="date" size={34} />} title="No history yet">
-                        <p className="muted">Go on a date with {character.name} to start writing your story together.</p>
+                      <Empty icon={<Icon name="date" size={34} />} title={t('profile.noHistoryTitle')}>
+                        <p className="muted">{t('profile.noHistoryBody', { name: character.name })}</p>
                       </Empty>
                     </div>
                   )}
@@ -608,9 +596,9 @@ export function CharacterProfile() {
 
             {confirmDelete && (
               <ConfirmDialog
-                title={`Delete ${character.name}?`}
-                body="This removes their memories and your relationship too. This can't be undone."
-                confirmLabel="Delete"
+                title={t('profile.confirmDeleteTitle', { name: character.name })}
+                body={t('profile.confirmDeleteBody')}
+                confirmLabel={t('profile.delete')}
                 danger
                 busy={busy}
                 onConfirm={remove}
@@ -620,10 +608,10 @@ export function CharacterProfile() {
 
             {confirmDuplicate && (
               <ConfirmDialog
-                kicker="Duplicate character"
-                title={`Duplicate ${character.name}?`}
-                body={`This creates a saved copy of ${character.name} now and opens it. The copy is kept whether or not you edit it further.`}
-                confirmLabel="Duplicate"
+                kicker={t('profile.duplicateKicker')}
+                title={t('profile.confirmDuplicateTitle', { name: character.name })}
+                body={t('profile.confirmDuplicateBody', { name: character.name })}
+                confirmLabel={t('profile.duplicate')}
                 busy={busy}
                 onConfirm={() => {
                   setConfirmDuplicate(false);
@@ -679,38 +667,39 @@ function MemoriesSection({
   characterName: string;
   onDelete: (id: string) => void;
 }) {
+  const { t } = useTranslation(['pages', 'common']);
   const [open, setOpen] = useState(true);
   return (
     <div className="card">
       <div className="section-head">
         <div className="titles">
-          <span className="kicker">What they hold onto</span>
-          <h2>Memories</h2>
+          <span className="kicker">{t('profile.whatTheyHold')}</span>
+          <h2>{t('profile.memories')}</h2>
         </div>
         <span className="trail" />
         <span className="readout">
-          <span className="num">{memories.length}</span> kept
+          <span className="num">{memories.length}</span> {t('profile.kept')}
         </span>
         {memories.length > 0 && (
           <button className="btn sm ghost" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-            <Icon name={open ? 'chevronDown' : 'chevronRight'} size={15} /> {open ? 'Hide' : 'Show'}
+            <Icon name={open ? 'chevronDown' : 'chevronRight'} size={15} /> {open ? t('profile.hide') : t('profile.show')}
           </button>
         )}
       </div>
       {memories.length === 0 ? (
-        <Empty icon={<Icon name="remember" size={34} />} title="No memories yet">
-          <p className="muted">Go on a date and end it to capture memories, or add some in the editor.</p>
+        <Empty icon={<Icon name="remember" size={34} />} title={t('profile.noMemoriesTitle')}>
+          <p className="muted">{t('profile.noMemoriesBody')}</p>
         </Empty>
       ) : open ? (
         <>
           <p className="hint" style={{ marginTop: 0 }}>
-            What {characterName} remembers about you — written manually or captured automatically after a date.
+            {t('profile.memoriesHint', { name: characterName })}
           </p>
           <MemoryList memories={memories} onDelete={onDelete} />
         </>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
-          {memories.length} {memories.length === 1 ? 'memory' : 'memories'} kept — tap <strong>Show</strong> to read them.
+          <Trans i18nKey="profile.memoriesCollapsed" ns="pages" count={memories.length} components={[<strong />]} />
         </p>
       )}
     </div>
@@ -724,11 +713,12 @@ function MemoryList({
   memories: CharacterMemory[];
   onDelete: (id: string) => void;
 }) {
+  const { t } = useTranslation(['pages', 'common']);
   return (
     <div className="prof-mem-list">
       {memories.map((m) => (
         <div className="prof-mem" key={m.id}>
-          <span className="prof-mem-pips" title={`importance ${m.importance}/5`} aria-label={`importance ${m.importance} of 5`}>
+          <span className="prof-mem-pips" title={t('profile.importanceTitle', { n: m.importance })} aria-label={t('profile.importanceAria', { n: m.importance })}>
             {Array.from({ length: 5 }).map((_, i) => (
               <span key={i} className={`prof-pip${i < m.importance ? ' on' : ''}`} />
             ))}
@@ -738,20 +728,20 @@ function MemoryList({
             <div className="prof-mem-meta">
               <small className={`prof-mem-src${m.sourceEventId ? ' date' : ''}`}>
                 {m.sourceEventId ? (
-                  <><Icon name="date" size={12} /> from a date</>
+                  <><Icon name="date" size={12} /> {t('profile.fromDate')}</>
                 ) : (
-                  <><Icon name="edit" size={12} /> added manually</>
+                  <><Icon name="edit" size={12} /> {t('profile.addedManually')}</>
                 )}
               </small>
-              <small className="prof-mem-src">· {ago(m.createdAt)}</small>
-              {m.tags.map((t) => (
-                <span className="tag prof-mem-tag" key={t}>
-                  {t}
+              <small className="prof-mem-src">· {relativeTime(m.createdAt)}</small>
+              {m.tags.map((tag) => (
+                <span className="tag prof-mem-tag" key={tag}>
+                  {tag}
                 </span>
               ))}
             </div>
           </div>
-          <button className="btn sm danger ghost prof-mem-del" onClick={() => onDelete(m.id)} aria-label="Delete memory">
+          <button className="btn sm danger ghost prof-mem-del" onClick={() => onDelete(m.id)} aria-label={t('profile.deleteMemory')}>
             <Icon name="close" size={15} />
           </button>
         </div>

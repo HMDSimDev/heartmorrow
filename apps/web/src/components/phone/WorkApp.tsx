@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   CAREER_SKILLS,
-  CAREER_SKILL_LABELS,
   careerProgress,
   isCareerSkill,
   masteryMult,
@@ -12,6 +12,7 @@ import {
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
+import { careerSkillLabel, phaseLabel } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { Banner } from '../ui';
@@ -19,6 +20,7 @@ import { GameView, type ActiveGame } from '../minigames/GameView';
 import './phone-life.css';
 
 export function WorkApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate, player } = useAppData();
   const [activities, setActivities] = useState<ActivityDef[]>([]);
   const [jobGames, setJobGames] = useState<MinigameInfo[]>([]);
@@ -56,15 +58,15 @@ export function WorkApp() {
   /** This world's level in a career skill (0 if never worked it). */
   const lvl = (skill?: string): number =>
     skill && isCareerSkill(skill) ? player?.career?.[skill]?.level ?? 0 : 0;
-  const skillName = (skill?: string): string => (skill && isCareerSkill(skill) ? CAREER_SKILL_LABELS[skill] : '');
+  const skillName = (skill?: string): string => (skill && isCareerSkill(skill) ? careerSkillLabel(skill) : '');
 
   const perform = async (a: ActivityDef) => {
     if (!activeWorldId) {
-      setError('Pick an active world first.');
+      setError(t('work.errWorld'));
       return;
     }
     if (onDate) {
-      setError(`You're on a date with ${activeDate!.characterName} — wrap it up on the Date tab first.`);
+      setError(t('work.errOnDate', { name: activeDate!.characterName }));
       return;
     }
     setBusy(true);
@@ -75,9 +77,9 @@ export function WorkApp() {
       await Promise.all([reloadPlayer(), refreshWorldState()]);
       const lifted =
         res.skillLeveledUp && isCareerSkill(res.skill)
-          ? `✦ ${CAREER_SKILL_LABELS[res.skill]} reached level ${res.skillLevel}! `
+          ? t('work.leveledUp', { skill: careerSkillLabel(res.skill), level: res.skillLevel })
           : '';
-      setNote(`${lifted}Earned ◈${res.money}. (Day ${res.state.day}, ${res.state.phase})`);
+      setNote(t('work.earned', { lifted, money: res.money, day: res.state.day, phase: phaseLabel(res.state.phase) }));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -87,11 +89,11 @@ export function WorkApp() {
 
   const startJob = async (g: MinigameInfo) => {
     if (!activeWorldId) {
-      setError('Pick an active world first.');
+      setError(t('work.errWorld'));
       return;
     }
     if (onDate) {
-      setError(`You're on a date with ${activeDate!.characterName} — wrap it up on the Date tab first.`);
+      setError(t('work.errOnDate', { name: activeDate!.characterName }));
       return;
     }
     setBusy(true);
@@ -113,13 +115,13 @@ export function WorkApp() {
     finishingRef.current = true;
     setBusy(true);
     try {
-      const title = jobGames.find((g) => g.id === active.minigameId)?.title ?? 'Shift';
+      const title = jobGames.find((g) => g.id === active.minigameId)?.title ?? t('work.shiftFallback');
       const res = await api.finishMinigame({ runId: active.runId, submission });
       setActive(null);
       await Promise.all([reloadPlayer(), refreshWorldState()]);
       const r = res.result;
-      const earned = r.reward.money > 0 ? `Earned ◈${r.reward.money}.` : 'No pay this time — sharpen up.';
-      setNote(`${title} — grade ${r.grade} (${r.score}). ${earned}`);
+      const earned = r.reward.money > 0 ? t('work.earnedShort', { money: r.reward.money }) : t('work.noPay');
+      setNote(t('work.shiftResult', { title, grade: r.grade, score: r.score, earned }));
     } catch (e) {
       setError(errorMessage(e));
       setActive(null);
@@ -133,12 +135,12 @@ export function WorkApp() {
   if (active) {
     return (
       <div className="phone-app">
-        <PhoneAppBar title="Work" kicker="on shift" icon="work" />
+        <PhoneAppBar title={t('work.title')} kicker={t('work.onShift')} icon="work" />
         <div className="phone-embed pl-work-embed">
           <div className="pl-job-stage-head">
-            <span className="pl-eyebrow">On shift · {jobGames.find((g) => g.id === active.minigameId)?.title}</span>
+            <span className="pl-eyebrow">{t('work.onShiftHead', { title: jobGames.find((g) => g.id === active.minigameId)?.title ?? '' })}</span>
             <button className="btn sm ghost danger" onClick={() => setActive(null)} disabled={busy}>
-              Quit
+              {t('work.quit')}
             </button>
           </div>
           <GameView active={active} partner={null} onComplete={finishJob} />
@@ -151,7 +153,7 @@ export function WorkApp() {
 
   return (
     <div className="phone-app">
-      <PhoneAppBar title="Work" kicker="the day's shifts" icon="work" />
+      <PhoneAppBar title={t('work.title')} kicker={t('work.daysShifts')} icon="work" />
       <div className="phone-embed pl-work-embed">
         {(note || error) && (
           <div className="pl-work-banner">
@@ -162,30 +164,28 @@ export function WorkApp() {
 
         <div className="pl-board">
           <p className="pl-board-note">
-            Each shift spends part of your day for coin — and builds a skill. The better you get, the more the work
-            pays. Some jobs take more than one action, some pay an uneven cut, and some stay locked until you've earned
-            your stripes.
+            {t('work.boardNote')}
           </p>
-          {noEnergy && <p className="pl-board-note">You're out of energy for today — end the day to rest.</p>}
+          {noEnergy && <p className="pl-board-note">{t('work.noEnergy')}</p>}
           {onDate && (
             <p className="pl-board-note">
-              You're on a date with {activeDate!.characterName} — finish it on the Date tab before clocking in.
+              {t('work.onDateNote', { name: activeDate!.characterName })}
             </p>
           )}
         </div>
 
         {/* --- Career skills ------------------------------------------------ */}
-        <div className="pl-eyebrow">Skills · mastery pays</div>
+        <div className="pl-eyebrow">{t('work.skillsHead')}</div>
         <div className="pl-skills">
           {CAREER_SKILLS.map((s) => {
             const p = careerProgress(player?.career?.[s]?.xp ?? 0);
             return (
               <div className="pl-skill" key={s}>
                 <div className="pl-skill-head">
-                  <span className="pl-skill-name">{CAREER_SKILL_LABELS[s]}</span>
+                  <span className="pl-skill-name">{careerSkillLabel(s)}</span>
                   <span className="pl-skill-lv">
-                    Lv {p.level}
-                    {p.atMax ? ' · max' : ''} · ×{masteryMult(p.level).toFixed(2)}
+                    {t('work.level', { level: p.level })}
+                    {p.atMax ? t('work.maxSuffix') : ''} · ×{masteryMult(p.level).toFixed(2)}
                   </span>
                 </div>
                 <div className="pl-skill-bar">
@@ -197,12 +197,12 @@ export function WorkApp() {
         </div>
 
         {/* --- Flat shifts -------------------------------------------------- */}
-        <div className="pl-eyebrow">Shifts · earn ◈</div>
+        <div className="pl-eyebrow">{t('work.shiftsHead')}</div>
         {worldState && (
           <div className={`pl-energy-readout${noEnergy ? ' is-spent' : ''}`}>
             <span>◆</span>
             <span>
-              {worldState.stamina} of {worldState.staminaMax} energy left today
+              {t('work.energyLeft', { stamina: worldState.stamina, max: worldState.staminaMax })}
             </span>
           </div>
         )}
@@ -228,17 +228,17 @@ export function WorkApp() {
                 <div className="pl-tile-desc">{a.description}</div>
                 <div className="pl-work-tags">
                   {isCareerSkill(a.skill) && <span className="pl-work-tag">{skillName(a.skill)}</span>}
-                  {v > 0 && <span className="pl-work-tag">pay varies</span>}
-                  {a.weatherPriced && <span className="pl-work-tag">☼ weather-priced</span>}
+                  {v > 0 && <span className="pl-work-tag">{t('work.payVaries')}</span>}
+                  {a.weatherPriced && <span className="pl-work-tag">{t('work.weatherPriced')}</span>}
                   {reqLocked && (
                     <span className="pl-work-tag locked">
-                      🔒 {skillName(a.requiresSkill)} Lv {a.requiresLevel}
+                      {t('work.lockedTag', { skill: skillName(a.requiresSkill), level: a.requiresLevel })}
                     </span>
                   )}
                 </div>
               </div>
               <div className="pl-tile-action">
-                <span className="pl-tile-cost" title={`Costs ${cost} action${cost > 1 ? 's' : ''}`}>
+                <span className="pl-tile-cost" title={t('work.costTitle', { count: cost })}>
                   −{cost} ◆
                 </span>
                 <button
@@ -247,9 +247,9 @@ export function WorkApp() {
                   disabled={busy || cantAfford || onDate || reqLocked}
                   title={
                     reqLocked
-                      ? `Locked — reach ${skillName(a.requiresSkill)} level ${a.requiresLevel}.`
+                      ? t('work.lockedTitle', { skill: skillName(a.requiresSkill), level: a.requiresLevel })
                       : cantAfford && !noEnergy
-                        ? `Needs ${cost} energy — you have ${stamina} left.`
+                        ? t('work.needEnergyTitle', { cost, stamina })
                         : undefined
                   }
                 >
@@ -263,7 +263,7 @@ export function WorkApp() {
         {/* --- Skill work (job minigames) ---------------------------------- */}
         {jobGames.length > 0 && (
           <>
-            <div className="pl-eyebrow">Skill work · play to earn</div>
+            <div className="pl-eyebrow">{t('work.skillWorkHead')}</div>
             {jobGames.map((g) => {
               const reqLocked =
                 isCareerSkill(g.requiresSkill) && lvl(g.requiresSkill) < (g.requiresLevel ?? 0);
@@ -281,27 +281,27 @@ export function WorkApp() {
                           {lvl(g.skill) > 0 ? ` Lv ${lvl(g.skill)}` : ''}
                         </span>
                       )}
-                      <span className="pl-work-tag">skill-graded</span>
+                      <span className="pl-work-tag">{t('work.skillGraded')}</span>
                       {reqLocked && (
                         <span className="pl-work-tag locked">
-                          🔒 {skillName(g.requiresSkill)} Lv {g.requiresLevel}
+                          {t('work.lockedTag', { skill: skillName(g.requiresSkill), level: g.requiresLevel })}
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="pl-tile-action">
-                    <span className="pl-tile-cost" title="Costs one action">−1 ◆</span>
+                    <span className="pl-tile-cost" title={t('work.costOneTitle')}>−1 ◆</span>
                     <button
                       className="btn sm primary"
                       onClick={() => startJob(g)}
                       disabled={busy || noEnergy || onDate || reqLocked}
                       title={
                         reqLocked
-                          ? `Locked — reach ${skillName(g.requiresSkill)} level ${g.requiresLevel}.`
+                          ? t('work.lockedTitle', { skill: skillName(g.requiresSkill), level: g.requiresLevel })
                           : undefined
                       }
                     >
-                      <span className="pl-coin">up to ◈{potential}</span>
+                      <span className="pl-coin">{t('work.upTo', { potential })}</span>
                     </button>
                   </div>
                 </div>

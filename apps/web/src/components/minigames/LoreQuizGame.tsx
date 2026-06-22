@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Character, LoreQuizConfig, LoreQuizSubmission } from '@dsim/shared';
 import { Portrait } from '../Portrait';
 import { MinigameShell } from './MinigameShell';
@@ -12,6 +13,7 @@ export function LoreQuizGame({
   partner?: Pick<Character, 'name' | 'portraitAssetId' | 'expressionAssets'>;
   onComplete: (submission: LoreQuizSubmission) => void;
 }) {
+  const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Array<{ questionId: string; choiceIndex: number }>>([]);
   const doneRef = useRef(false);
@@ -33,7 +35,7 @@ export function LoreQuizGame({
 
   return (
     <MinigameShell
-      title="Lore Quiz"
+      title={t('minigame.loreQuiz')}
       progress={{ current: index + 1, total: config.questions.length }}
     >
       <div className="mg-board mga-board">
@@ -43,7 +45,7 @@ export function LoreQuizGame({
               <Portrait character={partner} />
             </span>
             <p className="lq-lead">
-              {partner.name} leans in, eyes glinting. "Let's see how well you know me…"
+              {t('minigame.loreLead', { name: partner.name })}
             </p>
           </div>
         )}

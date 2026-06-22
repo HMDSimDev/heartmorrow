@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Character, GameEvent, PromptEstimateResult } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import i18n from '../i18n';
 import { Banner, Field } from '../components/ui';
 import './creator.page.css';
 
 const CONTEXT_WINDOW_KEY = 'dsim.debug.contextWindow';
 
 export function Debug() {
+  const { t } = useTranslation('pages');
   const [characters, setCharacters] = useState<Character[]>([]);
   const [previewId, setPreviewId] = useState('');
   const [preview, setPreview] = useState<string>();
@@ -88,7 +91,7 @@ export function Debug() {
     try {
       const text = await file.text();
       await api.importData(JSON.parse(text));
-      setNote('Import complete. Reload the app to see changes everywhere.');
+      setNote(t('debug.importComplete'));
       await loadEvents();
     } catch (e) {
       setError(errorMessage(e));
@@ -102,11 +105,11 @@ export function Debug() {
       <div className="framed creator-head">
         <div className="creator-head-titles">
           <div className="creator-meta">
-            <span className="kicker">Creator console</span>
-            <span className="creator-tool-tag">diagnostics</span>
+            <span className="kicker">{t('debug.console')}</span>
+            <span className="creator-tool-tag">{t('debug.diagnostics')}</span>
           </div>
-          <h1>Debug</h1>
-          <p>Inspect assembled prompts, recent game events, and import/export your local data.</p>
+          <h1>{t('debug.title')}</h1>
+          <p>{t('debug.intro')}</p>
         </div>
       </div>
       {error && <Banner kind="error">{error}</Banner>}
@@ -115,14 +118,14 @@ export function Debug() {
       <div className="card">
         <div className="creator-sec">
           <span className="creator-index">01</span>
-          <h2>Prompt preview</h2>
+          <h2>{t('debug.secPromptPreview')}</h2>
           <span className="trail" />
         </div>
         <div className="row" style={{ alignItems: 'flex-end' }}>
           <div className="flex-fill">
-            <Field label="Character">
+            <Field label={t('debug.character')}>
               <select value={previewId} onChange={(e) => setPreviewId(e.target.value)}>
-                <option value="">— Choose —</option>
+                <option value="">{t('debug.choose')}</option>
                 {characters.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -132,7 +135,7 @@ export function Debug() {
             </Field>
           </div>
           <button className="btn" onClick={showPreview} disabled={!previewId}>
-            Build prompt
+            {t('debug.buildPrompt')}
           </button>
         </div>
         {preview && <pre className="pre">{preview}</pre>}
@@ -141,19 +144,15 @@ export function Debug() {
       <div className="card">
         <div className="creator-sec">
           <span className="creator-index">02</span>
-          <h2>Prompt size estimator</h2>
+          <h2>{t('debug.secEstimator')}</h2>
           <span className="trail" />
         </div>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Builds the <strong>real</strong> prompt for each common interaction and counts its tokens, so you can see how
-          close each one runs to your model's context window. With <em>measure live</em> on, counts are your model's exact{' '}
-          <code>usage.prompt_tokens</code>; otherwise they're a rough chars/4 estimate.
-        </p>
+        <p className="muted" style={{ marginTop: 0 }}>{t('debug.estimatorIntro')}</p>
         <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
           <div className="flex-fill">
-            <Field label="Character (data source)" hint="Whose real world/relationship/history is used to assemble the prompts.">
+            <Field label={t('debug.charDataSource')} hint={t('debug.charDataSourceHint')}>
               <select value={estCharId} onChange={(e) => setEstCharId(e.target.value)}>
-                <option value="">— Auto (first character) —</option>
+                <option value="">{t('debug.autoFirst')}</option>
                 {characters.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -162,21 +161,21 @@ export function Debug() {
               </select>
             </Field>
           </div>
-          <Field label="Context window (tokens)" hint="Your model's loaded context length. Rows whose prompt + reply exceed it are flagged.">
+          <Field label={t('debug.contextWindow')} hint={t('debug.contextWindowHint')}>
             <input type="number" min={512} step={512} value={contextWindow} onChange={(e) => setCtxWindow(Number(e.target.value))} />
           </Field>
         </div>
         <div className="row" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
             <input type="checkbox" checked={estLive} onChange={(e) => setEstLive(e.target.checked)} />
-            <span>Measure live (exact tokens — needs the endpoint up)</span>
+            <span>{t('debug.measureLive')}</span>
           </label>
           <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
             <input type="checkbox" checked={estFull} onChange={(e) => setEstFull(e.target.checked)} />
-            <span>Simulate a full conversation (worst case)</span>
+            <span>{t('debug.simulateFull')}</span>
           </label>
           <button className="btn primary" onClick={runEstimate} disabled={estimating}>
-            {estimating ? 'Measuring…' : 'Estimate prompt sizes'}
+            {estimating ? t('debug.measuring') : t('debug.estimateSizes')}
           </button>
         </div>
 
@@ -189,24 +188,24 @@ export function Debug() {
               </div>
             )}
             <p className="muted" style={{ margin: '0 0 8px' }}>
-              Model <strong>{estimate.model}</strong>
-              {estimate.characterName ? <> · character <strong>{estimate.characterName}</strong></> : null} ·{' '}
-              {estimate.live ? 'exact token counts' : 'estimated token counts'}
-              {estimate.simulateFull ? ' · full-window simulation' : ''} · context window{' '}
-              {contextWindow.toLocaleString()} tokens
+              {t('debug.modelLabel')} <strong>{estimate.model}</strong>
+              {estimate.characterName ? <> · {t('debug.characterLabel')} <strong>{estimate.characterName}</strong></> : null} ·{' '}
+              {estimate.live ? t('debug.exactCounts') : t('debug.estimatedCounts')}
+              {estimate.simulateFull ? t('debug.fullSim') : ''} ·{' '}
+              {t('debug.contextWindowSuffix', { tokens: contextWindow.toLocaleString(i18n.language) })}
             </p>
             {estimate.estimates.length > 0 && (
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
                   <thead>
                     <tr style={{ textAlign: 'left', opacity: 0.7 }}>
-                      <th style={{ padding: '6px 8px' }}>Interaction</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>Msgs</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>Chars</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>Prompt</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>+ Reply</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>Total</th>
-                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>Fits</th>
+                      <th style={{ padding: '6px 8px' }}>{t('debug.thInteraction')}</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('debug.thMsgs')}</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('debug.thChars')}</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('debug.thPrompt')}</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('debug.thReply')}</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('debug.thTotal')}</th>
+                      <th style={{ padding: '6px 8px', textAlign: 'right' }}>{t('debug.thFits')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -223,17 +222,17 @@ export function Debug() {
                             )}
                           </td>
                           <td style={{ padding: '6px 8px', textAlign: 'right' }}>{e.messageCount}</td>
-                          <td style={{ padding: '6px 8px', textAlign: 'right' }}>{e.chars.toLocaleString()}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'right' }}>{e.chars.toLocaleString(i18n.language)}</td>
                           <td style={{ padding: '6px 8px', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            {e.promptTokens.toLocaleString()}{' '}
-                            <span className="badge" title={e.method === 'exact' ? "model's usage.prompt_tokens" : 'chars / 4'}>
+                            {e.promptTokens.toLocaleString(i18n.language)}{' '}
+                            <span className="badge" title={e.method === 'exact' ? t('debug.methodExactTitle') : t('debug.methodEstTitle')}>
                               {e.method}
                             </span>
                           </td>
-                          <td style={{ padding: '6px 8px', textAlign: 'right' }}>+{e.maxResponseTokens.toLocaleString()}</td>
-                          <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{total.toLocaleString()}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'right' }}>+{e.maxResponseTokens.toLocaleString(i18n.language)}</td>
+                          <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600 }}>{total.toLocaleString(i18n.language)}</td>
                           <td style={{ padding: '6px 8px', textAlign: 'right' }}>
-                            <span className={`badge ${fits ? 'good' : 'danger'}`}>{fits ? 'fits' : 'exceeds'}</span>
+                            <span className={`badge ${fits ? 'good' : 'danger'}`}>{fits ? t('debug.fits') : t('debug.exceeds')}</span>
                           </td>
                         </tr>
                       );
@@ -242,10 +241,7 @@ export function Debug() {
                 </table>
               </div>
             )}
-            <p className="muted" style={{ fontSize: '0.72rem', marginTop: 8 }}>
-              <strong>Total</strong> = prompt tokens + the reply budget (your <em>Max tokens</em> setting). If Total exceeds the
-              context window, the model will truncate the oldest context (or fail) during that interaction.
-            </p>
+            <p className="muted" style={{ fontSize: '0.72rem', marginTop: 8 }}>{t('debug.totalNote')}</p>
           </div>
         )}
       </div>
@@ -253,15 +249,15 @@ export function Debug() {
       <div className="card">
         <div className="creator-sec">
           <span className="creator-index">03</span>
-          <h2>Local data</h2>
+          <h2>{t('debug.secLocalData')}</h2>
           <span className="trail" />
         </div>
         <div className="creator-data-actions">
           <button className="btn" onClick={exportData}>
-            ⬇ Export JSON
+            {t('debug.exportJson')}
           </button>
           <label className="btn">
-            ⬆ Import JSON
+            {t('debug.importJson')}
             <input
               ref={fileRef}
               type="file"
@@ -276,21 +272,21 @@ export function Debug() {
         </div>
         <div className="creator-callout" style={{ marginTop: 12 }}>
           <span className="creator-callout-mark">!</span>
-          <span>Import replaces all local game data with the file's contents.</span>
+          <span>{t('debug.importReplaces')}</span>
         </div>
       </div>
 
       <div className="card">
         <div className="creator-sec">
           <span className="creator-index">04</span>
-          <h2>Recent events</h2>
+          <h2>{t('debug.secRecentEvents')}</h2>
           <span className="trail" />
           <button className="btn sm ghost creator-sec-action" onClick={loadEvents}>
-            Refresh
+            {t('debug.refresh')}
           </button>
         </div>
         {events.length === 0 ? (
-          <p className="muted">No events yet.</p>
+          <p className="muted">{t('debug.noEvents')}</p>
         ) : (
           events.slice(0, 60).map((e) => (
             <div className="list-item" key={e.id}>
@@ -298,7 +294,7 @@ export function Debug() {
               <span className="flex-fill truncate dim" style={{ fontSize: '0.8rem' }}>
                 {JSON.stringify(e.payload)}
               </span>
-              <small className="creator-event-time">{new Date(e.createdAt).toLocaleTimeString()}</small>
+              <small className="creator-event-time">{new Date(e.createdAt).toLocaleTimeString(i18n.language)}</small>
             </div>
           ))
         )}

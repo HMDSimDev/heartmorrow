@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { LumberjackConfig, LumberjackSubmission } from '@dsim/shared';
 import { MinigameShell } from './MinigameShell';
 
@@ -13,6 +14,7 @@ export function LumberjackGame({
   config: LumberjackConfig;
   onComplete: (submission: LumberjackSubmission) => void;
 }) {
+  const { t } = useTranslation();
   const totalLogs = config.logs.length;
   const [pos, setPos] = useState(0);
   const [log, setLog] = useState(0);
@@ -86,9 +88,9 @@ export function LumberjackGame({
 
   return (
     <MinigameShell
-      title="The Woodlot"
+      title={t('minigame.woodlot')}
       progress={{ current: Math.min(log + 1, totalLogs), total: totalLogs }}
-      combo={combo >= 2 ? <span className="mga-lumber-combo">🔥 {combo}× clean</span> : undefined}
+      combo={combo >= 2 ? <span className="mga-lumber-combo">{t('minigame.cleanCombo', { n: combo })}</span> : undefined}
     >
       <div className="mg-board mga-board mga-lumber">
         <div className="mga-lumber-stack" aria-hidden>
@@ -101,8 +103,8 @@ export function LumberjackGame({
         {last !== null && (
           <div className="row end">
             <span className={`mga-last lj-${last}`}>
-              <span className="num">{last === 'clean' ? 'CLEAN' : last === 'graze' ? 'GRAZE' : 'MISS'}</span>
-              <span className="lbl">last swing</span>
+              <span className="num">{last === 'clean' ? t('minigame.clean') : last === 'graze' ? t('minigame.graze') : t('minigame.miss')}</span>
+              <span className="lbl">{t('minigame.lastSwing')}</span>
             </span>
           </div>
         )}
@@ -115,7 +117,7 @@ export function LumberjackGame({
           {chip > 0 && <span key={chip} className="mga-chip" style={{ left: `${pos * 100}%` }} aria-hidden />}
         </div>
         <button className="btn primary block" onClick={swing} disabled={log >= totalLogs}>
-          {log >= totalLogs ? 'Timber!' : '🪓 Swing!'}
+          {log >= totalLogs ? t('minigame.timber') : t('minigame.swing')}
         </button>
       </div>
     </MinigameShell>

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import type { AsyncState } from '../lib/hooks';
 
 export function Banner({ kind, children }: { kind: 'error' | 'ok' | 'info'; children: ReactNode }) {
@@ -30,10 +31,10 @@ export function Modal({ onClose, children }: { onClose: () => void; children: Re
 export function ConfirmDialog({
   title,
   body,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   danger = false,
-  kicker = 'Please confirm',
+  kicker,
   busy = false,
   onConfirm,
   onCancel,
@@ -48,19 +49,20 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Modal onClose={onCancel}>
-      <div className="kicker">{kicker}</div>
+      <div className="kicker">{kicker ?? t('pleaseConfirm')}</div>
       <h2 style={{ marginTop: 0 }}>{title}</h2>
       {body && <p className="hint">{body}</p>}
       {/* Allow the actions to wrap (and stack) under a narrow width instead of
           ellipsizing long labels at ≤320px. */}
       <div className="row end" style={{ flexWrap: 'wrap' }}>
         <button className="btn ghost" onClick={onCancel} disabled={busy}>
-          {cancelLabel}
+          {cancelLabel ?? t('cancel')}
         </button>
         <button className={`btn ${danger ? 'danger' : 'primary'}`} onClick={onConfirm} disabled={busy} autoFocus>
-          {confirmLabel}
+          {confirmLabel ?? t('confirm')}
         </button>
       </div>
     </Modal>
@@ -126,6 +128,7 @@ export function TagInput({
   onChange: (next: string[]) => void;
   placeholder?: string;
 }) {
+  const { t: tr } = useTranslation();
   const [draft, setDraft] = useState('');
   const commit = () => {
     const v = draft.trim();
@@ -135,10 +138,10 @@ export function TagInput({
   return (
     <div>
       <div className="tags" style={{ marginBottom: value.length ? 8 : 0 }}>
-        {value.map((t) => (
-          <span className="tag" key={t}>
-            {t}
-            <button type="button" onClick={() => onChange(value.filter((x) => x !== t))} aria-label={`Remove ${t}`}>
+        {value.map((tag) => (
+          <span className="tag" key={tag}>
+            {tag}
+            <button type="button" onClick={() => onChange(value.filter((x) => x !== tag))} aria-label={tr('removeTag', { tag })}>
               ×
             </button>
           </span>
@@ -146,7 +149,7 @@ export function TagInput({
       </div>
       <input
         value={draft}
-        placeholder={placeholder ?? 'Type and press Enter…'}
+        placeholder={placeholder ?? tr('tagPlaceholder')}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ',') {

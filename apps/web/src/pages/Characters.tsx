@@ -1,6 +1,7 @@
 import './characters.page.css';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Trans, useTranslation } from 'react-i18next';
 import type { Character } from '@dsim/shared';
 import { api } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
@@ -10,9 +11,9 @@ import {
   keyForEnvelope,
   listDrafts,
   pruneDrafts,
-  relativeTime,
   removeDraft,
 } from '../lib/drafts';
+import { relativeTime } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
 import { Banner, Empty, Loader, ConfirmDialog } from '../components/ui';
@@ -22,6 +23,7 @@ import { useAppData } from '../state/app-context';
 const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // forget month-old drafts
 
 export function Characters() {
+  const { t } = useTranslation(['pages', 'common']);
   const nav = useNavigate();
   const { creatorMode, activeWorldId, activeWorld, worlds, worldsLoaded, dayTick } = useAppData();
   const state = useAsync(() => api.listCharacters(), [activeWorldId, dayTick]);
@@ -133,16 +135,16 @@ export function Characters() {
     <div className="stack">
       <div className="page-head ppl-head">
         <div className="ppl-titles">
-          <span className="kicker">The Almanac · Cast</span>
-          <h1>People</h1>
-          <p>The hearts you keep close — every face you can call on for a date.</p>
+          <span className="kicker">{t('characters.kicker')}</span>
+          <h1>{t('characters.title')}</h1>
+          <p>{t('characters.blurb')}</p>
         </div>
         {creatorMode && (
           <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
             {selecting ? (
               <>
                 <span className="muted" style={{ alignSelf: 'center' }}>
-                  {selected.size} selected
+                  {t('characters.selected', { count: selected.size })}
                 </span>
                 <button
                   className="btn primary"
@@ -150,10 +152,10 @@ export function Characters() {
                   disabled={selected.size === 0}
                   onClick={openExportSelected}
                 >
-                  <Icon name="download" size={16} /> Export {selected.size > 0 ? selected.size : ''}…
+                  <Icon name="download" size={16} /> {t('characters.exportCount', { count: selected.size })}
                 </button>
                 <button className="btn ghost" type="button" onClick={cancelSelecting}>
-                  Cancel
+                  {t('characters.cancel')}
                 </button>
               </>
             ) : (
@@ -161,13 +163,13 @@ export function Characters() {
                 <ShareImportButton
                   targetWorldId={activeWorldId ?? null}
                   onImported={() => state.reload()}
-                  label="Import"
+                  label={t('characters.import')}
                 />
                 <button className="btn ghost" type="button" onClick={() => setSelecting(true)}>
-                  <Icon name="download" size={16} /> Export…
+                  <Icon name="download" size={16} /> {t('characters.export')}
                 </button>
                 <Link className="btn primary" to="/characters/new">
-                  <Icon name="plus" size={16} /> New
+                  <Icon name="plus" size={16} /> {t('characters.new')}
                 </Link>
               </>
             )}
@@ -183,7 +185,7 @@ export function Characters() {
         <section className="ppl-drafts">
           <div className="ppl-drafts-head">
             <span className="ppl-draft-mark"><Icon name="recap" size={15} /></span>
-            <span className="kicker">Unfinished drafts</span>
+            <span className="kicker">{t('characters.unfinishedDrafts')}</span>
           </div>
           <div className="ppl-drafts-list">
             {drafts.map((d) => {
@@ -191,17 +193,17 @@ export function Characters() {
               return (
                 <div className="ppl-draft-row" key={d.scopeId}>
                   <div className="ppl-draft-main">
-                    <span className="ppl-draft-name">{d.label || 'Untitled character'}</span>
+                    <span className="ppl-draft-name">{d.label || t('characters.untitled')}</span>
                     <span className="ppl-draft-meta">
-                      {isNewChar ? 'New character' : 'Unsaved changes'} · {relativeTime(d.updatedAt)}
+                      {isNewChar ? t('characters.newCharacter') : t('characters.unsavedChanges')} · {relativeTime(d.updatedAt)}
                     </span>
                   </div>
                   <div className="ppl-draft-actions">
                     <button className="btn sm primary" onClick={() => resumeDraft(d)}>
-                      <Icon name="edit" size={14} /> Resume
+                      <Icon name="edit" size={14} /> {t('characters.resume')}
                     </button>
                     <button className="btn sm ghost" onClick={() => setPendingDraftDiscard(d)}>
-                      <Icon name="trash" size={14} /> Discard
+                      <Icon name="trash" size={14} /> {t('characters.discard')}
                     </button>
                   </div>
                 </div>
@@ -221,23 +223,22 @@ export function Characters() {
           return (
             <>
               {characters.length === 0 ? (
-            <Empty icon={<Icon name="people" size={34} />} title="No one in your life yet">
+            <Empty icon={<Icon name="people" size={34} />} title={t('characters.emptyTitle')}>
               {creatorMode ? (
                 <>
-                  <p>Bring someone into being to start dating.</p>
+                  <p>{t('characters.emptyCreatorBody')}</p>
                   <Link className="btn primary" to="/characters/new">
-                    Create your first character
+                    {t('characters.createFirst')}
                   </Link>
                 </>
               ) : (
-                <p>Switch to Creator mode (Phone → Settings) to add characters.</p>
+                <p>{t('characters.emptyPlayerBody')}</p>
               )}
             </Empty>
           ) : (
             <>
               <div className="ppl-count">
-                <span className="ppl-num">{characters.length}</span>{' '}
-                {characters.length === 1 ? 'soul' : 'souls'} in your almanac
+                <Trans i18nKey="characters.soulCount" ns="pages" count={characters.length} components={[<span className="ppl-num" />]} />
               </div>
               <div className="ppl-gallery">
                 {characters.map((c) => {
@@ -260,7 +261,7 @@ export function Characters() {
                       </h3>
                       <div className="ppl-meta">
                         {memorial ? (
-                          <span className="ppl-inmemoriam">In memoriam</span>
+                          <span className="ppl-inmemoriam">{t('characters.inMemoriam')}</span>
                         ) : (
                           <>
                             {c.age}
@@ -278,7 +279,7 @@ export function Characters() {
                         ? c.shortDescription.length > 90
                           ? `${c.shortDescription.slice(0, 90).trimEnd()}…`
                           : c.shortDescription
-                        : 'No description yet.'}
+                        : t('characters.noDescription')}
                     </p>
 
                     <div className="ppl-actions">
@@ -290,36 +291,36 @@ export function Characters() {
                           aria-pressed={selected.has(c.id)}
                         >
                           <Icon name={selected.has(c.id) ? 'check' : 'plus'} size={15} />{' '}
-                          {selected.has(c.id) ? 'Selected' : 'Select'}
+                          {selected.has(c.id) ? t('characters.selectedBtn') : t('characters.select')}
                         </button>
                       ) : (
                         <>
                           {memorial ? (
                             <Link className="btn sm ghost ppl-date" to={`/characters/${c.id}`}>
-                              <Icon name="remember" size={15} /> Remember
+                              <Icon name="remember" size={15} /> {t('characters.remember')}
                             </Link>
                           ) : (
                             <Link className="btn sm primary ppl-date" to={`/chat?character=${c.id}`}>
-                              <Icon name="date" size={15} /> Date
+                              <Icon name="date" size={15} /> {t('characters.date')}
                             </Link>
                           )}
                           {creatorMode && (
                             <div className="ppl-creator-row">
                               <Link className="btn sm ghost" to={`/characters/${c.id}/edit`}>
-                                <Icon name="edit" size={14} /> Edit
+                                <Icon name="edit" size={14} /> {t('characters.edit')}
                               </Link>
                               <button
                                 className="btn sm ghost"
                                 onClick={() => setPendingDuplicate({ id: c.id, name: c.name })}
                                 disabled={actingId !== null}
                               >
-                                <Icon name="duplicate" size={14} /> Duplicate
+                                <Icon name="duplicate" size={14} /> {t('characters.duplicate')}
                               </button>
                               <button className="btn sm ghost" onClick={() => setExportChars([c])}>
-                                <Icon name="download" size={14} /> Export
+                                <Icon name="download" size={14} /> {t('characters.export')}
                               </button>
                               <button className="btn sm danger" onClick={() => setPendingDelete({ id: c.id, name: c.name })}>
-                                <Icon name="trash" size={14} /> Delete
+                                <Icon name="trash" size={14} /> {t('characters.delete')}
                               </button>
                             </div>
                           )}
@@ -337,14 +338,14 @@ export function Characters() {
                 <section className="stack" style={{ marginTop: 24 }}>
                   <div className="section-head">
                     <div className="titles">
-                      <span className="kicker">Not in any world</span>
-                      <h2>Unassigned characters</h2>
+                      <span className="kicker">{t('characters.notInWorld')}</span>
+                      <h2>{t('characters.unassignedTitle')}</h2>
                     </div>
                     <span className="trail" />
                   </div>
                   <p className="muted" style={{ marginTop: -6 }}>
-                    These belong to no world, so they don't show in any roster.
-                    {activeWorld ? ` Place one into ${activeWorld.name} to start dating them.` : ' Enter a world to place them.'}
+                    {t('characters.unassignedBody')}
+                    {activeWorld ? t('characters.placeInWorld', { world: activeWorld.name }) : t('characters.enterWorld')}
                   </p>
                   <div className="ppl-gallery">
                     {unassigned.map((c) => (
@@ -370,14 +371,14 @@ export function Characters() {
                             disabled={!activeWorldId || actingId !== null}
                             onClick={() => moveToWorld(c.id)}
                           >
-                            <Icon name="plus" size={15} /> Move to {activeWorld?.name ?? 'world'}
+                            <Icon name="plus" size={15} /> {t('characters.moveTo', { world: activeWorld?.name ?? t('characters.world') })}
                           </button>
                           <div className="ppl-creator-row">
                             <Link className="btn sm ghost" to={`/characters/${c.id}/edit`}>
-                              <Icon name="edit" size={14} /> Edit
+                              <Icon name="edit" size={14} /> {t('characters.edit')}
                             </Link>
                             <button className="btn sm danger" onClick={() => setPendingDelete({ id: c.id, name: c.name })}>
-                              <Icon name="trash" size={14} /> Delete
+                              <Icon name="trash" size={14} /> {t('characters.delete')}
                             </button>
                           </div>
                         </div>
@@ -394,9 +395,9 @@ export function Characters() {
 
       {pendingDelete && (
         <ConfirmDialog
-          title={`Delete ${pendingDelete.name}?`}
-          body="This removes their memories and your relationship too. This can't be undone."
-          confirmLabel="Delete"
+          title={t('characters.confirmDeleteTitle', { name: pendingDelete.name })}
+          body={t('characters.confirmDeleteBody')}
+          confirmLabel={t('characters.delete')}
           danger
           busy={deleting}
           onConfirm={() => remove(pendingDelete.id)}
@@ -406,10 +407,10 @@ export function Characters() {
 
       {pendingDuplicate && (
         <ConfirmDialog
-          kicker="Duplicate character"
-          title={`Duplicate ${pendingDuplicate.name}?`}
-          body={`This creates a saved copy of ${pendingDuplicate.name} now and opens it in the editor. The copy is kept whether or not you save your edits.`}
-          confirmLabel="Duplicate"
+          kicker={t('characters.duplicateKicker')}
+          title={t('characters.confirmDuplicateTitle', { name: pendingDuplicate.name })}
+          body={t('characters.confirmDuplicateBody', { name: pendingDuplicate.name })}
+          confirmLabel={t('characters.duplicate')}
           busy={actingId !== null}
           onConfirm={() => {
             const id = pendingDuplicate.id;
@@ -422,10 +423,10 @@ export function Characters() {
 
       {pendingDraftDiscard && (
         <ConfirmDialog
-          kicker="Discard draft"
-          title={`Discard ${pendingDraftDiscard.label?.trim() || 'this draft'}?`}
-          body="This permanently removes the unsaved draft. Anything already saved is untouched."
-          confirmLabel="Discard draft"
+          kicker={t('characters.discardKicker')}
+          title={t('characters.confirmDiscardTitle', { label: pendingDraftDiscard.label?.trim() || t('characters.thisDraft') })}
+          body={t('characters.confirmDiscardBody')}
+          confirmLabel={t('characters.discardDraft')}
           danger
           onConfirm={() => discardDraft(pendingDraftDiscard)}
           onCancel={() => setPendingDraftDiscard(null)}

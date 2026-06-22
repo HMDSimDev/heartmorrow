@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { PHASE_ICONS, PHASE_LABELS, SEASON_ICONS, deriveCalendar, type SleepResponse, type WealthSummary } from '@dsim/shared';
+import { useTranslation } from 'react-i18next';
+import { PHASE_ICONS, SEASON_ICONS, deriveCalendar, type SleepResponse, type WealthSummary } from '@dsim/shared';
 import { useAppData } from '../state/app-context';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import { phaseLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { EnergyPips } from './EnergyPips';
 import { Icon } from './Icon';
 import { Modal } from './ui';
 
 /** Compact day / time-of-day / stamina indicator + Sleep control for the active world. */
 export function DayHud() {
+  const { t } = useTranslation();
   const { worlds, activeWorldId, activeWorld, worldState, setActiveWorld, sleep, player, dayTick, activeDate } =
     useAppData();
   const [recap, setRecap] = useState<SleepResponse | null>(null);
@@ -51,6 +54,9 @@ export function DayHud() {
 
   const cal = deriveCalendar(worldState.day);
   const activeName = worlds.find((w) => w.id === activeWorldId)?.name;
+  const phaseTxt = phaseLabel(worldState.phase);
+  const weekdayTxt = weekdayLabel(cal.dayOfWeek);
+  const seasonTxt = seasonLabel(cal.season);
 
   return (
     <div className="hud">
@@ -59,7 +65,7 @@ export function DayHud() {
           className="hud-world"
           value={activeWorldId}
           onChange={(e) => setActiveWorld(e.target.value)}
-          title="Active world"
+          title={t('hud.activeWorld')}
           disabled={sleeping}
         >
           {worlds.map((w) => (
@@ -72,19 +78,19 @@ export function DayHud() {
         activeName && <div className="hud-worldname">{activeName}</div>
       )}
 
-      <div className="hud-clock" title={`${PHASE_LABELS[worldState.phase]} · ${cal.dayOfWeek} · ${cal.season}`}>
+      <div className="hud-clock" title={t('hud.clockTitle', { phase: phaseTxt, weekday: weekdayTxt, season: seasonTxt })}>
         <span className="hud-phase">{PHASE_ICONS[worldState.phase]}</span>
         <div className="hud-when">
-          <span className="hud-day">Day {worldState.day} · {PHASE_LABELS[worldState.phase]}</span>
+          <span className="hud-day">{t('hud.dayPhase', { day: worldState.day, phase: phaseTxt })}</span>
           <span className="hud-cal">
-            {SEASON_ICONS[cal.season]} {cal.dayOfWeek}
-            {cal.isWeekend ? ' · weekend' : ''}
+            {SEASON_ICONS[cal.season]} {weekdayTxt}
+            {cal.isWeekend ? t('hud.weekendSuffix') : ''}
           </span>
         </div>
       </div>
 
-      <div className="hud-energy" title={`${worldState.stamina} of ${worldState.staminaMax} actions left today`} aria-label={`Energy: ${worldState.stamina} of ${worldState.staminaMax}`}>
-        <span className="hud-energy-label">Energy</span>
+      <div className="hud-energy" title={t('hud.energyTitle', { stamina: worldState.stamina, max: worldState.staminaMax })} aria-label={t('hud.energyAria', { stamina: worldState.stamina, max: worldState.staminaMax })}>
+        <span className="hud-energy-label">{t('hud.energy')}</span>
         <EnergyPips value={worldState.stamina} max={worldState.staminaMax} />
         <span className="hud-energy-count">
           {worldState.stamina}/{worldState.staminaMax}
@@ -92,13 +98,13 @@ export function DayHud() {
       </div>
 
       <div className="hud-foot">
-        <span className="hud-money" title="Cash on hand">
+        <span className="hud-money" title={t('hud.cashOnHand')}>
           <Icon name="coin" size={15} /> {player?.money ?? 0}
         </span>
         {wealth && wealth.total > wealth.cash && (
           <span
             className="hud-money hud-networth"
-            title={`Net worth — Cash ◈${wealth.cash} · Property ◈${wealth.property} · Stocks ◈${wealth.stocks}`}
+            title={t('hud.netWorth', { cash: wealth.cash, property: wealth.property, stocks: wealth.stocks })}
           >
             <Icon name="wealth" size={14} /> {wealth.total}
           </span>
@@ -109,15 +115,15 @@ export function DayHud() {
           disabled={sleeping || !!activeDate}
           title={
             activeDate
-              ? `You're on a date with ${activeDate.characterName} — finish it on the Date tab before ending the day.`
+              ? t('hud.endDayDateBlock', { name: activeDate.characterName })
               : undefined
           }
         >
-          {sleeping ? '…' : worldState.stamina <= 0 ? 'Sleep' : 'End day'}
+          {sleeping ? '…' : worldState.stamina <= 0 ? t('hud.sleep') : t('hud.endDay')}
         </button>
       </div>
 
-      {activeDate && <small className="hud-note">On a date — finish it to end the day.</small>}
+      {activeDate && <small className="hud-note">{t('hud.onDateNote')}</small>}
       {error && <small className="hud-err">{error}</small>}
       {recap && <RecapModal res={recap} onClose={() => setRecap(null)} />}
     </div>
@@ -125,6 +131,7 @@ export function DayHud() {
 }
 
 function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void }) {
+  const { t } = useTranslation();
   return (
     <Modal onClose={onClose}>
       <>
@@ -144,15 +151,15 @@ function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void 
           </>
         ) : (
           <>
-            <h2>A new day dawns</h2>
+            <h2>{t('recap.newDay')}</h2>
             <p className="muted">
-              {res.recapError ? `(Couldn't generate a recap: ${res.recapError})` : 'You rest and wake refreshed.'}
+              {res.recapError ? t('recap.recapError', { error: res.recapError }) : t('recap.rested')}
             </p>
           </>
         )}
         {res.worldSim && res.worldSim.beats.length > 0 && (
           <div style={{ marginTop: 10 }}>
-            <div className="kicker">Around town</div>
+            <div className="kicker">{t('recap.aroundTown')}</div>
             <ul style={{ paddingLeft: 18, marginTop: 4 }}>
               {res.worldSim.beats.map((b, i) => (
                 <li key={i} className="dim">
@@ -166,8 +173,8 @@ function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void 
           <div className="row" style={{ gap: 6, marginTop: 4 }}>
             {res.calendar && (
               <span className="badge">
-                {res.calendar.dayOfWeek} · {res.calendar.season}
-                {res.calendar.isWeekend ? ' · weekend ⚡' : ''}
+                {weekdayLabel(res.calendar.dayOfWeek)} · {seasonLabel(res.calendar.season)}
+                {res.calendar.isWeekend ? t('recap.weekendBadgeSuffix') : ''}
               </span>
             )}
             {res.weather && (
@@ -175,7 +182,7 @@ function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void 
                 {res.weather.icon} {res.weather.label}
               </span>
             )}
-            {res.income > 0 && <span className="badge">💰 +{res.income}</span>}
+            {res.income > 0 && <span className="badge">{t('recap.income', { income: res.income })}</span>}
           </div>
         )}
         {res.holiday && (
@@ -185,13 +192,14 @@ function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void 
         )}
         {res.decayed.length > 0 && (
           <p className="dim" style={{ fontSize: '0.85rem' }}>
-            You haven't seen {res.decayed.map((d) => `${d.name} (${d.daysSinceSeen}d)`).join(', ')} in a while — they're
-            starting to feel neglected.
+            {t('recap.decayed', {
+              names: res.decayed.map((d) => t('recap.decayedItem', { name: d.name, days: d.daysSinceSeen })).join(', '),
+            })}
           </p>
         )}
         <div className="row end">
           <button className="btn primary" onClick={onClose}>
-            Good morning, Day {res.state.day}
+            {t('recap.goodMorning', { day: res.state.day })}
           </button>
         </div>
       </>

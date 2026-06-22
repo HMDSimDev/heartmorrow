@@ -1,51 +1,50 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ActivityDef, Character, TogetherResult } from '@dsim/shared';
-import { RELATIONSHIP_STAT_LABELS, fitLabel, togetherFit } from '@dsim/shared';
+import { fitLabel, togetherFit } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
+import { relationshipStatLabel } from '../../i18n/labels';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PortraitPicker } from '../PortraitPicker';
 import { Banner } from '../ui';
 import './phone-life.css';
 
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
 /** Player-facing copy + banner tone for how an outing landed. */
-function togetherNote(res: TogetherResult, name: string): { kind: 'ok' | 'info' | 'error'; text: string } {
-  const label = (RELATIONSHIP_STAT_LABELS[res.stat] ?? res.stat).toLowerCase();
-  const tension = res.tensionDelta > 0 ? ` (tension +${res.tensionDelta})` : '';
+function togetherNote(res: TogetherResult, name: string, t: TFn): { kind: 'ok' | 'info' | 'error'; text: string } {
+  const stat = relationshipStatLabel(res.stat).toLowerCase();
+  const tension = res.tensionDelta > 0 ? t('together.tensionSuffix', { n: res.tensionDelta }) : '';
   switch (res.outcome) {
     case 'spark':
-      return { kind: 'ok', text: `A spark — ${name} lit up. Your ${label} grew, and the afternoon stuck with them.` };
+      return { kind: 'ok', text: t('together.note.spark', { name, stat }) };
     case 'warm':
       return {
         kind: 'ok',
         text:
           res.tensionDelta > 0
-            ? `A good afternoon with ${name} — ${label} grew (+${res.statDelta}), though it got a touch much by the end${tension}.`
-            : `A good afternoon together. Your ${label} with ${name} grew (+${res.statDelta}).`,
+            ? t('together.note.warmTension', { name, stat, delta: res.statDelta, tension })
+            : t('together.note.warm', { name, stat, delta: res.statDelta }),
       };
     case 'flat':
-      return {
-        kind: 'info',
-        text: `You're as close as easy afternoons can take you. To grow nearer now, ${name} needs a real date.`,
-      };
+      return { kind: 'info', text: t('together.note.flat', { name }) };
     case 'crowded':
-      return { kind: 'info', text: `That's a lot of ${name} for one day — they could use a little room${tension}.` };
+      return { kind: 'info', text: t('together.note.crowded', { name, tension }) };
     case 'misfire':
-      return {
-        kind: 'error',
-        text: `You reached for something deep too soon and it landed wrong — ${name} pulled back a little${tension}.`,
-      };
+      return { kind: 'error', text: t('together.note.misfire', { name, tension }) };
   }
 }
 
-const FIT_HINT: Record<TogetherResult['fit'], { label: string; cls: string }> = {
-  great: { label: 'Right up their alley', cls: 'is-great' },
-  ok: { label: 'Could be nice', cls: 'is-ok' },
-  poor: { label: 'Not really their thing', cls: 'is-poor' },
+const FIT_CLS: Record<TogetherResult['fit'], string> = {
+  great: 'is-great',
+  ok: 'is-ok',
+  poor: 'is-poor',
 };
 
 export function TogetherApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate } = useAppData();
   const [activities, setActivities] = useState<ActivityDef[]>([]);
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
@@ -79,15 +78,15 @@ export function TogetherApp() {
 
   const perform = async (a: ActivityDef) => {
     if (!activeWorldId) {
-      setError('Pick an active world first.');
+      setError(t('together.errWorld'));
       return;
     }
     if (onDate) {
-      setError(`You're on a date with ${activeDate!.characterName} — wrap it up on the Date tab first.`);
+      setError(t('together.errOnDate', { name: activeDate!.characterName }));
       return;
     }
     if (!target) {
-      setError('Choose someone to spend time with.');
+      setError(t('together.errChoose'));
       return;
     }
     setBusy(true);
@@ -96,8 +95,8 @@ export function TogetherApp() {
     try {
       const res = await api.performActivity({ activityId: a.id, worldId: activeWorldId, characterId: target });
       await Promise.all([reloadPlayer(), refreshWorldState()]);
-      const name = partner?.name.split(' ')[0] ?? 'They';
-      if (res.together) setNote(togetherNote(res.together, name));
+      const name = partner?.name.split(' ')[0] ?? t('together.they');
+      if (res.together) setNote(togetherNote(res.together, name, t as unknown as TFn));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -107,7 +106,7 @@ export function TogetherApp() {
 
   return (
     <div className="phone-app">
-      <PhoneAppBar title="Together" kicker="time, shared" icon="together" />
+      <PhoneAppBar title={t('together.title')} kicker={t('together.kicker')} icon="together" />
       <div className="phone-embed pl-work-embed">
         {(note || error) && (
           <div className="pl-work-banner">
@@ -118,32 +117,30 @@ export function TogetherApp() {
 
         <div className="pl-board">
           <p className="pl-board-note">
-            An afternoon is yours to give. Some moods suit some people — and pushing too hard, too soon, or too often
-            can cool things. The deepest closeness still only comes from a real date.
+            {t('together.boardNote')}
           </p>
-          {noEnergy && <p className="pl-board-note">You're out of energy for today — end the day to rest.</p>}
+          {noEnergy && <p className="pl-board-note">{t('together.noEnergy')}</p>}
           {onDate && (
             <p className="pl-board-note">
-              You're with {activeDate!.characterName} right now — finish it on the Date tab first.
+              {t('together.onDateNote', { name: activeDate!.characterName })}
             </p>
           )}
         </div>
 
         {partnerOptions.length === 0 ? (
-          <p className="pl-board-note">No one to spend time with in this world yet.</p>
+          <p className="pl-board-note">{t('together.noOne')}</p>
         ) : (
           <>
             <div className="pl-partner-pick">
-              <div className="pl-partner-label">With</div>
+              <div className="pl-partner-label">{t('together.with')}</div>
               <PortraitPicker options={partnerOptions} value={target} onChange={(id) => setTarget(id)} compact />
             </div>
 
-            <div className="pl-eyebrow">Ways to spend the time</div>
+            <div className="pl-eyebrow">{t('together.ways')}</div>
             {together.map((a) => {
               const tier = partner ? fitLabel(togetherFit(a, partner.datingStats)) : null;
-              const hint = tier ? FIT_HINT[tier] : null;
               const bold = (a.boldness ?? 0) >= 0.3;
-              const statLabel = a.relationshipStat ? RELATIONSHIP_STAT_LABELS[a.relationshipStat] : '';
+              const statLabel = a.relationshipStat ? relationshipStatLabel(a.relationshipStat) : '';
               return (
                 <div className="pl-tile pl-together" key={a.id}>
                   <div className="pl-tile-icon" aria-hidden="true">{a.icon ?? '☕'}</div>
@@ -151,8 +148,8 @@ export function TogetherApp() {
                     <div className="pl-tile-label">{a.label}</div>
                     <div className="pl-tile-desc">{a.description}</div>
                     <div className="pl-meta">
-                      {hint && <span className={`pl-fit ${hint.cls}`}>{hint.label}</span>}
-                      {bold && <span className="pl-bold">a bolder move</span>}
+                      {tier && <span className={`pl-fit ${FIT_CLS[tier]}`}>{t(`together.fit.${tier}`)}</span>}
+                      {bold && <span className="pl-bold">{t('together.bolder')}</span>}
                       {!!a.cost && <span className="pl-cost">◈ {a.cost}</span>}
                     </div>
                   </div>

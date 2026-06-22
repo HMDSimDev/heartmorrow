@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TimingMeterConfig, TimingMeterSubmission } from '@dsim/shared';
 import { MinigameShell } from './MinigameShell';
 
@@ -9,6 +10,7 @@ export function TimingMeterGame({
   config: TimingMeterConfig;
   onComplete: (submission: TimingMeterSubmission) => void;
 }) {
+  const { t } = useTranslation();
   const totalRounds = config.rounds.length;
   const [pos, setPos] = useState(0);
   const [round, setRound] = useState(0);
@@ -70,7 +72,7 @@ export function TimingMeterGame({
 
   return (
     <MinigameShell
-      title="Timing Meter"
+      title={t('minigame.timingMeter')}
       progress={{ current: Math.min(round + 1, totalRounds), total: totalRounds }}
     >
       <div className="mg-board mga-board">
@@ -78,7 +80,7 @@ export function TimingMeterGame({
           <div className="row end">
             <span className="mga-last">
               <span className="num">{Math.round(last * 100)}%</span>
-              <span className="lbl">last hit</span>
+              <span className="lbl">{t('minigame.lastHit')}</span>
             </span>
           </div>
         )}
@@ -90,7 +92,7 @@ export function TimingMeterGame({
           <div className="meter-needle" style={{ left: `${pos * 100}%` }} />
         </div>
         <button className="btn primary block" onClick={stop} disabled={round >= totalRounds}>
-          {round >= totalRounds ? 'Done!' : 'Stop in the zone!'}
+          {round >= totalRounds ? t('minigame.done') : t('minigame.stopInZone')}
         </button>
       </div>
     </MinigameShell>

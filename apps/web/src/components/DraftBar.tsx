@@ -1,27 +1,30 @@
-import { type DraftEnvelope, relativeTime } from '../lib/drafts';
+import { useTranslation } from 'react-i18next';
+import { type DraftEnvelope } from '../lib/drafts';
+import { relativeTime } from '../i18n/labels';
 import { Icon } from './Icon';
 
 /* The "Unsaved draft" status pill — placed beside a Save button to show that
    in-progress work is being auto-kept. Reuses the shared `.badge.warn` (brass)
    so it reads as caution-but-not-error, with a softly breathing lamplight dot. */
 export function UnsavedPill({ dirty, failed = false }: { dirty: boolean; failed?: boolean }) {
+  const { t } = useTranslation();
   if (!dirty) return null;
   // Storage full/disabled — stop promising the work is being kept.
   if (failed) {
     return (
       <span
         className="badge danger draft-pill"
-        title="Couldn't auto-save this draft (storage full). Press Save to keep your work."
+        title={t('draft.notSavedTitle')}
       >
         <span className="draft-pill-dot" aria-hidden />
-        Draft not saved
+        {t('draft.notSaved')}
       </span>
     );
   }
   return (
-    <span className="badge warn draft-pill" title="Your changes are auto-kept as a draft until you press Save.">
+    <span className="badge warn draft-pill" title={t('draft.autoKeptTitle')}>
       <span className="draft-pill-dot" aria-hidden />
-      Unsaved draft
+      {t('draft.unsaved')}
     </span>
   );
 }
@@ -44,31 +47,34 @@ export function DraftRestoreBar({
   onDiscard: () => void;
   onDismiss: () => void;
 }) {
+  const { t } = useTranslation();
   const when = relativeTime(env.updatedAt);
   const name = env.label.trim();
-  const titled = name ? `“${name}”` : `this ${noun}`;
+  const titled = name ? `“${name}”` : t('draft.thisNoun', { noun });
   return (
-    <div className="draft-bar" role="region" aria-label="Restore unsaved draft">
+    <div className="draft-bar" role="region" aria-label={t('draft.restoreAria')}>
       <span className="draft-bar-mark" aria-hidden>
         <Icon name="recap" size={16} />
       </span>
       <div className="draft-bar-text">
-        <strong>{env.isNew ? `Unsaved ${noun} draft` : 'Unsaved changes'}</strong>
+        <strong>{env.isNew ? t('draft.unsavedNounDraft', { noun }) : t('draft.unsavedChanges')}</strong>
         <span className="draft-bar-detail">
           {env.isNew
-            ? `You started ${name ? titled : `a new ${noun}`} ${when} but never saved it.`
-            : `You were editing ${titled} ${when} — those changes were never saved.`}
+            ? name
+              ? t('draft.startedNamed', { titled, when })
+              : t('draft.startedNew', { noun, when })
+            : t('draft.wereEditing', { titled, when })}
         </span>
       </div>
       <div className="draft-bar-actions">
         <button className="btn sm primary" onClick={onRestore}>
           <Icon name="recap" size={13} />
-          Restore
+          {t('draft.restore')}
         </button>
         <button className="btn sm ghost" onClick={onDiscard}>
-          Discard draft
+          {t('draft.discardDraft')}
         </button>
-        <button className="btn sm ghost draft-bar-x" onClick={onDismiss} aria-label="Dismiss">
+        <button className="btn sm ghost draft-bar-x" onClick={onDismiss} aria-label={t('draft.dismiss')}>
           <Icon name="close" size={13} />
         </button>
       </div>

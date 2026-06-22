@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   type Character,
   type MinigameFinishResponse,
   type MinigameId,
   type MinigameInfo,
   type MinigameSubmission,
-  RELATIONSHIP_STAT_LABELS,
-  DATING_STAT_LABELS,
 } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
+import { datingStatLabel, relationshipStatLabel } from '../i18n/labels';
 import { Banner, Empty, Modal, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { PortraitPicker } from '../components/PortraitPicker';
@@ -18,6 +18,7 @@ import { GameView, type ActiveGame } from '../components/minigames/GameView';
 import './minigames.page.css';
 
 export function Minigames() {
+  const { t } = useTranslation(['pages', 'common']);
   const { reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate } = useAppData();
   const [games, setGames] = useState<MinigameInfo[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -64,7 +65,7 @@ export function Minigames() {
 
   const start = async (minigameId: MinigameId) => {
     if (activeDate) {
-      setError(`You're on a date with ${activeDate.characterName} — finish it on the Date tab first.`);
+      setError(t('minigames.errOnDate', { name: activeDate.characterName }));
       return;
     }
     setBusy(true);
@@ -116,17 +117,17 @@ export function Minigames() {
   return (
     <div className="stack">
       <div className="page-head">
-        <span className="kicker">The Arcade Almanac</span>
-        <h1>Minigames</h1>
-        <p>Play together to grow closer — and earn a little money.</p>
+        <span className="kicker">{t('minigames.kicker')}</span>
+        <h1>{t('minigames.title')}</h1>
+        <p>{t('minigames.blurb')}</p>
       </div>
       {error && <Banner kind="error">{error}</Banner>}
       {outOfEnergy && !active && (
-        <Banner kind="info">You're out of energy for today — end the day to play again tomorrow.</Banner>
+        <Banner kind="info">{t('minigames.outOfEnergy')}</Banner>
       )}
       {onDate && !active && (
         <Banner kind="info">
-          You're on a date with {activeDate!.characterName} — finish it on the Date tab before playing.
+          {t('minigames.onDateBanner', { name: activeDate!.characterName })}
         </Banner>
       )}
 
@@ -138,12 +139,12 @@ export function Minigames() {
 
       {characters.length > 0 && !active && (
         <div className="card mga-console">
-          <span className="kicker">Playing with</span>
+          <span className="kicker">{t('minigames.playingWith')}</span>
           <PortraitPicker
             options={visibleChars.map((c) => ({ id: c.id, character: c }))}
             value={characterId}
             onChange={(id) => setCharacterId(id)}
-            none={{ label: 'No one', sub: 'money only' }}
+            none={{ label: t('minigames.noOne'), sub: t('minigames.moneyOnly') }}
             compact
           />
         </div>
@@ -159,17 +160,17 @@ export function Minigames() {
         <div className="framed mga-active">
           <div className="mga-stage-head">
             <div className="mga-stage-title">
-              <span className="kicker">Now playing</span>
+              <span className="kicker">{t('minigames.nowPlaying')}</span>
               <h2>{games.find((g) => g.id === active.minigameId)?.title}</h2>
             </div>
             <button className="btn sm ghost danger" onClick={() => setActive(null)} disabled={busy}>
-              Quit
+              {t('minigames.quit')}
             </button>
           </div>
           <GameView active={active} partner={partner} onComplete={finish} />
         </div>
       ) : games.length === 0 ? (
-        <Empty icon={<Icon name="games" size={32} />} title="No minigames registered" />
+        <Empty icon={<Icon name="games" size={32} />} title={t('minigames.noGames')} />
       ) : (
         <div className="mga-grid">
           {games.map((g, i) => (
@@ -178,7 +179,7 @@ export function Minigames() {
                 <span className="mga-no">{String(i + 1).padStart(2, '0')}</span>
                 <h3 className="mga-title">{g.title}</h3>
                 {g.rewardsCharacter && (
-                  <span className="mga-heart" title="Builds your bond">
+                  <span className="mga-heart" title={t('minigames.buildsBond')}>
                     <Icon name="date" size={13} />
                   </span>
                 )}
@@ -186,7 +187,7 @@ export function Minigames() {
               <p className="mga-desc">{g.description}</p>
               {g.targetStats.length > 0 && (
                 <div className="mga-stats">
-                  <span className="mga-stats-label">Builds</span>
+                  <span className="mga-stats-label">{t('minigames.builds')}</span>
                   {g.targetStats.map((s) => (
                     <span className="mga-stat" key={s}>
                       {s}
@@ -200,13 +201,13 @@ export function Minigames() {
                 disabled={busy || outOfEnergy || onDate}
                 title={
                   onDate
-                    ? `Finish your date with ${activeDate!.characterName} first.`
+                    ? t('minigames.finishDateFirst', { name: activeDate!.characterName })
                     : outOfEnergy
-                      ? 'Out of energy — end the day to begin a new one.'
+                      ? t('minigames.outOfEnergyTitle')
                       : undefined
                 }
               >
-                <Icon name="play" size={14} /> Play
+                <Icon name="play" size={14} /> {t('minigames.play')}
               </button>
             </div>
           ))}
@@ -217,16 +218,15 @@ export function Minigames() {
 }
 
 function ResultCard({ result, onClose }: { result: MinigameFinishResponse; onClose: () => void }) {
+  const { t } = useTranslation(['pages', 'common']);
   const { reward, score, grade } = result.result;
   const { reaction, milestone, isNewBest } = result;
   const datingEntries = Object.entries(reward.dating) as [string, number][];
   const relEntries = Object.entries(reward.relationship) as [string, number][];
   const noRewards = datingEntries.length === 0 && relEntries.length === 0 && reward.money === 0;
 
-  const statLabel = (key: string, kind: 'dating' | 'rel') => {
-    if (kind === 'rel') return RELATIONSHIP_STAT_LABELS[key as keyof typeof RELATIONSHIP_STAT_LABELS] ?? key;
-    return DATING_STAT_LABELS[key as keyof typeof DATING_STAT_LABELS] ?? key;
-  };
+  const statLabel = (key: string, kind: 'dating' | 'rel') =>
+    kind === 'rel' ? relationshipStatLabel(key) : datingStatLabel(key);
 
   return (
     <div className="mga-result-modal">
@@ -234,9 +234,9 @@ function ResultCard({ result, onClose }: { result: MinigameFinishResponse; onClo
         <div className="mga-grade">
           <span className={`mga-grade-badge grade-${grade}`}>{grade}</span>
           <div className="mga-score">
-            <span className="kicker">Final score</span>
+            <span className="kicker">{t('minigames.finalScore')}</span>
             <span className="num">{score}</span>
-            <span className="lbl">points</span>
+            <span className="lbl">{t('minigames.points')}</span>
           </div>
         </div>
         <button className="btn sm ghost" onClick={onClose}>
@@ -246,7 +246,7 @@ function ResultCard({ result, onClose }: { result: MinigameFinishResponse; onClo
 
       {isNewBest && (
         <div className="mga-best-ribbon">
-          <Icon name="trophy" size={14} /> New personal best!
+          <Icon name="trophy" size={14} /> {t('minigames.newBest')}
         </div>
       )}
 
@@ -256,12 +256,12 @@ function ResultCard({ result, onClose }: { result: MinigameFinishResponse; onClo
 
       {milestone && (
         <div className="mga-milestone">
-          <Icon name="date" size={15} /> <strong>You grew closer — you're {milestone.label}!</strong> {milestone.line}
+          <Icon name="date" size={15} /> <strong>{t('minigames.grewCloser', { label: milestone.label })}</strong> {milestone.line}
         </div>
       )}
 
       <p className="mga-reward-label">
-        Rewards {result.playedFavorite && <span className="mga-fav-note">· their favorite kind of game</span>}
+        {t('minigames.rewards')} {result.playedFavorite && <span className="mga-fav-note">{t('minigames.favoriteNote')}</span>}
       </p>
       <div className="tags">
         {datingEntries.map(([k, v]) => (
@@ -282,7 +282,7 @@ function ResultCard({ result, onClose }: { result: MinigameFinishResponse; onClo
           </span>
         )}
         {noRewards && (
-          <span className="muted">Nothing earned this time — but you played beautifully.</span>
+          <span className="muted">{t('minigames.noRewards')}</span>
         )}
       </div>
     </div>

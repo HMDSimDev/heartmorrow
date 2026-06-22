@@ -8,6 +8,7 @@ import {
   type SlotSymbol,
   type SlotsResult,
 } from '@dsim/shared';
+import { useTranslation } from 'react-i18next';
 import { api } from '../../../lib/api';
 import { errorMessage } from '../../../lib/hooks';
 import { Banner } from '../../ui';
@@ -34,6 +35,7 @@ const PAY_ROWS = (Object.keys(SLOT_TRIPLE_PAYOUT) as SlotSymbol[]).sort(
 );
 
 export function SlotsGame({ worldId, wallet, onSettled }: CasinoGameProps) {
+  const { t } = useTranslation(['phone', 'common']);
   const [bet, setBet] = useState(() => clampBet(25, wallet));
   const [strips, setStrips] = useState<SlotSymbol[][]>([
     ['bar', 'seven', 'bell'],
@@ -99,7 +101,7 @@ export function SlotsGame({ worldId, wallet, onSettled }: CasinoGameProps) {
   return (
     <div className="slot-machine">
       <div className="gmb-table">
-        <div className="gmb-felt-label">Lucky Sevens · match the line</div>
+        <div className="gmb-felt-label">{t('gambling.slotsFelt')}</div>
         <div className={`slot-window${won ? ' win' : ''}`}>
           <div className="slot-payline" />
           <div className="slot-reels">
@@ -121,9 +123,9 @@ export function SlotsGame({ worldId, wallet, onSettled }: CasinoGameProps) {
       {error && <Banner kind="error">{error}</Banner>}
       {result &&
         (won ? (
-          <ResultBanner outcome="win" title={result.line ?? 'Winner!'} net={result.net} />
+          <ResultBanner outcome="win" title={result.line ?? t('gambling.winner')} net={result.net} />
         ) : (
-          <ResultBanner outcome="lose" title="No line this time" net={result.net} />
+          <ResultBanner outcome="lose" title={t('gambling.noLine')} net={result.net} />
         ))}
 
       <div className="slot-paytable">
@@ -154,7 +156,7 @@ export function SlotsGame({ worldId, wallet, onSettled }: CasinoGameProps) {
       )}
       <div className="gmb-actions">
         <button className="gmb-go" onClick={spin} disabled={busy || !canBet}>
-          {busy ? 'Spinning…' : `Spin · ◈ ${bet}`}
+          {busy ? t('gambling.spinning') : t('gambling.spinBet', { bet })}
         </button>
       </div>
     </div>

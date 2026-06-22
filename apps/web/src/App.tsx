@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import type { ParseKeys } from 'i18next';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAppData } from './state/app-context';
 import { DayHud } from './components/DayHud';
 import { Icon, type IconName } from './components/Icon';
@@ -18,18 +20,19 @@ import { Settings } from './pages/Settings';
 import { Bench } from './pages/Bench';
 import { Debug } from './pages/Debug';
 
-// `short` is the label used by the cramped bottom nav (phones); the roomy
-// sidebar always shows the full `label`. Only set it where the full label is
+// `shortKey` is the label used by the cramped bottom nav (phones); the roomy
+// sidebar always shows the full `labelKey`. Only set it where the full label is
 // long enough to risk overflowing an evenly-flexed bottom-nav cell.
-const NAV: { to: string; icon: IconName; label: string; short?: string; end?: boolean; creatorOnly?: boolean }[] = [
-  { to: '/', icon: 'home', label: 'Home', end: true },
-  { to: '/characters', icon: 'people', label: 'People' },
-  { to: '/world', icon: 'chronicle', label: 'World', creatorOnly: true },
-  { to: '/chat', icon: 'date', label: 'Date' },
-  { to: '/phone', icon: 'phone', label: 'Phone' },
-  { to: '/settings', icon: 'settings', label: 'Settings' },
-  { to: '/worlds', icon: 'worlds', label: 'Switch world', short: 'Worlds' },
-  { to: '/debug', icon: 'debug', label: 'Debug', creatorOnly: true },
+type CommonKey = ParseKeys<'common'>;
+const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonKey; end?: boolean; creatorOnly?: boolean }[] = [
+  { to: '/', icon: 'home', labelKey: 'nav.home', end: true },
+  { to: '/characters', icon: 'people', labelKey: 'nav.people' },
+  { to: '/world', icon: 'chronicle', labelKey: 'nav.world', creatorOnly: true },
+  { to: '/chat', icon: 'date', labelKey: 'nav.date' },
+  { to: '/phone', icon: 'phone', labelKey: 'nav.phone' },
+  { to: '/settings', icon: 'settings', labelKey: 'nav.settings' },
+  { to: '/worlds', icon: 'worlds', labelKey: 'nav.switchWorld', shortKey: 'nav.worldsShort' },
+  { to: '/debug', icon: 'debug', labelKey: 'nav.debug', creatorOnly: true },
 ];
 
 /** A short, stable key for the current screen — drives the per-screen wallpaper. */
@@ -56,6 +59,7 @@ function CreatorRoute({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  const { t } = useTranslation();
   const { creatorMode, unreadTexts, activeWorldId, activeDate } = useAppData();
   const location = useLocation();
 
@@ -87,8 +91,8 @@ export default function App() {
       return (
         <span
           className="nav-badge nav-badge-live"
-          title={`On a date with ${activeDate.characterName}`}
-          aria-label={`Date in progress with ${activeDate.characterName}`}
+          title={t('hud.onDateWith', { name: activeDate.characterName })}
+          aria-label={t('hud.dateInProgress', { name: activeDate.characterName })}
         />
       );
     return null;
@@ -107,7 +111,7 @@ export default function App() {
             {nav.map((n) => (
               <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>
                 <span className="ico"><Icon name={n.icon} size={20} /></span>
-                {n.label}
+                {t(n.labelKey)}
                 {badgeFor(n.to)}
               </NavLink>
             ))}
@@ -146,7 +150,7 @@ export default function App() {
         {nav.map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>
             <span className="ico"><Icon name={n.icon} size={20} /></span>
-            {n.short ?? n.label}
+            {t(n.shortKey ?? n.labelKey)}
             {badgeFor(n.to)}
           </NavLink>
         ))}

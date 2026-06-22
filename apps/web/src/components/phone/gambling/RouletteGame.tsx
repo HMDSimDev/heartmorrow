@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   rouletteColor,
   rouletteBetWins,
@@ -10,6 +11,8 @@ import { errorMessage } from '../../../lib/hooks';
 import { Banner } from '../../ui';
 import { ResultBanner, maxAffordable, type CasinoGameProps } from './shared';
 import './roulette.css';
+
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
 const DENOMS = [5, 25, 50, 100];
 
@@ -36,15 +39,17 @@ function parseKey(key: string, stake: number): RouletteBet {
   const [kind, val] = key.split(':');
   return { kind: kind as RouletteBet['kind'], value: val ? Number(val) : 0, stake };
 }
-const labelFor = (key: string): string => {
+const labelFor = (key: string, t: TFn): string => {
   const [kind, val] = key.split(':');
   if (kind === 'straight') return val!;
-  if (kind === 'dozen') return ['1st 12', '2nd 12', '3rd 12'][Number(val) - 1]!;
-  if (kind === 'column') return `Col ${val}`;
-  return kind!.charAt(0).toUpperCase() + kind!.slice(1);
+  if (kind === 'dozen') return t(`gambling.dozen${val}`);
+  if (kind === 'column') return t('gambling.col', { n: val });
+  return t(`gambling.bet.${kind}`);
 };
 
 export function RouletteGame({ worldId, wallet, onSettled }: CasinoGameProps) {
+  const { t } = useTranslation(['phone', 'common']);
+  const tt = t as unknown as TFn;
   const [chips, setChips] = useState<Record<string, number>>({});
   const [denom, setDenom] = useState(25);
   const [phase, setPhase] = useState<'bet' | 'spinning' | 'done'>('bet');
@@ -172,7 +177,7 @@ export function RouletteGame({ worldId, wallet, onSettled }: CasinoGameProps) {
       {/* Stake + chip selector */}
       <div className="rl-bankline">
         <span>
-          Staked <b className="gmb-value">◈ {total}</b>
+          {t('gambling.staked')} <b className="gmb-value">◈ {total}</b>
         </span>
         <div className="rl-denoms">
           {DENOMS.filter((d) => d <= Math.max(top, DENOMS[0]!)).map((d) => (
@@ -182,7 +187,7 @@ export function RouletteGame({ worldId, wallet, onSettled }: CasinoGameProps) {
           ))}
         </div>
         <button className="rl-clear" onClick={clear} disabled={locked || total === 0}>
-          Clear
+          {t('gambling.clear')}
         </button>
       </div>
 
@@ -208,12 +213,12 @@ export function RouletteGame({ worldId, wallet, onSettled }: CasinoGameProps) {
       {/* Outside bets */}
       <div className="rl-outside">
         {['dozen:1', 'dozen:2', 'dozen:3'].map((k) => (
-          <Cell key={k} k={k} chips={chips} win={placedWin(k)} lost={placedLost(k)} place={place} disabled={locked} />
+          <Cell key={k} k={k} chips={chips} win={placedWin(k)} lost={placedLost(k)} place={place} disabled={locked} t={tt} />
         ))}
       </div>
       <div className="rl-outside">
         {['column:1', 'column:2', 'column:3'].map((k) => (
-          <Cell key={k} k={k} chips={chips} win={placedWin(k)} lost={placedLost(k)} place={place} disabled={locked} />
+          <Cell key={k} k={k} chips={chips} win={placedWin(k)} lost={placedLost(k)} place={place} disabled={locked} t={tt} />
         ))}
       </div>
       <div className="rl-outside">
@@ -227,18 +232,19 @@ export function RouletteGame({ worldId, wallet, onSettled }: CasinoGameProps) {
             place={place}
             disabled={locked}
             tone={k === 'red' || k === 'black' ? k : undefined}
+            t={tt}
           />
         ))}
       </div>
 
       <div className="gmb-actions">
         <button className="gmb-go" onClick={spin} disabled={locked || total < wallet.minBet}>
-          {locked ? 'Spinning…' : total > 0 ? `Spin · ◈ ${total}` : `Place at least ◈ ${wallet.minBet}`}
+          {locked ? t('gambling.spinning') : total > 0 ? t('gambling.spinTotal', { total }) : t('gambling.placeAtLeast', { min: wallet.minBet })}
         </button>
       </div>
       {chipKeys.length > 0 && phase !== 'spinning' && (
         <div className="gmb-muted">
-          On the table: {chipKeys.map((k) => `${labelFor(k)} ◈${chips[k]}`).join(' · ')}
+          {t('gambling.onTable', { bets: chipKeys.map((k) => `${labelFor(k, t as unknown as TFn)} ◈${chips[k]}`).join(' · ') })}
         </div>
       )}
     </div>
@@ -253,6 +259,7 @@ function Cell({
   place,
   disabled,
   tone,
+  t,
 }: {
   k: string;
   chips: Record<string, number>;
@@ -261,6 +268,7 @@ function Cell({
   place: (k: string) => void;
   disabled: boolean;
   tone?: string;
+  t: TFn;
 }) {
   return (
     <button
@@ -268,7 +276,7 @@ function Cell({
       onClick={() => place(k)}
       disabled={disabled}
     >
-      {labelFor(k)}
+      {labelFor(k, t)}
       {chips[k] ? <i className="rl-chip">{chips[k]}</i> : null}
     </button>
   );

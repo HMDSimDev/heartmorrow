@@ -1,12 +1,11 @@
 import {
   DATING_STAT_KEYS,
-  DATING_STAT_LABELS,
   RELATIONSHIP_STAT_KEYS,
-  RELATIONSHIP_STAT_LABELS,
   type DatingStats,
   type Relationship,
   type RelationshipStatKey,
 } from '@dsim/shared';
+import { datingStatLabel, relationshipStatLabel } from '../i18n/labels';
 
 export function StatBar({
   label,
@@ -60,7 +59,7 @@ export function RelationshipBars({
       {RELATIONSHIP_STAT_KEYS.map((k) => (
         <StatBar
           key={k}
-          label={RELATIONSHIP_STAT_LABELS[k]}
+          label={relationshipStatLabel(k)}
           value={relationship[k]}
           tension={k === 'tension'}
           delta={deltas?.[k]}
@@ -74,7 +73,7 @@ export function DatingBars({ stats }: { stats: DatingStats }) {
   return (
     <div>
       {DATING_STAT_KEYS.map((k) => (
-        <StatBar key={k} label={DATING_STAT_LABELS[k]} value={stats[k]} />
+        <StatBar key={k} label={datingStatLabel(k)} value={stats[k]} />
       ))}
     </div>
   );

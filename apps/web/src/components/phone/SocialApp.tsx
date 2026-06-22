@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
-  CHARACTER_LINK_LABELS,
   CHARACTER_LINK_ORDER,
   type Character,
   type CharacterLinkKind,
@@ -10,11 +10,14 @@ import {
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
+import { characterLinkLabel } from '../../i18n/labels';
 import { Icon, type IconName } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { Portrait } from '../Portrait';
 import { Banner, Empty, Spinner } from '../ui';
 import './phone-life.css';
+
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
 /** "Crossed paths" is low-signal noise next to real bonds, so it's collapsed
  *  until the player opts in (the footer toggle). */
@@ -32,11 +35,11 @@ const KIND_ICON: Record<CharacterLinkKind, IconName> = {
 
 /** A card-owner's read of a tie, for the chip tooltip (touch has no hover, but
  *  this still surfaces the full peer name when a chip truncates). */
-function tieTitle(owner: string, peer: string, kind: CharacterLinkKind, t: SocialTie): string {
-  const label = CHARACTER_LINK_LABELS[kind].toLowerCase();
-  if (t.incoming) return `${peer} considers ${owner} a ${label}`;
-  if (t.derived) return `${peer} · ${CHARACTER_LINK_LABELS[kind]} (grew during play)`;
-  return `${peer} · ${CHARACTER_LINK_LABELS[kind]}`;
+function tieTitle(owner: string, peer: string, kind: CharacterLinkKind, tie: SocialTie, tt: TFn): string {
+  const kindLabel = characterLinkLabel(kind);
+  if (tie.incoming) return tt('social.tieIncoming', { peer, owner, label: kindLabel.toLowerCase() });
+  if (tie.derived) return tt('social.tieDerived', { peer, kind: kindLabel });
+  return tt('social.tiePlain', { peer, kind: kindLabel });
 }
 
 /** Count the web's UNIQUE connections (an unordered pair + kind), so a mutual
@@ -61,6 +64,7 @@ function countEdges(nodes: SocialWebNode[]): { total: number; byKind: Map<Charac
  *  has formed during play), grouped by person and built to stay legible as the
  *  web fills in: a summary header, kind filters, search, and collapsed noise. */
 export function SocialApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, creatorMode, dayTick } = useAppData();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [nodes, setNodes] = useState<SocialWebNode[]>([]);
@@ -152,23 +156,23 @@ export function SocialApp() {
 
   return (
     <div className="phone-app">
-      <PhoneAppBar title="Social" kicker="The web" icon="social" />
+      <PhoneAppBar title={t('social.title')} kicker={t('social.kicker')} icon="social" />
       <div className="social-app">
         {loading ? (
           <Spinner />
         ) : error ? (
           <div className="sw-error">
-            <Banner kind="error">Couldn't load the web. {error}</Banner>
+            <Banner kind="error">{t('social.loadError', { error })}</Banner>
             <button type="button" className="btn ghost sm" onClick={() => setReloadKey((k) => k + 1)}>
-              <Icon name="refresh" size={14} /> Try again
+              <Icon name="refresh" size={14} /> {t('social.tryAgain')}
             </button>
           </div>
         ) : knownNodes.length === 0 ? (
-          <Empty icon={<Icon name="social" size={36} />} title="No connections yet">
+          <Empty icon={<Icon name="social" size={36} />} title={t('social.emptyTitle')}>
             {creatorMode ? (
-              <p className="muted">Add connections between characters in the character editor to map the social web.</p>
+              <p className="muted">{t('social.emptyCreator')}</p>
             ) : (
-              <p className="muted">As people's stories unfold, their connections will appear here.</p>
+              <p className="muted">{t('social.emptyPlayer')}</p>
             )}
           </Empty>
         ) : (
@@ -176,11 +180,11 @@ export function SocialApp() {
             <header className="sw-head">
               <div className="sw-summary">
                 <span className="sw-stat">
-                  <b>{knownNodes.length}</b> {knownNodes.length === 1 ? 'person' : 'people'}
+                  <b>{knownNodes.length}</b> {t('social.peopleCount', { count: knownNodes.length })}
                 </span>
                 <span className="sw-stat-dot">·</span>
                 <span className="sw-stat">
-                  <b>{edges.total}</b> {edges.total === 1 ? 'tie' : 'ties'}
+                  <b>{edges.total}</b> {t('social.tieCount', { count: edges.total })}
                 </span>
               </div>
               {legend.length > 0 && (
@@ -192,12 +196,12 @@ export function SocialApp() {
                       className={`sw-chip kind-${kind}${activeKinds.has(kind) ? '' : ' is-off'}`}
                       onClick={() => toggleKind(kind)}
                       aria-pressed={activeKinds.has(kind)}
-                      title={`${activeKinds.has(kind) ? 'Hide' : 'Show'} ${CHARACTER_LINK_LABELS[kind].toLowerCase()} ties`}
+                      title={t('social.chipTitle', { action: activeKinds.has(kind) ? t('social.hide') : t('social.show'), kind: characterLinkLabel(kind).toLowerCase() })}
                     >
                       <span className="sw-chip-icon">
                         <Icon name={KIND_ICON[kind]} size={14} />
                       </span>
-                      <span className="sw-chip-label">{CHARACTER_LINK_LABELS[kind]}</span>
+                      <span className="sw-chip-label">{characterLinkLabel(kind)}</span>
                       <span className="sw-chip-count">{count}</span>
                     </button>
                   ))}
@@ -209,19 +213,19 @@ export function SocialApp() {
               <Icon name="search" size={15} />
               <input
                 value={query}
-                placeholder="Search people…"
+                placeholder={t('social.searchPlaceholder')}
                 onChange={(e) => setQuery(e.target.value)}
-                aria-label="Search people"
+                aria-label={t('social.searchLabel')}
               />
               {query && (
-                <button type="button" className="sw-search-clear" onClick={() => setQuery('')} aria-label="Clear search">
+                <button type="button" className="sw-search-clear" onClick={() => setQuery('')} aria-label={t('social.clearSearch')}>
                   <Icon name="close" size={14} />
                 </button>
               )}
             </label>
 
             {cards.length === 0 ? (
-              <div className="sw-none">No connections match.</div>
+              <div className="sw-none">{t('social.noMatch')}</div>
             ) : (
               <div className="sw-list">
                 {cards.map(({ character, ties }) => (
@@ -238,7 +242,7 @@ export function SocialApp() {
                 aria-pressed={showingAcq}
               >
                 <Icon name="acquaintance" size={14} />
-                {showingAcq ? 'Hide' : 'Show'} {acqCount} {acqCount === 1 ? 'acquaintance' : 'acquaintances'}
+                {' '}{t('social.acqToggle', { action: showingAcq ? t('social.hide') : t('social.show'), count: acqCount })}
               </button>
             )}
           </>
@@ -259,6 +263,7 @@ function PersonCard({
   ties: SocialTie[];
   charById: Map<string, Character>;
 }) {
+  const { t } = useTranslation(['phone', 'common']);
   const groups = CHARACTER_LINK_ORDER.map((kind) => ({
     kind,
     peers: ties
@@ -274,26 +279,26 @@ function PersonCard({
         </span>
         <span className="sw-person-name">{character.name}</span>
         <span className="sw-person-count">
-          {ties.length} {ties.length === 1 ? 'tie' : 'ties'}
+          {t('social.tiesCount', { count: ties.length })}
         </span>
       </div>
       <div className="sw-groups">
         {groups.map(({ kind, peers }) => (
           <div className={`sw-group kind-${kind}`} key={kind}>
-            <span className="sw-group-icon" title={CHARACTER_LINK_LABELS[kind]} aria-label={CHARACTER_LINK_LABELS[kind]}>
+            <span className="sw-group-icon" title={characterLinkLabel(kind)} aria-label={characterLinkLabel(kind)}>
               <Icon name={KIND_ICON[kind]} size={15} />
             </span>
             <div className="sw-peers">
-              {peers.map((t) => {
-                const peer = charById.get(t.targetId);
-                const peerName = peer?.name ?? 'someone';
+              {peers.map((tie) => {
+                const peer = charById.get(tie.targetId);
+                const peerName = peer?.name ?? t('social.someone');
                 return (
                   <span
-                    key={t.targetId}
-                    className={`sw-peer${t.derived ? ' is-derived' : ''}${t.incoming ? ' is-incoming' : ''}`}
-                    title={tieTitle(character.name, peerName, kind, t)}
+                    key={tie.targetId}
+                    className={`sw-peer${tie.derived ? ' is-derived' : ''}${tie.incoming ? ' is-incoming' : ''}`}
+                    title={tieTitle(character.name, peerName, kind, tie, t as unknown as TFn)}
                   >
-                    {t.incoming && (
+                    {tie.incoming && (
                       <span className="sw-peer-dir" aria-hidden>
                         ‹
                       </span>

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   CASINO_GAMES,
-  CASINO_GAME_LABELS,
-  CASINO_GAME_BLURBS,
   type CasinoGame,
   type GamblingWallet,
 } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { useAppData } from '../../state/app-context';
 import { useAsync } from '../../lib/hooks';
+import { casinoGameLabel, casinoGameBlurb } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { Empty, Loader } from '../ui';
 import { PhoneAppBar } from './PhoneAppBar';
@@ -28,6 +28,7 @@ const GLYPH: Record<CasinoGame, string> = {
 };
 
 export function GamblingApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { reloadPlayer, activeWorldId, dayTick } = useAppData();
   const [view, setView] = useState<CasinoGame | 'lobby'>('lobby');
   const [wallet, setWallet] = useState<GamblingWallet>();
@@ -63,9 +64,9 @@ export function GamblingApp() {
   if (!activeWorldId) {
     return (
       <div className="phone-app">
-        <PhoneAppBar title="Casino" kicker="House of fortune" icon="gambling" />
+        <PhoneAppBar title={t('gambling.title')} kicker={t('gambling.houseOfFortune')} icon="gambling" />
         <div className="gmb-scroll">
-          <Empty icon={<Icon name="gambling" size={34} />} title="No world active" />
+          <Empty icon={<Icon name="gambling" size={34} />} title={t('gambling.noWorldTitle')} />
         </div>
       </div>
     );
@@ -75,14 +76,14 @@ export function GamblingApp() {
   return (
     <div className="phone-app">
       <PhoneAppBar
-        title="Casino"
-        kicker={view === 'lobby' ? 'House of fortune' : CASINO_GAME_LABELS[view]}
+        title={t('gambling.title')}
+        kicker={view === 'lobby' ? t('gambling.houseOfFortune') : casinoGameLabel(view)}
         icon="gambling"
         left={
           view !== 'lobby' ? (
             <button className="gmb-backbtn" onClick={toLobby}>
               <Icon name="chevronRight" size={14} style={{ transform: 'rotate(180deg)' }} />
-              Lobby
+              {t('gambling.lobby')}
             </button>
           ) : undefined
         }
@@ -96,20 +97,20 @@ export function GamblingApp() {
               return (
                 <>
                   <div className="gmb-marquee">
-                    <h2>The Gilded Hour</h2>
-                    <p>place your bets</p>
+                    <h2>{t('gambling.marqueeTitle')}</h2>
+                    <p>{t('gambling.marqueeSub')}</p>
                   </div>
                   <LimitRibbon wallet={wl} />
                   <div className="gmb-lobby">
                     {CASINO_GAMES.map((g) => (
                       <button key={g} className="gmb-tile" onClick={() => setView(g)}>
                         <span className="gmb-tile-glyph">{GLYPH[g]}</span>
-                        <span className="gmb-tile-name">{CASINO_GAME_LABELS[g]}</span>
-                        <span className="gmb-tile-blurb">{CASINO_GAME_BLURBS[g]}</span>
+                        <span className="gmb-tile-name">{casinoGameLabel(g)}</span>
+                        <span className="gmb-tile-blurb">{casinoGameBlurb(g)}</span>
                       </button>
                     ))}
                   </div>
-                  <div className="gmb-muted">House odds are real — play for the thrill, not the rent. Limits reset each day.</div>
+                  <div className="gmb-muted">{t('gambling.houseOdds')}</div>
                 </>
               );
             }
@@ -131,17 +132,18 @@ export function GamblingApp() {
 }
 
 function LimitRibbon({ wallet }: { wallet: GamblingWallet }) {
+  const { t } = useTranslation(['phone', 'common']);
   const pct = wallet.dailyLimit > 0 ? Math.min(100, (wallet.wageredToday / wallet.dailyLimit) * 100) : 0;
   return (
     <div className="gmb-limit">
       <span>
-        Wagered <b>◈ {wallet.wageredToday}</b>
+        {t('gambling.wagered')} <b>◈ {wallet.wageredToday}</b>
       </span>
       <span className="gmb-limit-bar">
         <i style={{ width: `${pct}%` }} />
       </span>
       <span>
-        Daily <b>◈ {wallet.dailyLimit}</b>
+        {t('gambling.daily')} <b>◈ {wallet.dailyLimit}</b>
       </span>
     </div>
   );

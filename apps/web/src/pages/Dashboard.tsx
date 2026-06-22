@@ -1,48 +1,39 @@
 import './dashboard.page.css';
 import { Link } from 'react-router-dom';
-import { PHASE_ICONS, PHASE_LABELS, SEASON_ICONS, deriveCalendar, type Phase } from '@dsim/shared';
+import type { ParseKeys } from 'i18next';
+import { Trans, useTranslation } from 'react-i18next';
+import { PHASE_ICONS, SEASON_ICONS, deriveCalendar } from '@dsim/shared';
 import { api } from '../lib/api';
 import { useAsync } from '../lib/hooks';
+import { phaseLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { Empty } from '../components/ui';
 import { Icon, type IconName } from '../components/Icon';
 import { EnergyPips } from '../components/EnergyPips';
 import { useAppData } from '../state/app-context';
 
-const GREETING: Record<Phase, string> = {
-  morning: 'Good morning',
-  afternoon: 'Good afternoon',
-  evening: 'Good evening',
-  night: 'Still up',
-};
-
-const PHASE_LINE: Record<Phase, string> = {
-  morning: 'A fresh day is open. Who will you spend it with?',
-  afternoon: 'The afternoon is yours — make a little time for someone.',
-  evening: 'The lamps are lit. A fine hour for a date.',
-  night: 'The night is quiet. Send a text, or rest until tomorrow.',
-};
-
 // How many faces the homepage "People in your life" strip previews before pointing
 // the player to the full roster. Newest-first, so a just-added person is always shown.
 const PEOPLE_PREVIEW_CAP = 15;
 
-const TILES: { to: string; icon: IconName; t: string; d: string }[] = [
-  { to: '/chat', icon: 'date', t: 'Date', d: 'Spend an evening with someone.' },
-  { to: '/phone', icon: 'phone', t: 'Phone', d: 'Messages, mail, gifts, and keepsakes.' },
-  { to: '/characters', icon: 'people', t: 'People', d: 'Everyone you know.' },
-  { to: '/settings', icon: 'settings', t: 'Settings', d: 'Your persona and preferences.' },
+type PagesKey = ParseKeys<'pages'>;
+const TILES: { to: string; icon: IconName; titleKey: PagesKey; descKey: PagesKey }[] = [
+  { to: '/chat', icon: 'date', titleKey: 'dashboard.tiles.dateTitle', descKey: 'dashboard.tiles.dateDesc' },
+  { to: '/phone', icon: 'phone', titleKey: 'dashboard.tiles.phoneTitle', descKey: 'dashboard.tiles.phoneDesc' },
+  { to: '/characters', icon: 'people', titleKey: 'dashboard.tiles.peopleTitle', descKey: 'dashboard.tiles.peopleDesc' },
+  { to: '/settings', icon: 'settings', titleKey: 'dashboard.tiles.settingsTitle', descKey: 'dashboard.tiles.settingsDesc' },
 ];
 
 export function Dashboard() {
+  const { t } = useTranslation(['pages', 'common']);
   const { creatorMode, player, worldState, activeWorld, activeWorldId, dayTick } = useAppData();
   const characters = useAsync(() => api.listCharacters(), [activeWorldId, dayTick]);
 
   const phase = worldState?.phase ?? null;
   const cal = worldState ? deriveCalendar(worldState.day) : null;
   const name = player?.name?.trim();
-  const greeting = phase ? GREETING[phase] : 'Welcome back';
-  const line = phase ? PHASE_LINE[phase] : 'Pick someone, and see where the evening goes.';
+  const greeting = phase ? t(`dashboard.greeting.${phase}` as 'dashboard.greeting.morning') : t('dashboard.welcome');
+  const line = phase ? t(`dashboard.line.${phase}` as 'dashboard.line.morning') : t('dashboard.fallbackLine');
   // Only the active world's cast appears in this world. The strip below is a capped
   // preview (newest first, then `.slice(0, PEOPLE_PREVIEW_CAP)`) — the server returns
   // characters oldest-first, so reversing here keeps a just-added person visible
@@ -78,40 +69,40 @@ export function Dashboard() {
       {worldState && cal && (
         <div className="dash-hud">
           <div className="dash-hud-strip">
-            <span className="dash-hud-label">Almanac status</span>
+            <span className="dash-hud-label">{t('dashboard.almanacStatus')}</span>
             <span className="dash-hud-rule" />
           </div>
           <div className="dash-hud-cells">
             {activeWorld && (
               <div className="dash-cell world">
-                <span className="dash-cell-k">World</span>
+                <span className="dash-cell-k">{t('dashboard.world')}</span>
                 <span className="dash-cell-v">{activeWorld.name}</span>
               </div>
             )}
-            <div className="dash-cell" title={PHASE_LABELS[worldState.phase]}>
-              <span className="dash-cell-k">Day · Hour</span>
+            <div className="dash-cell" title={phaseLabel(worldState.phase)}>
+              <span className="dash-cell-k">{t('dashboard.dayHour')}</span>
               <span className="dash-cell-v">
                 <span className="dash-icon">{PHASE_ICONS[worldState.phase]}</span>
-                <span className="dash-num">Day {worldState.day}</span>
+                <span className="dash-num">{t('dashboard.day', { day: worldState.day })}</span>
               </span>
-              <span className="dash-cell-sub">{PHASE_LABELS[worldState.phase]}</span>
+              <span className="dash-cell-sub">{phaseLabel(worldState.phase)}</span>
             </div>
-            <div className="dash-cell" title={`${cal.dayOfWeek} · ${cal.season}`}>
-              <span className="dash-cell-k">Calendar</span>
+            <div className="dash-cell" title={`${weekdayLabel(cal.dayOfWeek)} · ${seasonLabel(cal.season)}`}>
+              <span className="dash-cell-k">{t('dashboard.calendar')}</span>
               <span className="dash-cell-v">
                 <span className="dash-icon">{SEASON_ICONS[cal.season]}</span>
-                {cal.dayOfWeek}
+                {weekdayLabel(cal.dayOfWeek)}
               </span>
               <span className="dash-cell-sub">
-                {cal.season}
-                {cal.isWeekend ? ' · weekend' : ''}
+                {seasonLabel(cal.season)}
+                {cal.isWeekend ? t('dashboard.weekendSuffix') : ''}
               </span>
             </div>
             <div
               className="dash-cell dash-energy"
               title={`${worldState.stamina}/${worldState.staminaMax} energy`}
             >
-              <span className="dash-cell-k">Energy</span>
+              <span className="dash-cell-k">{t('dashboard.energy')}</span>
               <span className="dash-cell-v">
                 <EnergyPips value={worldState.stamina} max={worldState.staminaMax} />
                 <span className="dash-energy-count">
@@ -129,25 +120,25 @@ export function Dashboard() {
       <section className="dash-people">
         <div className="section-head">
           <div className="titles">
-            <span className="kicker">Your circle</span>
-            <h2>People in your life</h2>
+            <span className="kicker">{t('dashboard.yourCircle')}</span>
+            <h2>{t('dashboard.peopleInLife')}</h2>
           </div>
           <span className="trail" />
           <Link className="btn sm ghost" to="/characters">
-            See everyone
+            {t('dashboard.seeEveryone')}
           </Link>
         </div>
         {people.length === 0 ? (
-          <Empty icon="✦" title="No one here yet">
+          <Empty icon="✦" title={t('dashboard.noOneTitle')}>
             {creatorMode ? (
               <>
-                <p className="muted">Create someone to begin your story.</p>
+                <p className="muted">{t('dashboard.createSomeone')}</p>
                 <Link className="btn primary" to="/characters/new">
-                  Create a character
+                  {t('dashboard.createCharacter')}
                 </Link>
               </>
             ) : (
-              <p className="muted">Switch to Creator mode in the phone's Settings to add people.</p>
+              <p className="muted">{t('dashboard.switchToCreator')}</p>
             )}
           </Empty>
         ) : (
@@ -163,17 +154,15 @@ export function Dashboard() {
                 </Link>
               ))}
               {creatorMode && (
-                <Link className="dash-plate-add" to="/characters/new" title="New character">
+                <Link className="dash-plate-add" to="/characters/new" title={t('dashboard.newCharacter')}>
                   <span className="dash-plate-add-mark"><Icon name="plus" size={26} /></span>
-                  <span>New</span>
+                  <span>{t('dashboard.new')}</span>
                 </Link>
               )}
             </div>
             {hiddenCount > 0 && (
               <p className="dash-people-more muted">
-                There {hiddenCount === 1 ? 'is' : 'are'} {hiddenCount} more{' '}
-                {hiddenCount === 1 ? 'person' : 'people'} available — head to the{' '}
-                <Link to="/chat">Date tab</Link> to see the full list.
+                <Trans i18nKey="dashboard.morePeople" ns="pages" count={hiddenCount} components={[<Link to="/chat" />]} />
               </p>
             )}
           </>
@@ -183,8 +172,8 @@ export function Dashboard() {
       <section className="dash-people">
         <div className="section-head">
           <div className="titles">
-            <span className="kicker">Quick launch</span>
-            <h2>Where to tonight?</h2>
+            <span className="kicker">{t('dashboard.quickLaunch')}</span>
+            <h2>{t('dashboard.whereTonight')}</h2>
           </div>
           <span className="trail" />
         </div>
@@ -193,8 +182,8 @@ export function Dashboard() {
             <Link key={x.to} to={x.to} className="dash-tile">
               <span className="dash-tile-glyph"><Icon name={x.icon} size={24} /></span>
               <span className="dash-tile-text">
-                <span className="dash-tile-title">{x.t}</span>
-                <span className="dash-tile-desc">{x.d}</span>
+                <span className="dash-tile-title">{t(x.titleKey)}</span>
+                <span className="dash-tile-desc">{t(x.descKey)}</span>
               </span>
               <span className="dash-tile-go"><Icon name="chevronRight" size={18} /></span>
             </Link>

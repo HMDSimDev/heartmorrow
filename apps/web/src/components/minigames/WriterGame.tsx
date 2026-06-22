@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { WriterConfig, WriterSubmission } from '@dsim/shared';
 import { MinigameShell } from './MinigameShell';
 
@@ -15,6 +16,7 @@ export function WriterGame({
   config: WriterConfig;
   onComplete: (submission: WriterSubmission) => void;
 }) {
+  const { t } = useTranslation();
   const target = config.passage;
   const [typed, setTyped] = useState('');
   const doneRef = useRef(false);
@@ -47,7 +49,7 @@ export function WriterGame({
   };
 
   return (
-    <MinigameShell title="The Copy Desk">
+    <MinigameShell title={t('minigame.copyDesk')}>
       <div className="mg-board wr-board">
         {config.headline && <div className="wr-headline">{config.headline}</div>}
 
@@ -70,28 +72,28 @@ export function WriterGame({
           onChange={onChange}
           onPaste={(e) => e.preventDefault()}
           onDrop={(e) => e.preventDefault()}
-          placeholder="Set the copy above, exactly as written…"
+          placeholder={t('minigame.copyPlaceholder')}
           rows={3}
           autoFocus
           spellCheck={false}
           autoCorrect="off"
           autoCapitalize="off"
-          aria-label="Transcribe the dispatch"
+          aria-label={t('minigame.transcribeAria')}
         />
 
         <div className="wr-hud">
           <span className="wr-stat">
             <span className="num">{accuracyPct}%</span>
-            <span className="lbl">accuracy</span>
+            <span className="lbl">{t('minigame.accuracy')}</span>
           </span>
           <span className="wr-stat">
             <span className="num">{progressPct}%</span>
-            <span className="lbl">set</span>
+            <span className="lbl">{t('minigame.set')}</span>
           </span>
         </div>
 
         <button className="btn primary block" onClick={submit} disabled={typed.length === 0}>
-          {complete ? 'Send to press' : 'File it early'}
+          {complete ? t('minigame.sendToPress') : t('minigame.fileEarly')}
         </button>
       </div>
     </MinigameShell>

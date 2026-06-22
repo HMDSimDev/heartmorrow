@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { RhythmSerenadeConfig, RhythmSerenadeSubmission } from '@dsim/shared';
 import { MinigameShell } from './MinigameShell';
 
@@ -11,6 +12,7 @@ export function RhythmSerenade({
   config: RhythmSerenadeConfig;
   onComplete: (submission: RhythmSerenadeSubmission) => void;
 }) {
+  const { t: tr } = useTranslation();
   const beatMs = 60000 / config.bpm;
   const approach = Math.min(1500, config.leadInMs || 1500);
   const ideals = useMemo(() => config.slots.map((s) => config.leadInMs + s.index * beatMs), [config, beatMs]);
@@ -60,10 +62,10 @@ export function RhythmSerenade({
     if (slot?.kind === 'rest') {
       comboRef.current = 0;
       setCombo(0);
-      setFeedback('Rest!');
+      setFeedback(tr('minigame.rest'));
     } else {
       const d = Math.abs(offset);
-      setFeedback(d <= 45 ? 'Perfect' : d <= config.hitWindowMs * 0.6 ? 'Great' : 'Good');
+      setFeedback(d <= 45 ? tr('minigame.perfect') : d <= config.hitWindowMs * 0.6 ? tr('minigame.great') : tr('minigame.good'));
       comboRef.current += 1;
       setCombo(comboRef.current);
     }
@@ -100,7 +102,7 @@ export function RhythmSerenade({
   const comboSlot = (
     <span className="mga-last">
       <span className="num">{combo}</span>
-      <span className="lbl">combo</span>
+      <span className="lbl">{tr('minigame.combo')}</span>
     </span>
   );
 
@@ -123,12 +125,12 @@ export function RhythmSerenade({
               />
             );
           })}
-          {!started && <div className="rhy-countin">{countIn > 0 ? countIn : 'Go!'}</div>}
+          {!started && <div className="rhy-countin">{countIn > 0 ? countIn : tr('minigame.go')}</div>}
           {feedback && started && <div className="rhy-feedback">{feedback}</div>}
         </div>
 
         <button className="btn primary block" onClick={tap}>
-          Tap to the beat <span className="rhy-key">(or press Space)</span>
+          {tr('minigame.tapToBeat')} <span className="rhy-key">{tr('minigame.pressSpace')}</span>
         </button>
       </div>
     </MinigameShell>

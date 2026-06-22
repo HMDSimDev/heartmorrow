@@ -1,0 +1,46 @@
+{
+  "title": "Settings",
+  "language": {
+    "head": "Language",
+    "hint": "Interface language. Conversations and stories stay in English.",
+    "label": "Interface language"
+  },
+  "accent": {
+    "head": "Accent color",
+    "custom": "Custom tint",
+    "presets": {
+      "rose": "Rose (default)",
+      "brass": "Brass",
+      "moonlight": "Moonlight",
+      "sage": "Sage",
+      "ember": "Ember",
+      "plum": "Plum"
+    }
+  },
+  "wallpaper": {
+    "head": "Wallpaper"
+  },
+  "mode": {
+    "head": "Mode",
+    "hint": "Play mode hides creation/editing tools so you can just play. Creator mode shows them.",
+    "play": "Play mode",
+    "creator": "Creator mode"
+  },
+  "danger": {
+    "head": "Danger zone",
+    "hint": "Erase all progress and start fresh. Your created characters and worlds are kept.",
+    "reset": "Total reset (back to Day 1)",
+    "resetting": "Resetting…"
+  },
+  "reset": {
+    "kicker": "Danger zone",
+    "title": "Total reset",
+    "body": "Erase ALL progress (relationships, memories, texts, money, day) and start over at Day 1? Your created characters and worlds are kept.",
+    "confirm": "Reset everything"
+  },
+  "toast": {
+    "wallpaperTooLarge": "Image too large — pick one under 1.5 MB.",
+    "wallpaperSet": "Wallpaper set.",
+    "progressReset": "Progress reset. Back to Day 1."
+  }
+}

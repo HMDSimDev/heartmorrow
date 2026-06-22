@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Character, PackCharacterPreview, PackImportResult, PackInspectResult, World } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
@@ -8,23 +9,26 @@ import './sharetools.css';
 
 const ACCEPT = '.hmchr,.hmwrld,.hmpack';
 
-function kindNoun(kind: PackInspectResult['kind']): string {
-  return kind === 'character' ? 'character file' : kind === 'world' ? 'world file' : 'bundle';
+type TFn = (key: string, opts?: Record<string, unknown>) => string;
+
+function kindNounKey(kind: PackInspectResult['kind']): string {
+  return kind === 'character' ? 'share.characterFile' : kind === 'world' ? 'share.worldFile' : 'share.bundle';
 }
 
-function fmtDate(ms: number): string {
+function fmtDate(ms: number, lang: string): string {
   if (!ms) return '';
   try {
-    return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return new Date(ms).toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' });
   } catch {
     return '';
   }
 }
 
-function countLine(parts: Array<[number, string, string]>): string {
+/** Join localized "N thing" fragments (ICU-pluralized) with ' · ', dropping zeros. */
+function joinCounts(t: TFn, parts: Array<[number, string]>): string {
   return parts
     .filter(([n]) => n > 0)
-    .map(([n, one, many]) => `${n} ${n === 1 ? one : many}`)
+    .map(([n, key]) => t(key, { count: n }))
     .join(' · ');
 }
 
@@ -43,6 +47,7 @@ function WorldCardView({
   locations: string[];
   meta?: string;
 }) {
+  const { t } = useTranslation(['pages', 'common']);
   return (
     <div className="share-world">
       <div className="share-world-head">
@@ -52,7 +57,7 @@ function WorldCardView({
       {summary && <p className="share-world-sum">{summary}</p>}
       {locations.length > 0 && (
         <div className="share-world-locs">
-          <Icon name="location" size={13} /> {locations.length} {locations.length === 1 ? 'location' : 'locations'}
+          <Icon name="location" size={13} /> {t('share.locations', { count: locations.length })}
           <span className="share-locs-list">: {locations.slice(0, 8).join(', ')}{locations.length > 8 ? '…' : ''}</span>
         </div>
       )}
@@ -100,26 +105,28 @@ function ImportPreview({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t, i18n } = useTranslation(['pages', 'common']);
+  const tt = t as unknown as TFn;
   const showCharToggle = preview.worlds.length > 0 && preview.characters.length > 0;
-  const date = fmtDate(preview.createdAt);
-  const summary = countLine([
-    [preview.counts.worlds, 'world', 'worlds'],
-    [includeChars || !showCharToggle ? preview.counts.characters : 0, 'character', 'characters'],
-    [preview.counts.assets, 'image', 'images'],
+  const date = fmtDate(preview.createdAt, i18n.language);
+  const summary = joinCounts(tt, [
+    [preview.counts.worlds, 'share.cWorlds'],
+    [includeChars || !showCharToggle ? preview.counts.characters : 0, 'share.cCharacters'],
+    [preview.counts.assets, 'share.cImages'],
   ]);
 
   return (
     <Modal onClose={busy ? () => {} : onCancel}>
-      <div className="kicker">Import share file</div>
-      <h2 className="share-title">{preview.title || 'Heartmorrow share'}</h2>
+      <div className="kicker">{t('share.importTitle')}</div>
+      <h2 className="share-title">{preview.title || t('share.shareFallback')}</h2>
       <p className="hint share-sub">
-        {kindNoun(preview.kind)}
-        {date ? ` · made ${date}` : ''}
-        {preview.formatVersion ? ` · format v${preview.formatVersion}` : ''}
+        {tt(kindNounKey(preview.kind))}
+        {date ? t('share.madeOn', { date }) : ''}
+        {preview.formatVersion ? t('share.formatV', { version: preview.formatVersion }) : ''}
       </p>
       {preview.note && <p className="share-note">“{preview.note}”</p>}
 
-      <p className="share-adds">Adds {summary || 'nothing'} to your almanac. Your existing worlds and people are untouched.</p>
+      <p className="share-adds">{t('share.addsSummary', { summary: summary || t('share.nothing') })}</p>
 
       {preview.warnings.map((w, i) => (
         <Banner kind="info" key={i}>
@@ -135,10 +142,10 @@ function ImportPreview({
             tone={w.tone}
             summary={w.summary}
             locations={w.locations}
-            meta={countLine([
-              [w.characterCount, 'person', 'people'],
-              [w.propertyCount, 'property', 'properties'],
-              [w.companyCount, 'company', 'companies'],
+            meta={joinCounts(tt, [
+              [w.characterCount, 'share.cPeople'],
+              [w.propertyCount, 'share.cProperties'],
+              [w.companyCount, 'share.cCompanies'],
             ])}
           />
         ))}
@@ -146,8 +153,7 @@ function ImportPreview({
         {preview.characters.length > 0 && (includeChars || !showCharToggle) && (
           <div className={`share-people${showCharToggle ? '' : ''}`}>
             <div className="share-section-head">
-              <Icon name="people" size={14} /> {preview.characters.length}{' '}
-              {preview.characters.length === 1 ? 'person' : 'people'}
+              <Icon name="people" size={14} /> {t('share.peopleHead', { count: preview.characters.length })}
             </div>
             <ul className="share-people-list">
               {preview.characters.slice(0, 40).map((c, i) => (
@@ -155,7 +161,7 @@ function ImportPreview({
               ))}
             </ul>
             {preview.characters.length > 40 && (
-              <div className="share-more">+{preview.characters.length - 40} more</div>
+              <div className="share-more">{t('share.more', { count: preview.characters.length - 40 })}</div>
             )}
           </div>
         )}
@@ -165,8 +171,7 @@ function ImportPreview({
         <label className="share-toggle">
           <input type="checkbox" checked={includeChars} onChange={(e) => onToggleChars(e.target.checked)} />
           <span>
-            Import the {preview.counts.characters} {preview.counts.characters === 1 ? 'character' : 'characters'} too —
-            uncheck to take just the world{preview.counts.worlds === 1 ? '' : 's'} &amp; its locations
+            {t('share.importCharsToggle', { count: preview.counts.characters, worlds: preview.counts.worlds })}
           </span>
         </label>
       )}
@@ -175,10 +180,10 @@ function ImportPreview({
 
       <div className="row end share-actions">
         <button className="btn ghost" onClick={onCancel} disabled={busy} type="button">
-          Cancel
+          {t('share.cancel')}
         </button>
         <button className="btn primary" onClick={onConfirm} disabled={busy} type="button" autoFocus>
-          {busy ? 'Importing…' : 'Import'}
+          {busy ? t('share.importing') : t('share.import')}
         </button>
       </div>
     </Modal>
@@ -193,7 +198,7 @@ function ImportPreview({
 export function ShareImportButton({
   targetWorldId,
   onImported,
-  label = 'Import',
+  label,
   className = 'btn ghost',
 }: {
   targetWorldId?: string | null;
@@ -201,6 +206,7 @@ export function ShareImportButton({
   label?: string;
   className?: string;
 }) {
+  const { t } = useTranslation(['pages', 'common']);
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<{ file: File; preview: PackInspectResult } | null>(null);
   const [includeChars, setIncludeChars] = useState(true);
@@ -244,7 +250,7 @@ export function ShareImportButton({
   return (
     <>
       <button className={className} onClick={() => inputRef.current?.click()} disabled={busy} type="button">
-        <Icon name="upload" size={16} /> {label}
+        <Icon name="upload" size={16} /> {label ?? t('share.import')}
       </button>
       <input ref={inputRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={onFile} />
 
@@ -266,12 +272,12 @@ export function ShareImportButton({
 
       {inspectError && (
         <Modal onClose={() => setInspectError(undefined)}>
-          <div className="kicker">Couldn't read that file</div>
-          <h2 style={{ marginTop: 0 }}>Import failed</h2>
+          <div className="kicker">{t('share.cantRead')}</div>
+          <h2 style={{ marginTop: 0 }}>{t('share.importFailed')}</h2>
           <Banner kind="error">{inspectError}</Banner>
           <div className="row end" style={{ marginTop: 12 }}>
             <button className="btn primary" onClick={() => setInspectError(undefined)} type="button">
-              Close
+              {t('share.close')}
             </button>
           </div>
         </Modal>
@@ -296,12 +302,13 @@ export function ShareExportDialog({
   characters: Character[];
   onClose: () => void;
 }) {
+  const { t } = useTranslation(['pages', 'common']);
   const suggested =
     worlds.length === 1 && characters.length === 0
       ? worlds[0]!.name
       : characters.length === 1 && worlds.length === 0
         ? characters[0]!.name
-        : 'Heartmorrow bundle';
+        : t('share.bundleName');
   const [title, setTitle] = useState(suggested);
   const [note, setNote] = useState('');
   const [includeChars, setIncludeChars] = useState(true);
@@ -338,9 +345,15 @@ export function ShareExportDialog({
 
   return (
     <Modal onClose={busy ? () => {} : onClose}>
-      <div className="kicker">Export share file</div>
-      <h2 className="share-title">Share {worlds.length > 0 ? (worlds.length === 1 ? 'a world' : `${worlds.length} worlds`) : `${characters.length} ${characters.length === 1 ? 'character' : 'characters'}`}</h2>
-      <p className="hint share-sub">Saves a {ext} file you can hand to anyone — it carries the content, never your save.</p>
+      <div className="kicker">{t('share.exportTitle')}</div>
+      <h2 className="share-title">
+        {worlds.length > 0
+          ? worlds.length === 1
+            ? t('share.shareWorld')
+            : t('share.shareWorlds', { count: worlds.length })
+          : t('share.shareCharacters', { count: characters.length })}
+      </h2>
+      <p className="hint share-sub">{t('share.exportSub', { ext })}</p>
 
       <div className="share-scroll">
         {worlds.map((w) => (
@@ -355,7 +368,7 @@ export function ShareExportDialog({
         {characters.length > 0 && (
           <div className="share-people">
             <div className="share-section-head">
-              <Icon name="people" size={14} /> {characters.length} {characters.length === 1 ? 'person' : 'people'}
+              <Icon name="people" size={14} /> {t('share.peopleHead', { count: characters.length })}
             </div>
             <ul className="share-people-list">
               {characters.slice(0, 40).map((c) => (
@@ -379,22 +392,22 @@ export function ShareExportDialog({
       {worlds.length > 0 && (
         <label className="share-toggle">
           <input type="checkbox" checked={includeChars} onChange={(e) => setIncludeChars(e.target.checked)} />
-          <span>Include each world's characters (uncheck to share just the world{worlds.length === 1 ? '' : 's'} &amp; its locations)</span>
+          <span>{t('share.exportCharsToggle', { count: worlds.length })}</span>
         </label>
       )}
 
       <div className="field share-field">
-        <label>Title</label>
+        <label>{t('share.title')}</label>
         <input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder={suggested} />
       </div>
       <div className="field share-field">
-        <label>Note <span className="muted">(optional — a message for whoever opens it)</span></label>
+        <label>{t('share.note')} <span className="muted">{t('share.noteOptional')}</span></label>
         <textarea
           value={note}
           maxLength={2000}
           rows={2}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="e.g. The full Lumen Quarter cast — let me know what you think!"
+          placeholder={t('share.notePlaceholder')}
         />
       </div>
 
@@ -402,10 +415,10 @@ export function ShareExportDialog({
 
       <div className="row end share-actions">
         <button className="btn ghost" onClick={onClose} disabled={busy} type="button">
-          Cancel
+          {t('share.cancel')}
         </button>
         <button className="btn primary" onClick={download} disabled={busy} type="button">
-          <Icon name="download" size={16} /> {busy ? 'Preparing…' : `Download ${ext}`}
+          <Icon name="download" size={16} /> {busy ? t('share.preparing') : t('share.download', { ext })}
         </button>
       </div>
     </Modal>

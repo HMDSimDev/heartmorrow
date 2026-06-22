@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { TwoTruthsConfig, TwoTruthsSubmission } from '@dsim/shared';
 import { MinigameShell, ConfidenceControl, type ConfidenceLevel } from './MinigameShell';
 
@@ -9,6 +10,7 @@ export function TwoTruthsGame({
   config: TwoTruthsConfig;
   onComplete: (submission: TwoTruthsSubmission) => void;
 }) {
+  const { t } = useTranslation();
   const [roundIndex, setRoundIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<ConfidenceLevel>('medium');
@@ -34,11 +36,11 @@ export function TwoTruthsGame({
 
   return (
     <MinigameShell
-      title="Read Between the Lines"
+      title={t('minigame.readBetween')}
       progress={{ current: roundIndex + 1, total: config.rounds.length }}
     >
       <div className="mg-board mga-board ttl-board">
-        <p className="ttl-lead">They lean in. "Two of these are true. One's a bluff…"</p>
+        <p className="ttl-lead">{t('minigame.twoTruthsLead')}</p>
         <div className="stack ttl-statements">
           {round.statements.map((s) => (
             <button
@@ -54,7 +56,7 @@ export function TwoTruthsGame({
         <ConfidenceControl value={confidence} onChange={setConfidence} />
 
         <button className="btn primary block" onClick={callIt} disabled={!selected}>
-          {selected ? 'Call it' : 'Pick the bluff'}
+          {selected ? t('minigame.callIt') : t('minigame.pickBluff')}
         </button>
       </div>
     </MinigameShell>

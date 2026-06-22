@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import type {
   BenchCatalog,
@@ -13,6 +14,7 @@ import type {
 } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import i18n from '../i18n';
 import { Banner, Spinner, ConfirmDialog } from '../components/ui';
 import { Icon } from '../components/Icon';
 import './bench.page.css';
@@ -23,7 +25,7 @@ type CaseStatus = 'idle' | 'queued' | 'running' | 'done' | 'error';
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
 const pct = (n: number | null | undefined) => (n == null ? '—' : `${Math.round(n * 100)}%`);
-const num = (n: number | null | undefined) => (n == null ? '—' : Math.round(n).toLocaleString());
+const num = (n: number | null | undefined) => (n == null ? '—' : Math.round(n).toLocaleString(i18n.language));
 const fmtMs = (n: number | null | undefined) => {
   if (n == null) return '—';
   return n >= 1000 ? `${(n / 1000).toFixed(1)}s` : `${Math.round(n)}ms`;
@@ -70,8 +72,9 @@ interface BarItem {
   color?: string;
 }
 function Bars({ items, max }: { items: BarItem[]; max?: number }) {
+  const { t } = useTranslation('pages');
   const m = max ?? Math.max(1, ...items.map((i) => i.value));
-  if (!items.length) return <p className="muted bench-empty">No data.</p>;
+  if (!items.length) return <p className="muted bench-empty">{t('bench.noData')}</p>;
   return (
     <div className="bench-bars">
       {items.map((it) => (
@@ -94,16 +97,17 @@ interface StackRow {
   completion: number;
 }
 function StackedTokens({ rows }: { rows: StackRow[] }) {
+  const { t } = useTranslation('pages');
   const max = Math.max(1, ...rows.map((r) => r.prompt + r.completion));
-  if (!rows.length) return <p className="muted bench-empty">No data.</p>;
+  if (!rows.length) return <p className="muted bench-empty">{t('bench.noData')}</p>;
   return (
     <div className="bench-bars">
       {rows.map((r) => (
         <div className="bench-bar-row" key={r.key}>
           <div className="bench-bar-label" title={r.label}>{r.label}</div>
           <div className="bench-bar-track">
-            <div className="bench-bar-fill" style={{ width: `${(r.prompt / max) * 100}%`, background: 'var(--moon)' }} title={`${num(r.prompt)} in`} />
-            <div className="bench-bar-fill" style={{ width: `${(r.completion / max) * 100}%`, background: 'var(--rose)' }} title={`${num(r.completion)} out`} />
+            <div className="bench-bar-fill" style={{ width: `${(r.prompt / max) * 100}%`, background: 'var(--moon)' }} title={t('bench.inTitle', { n: num(r.prompt) })} />
+            <div className="bench-bar-fill" style={{ width: `${(r.completion / max) * 100}%`, background: 'var(--rose)' }} title={t('bench.outTitle', { n: num(r.completion) })} />
           </div>
           <div className="bench-bar-val">{num(r.prompt + r.completion)}</div>
         </div>
@@ -151,6 +155,7 @@ function BaselineEditor({
   value: BenchBaselineValue;
   onChange: (v: BenchBaselineValue) => void;
 }) {
+  const { t } = useTranslation('pages');
   if (spec.kind === 'engagement') {
     const eng = Number(value.engagement ?? 0);
     return (
@@ -160,12 +165,12 @@ function BaselineEditor({
             {eng > 0 ? `+${eng}` : eng}
           </span>
           <input type="range" min={-3} max={3} step={1} value={eng} onChange={(e) => onChange({ ...value, engagement: Number(e.target.value) })} />
-          <span className="bench-bl-scale"><span>bombed</span><span>connected</span></span>
+          <span className="bench-bl-scale"><span>{t('bench.bombed')}</span><span>{t('bench.connected')}</span></span>
         </label>
         {spec.hostile && (
           <label className="bench-bl-check">
             <input type="checkbox" checked={Boolean(value.hostile)} onChange={(e) => onChange({ ...value, hostile: e.target.checked })} />
-            <span>Hostile / cruel</span>
+            <span>{t('bench.hostileCruel')}</span>
           </label>
         )}
       </div>
@@ -213,10 +218,10 @@ function BaselineEditor({
   return (
     <div className="bench-bl bench-bl-choice">
       <button className={`btn sm ${value.value === true ? 'primary' : ''}`} onClick={() => onChange({ value: true })}>
-        Yes
+        {t('bench.yes')}
       </button>
       <button className={`btn sm ${value.value === false ? 'primary' : ''}`} onClick={() => onChange({ value: false })}>
-        No
+        {t('bench.no')}
       </button>
     </div>
   );
@@ -225,6 +230,7 @@ function BaselineEditor({
 // --- transcript + comparison + output views ---------------------------------
 
 function TranscriptView({ result }: { result: BenchCaseResult }) {
+  const { t: tr } = useTranslation('pages');
   return (
     <div className="bench-transcript">
       {result.transcript.map((t, i) => (
@@ -233,9 +239,9 @@ function TranscriptView({ result }: { result: BenchCaseResult }) {
           {t.role === 'character' && (
             <div className="bench-turn-meta">
               {t.latencyMs != null && <span>{fmtMs(t.latencyMs)}</span>}
-              {t.completionTokens != null && <span>{num(t.completionTokens)} tok</span>}
+              {t.completionTokens != null && <span>{num(t.completionTokens)} {tr('bench.tokUnit')}</span>}
               {t.repetitionVsPrev != null && (
-                <span className="bench-rep" style={{ color: repetitionColor(t.repetitionVsPrev) }} title="Similarity to this character's previous line">
+                <span className="bench-rep" style={{ color: repetitionColor(t.repetitionVsPrev) }} title={tr('bench.repetitionTitle')}>
                   ↻ {pct(t.repetitionVsPrev)}
                 </span>
               )}
@@ -248,6 +254,7 @@ function TranscriptView({ result }: { result: BenchCaseResult }) {
 }
 
 function ComparisonTable({ result }: { result: BenchCaseResult }) {
+  const { t } = useTranslation('pages');
   const cmp = result.comparison;
   if (!cmp) return null;
   return (
@@ -256,9 +263,9 @@ function ComparisonTable({ result }: { result: BenchCaseResult }) {
         <thead>
           <tr>
             <th />
-            <th>You</th>
-            <th>Model</th>
-            <th>Δ</th>
+            <th>{t('bench.cmpYou')}</th>
+            <th>{t('bench.cmpModel')}</th>
+            <th>{t('bench.cmpDelta')}</th>
           </tr>
         </thead>
         <tbody>
@@ -276,24 +283,25 @@ function ComparisonTable({ result }: { result: BenchCaseResult }) {
         <div className="bench-cmp-score">
           <span className="bench-cmp-pct" style={{ color: cmp.pass === false ? 'var(--ember)' : closenessColor(cmp.closeness) }}>{pct(cmp.closeness)}</span>
           <span className="muted">
-            agreement with the baseline
-            {cmp.pass === true ? ' · within tolerance ✓' : cmp.pass === false ? ' · off the baseline ✗' : ''}
+            {t('bench.agreement')}
+            {cmp.pass === true ? t('bench.withinTolerance') : cmp.pass === false ? t('bench.offBaseline') : ''}
           </span>
         </div>
       ) : (
-        <div className="muted bench-cmp-nobase">Not scored.</div>
+        <div className="muted bench-cmp-nobase">{t('bench.notScored')}</div>
       )}
     </div>
   );
 }
 
 function OutputBlock({ text }: { text: string }) {
+  const { t } = useTranslation('pages');
   const [open, setOpen] = useState(false);
   if (!text) return null;
   return (
     <div className="bench-output">
       <button className="btn sm ghost" onClick={() => setOpen((o) => !o)}>
-        {open ? 'Hide' : 'Show'} raw output
+        {open ? t('bench.hideRaw') : t('bench.showRaw')}
       </button>
       {open && <pre className="pre bench-pre">{text}</pre>}
     </div>
@@ -323,6 +331,7 @@ function CaseCard({
   onClearBaseline: () => Promise<void>;
   busy: boolean;
 }) {
+  const { t } = useTranslation('pages');
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<BenchBaselineValue | null>(null);
   const [savingBl, setSavingBl] = useState(false);
@@ -344,13 +353,13 @@ function CaseCard({
 
   const statusDot =
     status === 'running' ? (
-      <span className="bench-dot running" title="Running…" />
+      <span className="bench-dot running" title={t('bench.statusRunning')} />
     ) : status === 'done' ? (
-      <span className="bench-dot done" title="Done" />
+      <span className="bench-dot done" title={t('bench.statusDone')} />
     ) : status === 'error' ? (
-      <span className="bench-dot error" title="Failed" />
+      <span className="bench-dot error" title={t('bench.statusFailed')} />
     ) : status === 'queued' ? (
-      <span className="bench-dot queued" title="Queued" />
+      <span className="bench-dot queued" title={t('bench.statusQueued')} />
     ) : null;
 
   return (
@@ -370,8 +379,8 @@ function CaseCard({
           <span className="bench-case-tags">
             <span className={`badge bench-kind bench-kind-${meta.kind}`}>{meta.kind}</span>
             {meta.baselineSpec && (
-              <span className={`badge ${baseline ? 'good' : ''}`} title={baseline ? 'Your saved baseline' : 'Built-in default baseline (override it below)'}>
-                {baseline ? 'custom ✓' : 'default'}
+              <span className={`badge ${baseline ? 'good' : ''}`} title={baseline ? t('bench.baselineSavedTitle') : t('bench.baselineDefaultTitle')}>
+                {baseline ? t('bench.custom') : t('bench.default')}
               </span>
             )}
             {result && result.comparison?.closeness != null && (
@@ -401,7 +410,7 @@ function CaseCard({
             )}
             {meta.setup.playerScript.length > 0 && (
               <div className="bench-script">
-                <div className="kicker">Scripted player turns</div>
+                <div className="kicker">{t('bench.scriptedTurns')}</div>
                 <ol>
                   {meta.setup.playerScript.map((s, i) => (
                     <li key={i}>{s}</li>
@@ -414,18 +423,18 @@ function CaseCard({
           {/* Baseline editor (judge cases) — pre-filled with a sensible default; override + save if you disagree. */}
           {meta.baselineSpec && editing && (
             <div className="bench-baseline">
-              <div className="kicker">{meta.baselinePrompt || 'Your baseline'}</div>
+              <div className="kicker">{meta.baselinePrompt || t('bench.yourBaseline')}</div>
               <BaselineEditor spec={meta.baselineSpec} value={editing} onChange={(v) => setDraft(v)} />
               <div className="bench-baseline-actions">
                 <button className="btn sm primary" onClick={save} disabled={savingBl}>
-                  {savingBl ? 'Saving…' : baseline ? 'Update baseline' : 'Save as my baseline'}
+                  {savingBl ? t('bench.savingBl') : baseline ? t('bench.updateBaseline') : t('bench.saveBaseline')}
                 </button>
                 {baseline ? (
                   <button className="btn sm ghost" onClick={() => { setDraft(null); void onClearBaseline(); }} disabled={savingBl}>
-                    Reset to default
+                    {t('bench.resetDefault')}
                   </button>
                 ) : (
-                  <span className="muted bench-baseline-saved">Using the built-in default — runs score against this unless you save your own.</span>
+                  <span className="muted bench-baseline-saved">{t('bench.usingDefault')}</span>
                 )}
               </div>
             </div>
@@ -434,15 +443,15 @@ function CaseCard({
           {/* Result */}
           {result && (
             <div className="bench-result">
-              {!result.ok && <Banner kind="error">{result.error || 'Case failed.'}</Banner>}
+              {!result.ok && <Banner kind="error">{result.error || t('bench.caseFailed')}</Banner>}
               <div className="bench-result-metrics">
-                <Metric label="Prompt" value={num(result.promptTokens)} unit="tok" />
-                <Metric label="Reply" value={num(result.completionTokens)} unit="tok" />
-                <Metric label="Latency" value={fmtMs(result.totalLatencyMs)} />
-                <Metric label="Speed" value={fmtTps(result.tokensPerSec)} />
-                <Metric label="Calls" value={String(result.attempts)} />
+                <Metric label={t('bench.mPrompt')} value={num(result.promptTokens)} unit={t('bench.tokUnit')} />
+                <Metric label={t('bench.mReply')} value={num(result.completionTokens)} unit={t('bench.tokUnit')} />
+                <Metric label={t('bench.mLatency')} value={fmtMs(result.totalLatencyMs)} />
+                <Metric label={t('bench.mSpeed')} value={fmtTps(result.tokensPerSec)} />
+                <Metric label={t('bench.mCalls')} value={String(result.attempts)} />
                 {result.kind === 'dialogue' && result.repetitionMax != null && (
-                  <Metric label="Max repeat" value={pct(result.repetitionMax)} color={repetitionColor(result.repetitionMax)} />
+                  <Metric label={t('bench.mMaxRepeat')} value={pct(result.repetitionMax)} color={repetitionColor(result.repetitionMax)} />
                 )}
               </div>
               {result.transcript.length > 0 && <TranscriptView result={result} />}
@@ -471,6 +480,7 @@ function Metric({ label, value, unit, color }: { label: string; value: string; u
 // --- results dashboard ------------------------------------------------------
 
 function Dashboard({ results }: { results: BenchCaseResult[] }) {
+  const { t } = useTranslation('pages');
   const ok = results.filter((r) => r.ok);
   const totalPrompt = results.reduce((n, r) => n + (r.promptTokens ?? 0), 0);
   const totalCompletion = results.reduce((n, r) => n + (r.completionTokens ?? 0), 0);
@@ -486,49 +496,49 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
       <div className="bench-dash-cards">
         <div className="bench-stat framed">
           <div className="bench-stat-num mono">{ok.length}/{results.length}</div>
-          <div className="bench-stat-lbl">cases passed</div>
+          <div className="bench-stat-lbl">{t('bench.casesPassed')}</div>
         </div>
         <div className="bench-stat framed">
           <div className="bench-stat-num mono">{num(totalPrompt + totalCompletion)}</div>
-          <div className="bench-stat-lbl">total tokens{estimated ? ' *' : ''}</div>
+          <div className="bench-stat-lbl">{t('bench.totalTokens')}{estimated ? ' *' : ''}</div>
         </div>
         <div className="bench-stat framed">
           <div className="bench-stat-num mono">{fmtMs(totalLatency)}</div>
-          <div className="bench-stat-lbl">total time</div>
+          <div className="bench-stat-lbl">{t('bench.totalTime')}</div>
         </div>
         <div className="bench-stat framed">
           <div className="bench-stat-num mono">{avgTps != null ? avgTps.toFixed(1) : '—'}</div>
-          <div className="bench-stat-lbl">avg tok/sec</div>
+          <div className="bench-stat-lbl">{t('bench.avgTokSec')}</div>
         </div>
         {avgCloseness != null && (
           <div className="bench-stat framed bench-stat-ring">
-            <RingGauge value={avgCloseness} label="judge agreement" sub={`${judged.length} judged`} />
+            <RingGauge value={avgCloseness} label={t('bench.judgeAgreement')} sub={t('bench.nJudged', { count: judged.length })} />
           </div>
         )}
       </div>
 
       <div className="bench-charts">
         <div className="card bench-chart">
-          <div className="section-head"><div className="titles"><div className="kicker">Per case</div><h3>Tokens (in / out)</h3></div><div className="trail" /></div>
+          <div className="section-head"><div className="titles"><div className="kicker">{t('bench.perCase')}</div><h3>{t('bench.chTokens')}</h3></div><div className="trail" /></div>
           <StackedTokens rows={results.map((r) => ({ key: r.caseId, label: r.label, prompt: r.promptTokens ?? 0, completion: r.completionTokens ?? 0 }))} />
-          <div className="bench-legend"><span><i style={{ background: 'var(--moon)' }} /> prompt</span><span><i style={{ background: 'var(--rose)' }} /> reply</span></div>
+          <div className="bench-legend"><span><i style={{ background: 'var(--moon)' }} /> {t('bench.legendPrompt')}</span><span><i style={{ background: 'var(--rose)' }} /> {t('bench.legendReply')}</span></div>
         </div>
         <div className="card bench-chart">
-          <div className="section-head"><div className="titles"><div className="kicker">Per case</div><h3>Latency</h3></div><div className="trail" /></div>
+          <div className="section-head"><div className="titles"><div className="kicker">{t('bench.perCase')}</div><h3>{t('bench.chLatency')}</h3></div><div className="trail" /></div>
           <Bars items={results.map((r) => ({ key: r.caseId, label: r.label, value: r.totalLatencyMs, display: fmtMs(r.totalLatencyMs), color: 'var(--brass)' }))} />
         </div>
         <div className="card bench-chart">
-          <div className="section-head"><div className="titles"><div className="kicker">Per case</div><h3>Speed (tok/sec)</h3></div><div className="trail" /></div>
+          <div className="section-head"><div className="titles"><div className="kicker">{t('bench.perCase')}</div><h3>{t('bench.chSpeed')}</h3></div><div className="trail" /></div>
           <Bars items={results.filter((r) => r.tokensPerSec != null).map((r) => ({ key: r.caseId, label: r.label, value: r.tokensPerSec ?? 0, display: fmtTps(r.tokensPerSec), color: 'var(--moon)' }))} />
         </div>
         {judged.length > 0 && (
           <div className="card bench-chart">
-            <div className="section-head"><div className="titles"><div className="kicker">Human vs model</div><h3>Judge agreement</h3></div><div className="trail" /></div>
+            <div className="section-head"><div className="titles"><div className="kicker">{t('bench.humanVsModel')}</div><h3>{t('bench.chJudge')}</h3></div><div className="trail" /></div>
             <Bars items={judged.map((r) => ({ key: r.caseId, label: r.label, value: r.comparison!.closeness ?? 0, display: pct(r.comparison!.closeness), color: closenessColor(r.comparison!.closeness ?? 0) }))} max={1} />
           </div>
         )}
       </div>
-      {estimated && <p className="muted bench-foot">* Some token counts are chars/4 estimates (your endpoint didn’t report usage).</p>}
+      {estimated && <p className="muted bench-foot">{t('bench.estFoot')}</p>}
     </div>
   );
 }
@@ -536,6 +546,7 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
 // --- history ----------------------------------------------------------------
 
 function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
+  const { t } = useTranslation('pages');
   const [runs, setRuns] = useState<BenchRunListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
@@ -590,7 +601,7 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
     <div className="bench-history">
       {error && <Banner kind="error">{error}</Banner>}
       {runs.length === 0 ? (
-        <p className="muted">No saved runs yet. Run a bench and save it to compare later.</p>
+        <p className="muted">{t('bench.noRuns')}</p>
       ) : (
         <>
           {compareRuns.length === 2 && <CompareStrip a={compareRuns[0]!} b={compareRuns[1]!} />}
@@ -598,23 +609,23 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
             {runs.map((r) => (
               <div key={r.id} className="bench-runrow framed">
                 <div className="bench-runrow-line">
-                  <label className="bench-runrow-cmp" title="Compare (pick two)">
+                  <label className="bench-runrow-cmp" title={t('bench.comparePick')}>
                     <input type="checkbox" checked={compare.includes(r.id)} onChange={() => toggleCompare(r.id)} />
                   </label>
                   <button className="bench-runrow-main" onClick={() => void api.benchRun(r.id).then(onOpen).catch((e) => setError(errorMessage(e)))}>
                     <div className="bench-runrow-top">
-                      <span className="bench-runrow-label">{r.label || 'Untitled run'}</span>
+                      <span className="bench-runrow-label">{r.label || t('bench.untitledRun')}</span>
                       <span className="badge mono">{r.model}</span>
-                      {r.failures.length > 0 && <span className="badge danger">{r.failures.length} failed</span>}
+                      {r.failures.length > 0 && <span className="badge danger">{t('bench.nFailed', { count: r.failures.length })}</span>}
                     </div>
                     <div className="bench-runrow-meta mono">
-                      {new Date(r.createdAt).toLocaleString()} · {r.aggregate.passed}/{r.aggregate.cases} passed ·{' '}
-                      {num(r.aggregate.totalPromptTokens + r.aggregate.totalCompletionTokens)} tok ·{' '}
+                      {new Date(r.createdAt).toLocaleString(i18n.language)} · {t('bench.passedOf', { passed: r.aggregate.passed, cases: r.aggregate.cases })} ·{' '}
+                      {num(r.aggregate.totalPromptTokens + r.aggregate.totalCompletionTokens)} {t('bench.tokUnit')} ·{' '}
                       {r.aggregate.avgTokensPerSec != null ? `${r.aggregate.avgTokensPerSec.toFixed(1)} tok/s` : '—'}
-                      {r.aggregate.avgCloseness != null ? ` · judge ${pct(r.aggregate.avgCloseness)}` : ''}
+                      {r.aggregate.avgCloseness != null ? t('bench.judgePct', { pct: pct(r.aggregate.avgCloseness) }) : ''}
                     </div>
                   </button>
-                  <button className="btn sm danger ghost" aria-label="Delete run" title="Delete run" onClick={() => setConfirmId(r.id)}>
+                  <button className="btn sm danger ghost" aria-label={t('bench.deleteRun')} title={t('bench.deleteRun')} onClick={() => setConfirmId(r.id)}>
                     <Icon name="trash" size={14} />
                   </button>
                 </div>
@@ -636,9 +647,9 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
       )}
       {confirmId && (
         <ConfirmDialog
-          title="Delete this run?"
-          body="This permanently removes the saved bench run."
-          confirmLabel="Delete"
+          title={t('bench.deleteRunTitle')}
+          body={t('bench.deleteRunBody')}
+          confirmLabel={t('bench.delete')}
           danger
           onConfirm={() => void del(confirmId)}
           onCancel={() => setConfirmId(null)}
@@ -649,23 +660,24 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
 }
 
 function CompareStrip({ a, b }: { a: BenchRunSummary; b: BenchRunSummary }) {
+  const { t } = useTranslation('pages');
   const rows: Array<{ label: string; a: string; b: string }> = [
-    { label: 'Model', a: a.model, b: b.model },
-    { label: 'Passed', a: `${a.aggregate.passed}/${a.aggregate.cases}`, b: `${b.aggregate.passed}/${b.aggregate.cases}` },
-    { label: 'Total tokens', a: num(a.aggregate.totalPromptTokens + a.aggregate.totalCompletionTokens), b: num(b.aggregate.totalPromptTokens + b.aggregate.totalCompletionTokens) },
-    { label: 'Total time', a: fmtMs(a.aggregate.totalLatencyMs), b: fmtMs(b.aggregate.totalLatencyMs) },
-    { label: 'Avg tok/s', a: a.aggregate.avgTokensPerSec != null ? a.aggregate.avgTokensPerSec.toFixed(1) : '—', b: b.aggregate.avgTokensPerSec != null ? b.aggregate.avgTokensPerSec.toFixed(1) : '—' },
-    { label: 'Judge agreement', a: pct(a.aggregate.avgCloseness), b: pct(b.aggregate.avgCloseness) },
+    { label: t('bench.csModel'), a: a.model, b: b.model },
+    { label: t('bench.csPassed'), a: `${a.aggregate.passed}/${a.aggregate.cases}`, b: `${b.aggregate.passed}/${b.aggregate.cases}` },
+    { label: t('bench.csTotalTokens'), a: num(a.aggregate.totalPromptTokens + a.aggregate.totalCompletionTokens), b: num(b.aggregate.totalPromptTokens + b.aggregate.totalCompletionTokens) },
+    { label: t('bench.csTotalTime'), a: fmtMs(a.aggregate.totalLatencyMs), b: fmtMs(b.aggregate.totalLatencyMs) },
+    { label: t('bench.csAvgTokS'), a: a.aggregate.avgTokensPerSec != null ? a.aggregate.avgTokensPerSec.toFixed(1) : '—', b: b.aggregate.avgTokensPerSec != null ? b.aggregate.avgTokensPerSec.toFixed(1) : '—' },
+    { label: t('bench.csJudge'), a: pct(a.aggregate.avgCloseness), b: pct(b.aggregate.avgCloseness) },
   ];
   return (
     <div className="card bench-compare">
-      <div className="section-head"><div className="titles"><div className="kicker">Side by side</div><h3>Compare runs</h3></div><div className="trail" /></div>
+      <div className="section-head"><div className="titles"><div className="kicker">{t('bench.sideBySide')}</div><h3>{t('bench.compareRuns')}</h3></div><div className="trail" /></div>
       <table className="bench-cmp-table bench-compare-table">
         <thead>
           <tr>
             <th />
-            <th>{a.label || 'A'}</th>
-            <th>{b.label || 'B'}</th>
+            <th>{a.label || t('bench.runA')}</th>
+            <th>{b.label || t('bench.runB')}</th>
           </tr>
         </thead>
         <tbody>
@@ -687,6 +699,7 @@ function CompareStrip({ a, b }: { a: BenchRunSummary; b: BenchRunSummary }) {
 const QUICK_IDS = ['judge_turn_good', 'judge_turn_bad', 'judge_eval_good', 'judge_text_hostile', 'dialogue_text', 'gen_day_recap'];
 
 export function Bench() {
+  const { t } = useTranslation('pages');
   const [catalog, setCatalog] = useState<BenchCatalog | null>(null);
   const [baselines, setBaselines] = useState<Record<string, BenchBaseline>>({});
   const [error, setError] = useState<string>();
@@ -836,7 +849,7 @@ export function Bench() {
       const ids = done.map((r) => r.caseId);
       const runReq = { caseIds: ids, llmPlayer, dialogueTurns, label };
       await api.benchSaveRun(label, runReq, done, runSnapshotRef.current);
-      setSavedNote('Run saved — find it under History.');
+      setSavedNote(t('bench.runSaved'));
     } catch (e) {
       setError(errorMessage(e));
     }
@@ -860,16 +873,13 @@ export function Bench() {
   return (
     <div className="stack bench-page">
       <div className="page-head">
-        <div className="kicker">Diagnostics · the proving bench</div>
-        <h1>Heartmorrow Benchmark</h1>
+        <div className="kicker">{t('bench.proving')}</div>
+        <h1>{t('bench.title')}</h1>
         <p>
-          Run the real prompts this game asks of your model - the rapport judges, the date evaluator, the texting
-          replies, the world &amp; creator generators - against a fixed sample cast in <strong>Lanternford</strong>.
-          The point of this is to measure whether or not your model is, on a technical level, able to produce the structured output needed,
-		  and on a subjective level, produce interesting and fun prose which is not repetitive and does not go off the rails. Some models can easily produce the structured output but
-		  also produce very dry or bad prose.
-		  <br />
-		  <br />Current Model:{' '}
+          {t('bench.intro')}
+          <br />
+          <br />
+          {t('bench.currentModel')}{' '}
           <strong className="mono">{catalog.model}</strong>.
         </p>
       </div>
@@ -879,13 +889,13 @@ export function Bench() {
 
       <div className="bench-tabs">
         <button className={`btn sm ${view === 'run' ? 'primary' : ''}`} onClick={() => setView('run')}>
-          Run
+          {t('bench.tabRun')}
         </button>
         <button className={`btn sm ${view === 'history' ? 'primary' : ''}`} onClick={() => setView('history')}>
-          History
+          {t('bench.tabHistory')}
         </button>
         <Link to="/settings" className="btn sm ghost bench-back">
-          <Icon name="settings" size={14} /> Settings
+          <Icon name="settings" size={14} /> {t('bench.settings')}
         </Link>
       </div>
 
@@ -897,35 +907,35 @@ export function Bench() {
           <div className="framed bench-console">
             <div className="bench-console-row">
               <div className="bench-presets">
-                <span className="kicker">Select</span>
-                <button className="btn sm" onClick={() => setSel(catalog.cases.map((c) => c.id))} disabled={running}>All</button>
-                <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => c.kind === 'judge').map((c) => c.id))} disabled={running}>Judges</button>
-                <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => QUICK_IDS.includes(c.id)).map((c) => c.id))} disabled={running}>Quick</button>
-                <button className="btn sm" onClick={() => setSel([])} disabled={running}>None</button>
+                <span className="kicker">{t('bench.select')}</span>
+                <button className="btn sm" onClick={() => setSel(catalog.cases.map((c) => c.id))} disabled={running}>{t('bench.selAll')}</button>
+                <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => c.kind === 'judge').map((c) => c.id))} disabled={running}>{t('bench.selJudges')}</button>
+                <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => QUICK_IDS.includes(c.id)).map((c) => c.id))} disabled={running}>{t('bench.selQuick')}</button>
+                <button className="btn sm" onClick={() => setSel([])} disabled={running}>{t('bench.selNone')}</button>
               </div>
               <div className="bench-opts">
                 <label className="bench-opt">
-                  <span>Dialogue turns: {dialogueTurns}</span>
+                  <span>{t('bench.dialogueTurns', { n: dialogueTurns })}</span>
                   <input type="range" min={2} max={12} step={1} value={dialogueTurns} onChange={(e) => setDialogueTurns(Number(e.target.value))} disabled={running} />
                 </label>
-                <label className="bench-opt bench-opt-check" title="Let a second model play the player side of dialogue (dynamic but less comparable).">
+                <label className="bench-opt bench-opt-check" title={t('bench.llmPlayerTitle')}>
                   <input type="checkbox" checked={llmPlayer} onChange={(e) => setLlmPlayer(e.target.checked)} disabled={running} />
-                  <span>LLM plays the player</span>
+                  <span>{t('bench.llmPlayer')}</span>
                 </label>
               </div>
             </div>
             <div className="bench-console-foot">
-              <input className="bench-label-input" placeholder="Run label (optional, e.g. “Llama-3 8B @ temp 0.8”)" maxLength={80} value={label} onChange={(e) => setLabel(e.target.value.slice(0, 80))} disabled={running} />
+              <input className="bench-label-input" placeholder={t('bench.labelPlaceholder')} maxLength={80} value={label} onChange={(e) => setLabel(e.target.value.slice(0, 80))} disabled={running} />
               {running ? (
-                <button className="btn danger" onClick={cancel}>Cancel</button>
+                <button className="btn danger" onClick={cancel}>{t('bench.cancel')}</button>
               ) : (
                 <button className="btn primary" onClick={run} disabled={selectedCount === 0}>
-                  <Icon name="play" size={15} /> Run {selectedCount} case{selectedCount === 1 ? '' : 's'}
+                  <Icon name="play" size={15} /> {t('bench.runCases', { count: selectedCount })}
                 </button>
               )}
               {doneCount > 0 && !running && (
                 <button className="btn" onClick={save}>
-                  <Icon name="save" size={15} /> Save run
+                  <Icon name="save" size={15} /> {t('bench.saveRun')}
                 </button>
               )}
             </div>
@@ -934,7 +944,7 @@ export function Bench() {
                 <div className="bench-progress-track">
                   <div className="bench-progress-fill" style={{ width: `${(doneCount / Math.max(1, selectedCount)) * 100}%` }} />
                 </div>
-                <span className="muted mono">{doneCount}/{selectedCount} done</span>
+                <span className="muted mono">{t('bench.doneOf', { done: doneCount, total: selectedCount })}</span>
               </div>
             )}
           </div>
@@ -948,7 +958,7 @@ export function Bench() {
               <div key={group} className="bench-group">
                 <div className="section-head">
                   <div className="titles">
-                    <div className="kicker">{cases.length} case{cases.length === 1 ? '' : 's'}</div>
+                    <div className="kicker">{t('bench.nCases', { count: cases.length })}</div>
                     <h2>{group}</h2>
                   </div>
                   <div className="trail" />
@@ -965,7 +975,7 @@ export function Bench() {
                       });
                     }}
                   >
-                    Toggle group
+                    {t('bench.toggleGroup')}
                   </button>
                 </div>
                 <div className="bench-caselist">

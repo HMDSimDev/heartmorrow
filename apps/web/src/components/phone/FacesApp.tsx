@@ -1,34 +1,28 @@
 import { useEffect, useState } from 'react';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import type { FeedPostView, ReactionKind } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
+import { relativeTime } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { Portrait } from '../Portrait';
 import { Banner, Spinner } from '../ui';
 import './phone-faces.css';
 
-/** Relative time for a feed timestamp (mirrors MomentsApp's `ago`). */
-function ago(ts: number): string {
-  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
+type PhoneKey = ParseKeys<'phone'>;
 
 /** The reaction palette, in the order shown on a post.
- *  Glyphs use <Icon> (chrome); labels remain readable text. */
-const REACTIONS: ReadonlyArray<{ kind: ReactionKind; icon: Parameters<typeof Icon>[0]['name']; label: string }> = [
-  { kind: 'like',  icon: 'reactLike',  label: 'Like' },
-  { kind: 'love',  icon: 'reactLove',  label: 'Love' },
-  { kind: 'laugh', icon: 'reactLaugh', label: 'Haha' },
-  { kind: 'wow',   icon: 'reactWow',   label: 'Wow' },
-  { kind: 'sad',   icon: 'reactSad',   label: 'Sad' },
-  { kind: 'angry', icon: 'reactAngry', label: 'Angry' },
+ *  Glyphs use <Icon> (chrome); labels resolve from `faces.react.<kind>`. */
+const REACTIONS: ReadonlyArray<{ kind: ReactionKind; icon: Parameters<typeof Icon>[0]['name'] }> = [
+  { kind: 'like',  icon: 'reactLike'  },
+  { kind: 'love',  icon: 'reactLove'  },
+  { kind: 'laugh', icon: 'reactLaugh' },
+  { kind: 'wow',   icon: 'reactWow'   },
+  { kind: 'sad',   icon: 'reactSad'   },
+  { kind: 'angry', icon: 'reactAngry' },
 ];
 
 const REACTION_ICON: Record<ReactionKind, Parameters<typeof Icon>[0]['name']> = {
@@ -41,15 +35,16 @@ const REACTION_ICON: Record<ReactionKind, Parameters<typeof Icon>[0]['name']> = 
 };
 
 /** Posts that aren't plain statuses get a tinted label + edge to set the mood. */
-const KIND_HINT: Partial<Record<FeedPostView['kind'], { label: string; tone: string }>> = {
-  jealousy:  { label: 'Subtweet',     tone: 'rose' },
-  breakup:   { label: 'Heartbreak',   tone: 'rose' },
-  reconcile: { label: 'Back together', tone: 'sage' },
-  milestone: { label: 'Milestone',    tone: 'brass' },
-  life:      { label: 'Life update',  tone: 'moon' },
+const KIND_HINT: Partial<Record<FeedPostView['kind'], { labelKey: PhoneKey; tone: string }>> = {
+  jealousy:  { labelKey: 'faces.kind.jealousy',  tone: 'rose' },
+  breakup:   { labelKey: 'faces.kind.breakup',   tone: 'rose' },
+  reconcile: { labelKey: 'faces.kind.reconcile', tone: 'sage' },
+  milestone: { labelKey: 'faces.kind.milestone', tone: 'brass' },
+  life:      { labelKey: 'faces.kind.life',      tone: 'moon' },
 };
 
 export function FacesApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, dayTick } = useAppData();
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState<FeedPostView[]>([]);
@@ -104,13 +99,13 @@ export function FacesApp() {
 
   return (
     <div className="phone-app">
-      <PhoneAppBar title="Faces" kicker="see who's around" icon="faces" />
+      <PhoneAppBar title={t('faces.title')} kicker={t('faces.kicker')} icon="faces" />
 
       {!activeWorldId ? (
         <div className="fcs-empty">
           <span className="fcs-empty-icon"><Icon name="faces" size={32} /></span>
-          <span className="fcs-empty-title">No world selected</span>
-          <p>Pick a world to see what everyone's posting.</p>
+          <span className="fcs-empty-title">{t('faces.noWorldTitle')}</span>
+          <p>{t('faces.noWorldBody')}</p>
         </div>
       ) : (
         <div className="fcs-scroll">
@@ -120,7 +115,7 @@ export function FacesApp() {
             <textarea
               className="fcs-compose-input"
               value={draft}
-              placeholder="What's on your mind?"
+              placeholder={t('faces.composePlaceholder')}
               rows={2}
               maxLength={500}
               onChange={(e) => setDraft(e.target.value)}
@@ -135,7 +130,7 @@ export function FacesApp() {
                 onClick={submitPost}
                 disabled={posting || !draft.trim()}
               >
-                {posting ? 'Posting…' : 'Post'}
+                {posting ? t('faces.posting') : t('faces.post')}
               </button>
             </div>
           </div>
@@ -145,8 +140,8 @@ export function FacesApp() {
           ) : posts.length === 0 ? (
             <div className="fcs-empty">
               <span className="fcs-empty-icon"><Icon name="moon" size={32} /></span>
-              <span className="fcs-empty-title">Nothing on Faces yet</span>
-              <p>Post something — or let a few days pass and see who speaks up.</p>
+              <span className="fcs-empty-title">{t('faces.emptyTitle')}</span>
+              <p>{t('faces.emptyBody')}</p>
             </div>
           ) : (
             <div className="fcs-feed">
@@ -168,6 +163,7 @@ function PostCard({
   post: FeedPostView;
   onUpdate: (updated: FeedPostView) => void;
 }) {
+  const { t } = useTranslation(['phone', 'common']);
   const [busy, setBusy] = useState(false);
   const hint = KIND_HINT[post.kind];
   const isNpc = post.authorType === 'character';
@@ -196,8 +192,8 @@ function PostCard({
         <span className="fcs-head-meta">
           <span className="fcs-author">{post.authorName}</span>
           <span className="fcs-sub">
-            {post.dayNumber != null ? `Day ${post.dayNumber}` : ago(post.createdAt)}
-            {hint && <span className={`fcs-kind fcs-kind-${hint.tone}`}>{hint.label}</span>}
+            {post.dayNumber != null ? t('faces.day', { day: post.dayNumber }) : relativeTime(post.createdAt)}
+            {hint && <span className={`fcs-kind fcs-kind-${hint.tone}`}>{t(hint.labelKey)}</span>}
           </span>
         </span>
       </header>
@@ -214,8 +210,8 @@ function PostCard({
             className={`fcs-react${post.playerReaction === r.kind ? ' is-on' : ''}`}
             onClick={() => react(r.kind)}
             disabled={busy}
-            title={r.label}
-            aria-label={r.label}
+            title={t(`faces.react.${r.kind}`)}
+            aria-label={t(`faces.react.${r.kind}`)}
             aria-pressed={post.playerReaction === r.kind}
           >
             <Icon name={r.icon} size={18} />
@@ -229,6 +225,7 @@ function PostCard({
 }
 
 function ReactionSummary({ post }: { post: FeedPostView }) {
+  const { t } = useTranslation(['phone', 'common']);
   const live = post.reactions.filter((r) => r.count > 0);
   if (live.length === 0) return null;
   const names = live
@@ -247,7 +244,9 @@ function ReactionSummary({ post }: { post: FeedPostView }) {
       </span>
       <span className="fcs-react-names">
         {names.length > 0
-          ? `${names.join(', ')}${total > names.length ? ` and ${total - names.length} more` : ''}`
+          ? total > names.length
+            ? t('faces.andMore', { names: names.join(', '), count: total - names.length })
+            : names.join(', ')
           : total}
       </span>
     </div>
@@ -263,6 +262,7 @@ function CommentList({
   onUpdate: (updated: FeedPostView) => void;
   allowComment: boolean;
 }) {
+  const { t } = useTranslation(['phone', 'common']);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -304,7 +304,7 @@ function CommentList({
           <input
             className="fcs-comment-input"
             value={text}
-            placeholder="Add a comment…"
+            placeholder={t('faces.addComment')}
             maxLength={400}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -319,8 +319,8 @@ function CommentList({
             className="btn sm ghost fcs-comment-send"
             onClick={submit}
             disabled={sending || !text.trim()}
-            aria-label="Comment"
-            title="Comment"
+            aria-label={t('faces.comment')}
+            title={t('faces.comment')}
           >
             <Icon name="send" size={14} />
           </button>

@@ -1,4 +1,5 @@
-import React from 'react';
+import './i18n'; // Initialize i18next (side-effect) before any component renders.
+import React, { Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
@@ -28,6 +29,10 @@ const router = createBrowserRouter([
 
 createRoot(container).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    {/* Suspense covers the brief async load of a lazy locale-namespace chunk.
+        With no SSR there is no server HTML to mismatch, so this is safe. */}
+    <Suspense fallback={<div className="app-boot" aria-busy="true" style={{ minHeight: '100dvh' }} />}>
+      <RouterProvider router={router} />
+    </Suspense>
   </React.StrictMode>,
 );

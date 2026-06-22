@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   describeItemEffect,
   type ItemCategory,
@@ -9,6 +10,7 @@ import {
 import { api } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
+import { itemCategoryLabel, itemRarityLabel } from '../i18n/labels';
 import { Banner, Empty, Field, Loader, ConfirmDialog } from '../components/ui';
 import { Icon, type IconName } from '../components/Icon';
 import './shop.page.css';
@@ -30,6 +32,7 @@ interface Draft {
 }
 
 export function Shop() {
+  const { t } = useTranslation(['pages', 'common']);
   const { player, reloadPlayer, creatorMode, activeWorld, activeWorldId } = useAppData();
   const state = useAsync(() => api.listShopItems());
   const [note, setNote] = useState<string>();
@@ -61,7 +64,7 @@ export function Shop() {
       await api.purchase(item.id, 1, activeWorldId ?? undefined);
       await reloadPlayer();
       state.reload();
-      setNote(`Purchased ${item.name}!`);
+      setNote(t('shop.purchased', { name: item.name }));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -108,7 +111,7 @@ export function Shop() {
           : undefined,
       });
       if (res.ok) setDrafts(res.data.map((item) => ({ keep: true, item })));
-      else setError(`Item generation failed: ${res.error}`);
+      else setError(t('shop.genFailed', { error: res.error }));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -129,7 +132,7 @@ export function Shop() {
     try {
       const kept = drafts.filter((d) => d.keep).map((d) => d.item);
       for (const item of kept) await api.createShopItem(item);
-      setNote(`Saved ${kept.length} item(s) to the shop.`);
+      setNote(t('shop.saved', { count: kept.length }));
       setGenOpen(false);
       setDrafts([]);
       state.reload();
@@ -152,18 +155,18 @@ export function Shop() {
       <div className="card shop-counter">
         <div className="shop-counter-lamp"><Icon name="shop" size={28} /></div>
         <div className="shop-counter-text">
-          <div className="kicker">The Merchant's Shelf</div>
-          <h1>Shop</h1>
-          <p>Trinkets, gifts, and small luxuries to bring along on your dates.</p>
+          <div className="kicker">{t('shop.kicker')}</div>
+          <h1>{t('shop.title')}</h1>
+          <p>{t('shop.blurb')}</p>
         </div>
         <div className="shop-counter-side">
           <span className="shop-purse">
-            <span className="shop-purse-label">Purse</span>
+            <span className="shop-purse-label">{t('shop.purse')}</span>
             <span className="shop-purse-coin">◈ {money}</span>
           </span>
           {creatorMode && !genOpen && (
             <button className="btn primary sm" onClick={() => setGenOpen(true)}>
-              <Icon name="generate" size={15} /> Generate items
+              <Icon name="generate" size={15} /> {t('shop.generateItems')}
             </button>
           )}
         </div>
@@ -175,21 +178,21 @@ export function Shop() {
         <div className="framed shop-gen stack">
           <div className="shop-gen-head">
             <div>
-              <div className="kicker">Creator Workshop</div>
-              <h2>Generate in-world items</h2>
+              <div className="kicker">{t('shop.workshop')}</div>
+              <h2>{t('shop.genTitle')}</h2>
             </div>
             <button className="btn ghost sm" onClick={closeGen}>
-              Close
+              {t('shop.close')}
             </button>
           </div>
           <p className="hint" style={{ marginTop: 0 }}>
-            Creates a batch of lore-friendly items based on{' '}
-            {activeWorld ? <strong>{activeWorld.name}</strong> : 'a generic modern setting'}. Nothing is saved until
-            you press Save — review and tweak first.
+            {t('shop.genHintPre')}
+            {activeWorld ? <strong>{activeWorld.name}</strong> : t('shop.genericSetting')}
+            {t('shop.genHintPost')}
           </p>
 
           <div className="inline-fields">
-            <Field label="How many (1–12)">
+            <Field label={t('shop.howMany')}>
               <input
                 type="number"
                 min={1}
@@ -198,35 +201,35 @@ export function Shop() {
                 onChange={(e) => setGenForm({ ...genForm, count: Math.max(1, Math.min(12, Number(e.target.value) || 1)) })}
               />
             </Field>
-            <Field label="Rarity hint">
+            <Field label={t('shop.rarityHint')}>
               <select
                 value={genForm.rarityHint}
                 onChange={(e) => setGenForm({ ...genForm, rarityHint: e.target.value as '' | ItemRarity })}
               >
-                <option value="">— any —</option>
+                <option value="">{t('shop.any')}</option>
                 {RARITIES.map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {itemRarityLabel(r)}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Category hint">
+            <Field label={t('shop.categoryHint')}>
               <select
                 value={genForm.categoryHint}
                 onChange={(e) => setGenForm({ ...genForm, categoryHint: e.target.value as '' | ItemCategory })}
               >
-                <option value="">— any —</option>
+                <option value="">{t('shop.any')}</option>
                 {CATEGORIES.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {itemCategoryLabel(c)}
                   </option>
                 ))}
               </select>
             </Field>
           </div>
           <div className="inline-fields">
-            <Field label="Min price (◈)">
+            <Field label={t('shop.minPrice')}>
               <input
                 type="number"
                 min={0}
@@ -234,7 +237,7 @@ export function Shop() {
                 onChange={(e) => setGenForm({ ...genForm, minPrice: e.target.value })}
               />
             </Field>
-            <Field label="Max price (◈)">
+            <Field label={t('shop.maxPrice')}>
               <input
                 type="number"
                 min={0}
@@ -243,31 +246,30 @@ export function Shop() {
               />
             </Field>
           </div>
-          <Field label="Theme / guidance" hint="Optional — e.g. “cozy autumn café trinkets” or “relics from the old harbor”.">
+          <Field label={t('shop.theme')} hint={t('shop.themeHint')}>
             <textarea
               value={genForm.theme}
               onChange={(e) => setGenForm({ ...genForm, theme: e.target.value })}
-              placeholder="Describe the kind of items you want…"
+              placeholder={t('shop.themePlaceholder')}
             />
           </Field>
 
           <div className="row">
             <button className="btn primary" onClick={generate} disabled={generating}>
-              {generating ? 'Generating…' : <><Icon name="generate" size={15} /> Generate</>}
+              {generating ? t('shop.generating') : <><Icon name="generate" size={15} /> {t('shop.generate')}</>}
             </button>
             {drafts.length > 0 && (
               <button className="btn" onClick={save} disabled={saving || keptCount === 0}>
-                {saving ? 'Saving…' : `Save ${keptCount} selected`}
+                {saving ? t('shop.saving') : t('shop.saveSelected', { count: keptCount })}
               </button>
             )}
           </div>
 
           {drafts.length > 0 && (
             <>
-              <div className="shop-gen-divider">Review &amp; refine</div>
+              <div className="shop-gen-divider">{t('shop.reviewRefine')}</div>
               <p className="hint" style={{ marginTop: 0 }}>
-                Review the {drafts.length} generated item(s). Uncheck any you don't want, edit the rest, then Save.
-                Effects are balanced behind the scenes and shown read-only.
+                {t('shop.reviewHint', { count: drafts.length })}
               </p>
               <div className="shop-drafts">
                 {drafts.map((d, i) => (
@@ -275,15 +277,15 @@ export function Shop() {
                     <div className="shop-draft-top">
                       <label className="shop-draft-keep">
                         <input type="checkbox" checked={d.keep} onChange={() => toggleKeep(i)} />
-                        {d.keep ? 'Keep' : 'Skipped'}
+                        {d.keep ? t('shop.keep') : t('shop.skipped')}
                       </label>
                       <span className="money-pill">◈ {d.item.price ?? 0}</span>
                     </div>
                     <div className="inline-fields">
-                      <Field label="Name">
+                      <Field label={t('shop.name')}>
                         <input value={d.item.name} onChange={(e) => editDraft(i, { name: e.target.value })} />
                       </Field>
-                      <Field label="Price (◈)">
+                      <Field label={t('shop.price')}>
                         <input
                           type="number"
                           min={0}
@@ -293,32 +295,32 @@ export function Shop() {
                       </Field>
                     </div>
                     <div className="inline-fields">
-                      <Field label="Rarity">
+                      <Field label={t('shop.rarity')}>
                         <select
                           value={d.item.rarity ?? 'common'}
                           onChange={(e) => editDraft(i, { rarity: e.target.value as ItemRarity })}
                         >
                           {RARITIES.map((r) => (
                             <option key={r} value={r}>
-                              {r}
+                              {itemRarityLabel(r)}
                             </option>
                           ))}
                         </select>
                       </Field>
-                      <Field label="Category">
+                      <Field label={t('shop.category')}>
                         <select
                           value={d.item.category ?? 'gift'}
                           onChange={(e) => editDraft(i, { category: e.target.value as ItemCategory })}
                         >
                           {CATEGORIES.map((c) => (
                             <option key={c} value={c}>
-                              {c}
+                              {itemCategoryLabel(c)}
                             </option>
                           ))}
                         </select>
                       </Field>
                     </div>
-                    <Field label="Description">
+                    <Field label={t('shop.description')}>
                       <textarea
                         value={d.item.description ?? ''}
                         onChange={(e) => editDraft(i, { description: e.target.value })}
@@ -344,17 +346,17 @@ export function Shop() {
       <Loader state={state}>
         {(items) =>
           items.length === 0 ? (
-            <Empty icon={<Icon name="shop" size={34} />} title="The shelves are empty">
+            <Empty icon={<Icon name="shop" size={34} />} title={t('shop.emptyTitle')}>
               <p className="muted">
-                {creatorMode ? 'Generate a batch of items above to stock the shelf.' : 'Check back later — new wares arrive in time.'}
+                {creatorMode ? t('shop.emptyCreator') : t('shop.emptyPlayer')}
               </p>
             </Empty>
           ) : (
             <>
               <div className="section-head shop-shelf-head">
                 <div className="titles">
-                  <div className="kicker">On the Shelf</div>
-                  <h2>{items.length} item{items.length === 1 ? '' : 's'} in stock</h2>
+                  <div className="kicker">{t('shop.onTheShelf')}</div>
+                  <h2>{t('shop.inStock', { count: items.length })}</h2>
                 </div>
                 <div className="trail" />
               </div>
@@ -371,9 +373,9 @@ export function Shop() {
                           </div>
                           <div className="flex-fill">
                             <h3 className="shop-item-name">{item.name}</h3>
-                            <div className="shop-item-cat">{item.category}</div>
+                            <div className="shop-item-cat">{itemCategoryLabel(item.category)}</div>
                           </div>
-                          <span className="shop-item-rarity">{item.rarity}</span>
+                          <span className="shop-item-rarity">{itemRarityLabel(item.rarity)}</span>
                         </div>
                         <p className="shop-item-desc">{item.description}</p>
                         {item.effects.length > 0 && (
@@ -392,7 +394,7 @@ export function Shop() {
                         </span>
                         {!item.infiniteStock && (
                           <span className={`shop-stock${soldOut ? ' out' : ''}`}>
-                            {soldOut ? 'Out of stock' : `${item.stock} left`}
+                            {soldOut ? t('shop.outOfStock') : t('shop.stockLeft', { count: item.stock })}
                           </span>
                         )}
                       </div>
@@ -402,10 +404,10 @@ export function Shop() {
                           disabled={soldOut || cantAfford || buyingId !== null}
                           onClick={() => buy(item)}
                         >
-                          {soldOut ? 'Sold out' : cantAfford ? 'Not enough ◈' : buyingId === item.id ? 'Buying…' : 'Buy'}
+                          {soldOut ? t('shop.soldOut') : cantAfford ? t('shop.notEnough') : buyingId === item.id ? t('shop.buying') : t('shop.buy')}
                         </button>
                         {creatorMode && (
-                          <button className="btn danger ghost" onClick={() => setPendingDelete(item)} title="Delete item" aria-label="Delete item">
+                          <button className="btn danger ghost" onClick={() => setPendingDelete(item)} title={t('shop.deleteItem')} aria-label={t('shop.deleteItem')}>
                             <Icon name="trash" size={16} />
                           </button>
                         )}
@@ -421,9 +423,9 @@ export function Shop() {
 
       {pendingDelete && (
         <ConfirmDialog
-          title={`Delete ${pendingDelete.name}?`}
-          body="This removes the item from the shop."
-          confirmLabel="Delete"
+          title={t('shop.confirmDeleteTitle', { name: pendingDelete.name })}
+          body={t('shop.confirmDeleteBody')}
+          confirmLabel={t('shop.confirmDelete')}
           danger
           busy={deleting}
           onConfirm={() => removeItem(pendingDelete)}

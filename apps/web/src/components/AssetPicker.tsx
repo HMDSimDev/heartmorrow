@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ALLOWED_IMAGE_MIME_TYPES,
   ALLOWED_IMAGE_LABEL,
@@ -26,6 +27,7 @@ export function AssetPicker({
    *  "None" tile). Keeps the picker focused — e.g. only location photos. */
   filterType?: Asset['type'];
 }) {
+  const { t } = useTranslation();
   const { assets: allAssets, reloadAssets } = useAppData();
   // Always keep the currently-selected asset visible even if it predates the
   // filter (e.g. an older photo saved under a different type).
@@ -42,7 +44,7 @@ export function AssetPicker({
     // "All files" override. Reject anything the vision model can't read before we
     // upload it, so the failure is immediate and clear rather than at request time.
     if (!(ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(file.type)) {
-      setError(`Unsupported image type. Please choose a ${ALLOWED_IMAGE_LABEL} image.`);
+      setError(t('unsupportedImage', { label: ALLOWED_IMAGE_LABEL }));
       if (inputRef.current) inputRef.current.value = '';
       return;
     }
@@ -63,7 +65,7 @@ export function AssetPicker({
     <div>
       {assets.length === 0 && !uploading ? (
         <div className="ap-empty">
-          <Empty title="No images uploaded yet" />
+          <Empty title={t('asset.noImages')} />
         </div>
       ) : (
         <div className="ap-grid">
@@ -71,11 +73,11 @@ export function AssetPicker({
           <div
             className={`ap-thumb ${value === null ? 'ap-selected' : ''}`}
             onClick={() => onChange(null)}
-            title="No portrait"
+            title={t('asset.noPortrait')}
             role="button"
             aria-pressed={value === null}
           >
-            <span className="ap-none-tile">None</span>
+            <span className="ap-none-tile">{t('asset.none')}</span>
             <span className="ap-check" aria-hidden>✓</span>
           </div>
 
@@ -98,7 +100,7 @@ export function AssetPicker({
       <div className="ap-upload-row">
         <label className="btn sm ap-upload-label">
           <Icon name="upload" size={14} />
-          {uploading ? 'Uploading…' : 'Upload image'}
+          {uploading ? t('asset.uploading') : t('asset.uploadImage')}
           <input
             ref={inputRef}
             type="file"

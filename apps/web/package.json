@@ -17,9 +17,14 @@
     "@fontsource-variable/fraunces": "^5.2.9",
     "@fontsource-variable/hanken-grotesk": "^5.2.8",
     "@fontsource-variable/spline-sans-mono": "^5.2.8",
+    "i18next": "^23.16.8",
+    "i18next-browser-languagedetector": "^8.0.2",
+    "i18next-icu": "^2.3.0",
+    "i18next-resources-to-backend": "^1.2.1",
     "lucide-react": "^1.20.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^15.4.0",
     "react-router-dom": "^6.28.0"
   },
   "devDependencies": {

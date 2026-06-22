@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   RELATIONSHIP_STAT_KEYS,
-  RELATIONSHIP_STATUS_LABELS,
   currentStatus,
   isBrokenUp,
   isOnTheRocks,
@@ -11,12 +11,10 @@ import {
   bandIndex,
   deriveCalendar,
   PHASE_ICONS,
-  PHASE_LABELS,
   venueCost,
   venueTierMeta,
   availableIntents,
   isGiftableItem,
-  INTENT_LABELS,
   INTENT_ICONS,
   type Intent,
   type InventoryItem,
@@ -37,6 +35,7 @@ import {
 import { api, streamChat, assetUrl } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
+import { intentLabel, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
 import { RelationshipBars } from '../components/StatBars';
@@ -58,11 +57,12 @@ function DateTrajectory({
   label: string;
   pulse: { delta: number; key: number } | null;
 }) {
+  const { t } = useTranslation(['pages', 'common']);
   const tone = value >= 60 ? 'good' : value < 40 ? 'bad' : 'mid';
   const mag = Math.max(0, Math.min(50, Math.abs(value - 50))); // 0..50 → 0..50% of the track
   const side = value >= 50 ? 'warm' : 'cool';
   return (
-    <div className={`date-trajectory tone-${tone}`} role="img" aria-label={`How the date is going: ${label}`}>
+    <div className={`date-trajectory tone-${tone}`} role="img" aria-label={t('chat.trajectoryAria', { label })}>
       {pulse && pulse.delta !== 0 && (
         <div className="dt-pulse-wrap" key={pulse.key} aria-hidden="true">
           <span className={`dt-pulse ${pulse.delta > 0 ? 'up' : 'down'}`}>
@@ -76,15 +76,16 @@ function DateTrajectory({
         <span className={`dt-fill ${side}`} style={{ width: `${mag}%` }} />
       </div>
       <div className="dt-foot">
-        <span className="dt-end">cooling</span>
+        <span className="dt-end">{t('chat.cooling')}</span>
         <span className="dt-now">{label}</span>
-        <span className="dt-end">warming</span>
+        <span className="dt-end">{t('chat.warming')}</span>
       </div>
     </div>
   );
 }
 
 export function Chat() {
+  const { t } = useTranslation(['pages', 'common']);
   const [params] = useSearchParams();
   const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, assetById } =
     useAppData();
@@ -475,7 +476,7 @@ export function Chat() {
           onWalkout: (m, reason) => {
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
-            setWalkout(reason || 'They ended the date.');
+            setWalkout(reason || t('chat.walkoutDefault'));
           },
           onBreakupIntent: (m, reaction) => {
             setMessages((prev) => [...prev, m]);
@@ -725,21 +726,21 @@ export function Chat() {
       return (
         <div className="stack">
           <div className="page-head">
-            <div className="kicker">Tonight's plan</div>
-            <h1>You're on a date</h1>
-            <p>Your date with {activeDate.characterName} is still going — your progress is safe.</p>
+            <div className="kicker">{t('chat.tonightsPlan')}</div>
+            <h1>{t('chat.onADateTitle')}</h1>
+            <p>{t('chat.onADateBody', { name: activeDate.characterName })}</p>
           </div>
           {error && <Banner kind="error">{error}</Banner>}
           <div className="framed date-setup">
-            <p>We couldn't reopen the conversation just now. Try again to pick it back up.</p>
+            <p>{t('chat.reopenFailed')}</p>
             <button className="btn primary block" onClick={() => void resume(activeDate)} disabled={resuming}>
               {resuming ? (
                 <>
-                  <span className="date-btn-spinner" aria-hidden="true" /> Reopening…
+                  <span className="date-btn-spinner" aria-hidden="true" /> {t('chat.reopening')}
                 </>
               ) : (
                 <>
-                  <Icon name="date" size={16} /> Resume your date with {activeDate.characterName}
+                  <Icon name="date" size={16} /> {t('chat.resumeDate', { name: activeDate.characterName })}
                 </>
               )}
             </button>
@@ -755,26 +756,26 @@ export function Chat() {
     return (
       <div className="stack">
         <div className="page-head">
-          <div className="kicker">Tonight's plan</div>
-          <h1>Plan a date</h1>
-          <p>Pick someone, choose where to meet, and begin.</p>
+          <div className="kicker">{t('chat.tonightsPlan')}</div>
+          <h1>{t('chat.planADate')}</h1>
+          <p>{t('chat.planSub')}</p>
         </div>
         {error && <Banner kind="error">{error}</Banner>}
         {characters.length === 0 ? (
-          <Empty icon="💬" title="No characters to date yet">
-            <p>Create a character first.</p>
+          <Empty icon="💬" title={t('chat.noCharsTitle')}>
+            <p>{t('chat.noCharsBody')}</p>
           </Empty>
         ) : (
           <div className="framed date-setup">
             <div className="date-setup-head">
               <div className="date-setup-mark" aria-hidden="true" />
               <div>
-                <div className="kicker date-setup-kicker">Arrange the evening</div>
-                <h2>Who, where, and when</h2>
+                <div className="kicker date-setup-kicker">{t('chat.arrangeEvening')}</div>
+                <h2>{t('chat.whoWhereWhen')}</h2>
               </div>
             </div>
             <div className="date-pick">
-              <div className="kicker">Who are you meeting?</div>
+              <div className="kicker">{t('chat.whoMeeting')}</div>
               <div className="date-pick-grid">
                 {characters
                   .filter((c) => !activeWorldId || c.worldId === activeWorldId)
@@ -789,7 +790,7 @@ export function Chat() {
                         className={`date-pick-card${selected ? ' selected' : ''}${unavailable ? ' unavailable' : ''}`}
                         onClick={() => setSetup((s) => ({ ...s, characterId: c.id, locationId: '' }))}
                         disabled={unavailable}
-                        title={unavailable ? `${c.name} — ${avail?.reason ?? 'unavailable today'}` : `Meet ${c.name}`}
+                        title={unavailable ? t('chat.cardTitleUnavailable', { name: c.name, reason: avail?.reason ?? t('chat.unavailableToday') }) : t('chat.cardTitleMeet', { name: c.name })}
                       >
                         {selected && (
                           <span className="date-pick-check" aria-hidden="true">
@@ -801,7 +802,7 @@ export function Chat() {
                         </div>
                         <div className="date-pick-name">{c.name}</div>
                         <div className="date-pick-sub">
-                          {unavailable ? (avail?.reason ?? 'busy today') : `${c.age} · ${c.pronouns}`}
+                          {unavailable ? (avail?.reason ?? t('chat.busyToday')) : t('chat.agePronouns', { age: c.age, pronouns: c.pronouns })}
                         </div>
                       </button>
                     );
@@ -809,7 +810,7 @@ export function Chat() {
               </div>
             </div>
             {((setupWorld && setupWorld.locations.length > 0) || roomUnlocked || setupProperties.length > 0) && (
-              <Field label="Location / activity (optional)">
+              <Field label={t('chat.locationField')}>
                 {(() => {
                   // One unified list of pickable venues rendered as photo tiles.
                   // Each tile: a value (locationId), label, optional sub-line,
@@ -823,7 +824,7 @@ export function Chat() {
                     disabled?: boolean;
                   };
                   const tiles: Tile[] = [
-                    { value: '', label: 'Anywhere', sub: 'free', glyph: '✨' },
+                    { value: '', label: t('chat.anywhere'), sub: t('chat.free'), glyph: '✨' },
                   ];
                   for (const pv of setupProperties) {
                     // Date at a property you OWN or currently LEASE (both free — the
@@ -832,7 +833,7 @@ export function Chat() {
                     tiles.push({
                       value: `prop:${pv.property.id}`,
                       label: pv.property.name,
-                      sub: `${pv.owned ? 'your place' : 'leased'} · free`,
+                      sub: `${pv.owned ? t('chat.yourPlace') : t('chat.leased')}${t('chat.freeSuffix')}`,
                       image: assetById(pv.property.assetId)?.path,
                       glyph: '🏠',
                     });
@@ -844,46 +845,47 @@ export function Chat() {
                     tiles.push({
                       value: l.id,
                       label: l.name,
-                      sub: cost > 0 ? `${meta.symbol} ${cost}${broke ? " · can't afford" : ''}` : 'free',
+                      sub: cost > 0 ? `${t('chat.venueCost', { symbol: meta.symbol, cost })}${broke ? t('chat.cantAffordSuffix') : ''}` : t('chat.free'),
                       image: assetById(l.imageAssetId)?.path,
                       glyph: '📍',
                       disabled: broke,
                     });
                   }
                   if (roomUnlocked) {
+                    const partnerName = characters.find((c) => c.id === setup.characterId)?.name;
                     tiles.push({
                       value: `room:${setup.characterId}`,
-                      label: `${characters.find((c) => c.id === setup.characterId)?.name ?? 'Their'}'s Room`,
-                      sub: 'stay in · free',
+                      label: partnerName ? t('chat.roomName', { name: partnerName }) : t('chat.theirRoomName'),
+                      sub: t('chat.stayInFree'),
                       glyph: '🚪',
                     });
                   }
                   return (
-                    <div className="date-loc-grid" role="radiogroup" aria-label="Choose a location">
-                      {tiles.map((t) => {
-                        const selected = setup.locationId === t.value;
+                    <div className="date-loc-grid" role="radiogroup" aria-label={t('chat.chooseLocation')}>
+                      {tiles.map((tile) => {
+                        const selected = setup.locationId === tile.value;
                         return (
                           <button
-                            key={t.value || 'anywhere'}
+                            key={tile.value || 'anywhere'}
                             type="button"
                             role="radio"
                             aria-checked={selected}
-                            className={`date-loc-card${selected ? ' selected' : ''}${t.disabled ? ' unavailable' : ''}`}
-                            onClick={() => !t.disabled && setSetup((s) => ({ ...s, locationId: t.value }))}
-                            disabled={t.disabled}
-                            title={t.disabled ? `${t.label} — can't afford` : t.label}
+                            className={`date-loc-card${selected ? ' selected' : ''}${tile.disabled ? ' unavailable' : ''}`}
+                            onClick={() => !tile.disabled && setSetup((s) => ({ ...s, locationId: tile.value }))}
+                            disabled={tile.disabled}
+                            title={tile.disabled ? t('chat.tileTitleCantAfford', { label: tile.label }) : tile.label}
                           >
                             <div className="date-loc-photo">
-                              {t.image ? (
-                                <img src={assetUrl(t.image)} alt="" />
+                              {tile.image ? (
+                                <img src={assetUrl(tile.image)} alt="" />
                               ) : (
-                                <span className="date-loc-glyph" aria-hidden="true">{t.glyph}</span>
+                                <span className="date-loc-glyph" aria-hidden="true">{tile.glyph}</span>
                               )}
                               {selected && <span className="date-loc-check" aria-hidden="true">✓</span>}
                             </div>
                             <div className="date-loc-meta">
-                              <span className="date-loc-name">{t.label}</span>
-                              {t.sub && <span className="date-loc-sub">{t.sub}</span>}
+                              <span className="date-loc-name">{tile.label}</span>
+                              {tile.sub && <span className="date-loc-sub">{tile.sub}</span>}
                             </div>
                           </button>
                         );
@@ -892,18 +894,21 @@ export function Chat() {
                   );
                 })()}
                 <div className="muted" style={{ fontSize: '0.78rem', marginTop: '0.5rem' }}>
-                  Wallet: {wallet} · a nicer venue costs money but can impress the right person.
+                  {t('chat.walletNote', { wallet })}
                 </div>
               </Field>
             )}
             {setup.characterId && availability[setup.characterId] && !availability[setup.characterId]!.available && (
               <div className="banner error" style={{ fontSize: '0.82rem' }}>
-                {characters.find((c) => c.id === setup.characterId)?.name} {availability[setup.characterId]!.reason ?? 'is unavailable today'} — pick someone else or come back tomorrow.
+                {t('chat.availBanner', {
+                  name: characters.find((c) => c.id === setup.characterId)?.name ?? '',
+                  reason: availability[setup.characterId]!.reason ?? t('chat.isUnavailableToday'),
+                })}
               </div>
             )}
             {outOfEnergy && (
               <div className="banner info" style={{ fontSize: '0.82rem' }}>
-                You're out of energy for today — End the day from the menu to rest, then come back tomorrow.
+                {t('chat.outOfEnergy')}
               </div>
             )}
             <button
@@ -919,11 +924,11 @@ export function Chat() {
               {starting ? (
                 <>
                   <span className="date-btn-spinner" aria-hidden="true" />
-                  Setting the scene…
+                  {t('chat.settingScene')}
                 </>
               ) : (
                 <>
-                  <Icon name="date" size={16} /> Begin
+                  <Icon name="date" size={16} /> {t('chat.begin')}
                 </>
               )}
             </button>
@@ -943,11 +948,11 @@ export function Chat() {
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
   const locationName = session.locationId
     ? session.locationId.startsWith('room:')
-      ? `${character.name}'s Room`
+      ? t('chat.loc.room', { name: character.name })
       : session.locationId.startsWith('prop:')
-        ? setupProperties.find((pv) => `prop:${pv.property.id}` === session.locationId)?.property.name ?? 'Your place'
-        : setupWorld?.locations.find((l) => l.id === session.locationId)?.name ?? 'Somewhere'
-    : 'Anywhere';
+        ? setupProperties.find((pv) => `prop:${pv.property.id}` === session.locationId)?.property.name ?? t('chat.loc.yourPlace')
+        : setupWorld?.locations.find((l) => l.id === session.locationId)?.name ?? t('chat.loc.somewhere')
+    : t('chat.loc.anywhere');
   // The chosen venue's uploaded photo, if any — surfaced as a scene backdrop.
   const locationAssetId = session.locationId
     ? session.locationId.startsWith('prop:')
@@ -967,13 +972,13 @@ export function Chat() {
     ? evalResult.evaluated
       ? (
         <Banner kind="ok">
-          <strong>Date evaluated.</strong> Mood: {evalResult.mood}. {evalResult.summaryLine}{' '}
-          ({evalResult.memoriesWritten} memor{evalResult.memoriesWritten === 1 ? 'y' : 'ies'} saved)
+          <strong>{t('chat.evalTitle')}</strong>{' '}
+          {t('chat.evalDetail', { mood: evalResult.mood, summary: evalResult.summaryLine, count: evalResult.memoriesWritten })}
         </Banner>
       )
       : (
         <Banner kind="error">
-          <strong>Evaluation failed safely</strong> — no stats were changed. {evalResult.evalError}
+          <strong>{t('chat.evalFailedTitle')}</strong>{t('chat.evalFailedBody', { error: evalResult.evalError })}
         </Banner>
       )
     : null;
@@ -988,11 +993,11 @@ export function Chat() {
       return (
         <div className="date-moment date-moment-ending">
           <div className="date-moment-seal" aria-hidden="true">✦</div>
-          <div className="date-moment-kicker">A happy ending</div>
-          <div className="date-moment-title">"{evalResult.ending.title}"</div>
+          <div className="date-moment-kicker">{t('chat.endingKicker')}</div>
+          <div className="date-moment-title">{t('chat.endingTitle', { title: evalResult.ending.title })}</div>
           <p className="date-moment-body">{evalResult.ending.epilogue}</p>
           <p className="date-moment-note">
-            You've built something that lasts. Read it any time in the phone's Endings — and the game goes on.
+            {t('chat.endingNote')}
           </p>
         </div>
       );
@@ -1001,10 +1006,10 @@ export function Chat() {
       return (
         <div className="date-moment date-moment-breakup">
           <div className="date-moment-seal" aria-hidden="true">💔</div>
-          <div className="date-moment-kicker">It's over</div>
-          <div className="date-moment-title">{character.name} broke up with you.</div>
+          <div className="date-moment-kicker">{t('chat.breakupKicker')}</div>
+          <div className="date-moment-title">{t('chat.breakupTitle', { name: character.name })}</div>
           <p className="date-moment-body">{evalResult.breakup.line}</p>
-          <p className="date-moment-note">Give them space — keep reaching out and you may win them back.</p>
+          <p className="date-moment-note">{t('chat.breakupNote')}</p>
         </div>
       );
     }
@@ -1012,9 +1017,9 @@ export function Chat() {
       return (
         <div className="date-moment date-moment-breakup">
           <div className="date-moment-seal" aria-hidden="true">💔</div>
-          <div className="date-moment-kicker">You ended it</div>
-          <div className="date-moment-title">You broke up with {character.name}.</div>
-          <p className="date-moment-body">It's over for now. They'll need some space — but if you keep reaching out, you may be able to win them back later.</p>
+          <div className="date-moment-kicker">{t('chat.youEndedKicker')}</div>
+          <div className="date-moment-title">{t('chat.youEndedTitle', { name: character.name })}</div>
+          <p className="date-moment-body">{t('chat.youEndedBody')}</p>
         </div>
       );
     }
@@ -1022,10 +1027,10 @@ export function Chat() {
       return (
         <div className="date-moment date-moment-walkout">
           <div className="date-moment-seal" aria-hidden="true">🚪</div>
-          <div className="date-moment-kicker">They walked out</div>
-          <div className="date-moment-title">{character.name} left.</div>
+          <div className="date-moment-kicker">{t('chat.walkoutKicker')}</div>
+          <div className="date-moment-title">{t('chat.walkoutTitle', { name: character.name })}</div>
           <p className="date-moment-body">{walkout}</p>
-          <p className="date-moment-note">The date is over — this reflected badly on you.</p>
+          <p className="date-moment-note">{t('chat.walkoutNote')}</p>
         </div>
       );
     }
@@ -1033,10 +1038,10 @@ export function Chat() {
       return (
         <div className="date-moment date-moment-walkout">
           <div className="date-moment-seal" aria-hidden="true">🌙</div>
-          <div className="date-moment-kicker">Called it a night</div>
-          <div className="date-moment-title">{character.name} lost interest.</div>
-          <p className="date-moment-body">The date wasn't landing and they slipped away early — it fizzled out, and that set things back a little.</p>
-          <p className="date-moment-note">Try reading them better next time.</p>
+          <div className="date-moment-kicker">{t('chat.leftEarlyKicker')}</div>
+          <div className="date-moment-title">{t('chat.leftEarlyTitle', { name: character.name })}</div>
+          <p className="date-moment-body">{t('chat.leftEarlyBody')}</p>
+          <p className="date-moment-note">{t('chat.leftEarlyNote')}</p>
         </div>
       );
     }
@@ -1044,8 +1049,8 @@ export function Chat() {
       return (
         <div className="date-moment date-moment-milestone">
           <div className="date-moment-seal" aria-hidden="true">✦</div>
-          <div className="date-moment-kicker">New milestone</div>
-          <div className="date-moment-title">You're {milestone.label}!</div>
+          <div className="date-moment-kicker">{t('chat.milestoneKicker')}</div>
+          <div className="date-moment-title">{t('chat.milestoneTitle', { label: milestone.label })}</div>
           <p className="date-moment-body">{milestone.line}</p>
         </div>
       );
@@ -1055,8 +1060,8 @@ export function Chat() {
         return (
           <div className="date-moment date-moment-milestone">
             <div className="date-moment-seal" aria-hidden="true">✦</div>
-            <div className="date-moment-kicker">Status confirmed</div>
-            <div className="date-moment-title">You're now {RELATIONSHIP_STATUS_LABELS[dtrOutcome.status]}.</div>
+            <div className="date-moment-kicker">{t('chat.dtrConfirmedKicker')}</div>
+            <div className="date-moment-title">{t('chat.dtrConfirmedTitle', { status: relationshipStatusLabel(dtrOutcome.status) })}</div>
           </div>
         );
       }
@@ -1064,13 +1069,13 @@ export function Chat() {
         return (
           <div className="date-moment date-moment-walkout">
             <div className="date-moment-seal" aria-hidden="true">⚠</div>
-            <div className="date-moment-kicker">That landed badly</div>
-            <div className="date-moment-title">It didn't go as you hoped.</div>
-            {dtrOutcome.ended && <p className="date-moment-note">The date ended.</p>}
+            <div className="date-moment-kicker">{t('chat.dtrBackfireKicker')}</div>
+            <div className="date-moment-title">{t('chat.dtrBackfireTitle')}</div>
+            {dtrOutcome.ended && <p className="date-moment-note">{t('chat.dtrEnded')}</p>}
           </div>
         );
       }
-      return <Banner kind="info">Not yet — give it a little more time.</Banner>;
+      return <Banner kind="info">{t('chat.dtrNotYet')}</Banner>;
     }
     if (evalResult) return evalBanner;
     return null;
@@ -1083,18 +1088,18 @@ export function Chat() {
       <div className="chat-wrap date-wrap">
         <aside className="chat-side date-dossier">
           <div className="framed bracketed date-plate">
-            <div className="kicker">Your companion</div>
+            <div className="kicker">{t('chat.yourCompanion')}</div>
             <div className="date-plate-portrait">
               <Portrait character={character} expression={expression} crossfade />
             </div>
             <div className="date-plate-name">{character.name}</div>
             <div className="date-plate-badges">
               {relationship && isBrokenUp(relationship) ? (
-                <span className="badge danger"><Icon name="breakup" size={12} /> Broken up</span>
+                <span className="badge danger"><Icon name="breakup" size={12} /> {t('chat.brokenUp')}</span>
               ) : (
                 <>
-                  {status !== 'none' && <span className="badge accent"><Icon name="date" size={12} /> {RELATIONSHIP_STATUS_LABELS[status]}</span>}
-                  {relationship && isOnTheRocks(relationship) && <span className="badge warn"><Icon name="warn" size={12} /> On the rocks</span>}
+                  {status !== 'none' && <span className="badge accent"><Icon name="date" size={12} /> {relationshipStatusLabel(status)}</span>}
+                  {relationship && isOnTheRocks(relationship) && <span className="badge warn"><Icon name="warn" size={12} /> {t('chat.onTheRocks')}</span>}
                 </>
               )}
               {expression && <span className="badge accent date-mood-chip">{expression}</span>}
@@ -1103,7 +1108,7 @@ export function Chat() {
           {relationship && (
             <div className={`card date-gauges ${milestone ? 'stage-up' : ''}`}>
               <div className="date-gauges-head">
-                <div className="kicker">Where you stand</div>
+                <div className="kicker">{t('chat.whereYouStand')}</div>
                 <div className="trail" />
               </div>
               <RelationshipBars relationship={relationship} deltas={deltas ?? undefined} />
@@ -1111,7 +1116,7 @@ export function Chat() {
           )}
           <div className="card date-actions">
             {dtrReady && !locked && (
-              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active} title="Where is this going?">
+              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active} title={t('chat.dtrTitle')}>
                 <Icon name="commit" size={16} /> {rung!.rung.label}
               </button>
             )}
@@ -1120,15 +1125,15 @@ export function Chat() {
                 className="btn ghost block date-gift-btn"
                 onClick={() => (giftPicker ? setGiftPicker(false) : void openGiftPicker())}
                 disabled={busy || streaming.active}
-                title="Give them something"
+                title={t('chat.giveSomething')}
               >
-                <Icon name="gift" size={15} /> {giftPicker ? 'Never mind' : 'Give a gift'}
+                <Icon name="gift" size={15} /> {giftPicker ? t('chat.neverMind') : t('chat.giveGift')}
               </button>
             )}
             {giftPicker && !locked && (
               <div className="date-gift-picker">
                 {giftItems.length === 0 ? (
-                  <p className="muted date-gift-empty">No gifts on hand — buy something at the Shop first.</p>
+                  <p className="muted date-gift-empty">{t('chat.giftEmpty')}</p>
                 ) : (
                   giftItems.map((e) => (
                     <button
@@ -1148,21 +1153,21 @@ export function Chat() {
                 live — you finish it (End & evaluate), or back out of one you haven't
                 spoken in (Cancel date, free). Once it's over, start a new one. */}
             {locked ? (
-              <button className="btn ghost block" onClick={newConversation} disabled={busy} title="Start a fresh date with someone else">
-                <Icon name="recap" size={14} /> New date
+              <button className="btn ghost block" onClick={newConversation} disabled={busy} title={t('chat.newDateTitle')}>
+                <Icon name="recap" size={14} /> {t('chat.newDate')}
               </button>
             ) : spokeThisSession ? (
               <>
                 <button className="btn sm block" onClick={summarize} disabled={busy || streaming.active}>
-                  <Icon name="recap" size={14} /> Recap
+                  <Icon name="recap" size={14} /> {t('chat.recap')}
                 </button>
                 <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active}>
-                  {busy ? 'Evaluating…' : <><Icon name="end" size={14} /> End &amp; evaluate</>}
+                  {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t('chat.endEvaluate')}</>}
                 </button>
               </>
             ) : (
               <button className="btn ghost block date-end-btn" onClick={cancelDate} disabled={busy || streaming.active}>
-                {busy ? 'Leaving…' : <><Icon name="leave" size={14} /> Cancel date</>}
+                {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {t('chat.cancelDate')}</>}
               </button>
             )}
           </div>
@@ -1176,10 +1181,10 @@ export function Chat() {
               </div>
             )}
             {scene && cal && (
-              <span className="date-scene-lead" title={`${cal.dayOfWeek}, ${cal.season}`}>
+              <span className="date-scene-lead" title={t('chat.sceneLeadTitle', { weekday: weekdayLabel(cal.dayOfWeek), season: seasonLabel(cal.season) })}>
                 <span className="ph">{PHASE_ICONS[scene.phase]}</span>
                 <span className="day">
-                  Day {scene.day} · <span className="ph-label">{PHASE_LABELS[scene.phase]}</span>
+                  {t('chat.sceneDay', { day: scene.day })}<span className="ph-label">{phaseLabel(scene.phase)}</span>
                 </span>
               </span>
             )}
@@ -1193,12 +1198,12 @@ export function Chat() {
             )}
             {scene?.mood && (
               <span className="date-chip">
-                <span className="ico">{scene.moodIcon}</span> {character.name} seems {scene.mood}
+                <span className="ico">{scene.moodIcon}</span> {t('chat.seems', { name: character.name, mood: scene.mood })}
               </span>
             )}
           </div>
           {!locked && (
-            <DateTrajectory value={rapport ?? 50} label={vibe ?? 'settling in'} pulse={rapportPulse} />
+            <DateTrajectory value={rapport ?? 50} label={vibe ?? t('chat.settlingIn')} pulse={rapportPulse} />
           )}
           <div className="messages date-reel">
             {messages.length === 0 && !streaming.active && (
@@ -1210,12 +1215,17 @@ export function Chat() {
                   <div className="date-opening-name">{character.name}</div>
                   <p className="date-opening-scene">
                     {scene?.mood
-                      ? `${character.name} is here, looking ${scene.mood}. ${locationName !== 'Anywhere' ? `You're at ${locationName}.` : ''} ${scene.weatherLabel ? `It's ${scene.weatherLabel.toLowerCase()} out.` : ''}`
-                      : locationName !== 'Anywhere'
-                        ? `${character.name} is waiting for you at ${locationName}.`
-                        : `${character.name} is here, waiting.`}
+                      ? t('chat.openingWithMood', {
+                          name: character.name,
+                          mood: scene.mood,
+                          atLocation: locationName !== t('chat.loc.anywhere') ? t('chat.openingAtLocation', { location: locationName }) : '',
+                          weather: scene.weatherLabel ? t('chat.openingWeather', { weather: scene.weatherLabel.toLowerCase() }) : '',
+                        })
+                      : locationName !== t('chat.loc.anywhere')
+                        ? t('chat.openingWaitingAt', { name: character.name, location: locationName })
+                        : t('chat.openingWaiting', { name: character.name })}
                   </p>
-                  <div className="date-opening-cue">Say hello to start the conversation…</div>
+                  <div className="date-opening-cue">{t('chat.sayHello')}</div>
                 </div>
               </div>
             )}
@@ -1251,12 +1261,12 @@ export function Chat() {
           {milestoneTookPrimary && evalBanner}
           {evalResult?.reconciled && (
             <Banner kind="ok">
-              <Icon name="date" size={14} /> <strong>You and {character.name} are back together.</strong> Don't let it slip again.
+              <Icon name="date" size={14} /> <strong>{t('chat.backTogether', { name: character.name })}</strong> {t('chat.backTogetherNote')}
             </Banner>
           )}
           {evalResult?.onTheRocks && !evalResult.breakup && (
             <Banner kind="info">
-              <Icon name="warn" size={14} /> <strong>Things are on the rocks.</strong> The relationship feels strained — turn it around soon.
+              <Icon name="warn" size={14} /> <strong>{t('chat.rocksTitle')}</strong> {t('chat.rocksNote')}
             </Banner>
           )}
           {evalResult?.jealousy?.triggered && (
@@ -1266,28 +1276,28 @@ export function Chat() {
           {locked ? (
             <div className="date-restart">
               <button className="btn" onClick={newConversation}>
-                <Icon name="recap" size={14} /> Start over
+                <Icon name="recap" size={14} /> {t('chat.startOver')}
               </button>
             </div>
           ) : breakupPending ? (
             <div className="date-breakup">
-              <div className="date-breakup-title"><Icon name="breakup" size={16} /> Break up with {character.name}?</div>
+              <div className="date-breakup-title"><Icon name="breakup" size={16} /> {t('chat.breakupConfirmTitle', { name: character.name })}</div>
               <p>
-                You're about to end things. {character.name} just responded above — confirm to break up for real, or keep going.
+                {t('chat.breakupConfirmBody', { name: character.name })}
               </p>
               <div className="row">
                 <button className="btn danger" onClick={confirmBreakup} disabled={busy}>
-                  {busy ? 'Ending…' : <><Icon name="breakup" size={14} /> Confirm breakup</>}
+                  {busy ? t('chat.ending') : <><Icon name="breakup" size={14} /> {t('chat.confirmBreakup')}</>}
                 </button>
                 <button className="btn ghost" onClick={cancelBreakup} disabled={busy}>
-                  Never mind
+                  {t('chat.neverMind')}
                 </button>
               </div>
             </div>
           ) : (
             <div className="date-input-wrap">
               {relationship && (
-                <div className="intent-chips" role="group" aria-label="How you want to come across">
+                <div className="intent-chips" role="group" aria-label={t('chat.intentComing')}>
                   {availableIntents(relationship).map((opt) => (
                     <button
                       key={opt}
@@ -1298,7 +1308,7 @@ export function Chat() {
                       onClick={() => setIntent((cur) => (cur === opt ? null : opt))}
                     >
                       <span className="intent-chip-emoji">{INTENT_ICONS[opt]}</span>
-                      {INTENT_LABELS[opt]}
+                      {intentLabel(opt)}
                     </button>
                   ))}
                 </div>
@@ -1306,7 +1316,7 @@ export function Chat() {
               <div className="chat-input date-composer">
                 <textarea
                   value={input}
-                  placeholder={intent ? `${INTENT_LABELS[intent]} — message ${character.name}…` : `Message ${character.name}…`}
+                  placeholder={intent ? t('chat.composerIntent', { intent: intentLabel(intent), name: character.name }) : t('chat.composerPlain', { name: character.name })}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {

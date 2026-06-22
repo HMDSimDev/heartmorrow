@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   VIDEO_POKER_PAYTABLE,
-  VIDEO_POKER_RANK_LABELS,
   type VideoPokerRank,
   type VideoPokerView,
 } from '@dsim/shared';
 import { api } from '../../../lib/api';
 import { errorMessage } from '../../../lib/hooks';
+import { videoPokerRankLabel } from '../../../i18n/labels';
 import { Banner } from '../../ui';
 import { PlayingCard, BetStepper, CantBetNote, ResultBanner, clampBet, maxAffordable, type CasinoGameProps } from './shared';
 import './videopoker.css';
@@ -19,6 +20,7 @@ const PAY_ROWS = (Object.keys(VIDEO_POKER_PAYTABLE) as VideoPokerRank[])
   .sort((a, b) => VIDEO_POKER_PAYTABLE[b] - VIDEO_POKER_PAYTABLE[a]);
 
 export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
+  const { t } = useTranslation(['phone', 'common']);
   const [hand, setHand] = useState<VideoPokerView | null>(resume ?? null);
   const [held, setHeld] = useState<boolean[]>(resume?.held ?? [false, false, false, false, false]);
   const [bet, setBet] = useState(() => clampBet(25, wallet));
@@ -75,7 +77,7 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
   return (
     <div className="vp">
       <div className="gmb-table">
-        <div className="gmb-felt-label">Jacks or Better · hold the keepers</div>
+        <div className="gmb-felt-label">{t('gambling.vpFelt')}</div>
         <div className="gmb-hand vp-hand">
           {hand ? (
             hand.cards.map((c, i) => (
@@ -83,7 +85,7 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
                 {/* Key the card by identity so only changed (drawn) cards re-deal;
                     held keepers + hold-toggles keep their DOM node (no flicker). */}
                 <PlayingCard key={`${c.rank}${c.suit}`} card={c} held={held[i]} deal index={i} />
-                <span className={`vp-hold${held[i] ? ' on' : ''}`}>{held[i] ? 'HELD' : draw ? 'tap' : ''}</span>
+                <span className={`vp-hold${held[i] ? ' on' : ''}`}>{held[i] ? t('gambling.held') : draw ? t('gambling.tap') : ''}</span>
               </button>
             ))
           ) : (
@@ -100,7 +102,7 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
       {done && hand && (
         <ResultBanner
           outcome={won ? 'win' : 'lose'}
-          title={hand.rank && hand.rank !== 'none' ? VIDEO_POKER_RANK_LABELS[hand.rank] : 'No pay'}
+          title={hand.rank && hand.rank !== 'none' ? videoPokerRankLabel(hand.rank) : t('gambling.noPay')}
           net={hand.net}
         />
       )}
@@ -109,7 +111,7 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
       <div className="vp-paytable">
         {PAY_ROWS.map((r) => (
           <div key={r} className={`vp-payrow${done && hand?.rank === r ? ' hit' : ''}`}>
-            <span>{VIDEO_POKER_RANK_LABELS[r]}</span>
+            <span>{videoPokerRankLabel(r)}</span>
             <span className="vp-paymult">{VIDEO_POKER_PAYTABLE[r]}×</span>
           </div>
         ))}
@@ -119,7 +121,7 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
       {draw ? (
         <div className="gmb-actions">
           <button className="gmb-go" onClick={drawCards} disabled={busy}>
-            {busy ? 'Drawing…' : `Draw (${held.filter(Boolean).length} held)`}
+            {busy ? t('gambling.drawing') : t('gambling.draw', { count: held.filter(Boolean).length })}
           </button>
         </div>
       ) : !canBet ? (
@@ -129,7 +131,7 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
           <BetStepper wallet={wallet} value={bet} onChange={setBet} disabled={busy} />
           <div className="gmb-actions">
             <button className="gmb-go" onClick={deal} disabled={busy}>
-              {busy ? 'Dealing…' : done ? `Deal again · ◈ ${bet}` : `Deal · ◈ ${bet}`}
+              {busy ? t('gambling.dealing') : done ? t('gambling.dealAgain', { bet }) : t('gambling.deal', { bet })}
             </button>
           </div>
         </>

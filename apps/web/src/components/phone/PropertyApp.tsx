@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   type Property,
   type PropertyView,
@@ -7,15 +8,17 @@ import {
   type PropertyLease,
   type RentCadence,
   type RelationshipStatKey,
-  PROPERTY_CATEGORY_LABELS,
-  RELATIONSHIP_STAT_LABELS,
   RELATIONSHIP_STAT_KEYS,
-  RENT_CADENCE_LABELS,
-  RENT_CADENCE_PER,
 } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { useAsync, errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
+import {
+  propertyCategoryLabel,
+  rentCadenceLabel,
+  rentCadencePer,
+  relationshipStatLabel,
+} from '../../i18n/labels';
 import { Banner, Empty, Field, Loader, ConfirmDialog } from '../ui';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
@@ -44,6 +47,7 @@ const EMPTY_CREATE: Omit<PropertyCreate, 'worldId'> = {
 };
 
 export function PropertyApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { player, reloadPlayer, creatorMode, activeWorld, activeWorldId, worldState, dayTick } = useAppData();
   const state = useAsync(
     () => (activeWorldId ? api.listProperties(activeWorldId) : Promise.resolve({ properties: [] })),
@@ -101,32 +105,32 @@ export function PropertyApp() {
   const buy = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.buyProperty(activeWorldId!, pv.property.id);
-      setNote(`You now own ${pv.property.name}!`);
+      setNote(t('property.toast.bought', { name: pv.property.name }));
     });
 
   const sell = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.sellProperty(activeWorldId!, pv.property.id);
-      setNote(`Sold ${pv.property.name}. ◈ ${pv.property.buyPrice} returned.`);
+      setNote(t('property.toast.sold', { name: pv.property.name, price: pv.property.buyPrice }));
     });
 
   const startLease = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.leaseProperty(activeWorldId!, pv.property.id);
-      setNote(`Leasing ${pv.property.name}.`);
+      setNote(t('property.toast.leasing', { name: pv.property.name }));
     });
 
   const payRent = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.payRent(activeWorldId!, pv.property.id);
-      setNote(`Rent paid for ${pv.property.name}.`);
+      setNote(t('property.toast.rentPaid', { name: pv.property.name }));
     });
 
   const doEndLease = async (pv: PropertyView) => {
     setPendingEndLease(null);
     await withBusy(pv.property.id, async () => {
       await api.endLease(activeWorldId!, pv.property.id);
-      setNote(`Moved out of ${pv.property.name}.`);
+      setNote(t('property.toast.movedOut', { name: pv.property.name }));
     });
   };
 
@@ -171,7 +175,7 @@ export function PropertyApp() {
       if (res.ok) {
         setDrafts(res.data.map((item) => ({ keep: true, item: { ...item, worldId: activeWorldId } })));
       } else {
-        setError(`Property generation failed: ${res.error}`);
+        setError(t('property.toast.genFailed', { error: res.error }));
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -193,7 +197,7 @@ export function PropertyApp() {
     try {
       const kept = drafts.filter((d) => d.keep).map((d) => d.item);
       for (const item of kept) await api.createProperty({ ...item, worldId: activeWorldId });
-      setNote(`Saved ${kept.length} propert${kept.length === 1 ? 'y' : 'ies'}.`);
+      setNote(t('property.toast.savedDrafts', { count: kept.length }));
       setGenOpen(false);
       setDrafts([]);
       state.reload();
@@ -216,7 +220,7 @@ export function PropertyApp() {
     setError(undefined);
     try {
       await api.createProperty({ ...createForm, worldId: activeWorldId });
-      setNote(`"${createForm.name}" added.`);
+      setNote(t('property.toast.created', { name: createForm.name }));
       setCreateForm(EMPTY_CREATE);
       setCreateOpen(false);
       state.reload();
@@ -231,10 +235,10 @@ export function PropertyApp() {
   if (!activeWorldId) {
     return (
       <div className="phone-app">
-        <PhoneAppBar title="Property" kicker="Real estate" icon="location" />
+        <PhoneAppBar title={t('property.title')} kicker={t('property.kicker')} icon="location" />
         <div className="phone-embed">
-          <Empty icon={<Icon name="location" size={34} />} title="No world active">
-            <p className="muted">Pick a world to browse properties.</p>
+          <Empty icon={<Icon name="location" size={34} />} title={t('property.noWorldTitle')}>
+            <p className="muted">{t('property.noWorldBody')}</p>
           </Empty>
         </div>
       </div>
@@ -244,8 +248,8 @@ export function PropertyApp() {
   return (
     <div className="phone-app">
       <PhoneAppBar
-        title="Property"
-        kicker="Real estate"
+        title={t('property.title')}
+        kicker={t('property.kicker')}
         icon="location"
         right={
           <span className="prop-purse">
@@ -265,10 +269,10 @@ export function PropertyApp() {
             {!genOpen && !createOpen && (
               <>
                 <button className="btn primary sm" onClick={() => setGenOpen(true)}>
-                  <Icon name="generate" size={14} /> Generate
+                  <Icon name="generate" size={14} /> {t('property.creator.generate')}
                 </button>
                 <button className="btn ghost sm" onClick={() => setCreateOpen(true)}>
-                  <Icon name="plus" size={14} /> New property
+                  <Icon name="plus" size={14} /> {t('property.creator.newProperty')}
                 </button>
               </>
             )}
@@ -280,20 +284,20 @@ export function PropertyApp() {
           <div className="framed prop-gen stack">
             <div className="prop-gen-head">
               <div>
-                <div className="kicker">Creator Workshop</div>
-                <h3 className="prop-gen-title">Generate properties</h3>
+                <div className="kicker">{t('property.creator.workshop')}</div>
+                <h3 className="prop-gen-title">{t('property.gen.title')}</h3>
               </div>
               <button className="btn ghost sm" onClick={closeGen}>
-                Close
+                {t('property.creator.close')}
               </button>
             </div>
             <p className="hint" style={{ marginTop: 0 }}>
-              Generates lore-friendly properties for{' '}
-              {activeWorld ? <strong>{activeWorld.name}</strong> : 'a generic setting'}. Nothing is saved until
-              you press Save — review and tweak first.
+              {t('property.gen.hintPre')}
+              {activeWorld ? <strong>{activeWorld.name}</strong> : t('property.gen.genericSetting')}
+              {t('property.gen.hintPost')}
             </p>
             <div className="inline-fields">
-              <Field label="How many (1–8)">
+              <Field label={t('property.gen.howMany')}>
                 <input
                   type="number"
                   min={1}
@@ -304,44 +308,43 @@ export function PropertyApp() {
                   }
                 />
               </Field>
-              <Field label="Category hint">
+              <Field label={t('property.gen.categoryHint')}>
                 <select
                   value={genForm.categoryHint}
                   onChange={(e) => setGenForm({ ...genForm, categoryHint: e.target.value as '' | PropertyCategory })}
                 >
-                  <option value="">— any —</option>
+                  <option value="">{t('property.gen.any')}</option>
                   {PROPERTY_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
-                      {PROPERTY_CATEGORY_LABELS[c]}
+                      {propertyCategoryLabel(c)}
                     </option>
                   ))}
                 </select>
               </Field>
             </div>
-            <Field label="Theme / guidance" hint='Optional — e.g. "cozy harbour apartments" or "grand countryside estates".'>
+            <Field label={t('property.gen.theme')} hint={t('property.gen.themeHint')}>
               <textarea
                 value={genForm.theme}
                 onChange={(e) => setGenForm({ ...genForm, theme: e.target.value })}
-                placeholder="Describe the kind of properties you want…"
+                placeholder={t('property.gen.themePlaceholder')}
               />
             </Field>
             <div className="row">
               <button className="btn primary" onClick={generate} disabled={generating}>
-                {generating ? 'Generating…' : <><Icon name="generate" size={15} /> Generate</>}
+                {generating ? t('property.gen.generating') : <><Icon name="generate" size={15} /> {t('property.creator.generate')}</>}
               </button>
               {drafts.length > 0 && (
                 <button className="btn" onClick={saveDrafts} disabled={saving || keptCount === 0}>
-                  {saving ? 'Saving…' : `Save ${keptCount} selected`}
+                  {saving ? t('property.gen.saving') : t('property.gen.saveSelected', { count: keptCount })}
                 </button>
               )}
             </div>
 
             {drafts.length > 0 && (
               <>
-                <div className="prop-gen-divider">Review &amp; refine</div>
+                <div className="prop-gen-divider">{t('property.gen.reviewRefine')}</div>
                 <p className="hint" style={{ marginTop: 0 }}>
-                  {drafts.length} propert{drafts.length === 1 ? 'y' : 'ies'} generated. Uncheck any you don't want,
-                  edit the rest, then Save.
+                  {t('property.gen.draftsGenerated', { count: drafts.length })}
                 </p>
                 <div className="prop-drafts">
                   {drafts.map((d, i) => (
@@ -349,29 +352,29 @@ export function PropertyApp() {
                       <div className="prop-draft-top">
                         <label className="prop-draft-keep">
                           <input type="checkbox" checked={d.keep} onChange={() => toggleKeep(i)} />
-                          {d.keep ? 'Keep' : 'Skipped'}
+                          {d.keep ? t('property.gen.keep') : t('property.gen.skipped')}
                         </label>
                         <span className="prop-money-pill">◈ {d.item.buyPrice ?? 0}</span>
                       </div>
                       <div className="inline-fields">
-                        <Field label="Name">
+                        <Field label={t('property.fields.name')}>
                           <input value={d.item.name} onChange={(e) => editDraft(i, { name: e.target.value })} />
                         </Field>
-                        <Field label="Category">
+                        <Field label={t('property.fields.category')}>
                           <select
                             value={d.item.category ?? 'residence'}
                             onChange={(e) => editDraft(i, { category: e.target.value as PropertyCategory })}
                           >
                             {PROPERTY_CATEGORIES.map((c) => (
                               <option key={c} value={c}>
-                                {PROPERTY_CATEGORY_LABELS[c]}
+                                {propertyCategoryLabel(c)}
                               </option>
                             ))}
                           </select>
                         </Field>
                       </div>
                       <div className="inline-fields">
-                        <Field label="Buy price (◈)">
+                        <Field label={t('property.fields.buyPrice')}>
                           <input
                             type="number"
                             min={0}
@@ -379,7 +382,7 @@ export function PropertyApp() {
                             onChange={(e) => editDraft(i, { buyPrice: Math.max(0, Number(e.target.value) || 0) })}
                           />
                         </Field>
-                        <Field label="Lease rent (◈)">
+                        <Field label={t('property.fields.leaseRent')}>
                           <input
                             type="number"
                             min={0}
@@ -387,36 +390,36 @@ export function PropertyApp() {
                             onChange={(e) => editDraft(i, { rentAmount: Math.max(0, Number(e.target.value) || 0) })}
                           />
                         </Field>
-                        <Field label="Cadence">
+                        <Field label={t('property.fields.cadence')}>
                           <select
                             value={d.item.rentCadence ?? 'weekly'}
                             onChange={(e) => editDraft(i, { rentCadence: e.target.value as RentCadence })}
                           >
                             {RENT_CADENCES.map((rc) => (
                               <option key={rc} value={rc}>
-                                {RENT_CADENCE_LABELS[rc]}
+                                {rentCadenceLabel(rc)}
                               </option>
                             ))}
                           </select>
                         </Field>
                       </div>
                       <div className="inline-fields">
-                        <Field label="Date buff stat">
+                        <Field label={t('property.fields.buffStat')}>
                           <select
                             value={d.item.buffStat ?? ''}
                             onChange={(e) =>
                               editDraft(i, { buffStat: (e.target.value as RelationshipStatKey) || null })
                             }
                           >
-                            <option value="">— none —</option>
+                            <option value="">{t('property.fields.none')}</option>
                             {RELATIONSHIP_STAT_KEYS.map((k) => (
                               <option key={k} value={k}>
-                                {RELATIONSHIP_STAT_LABELS[k]}
+                                {relationshipStatLabel(k)}
                               </option>
                             ))}
                           </select>
                         </Field>
-                        <Field label="Buff amount (0–5)">
+                        <Field label={t('property.fields.buffAmount')}>
                           <input
                             type="number"
                             min={0}
@@ -428,7 +431,7 @@ export function PropertyApp() {
                           />
                         </Field>
                       </div>
-                      <Field label="Description">
+                      <Field label={t('property.fields.description')}>
                         <textarea
                           value={d.item.description ?? ''}
                           onChange={(e) => editDraft(i, { description: e.target.value })}
@@ -447,36 +450,36 @@ export function PropertyApp() {
           <div className="framed prop-create-form stack">
             <div className="prop-gen-head">
               <div>
-                <div className="kicker">Creator Workshop</div>
-                <h3 className="prop-gen-title">New property</h3>
+                <div className="kicker">{t('property.creator.workshop')}</div>
+                <h3 className="prop-gen-title">{t('property.create.title')}</h3>
               </div>
               <button className="btn ghost sm" onClick={() => { setCreateOpen(false); setCreateForm(EMPTY_CREATE); }}>
-                Close
+                {t('property.creator.close')}
               </button>
             </div>
             <div className="inline-fields">
-              <Field label="Name">
+              <Field label={t('property.fields.name')}>
                 <input
                   value={createForm.name}
                   onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  placeholder="e.g. The Amber Flat"
+                  placeholder={t('property.fields.namePlaceholder')}
                 />
               </Field>
-              <Field label="Category">
+              <Field label={t('property.fields.category')}>
                 <select
                   value={createForm.category}
                   onChange={(e) => setCreateForm({ ...createForm, category: e.target.value as PropertyCategory })}
                 >
                   {PROPERTY_CATEGORIES.map((c) => (
                     <option key={c} value={c}>
-                      {PROPERTY_CATEGORY_LABELS[c]}
+                      {propertyCategoryLabel(c)}
                     </option>
                   ))}
                 </select>
               </Field>
             </div>
             <div className="inline-fields">
-              <Field label="Buy price (◈)">
+              <Field label={t('property.fields.buyPrice')}>
                 <input
                   type="number"
                   min={0}
@@ -484,7 +487,7 @@ export function PropertyApp() {
                   onChange={(e) => setCreateForm({ ...createForm, buyPrice: Math.max(0, Number(e.target.value) || 0) })}
                 />
               </Field>
-              <Field label="Lease rent (◈)">
+              <Field label={t('property.fields.leaseRent')}>
                 <input
                   type="number"
                   min={0}
@@ -494,36 +497,36 @@ export function PropertyApp() {
                   }
                 />
               </Field>
-              <Field label="Cadence">
+              <Field label={t('property.fields.cadence')}>
                 <select
                   value={createForm.rentCadence}
                   onChange={(e) => setCreateForm({ ...createForm, rentCadence: e.target.value as RentCadence })}
                 >
                   {RENT_CADENCES.map((rc) => (
                     <option key={rc} value={rc}>
-                      {RENT_CADENCE_LABELS[rc]}
+                      {rentCadenceLabel(rc)}
                     </option>
                   ))}
                 </select>
               </Field>
             </div>
             <div className="inline-fields">
-              <Field label="Date buff stat">
+              <Field label={t('property.fields.buffStat')}>
                 <select
                   value={createForm.buffStat ?? ''}
                   onChange={(e) =>
                     setCreateForm({ ...createForm, buffStat: (e.target.value as RelationshipStatKey) || null })
                   }
                 >
-                  <option value="">— none —</option>
+                  <option value="">{t('property.fields.none')}</option>
                   {RELATIONSHIP_STAT_KEYS.map((k) => (
                     <option key={k} value={k}>
-                      {RELATIONSHIP_STAT_LABELS[k]}
+                      {relationshipStatLabel(k)}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Buff amount (0–5)">
+              <Field label={t('property.fields.buffAmount')}>
                 <input
                   type="number"
                   min={0}
@@ -537,22 +540,22 @@ export function PropertyApp() {
                   }
                 />
               </Field>
-              <Field label="Indoor">
+              <Field label={t('property.fields.indoor')}>
                 <label className="prop-checkbox-label">
                   <input
                     type="checkbox"
                     checked={createForm.indoor}
                     onChange={(e) => setCreateForm({ ...createForm, indoor: e.target.checked })}
                   />
-                  Sheltered venue
+                  {t('property.fields.shelteredVenue')}
                 </label>
               </Field>
             </div>
-            <Field label="Description">
+            <Field label={t('property.fields.description')}>
               <textarea
                 value={createForm.description}
                 onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
-                placeholder="A lamplit room with brass fixtures and faded curtains…"
+                placeholder={t('property.fields.descPlaceholder')}
               />
             </Field>
             <div className="row">
@@ -561,7 +564,7 @@ export function PropertyApp() {
                 onClick={submitCreate}
                 disabled={creating || !createForm.name.trim()}
               >
-                {creating ? 'Adding…' : <><Icon name="plus" size={14} /> Add property</>}
+                {creating ? t('property.create.adding') : <><Icon name="plus" size={14} /> {t('property.create.addProperty')}</>}
               </button>
             </div>
           </div>
@@ -571,20 +574,20 @@ export function PropertyApp() {
         <Loader state={state}>
           {({ properties }) =>
             properties.length === 0 ? (
-              <Empty icon={<Icon name="location" size={34} />} title="No properties yet">
+              <Empty icon={<Icon name="location" size={34} />} title={t('property.list.emptyTitle')}>
                 <p className="muted">
                   {creatorMode
-                    ? 'Generate or add a property above to list it here.'
-                    : 'No properties are available in this world.'}
+                    ? t('property.list.emptyCreator')
+                    : t('property.list.emptyPlayer')}
                 </p>
               </Empty>
             ) : (
               <>
                 <div className="section-head prop-list-head">
                   <div className="titles">
-                    <div className="kicker">On the market</div>
+                    <div className="kicker">{t('property.list.onTheMarket')}</div>
                     <h3 className="prop-list-count">
-                      {properties.length} propert{properties.length === 1 ? 'y' : 'ies'}
+                      {t('property.list.count', { count: properties.length })}
                     </h3>
                   </div>
                 </div>
@@ -612,15 +615,15 @@ export function PropertyApp() {
                             <div className="flex-fill">
                               <h4 className="prop-card-name">{property.name}</h4>
                               <div className="prop-card-cat">
-                                {PROPERTY_CATEGORY_LABELS[property.category]}
-                                {property.indoor ? ' · Indoor' : ' · Outdoor'}
+                                {propertyCategoryLabel(property.category)}
+                                {property.indoor ? t('property.card.indoor') : t('property.card.outdoor')}
                               </div>
                             </div>
-                            {owned && <span className="prop-owned-badge">Owned</span>}
-                            {isLeased && !isOverdue && <span className="prop-leased-badge">Leased</span>}
+                            {owned && <span className="prop-owned-badge">{t('property.card.owned')}</span>}
+                            {isLeased && !isOverdue && <span className="prop-leased-badge">{t('property.card.leased')}</span>}
                             {isOverdue && (
                               <span className="prop-overdue-badge">
-                                <Icon name="warn" size={11} /> Overdue
+                                <Icon name="warn" size={11} /> {t('property.card.overdue')}
                               </span>
                             )}
                           </div>
@@ -645,7 +648,7 @@ export function PropertyApp() {
                           {owned ? (
                             /* Owned: just buy-back price + buff */
                             <div className="prop-econ-row">
-                              <span className="prop-price-label">Sell value</span>
+                              <span className="prop-price-label">{t('property.card.sellValue')}</span>
                               <span className="prop-price">◈ {property.buyPrice}</span>
                             </div>
                           ) : isLeased ? (
@@ -654,16 +657,19 @@ export function PropertyApp() {
                               <div className="prop-overdue-notice">
                                 <Icon name="warn" size={13} />
                                 <span>
-                                  RENT OVERDUE — pay ◈{property.rentAmount} by Day {(lease as PropertyLease).graceUntilDay ?? '?'} or you'll be evicted
+                                  {t('property.card.rentOverdue', {
+                                    rent: property.rentAmount,
+                                    day: (lease as PropertyLease).graceUntilDay ?? '?',
+                                  })}
                                 </span>
                               </div>
                             ) : (
                               <div className="prop-econ-row">
                                 <span className="prop-price-label">
-                                  Rent ◈{property.rentAmount}/{RENT_CADENCE_PER[cadence]}
+                                  {t('property.card.rentPer', { rent: property.rentAmount, per: rentCadencePer(cadence) })}
                                 </span>
                                 <span className="prop-price secondary">
-                                  next due Day {(lease as PropertyLease).nextDueDay}
+                                  {t('property.card.nextDue', { day: (lease as PropertyLease).nextDueDay })}
                                 </span>
                               </div>
                             )
@@ -673,13 +679,13 @@ export function PropertyApp() {
                               {property.rentAmount > 0 && (
                                 <div className="prop-econ-row">
                                   <span className="prop-price-label">
-                                    Lease /{RENT_CADENCE_PER[cadence]}
+                                    {t('property.card.leasePer', { per: rentCadencePer(cadence) })}
                                   </span>
                                   <span className="prop-price secondary">◈ {property.rentAmount}</span>
                                 </div>
                               )}
                               <div className="prop-econ-row">
-                                <span className="prop-price-label">Buy</span>
+                                <span className="prop-price-label">{t('property.card.buy')}</span>
                                 <span className="prop-price">◈ {property.buyPrice}</span>
                               </div>
                             </>
@@ -688,8 +694,11 @@ export function PropertyApp() {
                           {property.buffStat && property.buffAmount > 0 && (
                             <div className="prop-econ-row prop-buff-row">
                               <span className="prop-buff">
-                                +{property.buffAmount} {RELATIONSHIP_STAT_LABELS[property.buffStat]} on dates here
-                                {' '}({owned ? 'full when owned' : 'half when leased, full when owned'})
+                                {t('property.card.buff', {
+                                  amount: property.buffAmount,
+                                  stat: relationshipStatLabel(property.buffStat),
+                                  note: owned ? t('property.card.buffOwned') : t('property.card.buffLeased'),
+                                })}
                               </span>
                             </div>
                           )}
@@ -704,7 +713,7 @@ export function PropertyApp() {
                               disabled={isBusy || busyId !== null}
                               onClick={() => sell(pv)}
                             >
-                              {isBusy ? 'Selling…' : `Sell (◈ ${property.buyPrice})`}
+                              {isBusy ? t('property.card.selling') : t('property.card.sell', { price: property.buyPrice })}
                             </button>
                           ) : isLeased ? (
                             /* Leased: pay rent (only when due), buy, end lease */
@@ -714,26 +723,26 @@ export function PropertyApp() {
                                   className={`btn flex-fill${isOverdue ? ' danger' : ''}`}
                                   disabled={!affordableLease || isBusy || busyId !== null}
                                   onClick={() => payRent(pv)}
-                                  title={!affordableLease ? 'Not enough ◈' : undefined}
+                                  title={!affordableLease ? t('property.card.notEnough') : undefined}
                                 >
-                                  {isBusy ? 'Paying…' : !affordableLease ? 'Not enough ◈' : `Pay rent (◈ ${property.rentAmount})`}
+                                  {isBusy ? t('property.card.paying') : !affordableLease ? t('property.card.notEnough') : t('property.card.payRent', { rent: property.rentAmount })}
                                 </button>
                               )}
                               <button
                                 className="btn primary"
                                 disabled={!affordableBuy || isBusy || busyId !== null}
                                 onClick={() => buy(pv)}
-                                title={!affordableBuy ? 'Not enough ◈' : `Buy outright`}
+                                title={!affordableBuy ? t('property.card.notEnough') : t('property.card.buyOutright')}
                               >
-                                {`Buy (◈ ${property.buyPrice})`}
+                                {t('property.card.buyPrice', { price: property.buyPrice })}
                               </button>
                               <button
                                 className="btn ghost"
                                 disabled={isBusy || busyId !== null}
                                 onClick={() => setPendingEndLease(pv)}
-                                title="Move out"
+                                title={t('property.card.moveOut')}
                               >
-                                End lease
+                                {t('property.card.endLease')}
                               </button>
                             </>
                           ) : (
@@ -746,10 +755,10 @@ export function PropertyApp() {
                                   onClick={() => startLease(pv)}
                                 >
                                   {isBusy
-                                    ? 'Leasing…'
+                                    ? t('property.card.leasing')
                                     : !affordableLease
-                                    ? 'Not enough ◈'
-                                    : 'Lease'}
+                                    ? t('property.card.notEnough')
+                                    : t('property.card.lease')}
                                 </button>
                               )}
                               <button
@@ -758,10 +767,10 @@ export function PropertyApp() {
                                 onClick={() => buy(pv)}
                               >
                                 {isBusy
-                                  ? 'Buying…'
+                                  ? t('property.card.buying')
                                   : !affordableBuy
-                                  ? 'Not enough ◈'
-                                  : `Buy (◈ ${property.buyPrice})`}
+                                  ? t('property.card.notEnough')
+                                  : t('property.card.buyPrice', { price: property.buyPrice })}
                               </button>
                             </>
                           )}
@@ -769,8 +778,8 @@ export function PropertyApp() {
                             <button
                               className="btn danger ghost"
                               onClick={() => setPendingDelete(property)}
-                              title="Delete property"
-                              aria-label="Delete property"
+                              title={t('property.card.deleteProperty')}
+                              aria-label={t('property.card.deleteProperty')}
                             >
                               <Icon name="trash" size={15} />
                             </button>
@@ -788,9 +797,9 @@ export function PropertyApp() {
 
       {pendingDelete && (
         <ConfirmDialog
-          title={`Delete ${pendingDelete.name}?`}
-          body="This removes the property from the world permanently."
-          confirmLabel="Delete"
+          title={t('property.confirmDelete.title', { name: pendingDelete.name })}
+          body={t('property.confirmDelete.body')}
+          confirmLabel={t('property.confirmDelete.confirm')}
           danger
           busy={deleting}
           onConfirm={() => removeProperty(pendingDelete)}
@@ -800,9 +809,9 @@ export function PropertyApp() {
 
       {pendingEndLease && (
         <ConfirmDialog
-          title="Move out?"
-          body={`You'll lose your lease on ${pendingEndLease.property.name}. Any overdue rent will be forgiven but you'll need to lease again to return.`}
-          confirmLabel="Move out"
+          title={t('property.confirmEndLease.title')}
+          body={t('property.confirmEndLease.body', { name: pendingEndLease.property.name })}
+          confirmLabel={t('property.confirmEndLease.confirm')}
           danger
           busy={busyId === pendingEndLease.property.id}
           onConfirm={() => doEndLease(pendingEndLease)}

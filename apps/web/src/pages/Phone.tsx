@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { PHASE_ICONS, PHASE_LABELS } from '@dsim/shared';
+import type { ParseKeys } from 'i18next';
+import { useTranslation } from 'react-i18next';
+import { PHASE_ICONS } from '@dsim/shared';
 import { api } from '../lib/api';
 import './phone.page.css';
 import { useAppData } from '../state/app-context';
+import { phaseLabel } from '../i18n/labels';
 import { Icon } from '../components/Icon';
 import { MessagesApp } from '../components/phone/MessagesApp';
 import { FacesApp } from '../components/phone/FacesApp';
@@ -26,31 +29,32 @@ type AppId = 'home' | 'messages' | 'email' | 'faces' | 'moments' | 'social' | 'w
 
 type Tint = 'rose' | 'brass' | 'moon' | 'sage';
 
-type AppDef = { id: Exclude<AppId, 'home'>; icon: string; label: string; tint: Tint };
+type CommonKey = ParseKeys<'common'>;
+type AppDef = { id: Exclude<AppId, 'home'>; icon: string; labelKey: CommonKey; tint: Tint };
 
 const APPS: AppDef[] = [
-  { id: 'messages', icon: 'messages', label: 'Messages', tint: 'rose' },
-  { id: 'email', icon: 'mail', label: 'Mail', tint: 'moon' },
-  { id: 'faces', icon: 'faces', label: 'Faces', tint: 'moon' },
-  { id: 'moments', icon: 'moments', label: 'Moments', tint: 'rose' },
-  { id: 'calendar', icon: 'calendar', label: 'Almanac', tint: 'brass' },
-  { id: 'social', icon: 'social', label: 'Social', tint: 'moon' },
-  { id: 'weather', icon: 'weather', label: 'Weather', tint: 'moon' },
-  { id: 'endings', icon: 'endings', label: 'Endings', tint: 'brass' },
-  { id: 'work', icon: 'work', label: 'Work', tint: 'brass' },
-  { id: 'together', icon: 'together', label: 'Together', tint: 'rose' },
-  { id: 'property', icon: 'property', label: 'Property', tint: 'brass' },
-  { id: 'market', icon: 'stocks', label: 'Market', tint: 'sage' },
-  { id: 'gambling', icon: 'gambling', label: 'Casino', tint: 'rose' },
-  { id: 'shop', icon: 'shop', label: 'Shop', tint: 'brass' },
-  { id: 'games', icon: 'games', label: 'Games', tint: 'sage' },
-  { id: 'bag', icon: 'bag', label: 'Bag', tint: 'sage' },
+  { id: 'messages', icon: 'messages', labelKey: 'phone.app.messages', tint: 'rose' },
+  { id: 'email', icon: 'mail', labelKey: 'phone.app.email', tint: 'moon' },
+  { id: 'faces', icon: 'faces', labelKey: 'phone.app.faces', tint: 'moon' },
+  { id: 'moments', icon: 'moments', labelKey: 'phone.app.moments', tint: 'rose' },
+  { id: 'calendar', icon: 'calendar', labelKey: 'phone.app.calendar', tint: 'brass' },
+  { id: 'social', icon: 'social', labelKey: 'phone.app.social', tint: 'moon' },
+  { id: 'weather', icon: 'weather', labelKey: 'phone.app.weather', tint: 'moon' },
+  { id: 'endings', icon: 'endings', labelKey: 'phone.app.endings', tint: 'brass' },
+  { id: 'work', icon: 'work', labelKey: 'phone.app.work', tint: 'brass' },
+  { id: 'together', icon: 'together', labelKey: 'phone.app.together', tint: 'rose' },
+  { id: 'property', icon: 'property', labelKey: 'phone.app.property', tint: 'brass' },
+  { id: 'market', icon: 'stocks', labelKey: 'phone.app.market', tint: 'sage' },
+  { id: 'gambling', icon: 'gambling', labelKey: 'phone.app.gambling', tint: 'rose' },
+  { id: 'shop', icon: 'shop', labelKey: 'phone.app.shop', tint: 'brass' },
+  { id: 'games', icon: 'games', labelKey: 'phone.app.games', tint: 'sage' },
+  { id: 'bag', icon: 'bag', labelKey: 'phone.app.bag', tint: 'sage' },
 ];
 
 // Pinned to the dock, in order; the rest fill the home grid.
 const DOCK_IDS: Array<AppDef['id']> = ['messages', 'email', 'moments', 'settings'];
 
-const SETTINGS_APP: AppDef = { id: 'settings', icon: 'settings', label: 'Settings', tint: 'sage' };
+const SETTINGS_APP: AppDef = { id: 'settings', icon: 'settings', labelKey: 'phone.app.settings', tint: 'sage' };
 const ALL_APPS: AppDef[] = [...APPS, SETTINGS_APP];
 
 /** Derive a plausible battery % from the world's daily stamina consumption.
@@ -70,18 +74,20 @@ function batteryLevel(pct: number): 'is-high' | 'is-mid' | 'is-low' {
   return 'is-low';
 }
 
-/** A warm, phase-aware home greeting — the cover line of the almanac. */
-function greetingForPhase(phase: string | undefined): string {
+/** A warm, phase-aware home greeting — the cover line of the almanac. Returns a
+ *  catalog key under `phone.greeting.*` so the line localizes with the UI. */
+function greetingKeyForPhase(phase: string | undefined): CommonKey {
   switch (phase) {
-    case 'morning': return 'Good morning';
-    case 'afternoon': return 'Good afternoon';
-    case 'evening': return 'Good evening';
-    case 'night': return 'Still awake?';
-    default: return 'Good evening';
+    case 'morning': return 'phone.greeting.morning';
+    case 'afternoon': return 'phone.greeting.afternoon';
+    case 'evening': return 'phone.greeting.evening';
+    case 'night': return 'phone.greeting.night';
+    default: return 'phone.greeting.evening';
   }
 }
 
 export function Phone() {
+  const { t } = useTranslation();
   const { worldState, activeWorldId, activeWorld, dayTick, theme } = useAppData();
   const [app, setApp] = useState<AppId>('home');
   const [inbox, setInbox] = useState({ unreadTexts: 0, unreadEmails: 0, feedUnread: 0, landlordUnread: 0 });
@@ -109,7 +115,7 @@ export function Phone() {
   const renderAppIcon = (a: AppDef) => {
     const count = badgeFor(a.id);
     return (
-      <button key={a.id} className={`ph-app is-${a.tint}`} onClick={() => setApp(a.id)} title={a.label}>
+      <button key={a.id} className={`ph-app is-${a.tint}`} onClick={() => setApp(a.id)} title={t(a.labelKey)}>
         <span className="ph-app-icon">
           <span className="ph-app-tile">
             <span className="ph-app-glyph">
@@ -118,7 +124,7 @@ export function Phone() {
           </span>
           {count > 0 && <span className="ph-badge">{count}</span>}
         </span>
-        <span className="ph-app-label">{a.label}</span>
+        <span className="ph-app-label">{t(a.labelKey)}</span>
       </button>
     );
   };
@@ -133,20 +139,20 @@ export function Phone() {
   const gridApps = ALL_APPS.filter((a) => !DOCK_IDS.includes(a.id) && featureOk(a.id));
   const dockApps = DOCK_IDS.map((id) => ALL_APPS.find((a) => a.id === id)!).filter(Boolean);
 
-  const phaseLabel = worldState ? PHASE_LABELS[worldState.phase] : 'Twilight';
+  const phaseTxt = worldState ? phaseLabel(worldState.phase) : t('phone.twilight');
   const phaseIcon = worldState ? PHASE_ICONS[worldState.phase] : '🌙';
   const batteryPct = deriveBattery(worldState?.stamina, worldState?.staminaMax);
-  const greeting = worldState ? greetingForPhase(worldState.phase) : 'Welcome back';
+  const greeting = worldState ? t(greetingKeyForPhase(worldState.phase)) : t('phone.greeting.welcome');
   // Footer hint reacts to what's actually waiting: unread mail/texts first, then a
   // low-energy nudge, otherwise the ambient "letters arrive in time" line.
   const totalUnread = inbox.unreadTexts + inbox.unreadEmails + inbox.landlordUnread + inbox.feedUnread;
   const lowEnergy = batteryPct <= 30;
   const homeHint =
     totalUnread > 0
-      ? `${totalUnread} ${totalUnread === 1 ? 'thing is' : 'things are'} waiting for you.`
+      ? t('phone.hintWaiting', { count: totalUnread })
       : lowEnergy
-        ? 'The lamp runs low — end the day to rest.'
-        : 'Texts and mail arrive as the days pass.';
+        ? t('phone.hintLowEnergy')
+        : t('phone.hintAmbient');
 
   return (
     <div className="phone-wrap">
@@ -154,14 +160,14 @@ export function Phone() {
         <div className="phone-statusbar">
           <div className="ph-status">
             <div className="ph-status-left">
-              <span className="ph-status-time">{phaseIcon} {worldState ? `Day ${worldState.day}` : 'The Almanac'}</span>
-              <span className="ph-status-phase">{phaseLabel}</span>
+              <span className="ph-status-time">{phaseIcon} {worldState ? t('phone.day', { day: worldState.day }) : t('phone.almanac')}</span>
+              <span className="ph-status-phase">{phaseTxt}</span>
             </div>
             <div className="ph-status-right">
               <span className="ph-signal" aria-hidden="true">
                 <i /><i /><i /><i />
               </span>
-              <span className="ph-batt" aria-label={`Energy ${batteryPct}%`}>
+              <span className="ph-batt" aria-label={t('phone.energyPct', { pct: batteryPct })}>
                 <span className="ph-batt-pct">{batteryPct}</span>
                 <span className="ph-batt-body">
                   <span className={`ph-batt-fill ${batteryLevel(batteryPct)}`} style={{ flex: `0 0 ${batteryPct}%` }} />
@@ -178,7 +184,7 @@ export function Phone() {
                 <div className="ph-home">
                   <div className="ph-greeting">
                     <div className="ph-greeting-eyebrow">
-                      Pocket <span className="ph-amp">&</span> Lamplight · {phaseLabel}
+                      Pocket <span className="ph-amp">&</span> Lamplight · {phaseTxt}
                     </div>
                     <h1 className="ph-greeting-title">{greeting}</h1>
                   </div>
@@ -226,7 +232,7 @@ export function Phone() {
             </div>
           )}
         </div>
-        <button className="ph-homebtn" onClick={() => setApp('home')} aria-label="Home" title="Home" />
+        <button className="ph-homebtn" onClick={() => setApp('home')} aria-label={t('phone.home')} title={t('phone.home')} />
       </div>
     </div>
   );

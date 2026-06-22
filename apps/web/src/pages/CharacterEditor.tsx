@@ -1,22 +1,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   DATING_STAT_KEYS,
-  DATING_STAT_LABELS,
-  DATING_STAT_DESCRIPTIONS,
   DEFAULT_DATING_STATS,
   GUARDEDNESS_DEFAULT,
-  guardednessDescriptor,
   MIN_CHARACTER_AGE,
   RELATIONSHIP_STYLE_LABELS,
   CHARACTER_LINK_LABELS,
   GENDER_LABELS,
   SEXUALITY_LABELS,
   EXPRESSIONS,
-  EXPRESSION_LABELS,
   DAYS_OF_WEEK,
   WEATHER_KINDS,
-  WEATHER_LABELS,
   WEATHER_ICONS,
   type Character,
   type CharacterLink,
@@ -24,7 +20,6 @@ import {
   type Employment,
   type CharacterMemory,
   type DatingStats,
-  type Expression,
   type Gender,
   type Relationship,
   type RelationshipStyle,
@@ -34,6 +29,19 @@ import {
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
+import {
+  genderLabel,
+  sexualityLabel,
+  relationshipStyleLabel,
+  characterLinkLabel,
+  weatherLabel,
+  datingStatLabel,
+  datingStatDesc,
+  expressionLabel,
+  weekdayAbbr,
+  weekdayLabel,
+  guardednessDescriptorLabel,
+} from '../i18n/labels';
 import { Banner, ConfirmDialog, Field, TagInput } from '../components/ui';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
 import { useDraft } from '../lib/useDraft';
@@ -128,12 +136,12 @@ const emptyForm: Form = {
 
 type TabId = 'identity' | 'personality' | 'profile' | 'relationships' | 'world';
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'identity',      label: 'Identity' },
-  { id: 'personality',   label: 'Personality' },
-  { id: 'profile',       label: 'Profile' },
-  { id: 'relationships', label: 'Relationships' },
-  { id: 'world',         label: 'World' },
+const TABS: { id: TabId; labelKey: `characterEditor.tabs.${TabId}` }[] = [
+  { id: 'identity',      labelKey: 'characterEditor.tabs.identity' },
+  { id: 'personality',   labelKey: 'characterEditor.tabs.personality' },
+  { id: 'profile',       labelKey: 'characterEditor.tabs.profile' },
+  { id: 'relationships', labelKey: 'characterEditor.tabs.relationships' },
+  { id: 'world',         labelKey: 'characterEditor.tabs.world' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -141,6 +149,7 @@ const TABS: { id: TabId; label: string }[] = [
 // ---------------------------------------------------------------------------
 
 export function CharacterEditor() {
+  const { t } = useTranslation(['pages', 'common']);
   const { id } = useParams();
   const isNew = !id;
   const nav = useNavigate();
@@ -328,7 +337,7 @@ export function CharacterEditor() {
       // re-file the draft under a world the character doesn't live in yet.
       worldId: isNew ? activeWorldId : baseline?.worldId ?? form.worldId,
       isNew,
-      label: () => form.name.trim() || 'Untitled character',
+      label: () => form.name.trim() || t('pages:characterEditor.untitledCharacter'),
     },
   });
 
@@ -364,7 +373,7 @@ export function CharacterEditor() {
         await api.updateCharacter(id!, payload);
         setBaseline(form); // saved → the form is clean again
         draft.clear();
-        setSavedNote('Saved!');
+        setSavedNote(t('pages:characterEditor.saved'));
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -404,10 +413,10 @@ export function CharacterEditor() {
       });
       if (res.ok) {
         set('datingStats', res.data);
-        setSavedNote('Stats generated — review and Save.');
+        setSavedNote(t('pages:characterEditor.statsGenerated'));
         draft.dismissFound(); // generated content supersedes any stale restore offer
       } else {
-        setError(`Stat generation failed: ${res.error}`);
+        setError(t('pages:characterEditor.statGenFailed', { error: res.error }));
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -445,10 +454,10 @@ export function CharacterEditor() {
           insecurities: res.data.insecurities,
           quirks: res.data.quirks,
         }));
-        setSavedNote('Profile generated — review and Save.');
+        setSavedNote(t('pages:characterEditor.profileGenerated'));
         draft.dismissFound();
       } else {
-        setError(`Profile generation failed: ${res.error}`);
+        setError(t('pages:characterEditor.profileGenFailed', { error: res.error }));
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -506,10 +515,10 @@ export function CharacterEditor() {
           datingStats: d.datingStats,
         }));
         setActiveTab('identity');
-        setSavedNote('Character generated from portrait — review every tab and Save.');
+        setSavedNote(t('pages:characterEditor.imageGenerated'));
         draft.dismissFound();
       } else {
-        setError(`Generation from image failed: ${res.error}`);
+        setError(t('pages:characterEditor.imageGenFailed', { error: res.error }));
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -540,7 +549,7 @@ export function CharacterEditor() {
   // needing an actual saved character record.
   const previewCharacter = useMemo(
     () => ({
-      name: form.name || 'Unnamed',
+      name: form.name || t('pages:characterEditor.unnamed'),
       portraitAssetId: form.portraitAssetId,
       expressionAssets: Object.fromEntries(
         form.expressionRows.filter((r) => r.name.trim() && r.assetId).map((r) => [r.name.trim(), r.assetId as string]),
@@ -557,23 +566,35 @@ export function CharacterEditor() {
       <div className="framed creator-head ce-head">
         <div className="creator-head-titles">
           <div className="creator-meta">
-            <span className="kicker">Character workbench</span>
-            <span className="creator-tool-tag">{isNew ? 'new' : 'editing'}</span>
+            <span className="kicker">{t('pages:characterEditor.workbench')}</span>
+            <span className="creator-tool-tag">
+              {isNew ? t('pages:characterEditor.tagNew') : t('pages:characterEditor.tagEditing')}
+            </span>
           </div>
-          <h1>{isNew ? 'New character' : `Edit ${form.name || 'character'}`}</h1>
-          <p>All notes here are treated as character <b>data</b> in prompts - never as instructions to the model. You should fill this out with a lot of detail so the LLM can breathe as much life into your characters as possible. Data from this profile is surfaced in quite a few areas, and it will only be as good as what you put in. Putting slop in will give slop out. The only thing you should be cognizant of is that the more data you put here, the longer the prompts will be. You can press preview prompt in the top right to see how long a full prompt would be.</p>
+          <h1>
+            {isNew
+              ? t('pages:characterEditor.newTitle')
+              : t('pages:characterEditor.editTitle', {
+                  name: form.name || t('pages:characterEditor.editFallback'),
+                })}
+          </h1>
+          <p>{t('pages:characterEditor.intro')}</p>
         </div>
         <div className="creator-head-actions">
           {!isNew && (
             <button className="btn ghost" onClick={showPreview}>
               <Icon name="preview" size={14} />
-              Preview prompt
+              {t('pages:characterEditor.previewPrompt')}
             </button>
           )}
           <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />
           <button className="btn primary" onClick={save} disabled={saving || !form.name.trim()}>
             <Icon name="save" size={14} />
-            {saving ? 'Saving…' : isNew ? 'Create' : 'Save'}
+            {saving
+              ? t('pages:characterEditor.saving')
+              : isNew
+                ? t('pages:characterEditor.create')
+                : t('pages:characterEditor.save')}
           </button>
         </div>
       </div>
@@ -584,7 +605,7 @@ export function CharacterEditor() {
       {draft.found && (
         <DraftRestoreBar
           env={draft.found}
-          noun="character"
+          noun={t('pages:characterEditor.noun')}
           onRestore={() => {
             const d = draft.restore();
             if (d) setForm({ ...emptyForm, ...d }); // spread over defaults = forward-tolerant
@@ -603,7 +624,7 @@ export function CharacterEditor() {
         <aside className="ce-rail">
           <div className="ce-portrait-plate framed">
             <Portrait character={previewCharacter} className="ce-portrait-img" />
-            <div className="ce-portrait-name">{form.name || <span className="ce-portrait-placeholder">Unnamed</span>}</div>
+            <div className="ce-portrait-name">{form.name || <span className="ce-portrait-placeholder">{t('pages:characterEditor.unnamed')}</span>}</div>
             {form.age >= MIN_CHARACTER_AGE && (
               <div className="ce-portrait-meta">{form.age} · {form.pronouns || '—'}</div>
             )}
@@ -619,15 +640,15 @@ export function CharacterEditor() {
         <div className="ce-main stack">
 
           {/* Tab nav */}
-          <nav className="ce-tabs" aria-label="Editor sections">
-            {TABS.map((t) => (
+          <nav className="ce-tabs" aria-label={t('pages:characterEditor.editorSectionsAria')}>
+            {TABS.map((tab) => (
               <button
-                key={t.id}
+                key={tab.id}
                 type="button"
-                className={`ce-tab ${activeTab === t.id ? 'ce-tab-active' : ''}`}
-                onClick={() => setActiveTab(t.id)}
+                className={`ce-tab ${activeTab === tab.id ? 'ce-tab-active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
               >
-                {t.label}
+                {t(`pages:${tab.labelKey}`)}
               </button>
             ))}
           </nav>
@@ -640,14 +661,14 @@ export function CharacterEditor() {
               <div className="card">
                 <div className="creator-sec">
                   <span className="creator-index">01</span>
-                  <h2>Identity</h2>
+                  <h2>{t('pages:characterEditor.secIdentity')}</h2>
                   <span className="trail" />
                 </div>
-                <Field label="Name">
+                <Field label={t('pages:characterEditor.name')}>
                   <input value={form.name} onChange={(e) => set('name', e.target.value)} />
                 </Field>
                 <div className="inline-fields">
-                  <Field label="Age" hint={`Must be ${MIN_CHARACTER_AGE}+`}>
+                  <Field label={t('pages:characterEditor.age')} hint={t('pages:characterEditor.ageHint', { min: MIN_CHARACTER_AGE })}>
                     <input
                       type="number"
                       min={MIN_CHARACTER_AGE}
@@ -655,33 +676,33 @@ export function CharacterEditor() {
                       onChange={(e) => set('age', Number(e.target.value))}
                     />
                   </Field>
-                  <Field label="Pronouns">
+                  <Field label={t('pages:characterEditor.pronouns')}>
                     <input value={form.pronouns} onChange={(e) => set('pronouns', e.target.value)} />
                   </Field>
                 </div>
                 <div className="inline-fields">
-                  <Field label="Gender" hint="Separate from pronouns.">
+                  <Field label={t('pages:characterEditor.gender')} hint={t('pages:characterEditor.genderHint')}>
                     <select value={form.gender} onChange={(e) => set('gender', e.target.value as Gender)}>
-                      {Object.entries(GENDER_LABELS).map(([k, label]) => (
+                      {Object.keys(GENDER_LABELS).map((k) => (
                         <option key={k} value={k}>
-                          {label}
+                          {genderLabel(k)}
                         </option>
                       ))}
                     </select>
                   </Field>
-                  <Field label="Sexuality" hint="Gates who romance can deepen with. Players discover it through play.">
+                  <Field label={t('pages:characterEditor.sexuality')} hint={t('pages:characterEditor.sexualityHint')}>
                     <select value={form.sexuality} onChange={(e) => set('sexuality', e.target.value as Sexuality)}>
-                      {Object.entries(SEXUALITY_LABELS).map(([k, label]) => (
+                      {Object.keys(SEXUALITY_LABELS).map((k) => (
                         <option key={k} value={k}>
-                          {label}
+                          {sexualityLabel(k)}
                         </option>
                       ))}
                     </select>
                   </Field>
                 </div>
-                <Field label="World" hint="A character with no world is unassigned and won't appear in any world until you place them (recover them under People → Unassigned).">
+                <Field label={t('pages:characterEditor.world')} hint={t('pages:characterEditor.worldHint')}>
                   <select value={form.worldId ?? ''} onChange={(e) => set('worldId', e.target.value || null)}>
-                    <option value="">— No world (unassigned) —</option>
+                    <option value="">{t('pages:characterEditor.noWorld')}</option>
                     {worlds.map((w) => (
                       <option key={w.id} value={w.id}>
                         {w.name}
@@ -690,8 +711,8 @@ export function CharacterEditor() {
                   </select>
                 </Field>
                 <Field
-                  label="Relationship style"
-                  hint="Monogamous characters may get jealous if they learn you're dating others."
+                  label={t('pages:characterEditor.relStyle')}
+                  hint={t('pages:characterEditor.relStyleHint')}
                 >
                   <select
                     value={form.relationshipStyle}
@@ -699,12 +720,12 @@ export function CharacterEditor() {
                   >
                     {(Object.keys(RELATIONSHIP_STYLE_LABELS) as RelationshipStyle[]).map((k) => (
                       <option key={k} value={k}>
-                        {RELATIONSHIP_STYLE_LABELS[k]}
+                        {relationshipStyleLabel(k)}
                       </option>
                     ))}
                   </select>
                 </Field>
-                <Field label="Short description">
+                <Field label={t('pages:characterEditor.shortDesc')}>
                   <textarea value={form.shortDescription} onChange={(e) => set('shortDescription', e.target.value)} />
                 </Field>
               </div>
@@ -712,7 +733,7 @@ export function CharacterEditor() {
               <div className="card">
                 <div className="creator-sec">
                   <span className="creator-index">02</span>
-                  <h2>Portrait</h2>
+                  <h2>{t('pages:characterEditor.secPortrait')}</h2>
                   <span className="trail" />
                 </div>
                 <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} />
@@ -723,12 +744,14 @@ export function CharacterEditor() {
                     disabled={generatingFromImage || !form.portraitAssetId}
                   >
                     <Icon name="generate" size={13} />
-                    {generatingFromImage ? 'Reading the portrait…' : 'Generate character from portrait'}
+                    {generatingFromImage
+                      ? t('pages:characterEditor.readingPortrait')
+                      : t('pages:characterEditor.genFromPortrait')}
                   </button>
                   <p className="creator-note">
                     {form.portraitAssetId
-                      ? 'Uses a vision model to draft a whole character from this image, fitted to the selected world. Fills every tab for you to review before saving. Set a vision model in Settings (it falls back to your main model).'
-                      : 'Upload or pick a portrait above first, then a vision model can draft a full character from it.'}
+                      ? t('pages:characterEditor.portraitNoteHas')
+                      : t('pages:characterEditor.portraitNoteEmpty')}
                   </p>
                 </div>
                 <div className="divider" />
@@ -748,23 +771,22 @@ export function CharacterEditor() {
                 >
                   <h3 style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Icon name={expressionsOpen ? 'chevronDown' : 'chevronRight'} size={16} />
-                    Expressions
+                    {t('pages:characterEditor.expressions')}
                     <span className="badge" style={{ marginLeft: 6 }}>
-                      {form.expressionRows.filter((r) => r.assetId).length} set
+                      {t('pages:characterEditor.expressionsSet', {
+                        count: form.expressionRows.filter((r) => r.assetId).length,
+                      })}
                     </span>
                   </h3>
                   <span className="trail" />
                 </div>
                 {expressionsOpen && (
                   <>
-                    <p className="creator-note">
-                      These are the fixed expressions the date evaluator can pick. Assign an image to any you want
-                      shown; leave the rest blank to use the default portrait.
-                    </p>
+                    <p className="creator-note">{t('pages:characterEditor.expressionsNote')}</p>
                     {form.expressionRows.map((row, i) => (
                   <div key={row.name} className="creator-subcard stack">
                     <div className="row">
-                      <strong className="flex-fill">{EXPRESSION_LABELS[row.name as Expression] ?? row.name}</strong>
+                      <strong className="flex-fill">{expressionLabel(row.name)}</strong>
                       {row.assetId && (
                         <button
                           className="btn sm danger"
@@ -775,7 +797,7 @@ export function CharacterEditor() {
                           }}
                         >
                           <Icon name="trash" size={13} />
-                          Clear
+                          {t('pages:characterEditor.clear')}
                         </button>
                       )}
                     </div>
@@ -804,22 +826,22 @@ export function CharacterEditor() {
               <div className="card">
                 <div className="creator-sec">
                   <span className="creator-index">03</span>
-                  <h2>Personality & voice</h2>
+                  <h2>{t('pages:characterEditor.secPersonality')}</h2>
                   <span className="trail" />
                 </div>
-                <Field label="Personality">
+                <Field label={t('pages:characterEditor.personality')}>
                   <textarea value={form.personality} onChange={(e) => set('personality', e.target.value)} />
                 </Field>
-                <Field label="Speech style">
+                <Field label={t('pages:characterEditor.speechStyle')}>
                   <textarea value={form.speechStyle} onChange={(e) => set('speechStyle', e.target.value)} />
                 </Field>
-                <Field label="Relationship preferences">
+                <Field label={t('pages:characterEditor.relPrefs')}>
                   <textarea
                     value={form.relationshipPreferences}
                     onChange={(e) => set('relationshipPreferences', e.target.value)}
                   />
                 </Field>
-                <Field label="Private creator notes" hint="Whatever extra guidance you want to give to the model; never shown verbatim to players.">
+                <Field label={t('pages:characterEditor.creatorNotes')} hint={t('pages:characterEditor.creatorNotesHint')}>
                   <textarea value={form.creatorNotes} onChange={(e) => set('creatorNotes', e.target.value)} />
                 </Field>
               </div>
@@ -827,24 +849,27 @@ export function CharacterEditor() {
               <div className="card">
                 <div className="creator-sec">
                   <span className="creator-index">04</span>
-                  <h2>Traits & boundaries</h2>
+                  <h2>{t('pages:characterEditor.secTraits')}</h2>
                   <span className="trail" />
                 </div>
-                <Field label="Likes">
+                <Field label={t('pages:characterEditor.likes')}>
                   <TagInput value={form.likes} onChange={(v) => set('likes', v)} />
                 </Field>
-                <Field label="Dislikes">
+                <Field label={t('pages:characterEditor.dislikes')}>
                   <TagInput value={form.dislikes} onChange={(v) => set('dislikes', v)} />
                 </Field>
-                <Field label="Goals">
+                <Field label={t('pages:characterEditor.goals')}>
                   <TagInput value={form.goals} onChange={(v) => set('goals', v)} />
                 </Field>
-                <Field label="Boundaries">
+                <Field label={t('pages:characterEditor.boundaries')}>
                   <TagInput value={form.boundaries} onChange={(v) => set('boundaries', v)} />
                 </Field>
                 <Field
-                  label={`Guardedness: ${form.guardedness} — ${guardednessDescriptor(form.guardedness)}`}
-                  hint="How slow they are to warm up on a date. Higher = they open up, trust, and flirt only once it's earned, and a date with them starts cooler. Doesn't change how fast a bad date sours."
+                  label={t('pages:characterEditor.guardedness', {
+                    value: form.guardedness,
+                    descriptor: guardednessDescriptorLabel(form.guardedness),
+                  })}
+                  hint={t('pages:characterEditor.guardednessHint')}
                 >
                   <input
                     type="range"
@@ -854,8 +879,8 @@ export function CharacterEditor() {
                     onChange={(e) => set('guardedness', Number(e.target.value))}
                   />
                   <div className="ce-range-ends">
-                    <span>open book</span>
-                    <span>walled off</span>
+                    <span>{t('pages:characterEditor.openBook')}</span>
+                    <span>{t('pages:characterEditor.walledOff')}</span>
                   </div>
                 </Field>
               </div>
@@ -865,12 +890,10 @@ export function CharacterEditor() {
             <div className="card">
               <div className="creator-sec">
                 <span className="creator-index">09</span>
-                <h2>Weather preferences</h2>
+                <h2>{t('pages:characterEditor.secWeather')}</h2>
                 <span className="trail" />
               </div>
-              <p className="creator-note">
-                Sets their mood on those days and nudges outdoor dates. ♥ = loves it, ✕ = can't stand it.
-              </p>
+              <p className="creator-note">{t('pages:characterEditor.weatherNote')}</p>
               <div className="weather-pref-grid">
                 {WEATHER_KINDS.map((k) => {
                   const fav = form.favoriteWeather.includes(k);
@@ -878,19 +901,19 @@ export function CharacterEditor() {
                   return (
                     <div className="weather-pref" key={k}>
                       <span className="flex-fill">
-                        {WEATHER_ICONS[k]} {WEATHER_LABELS[k]}
+                        {WEATHER_ICONS[k]} {weatherLabel(k)}
                       </span>
                       <button
                         className={`btn sm ${fav ? 'primary' : 'ghost'}`}
                         onClick={() => toggleWeather(k, 'fav')}
-                        title="loves this weather"
+                        title={t('pages:characterEditor.lovesWeather')}
                       >
                         ♥
                       </button>
                       <button
                         className={`btn sm ${dis ? 'danger' : 'ghost'}`}
                         onClick={() => toggleWeather(k, 'dis')}
-                        title="dislikes this weather"
+                        title={t('pages:characterEditor.dislikesWeather')}
                       >
                         ✕
                       </button>
@@ -909,7 +932,7 @@ export function CharacterEditor() {
               <div className="card">
                 <div className="creator-sec">
                   <span className="creator-index">05</span>
-                  <h2>Profile & presence</h2>
+                  <h2>{t('pages:characterEditor.secProfile')}</h2>
                   <span className="trail" />
                   <button
                     className="btn sm creator-sec-action"
@@ -917,23 +940,26 @@ export function CharacterEditor() {
                     disabled={generatingProfile || !form.name.trim()}
                   >
                     <Icon name="generate" size={13} />
-                    {generatingProfile ? 'Generating…' : 'Generate from description'}
+                    {generatingProfile
+                      ? t('pages:characterEditor.generating')
+                      : t('pages:characterEditor.genFromDesc')}
                   </button>
                 </div>
                 <p className="creator-note">
-                  Flavor that makes {form.name || 'this character'} feel alive — how they look, text, and show up online.
-                  Used by the in-world phone feed.
+                  {t('pages:characterEditor.profileNote', {
+                    name: form.name || t('pages:characterEditor.thisCharacter'),
+                  })}
                 </p>
-                <Field label="Appearance">
+                <Field label={t('pages:characterEditor.appearance')}>
                   <textarea value={form.appearance} onChange={(e) => set('appearance', e.target.value)} />
                 </Field>
-                <Field label="Texting style" hint="How they write texts & posts — distinct from how they speak aloud.">
+                <Field label={t('pages:characterEditor.textingStyle')} hint={t('pages:characterEditor.textingStyleHint')}>
                   <textarea value={form.textingStyle} onChange={(e) => set('textingStyle', e.target.value)} />
                 </Field>
-                <Field label="Online persona" hint="How they behave on a social feed.">
+                <Field label={t('pages:characterEditor.onlinePersona')} hint={t('pages:characterEditor.onlinePersonaHint')}>
                   <textarea value={form.onlinePersona} onChange={(e) => set('onlinePersona', e.target.value)} />
                 </Field>
-                <Field label="Love language">
+                <Field label={t('pages:characterEditor.loveLanguage')}>
                   <input value={form.loveLanguage} onChange={(e) => set('loveLanguage', e.target.value)} />
                 </Field>
               </div>
@@ -941,23 +967,23 @@ export function CharacterEditor() {
               <div className="card">
                 <div className="creator-sec">
                   <span className="creator-index">06</span>
-                  <h2>Chemistry & quirks</h2>
+                  <h2>{t('pages:characterEditor.secChemistry')}</h2>
                   <span className="trail" />
                 </div>
-                <p className="creator-note">Tasteful physical/sensory notes plus the little human details.</p>
-                <Field label="Physical needs">
+                <p className="creator-note">{t('pages:characterEditor.chemistryNote')}</p>
+                <Field label={t('pages:characterEditor.physicalNeeds')}>
                   <TagInput value={form.physicalNeeds} onChange={(v) => set('physicalNeeds', v)} />
                 </Field>
-                <Field label="Physical desires">
+                <Field label={t('pages:characterEditor.physicalDesires')}>
                   <TagInput value={form.physicalDesires} onChange={(v) => set('physicalDesires', v)} />
                 </Field>
-                <Field label="Physical dislikes">
+                <Field label={t('pages:characterEditor.physicalDislikes')}>
                   <TagInput value={form.physicalDislikes} onChange={(v) => set('physicalDislikes', v)} />
                 </Field>
-                <Field label="Insecurities">
+                <Field label={t('pages:characterEditor.insecurities')}>
                   <TagInput value={form.insecurities} onChange={(v) => set('insecurities', v)} />
                 </Field>
-                <Field label="Quirks">
+                <Field label={t('pages:characterEditor.quirks')}>
                   <TagInput value={form.quirks} onChange={(v) => set('quirks', v)} />
                 </Field>
               </div>
@@ -967,7 +993,7 @@ export function CharacterEditor() {
             <div className="card">
               <div className="creator-sec">
                 <span className="creator-index">10</span>
-                <h2>Base dating stats</h2>
+                <h2>{t('pages:characterEditor.secBaseStats')}</h2>
                 <span className="trail" />
                 <button
                   className="btn sm creator-sec-action"
@@ -975,20 +1001,20 @@ export function CharacterEditor() {
                   disabled={generatingStats || !form.name.trim()}
                 >
                   <Icon name="generate" size={13} />
-                  {generatingStats ? 'Generating…' : 'Generate from description'}
+                  {generatingStats
+                    ? t('pages:characterEditor.generating')
+                    : t('pages:characterEditor.genFromDesc')}
                 </button>
               </div>
-              <p className="creator-note">
-                These six traits define the character's dating persona. They shape how much relationship progress
-                Together activities yield (each activity favors certain stats), pick the character's favorite minigame
-                (their highest stat), and color how they talk on dates. They may also drive additional systems in the
-                future.
-              </p>
+              <p className="creator-note">{t('pages:characterEditor.baseStatsNote')}</p>
               {DATING_STAT_KEYS.map((k) => (
                 <Field
                   key={k}
-                  label={`${DATING_STAT_LABELS[k]}: ${form.datingStats[k]}`}
-                  hint={DATING_STAT_DESCRIPTIONS[k]}
+                  label={t('pages:characterEditor.statLabel', {
+                    label: datingStatLabel(k),
+                    value: form.datingStats[k],
+                  })}
+                  hint={datingStatDesc(k)}
                 >
                   <input
                     type="range"
@@ -1009,11 +1035,13 @@ export function CharacterEditor() {
             <div className="card">
               <div className="creator-sec">
                 <span className="creator-index">07</span>
-                <h2>Connections</h2>
+                <h2>{t('pages:characterEditor.secConnections')}</h2>
                 <span className="trail" />
               </div>
               <p className="creator-note">
-                How {form.name || 'this character'} relates to others in the world — drives gossip and edge-aware jealousy.
+                {t('pages:characterEditor.connectionsNote', {
+                  name: form.name || t('pages:characterEditor.thisCharacter'),
+                })}
               </p>
               {form.links.map((link, i) => (
                 <div className="ce-link-row" key={i}>
@@ -1026,7 +1054,7 @@ export function CharacterEditor() {
                       set('links', links);
                     }}
                   >
-                    <option value="">— Character —</option>
+                    <option value="">{t('pages:characterEditor.selectCharacter')}</option>
                     {allChars
                       // Only this character's OWN world — connections never cross worlds.
                       .filter((c) => c.id !== id && c.worldId === form.worldId)
@@ -1046,7 +1074,7 @@ export function CharacterEditor() {
                   >
                     {(Object.keys(CHARACTER_LINK_LABELS) as CharacterLinkKind[]).map((k) => (
                       <option key={k} value={k}>
-                        {CHARACTER_LINK_LABELS[k]}
+                        {characterLinkLabel(k)}
                       </option>
                     ))}
                   </select>
@@ -1063,7 +1091,7 @@ export function CharacterEditor() {
                 onClick={() => set('links', [...form.links, { targetId: '', kind: 'friend' }])}
               >
                 <Icon name="plus" size={13} />
-                Add connection
+                {t('pages:characterEditor.addConnection')}
               </button>
               <label className="ce-excanoize-label">
                 <input
@@ -1072,10 +1100,10 @@ export function CharacterEditor() {
                   onChange={(e) => set('allowsExCanonization', e.target.checked)}
                 />
                 <span className="creator-note ce-excanoize-body">
-                  <strong>Allow ex-canonization.</strong> Let other characters establish facts about{' '}
-                  {form.name || 'this character'} by revealing them as their ex on a date (e.g. a date mentions their ex used
-                  to smoke → it becomes true here, and they react if you bring it up). Off by default — their truth stays
-                  immutable. Reversible anytime.
+                  <strong>{t('pages:characterEditor.exCanonStrong')}</strong>
+                  {t('pages:characterEditor.exCanonBody', {
+                    name: form.name || t('pages:characterEditor.thisCharacter'),
+                  })}
                 </span>
               </label>
             </div>
@@ -1084,13 +1112,13 @@ export function CharacterEditor() {
             <div className="card">
               <div className="creator-sec">
                 <span className="creator-index">11</span>
-                <h2>Relationship</h2>
+                <h2>{t('pages:characterEditor.secRelationship')}</h2>
                 <span className="trail" />
               </div>
               {relationship ? (
                 <RelationshipBars relationship={relationship} />
               ) : (
-                <p className="muted">Relationship stats appear after the character is created.</p>
+                <p className="muted">{t('pages:characterEditor.relStatsLater')}</p>
               )}
             </div>
 
@@ -1098,24 +1126,24 @@ export function CharacterEditor() {
             <div className="card">
               <div className="creator-sec">
                 <span className="creator-index">12</span>
-                <h2>Memories</h2>
+                <h2>{t('pages:characterEditor.secMemories')}</h2>
                 <span className="trail" />
               </div>
               {isNew ? (
-                <p className="muted">Save the character first to add manual memories.</p>
+                <p className="muted">{t('pages:characterEditor.memoriesSaveFirst')}</p>
               ) : (
                 <>
                   <div className="row" style={{ alignItems: 'flex-end' }}>
                     <div className="flex-fill">
-                      <Field label="Add a memory">
+                      <Field label={t('pages:characterEditor.addMemory')}>
                         <input
                           value={newMemory.text}
-                          placeholder="e.g. The player loves rainy days too."
+                          placeholder={t('pages:characterEditor.memoryPlaceholder')}
                           onChange={(e) => setNewMemory((m) => ({ ...m, text: e.target.value }))}
                         />
                       </Field>
                     </div>
-                    <Field label="Importance">
+                    <Field label={t('pages:characterEditor.importance')}>
                       <select
                         value={newMemory.importance}
                         onChange={(e) => setNewMemory((m) => ({ ...m, importance: Number(e.target.value) }))}
@@ -1128,11 +1156,11 @@ export function CharacterEditor() {
                       </select>
                     </Field>
                     <button className="btn" onClick={addMemory} disabled={addingMemory || !newMemory.text.trim()}>
-                      {addingMemory ? 'Adding…' : 'Add'}
+                      {addingMemory ? t('pages:characterEditor.adding') : t('pages:characterEditor.add')}
                     </button>
                   </div>
                   {memories.length === 0 ? (
-                    <p className="muted">No memories yet.</p>
+                    <p className="muted">{t('pages:characterEditor.noMemories')}</p>
                   ) : (
                     memories.map((m) => (
                       <div className="list-item" key={m.id}>
@@ -1154,7 +1182,7 @@ export function CharacterEditor() {
                             }
                           }}
                         >
-                          {deletingMemoryId === m.id ? 'Deleting…' : 'Delete'}
+                          {deletingMemoryId === m.id ? t('pages:characterEditor.deleting') : t('pages:characterEditor.delete')}
                         </button>
                       </div>
                     ))
@@ -1171,12 +1199,13 @@ export function CharacterEditor() {
             <div className="card">
               <div className="creator-sec">
                 <span className="creator-index">08</span>
-                <h2>Employment</h2>
+                <h2>{t('pages:characterEditor.secEmployment')}</h2>
                 <span className="trail" />
               </div>
               <p className="creator-note">
-                What {form.name || 'this character'} does for work. Coworkers (anyone sharing the same workplace) tend to run
-                into each other — this feeds the world simulation. Leave unemployed if they don't work.
+                {t('pages:characterEditor.employmentNote', {
+                  name: form.name || t('pages:characterEditor.thisCharacter'),
+                })}
               </p>
               <label className="ce-employed-toggle">
                 <input
@@ -1184,29 +1213,29 @@ export function CharacterEditor() {
                   checked={form.employment != null}
                   onChange={(e) => set('employment', e.target.checked ? { ...DEFAULT_JOB } : null)}
                 />
-                <span>Employed</span>
+                <span>{t('pages:characterEditor.employed')}</span>
               </label>
               {form.employment && (
                 <>
                   <div className="inline-fields">
-                    <Field label="Job title">
+                    <Field label={t('pages:characterEditor.jobTitle')}>
                       <input value={form.employment.title} onChange={(e) => patchEmp({ title: e.target.value })} />
                     </Field>
-                    <Field label="Workplace" hint="Characters who share a workplace are coworkers.">
+                    <Field label={t('pages:characterEditor.workplace')} hint={t('pages:characterEditor.workplaceHint')}>
                       <input value={form.employment.place} onChange={(e) => patchEmp({ place: e.target.value })} />
                     </Field>
                   </div>
-                  <Field label="Shift">
+                  <Field label={t('pages:characterEditor.shift')}>
                     <select
                       value={form.employment.shiftPhase}
                       onChange={(e) => patchEmp({ shiftPhase: e.target.value as Employment['shiftPhase'] })}
                     >
-                      <option value="morning">Morning</option>
-                      <option value="afternoon">Afternoon</option>
-                      <option value="evening">Evening</option>
+                      <option value="morning">{t('pages:characterEditor.shiftMorning')}</option>
+                      <option value="afternoon">{t('pages:characterEditor.shiftAfternoon')}</option>
+                      <option value="evening">{t('pages:characterEditor.shiftEvening')}</option>
                     </select>
                   </Field>
-                  <Field label="Workdays">
+                  <Field label={t('pages:characterEditor.workdays')}>
                     <div className="ce-workdays">
                       {DAYS_OF_WEEK.map((d, idx) => (
                         <button
@@ -1214,9 +1243,9 @@ export function CharacterEditor() {
                           type="button"
                           className={`btn sm ${form.employment!.workdays.includes(idx) ? 'primary' : 'ghost'}`}
                           onClick={() => toggleWorkday(idx)}
-                          title={d}
+                          title={weekdayLabel(d)}
                         >
-                          {d.slice(0, 3)}
+                          {weekdayAbbr(d)}
                         </button>
                       ))}
                     </div>
@@ -1236,14 +1265,14 @@ export function CharacterEditor() {
         <details className="card ce-prompt-details" open>
           <summary className="ce-prompt-summary">
             <div className="creator-sec" style={{ margin: 0, flex: 1 }}>
-              <span className="kicker">Assembled system prompt</span>
+              <span className="kicker">{t('pages:characterEditor.assembledPrompt')}</span>
               <span className="trail" />
               <button
                 className="btn sm ghost creator-sec-action"
                 onClick={() => setPreviewOpen(false)}
               >
                 <Icon name="close" size={13} />
-                Close
+                {t('pages:characterEditor.close')}
               </button>
             </div>
           </summary>
@@ -1253,18 +1282,12 @@ export function CharacterEditor() {
 
       {imageConfirmOpen && (
         <ConfirmDialog
-          title="Overwrite this draft from the portrait?"
-          kicker="Generate from image"
-          confirmLabel={generatingFromImage ? 'Generating…' : 'Overwrite & generate'}
+          title={t('pages:characterEditor.imageConfirmTitle')}
+          kicker={t('pages:characterEditor.imageConfirmKicker')}
+          confirmLabel={generatingFromImage ? t('pages:characterEditor.generating') : t('pages:characterEditor.imageConfirmConfirm')}
           danger
           busy={generatingFromImage}
-          body={
-            <>
-              This will replace the name, identity, personality, traits, profile, and dating stats with a fresh draft
-              generated from the portrait. Your portrait, expressions, connections, and employment are kept. This can't
-              be undone (but nothing is saved until you press Save).
-            </>
-          }
+          body={t('pages:characterEditor.imageConfirmBody')}
           onCancel={() => setImageConfirmOpen(false)}
           onConfirm={async () => {
             await runImageGeneration();

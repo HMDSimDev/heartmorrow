@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Character, CharacterEnding } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { useAppData } from '../../state/app-context';
@@ -10,6 +11,7 @@ import './phone-keepsakes.css';
 
 /** The "happy endings" gallery — keepsake epilogues of relationships you've seen through. */
 export function EndingsApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, dayTick } = useAppData();
   const [endings, setEndings] = useState<CharacterEnding[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
@@ -32,20 +34,17 @@ export function EndingsApp() {
 
   return (
     <div className="phone-app">
-      <PhoneAppBar title="Endings" kicker="Happy Endings" icon="endings" />
+      <PhoneAppBar title={t('endings.title')} kicker={t('endings.kicker')} icon="endings" />
       <div className="end-shell">
         {endings.length === 0 ? (
-          <Empty icon={<Icon name="trophy" size={36} />} title="No endings yet">
-            <p className="muted">
-              See a relationship all the way through — move in together and stay deeply in love — to reach a happy ending.
-              It's a celebration, not a finish: you can always keep playing.
-            </p>
+          <Empty icon={<Icon name="trophy" size={36} />} title={t('endings.emptyTitle')}>
+            <p className="muted">{t('endings.emptyBody')}</p>
           </Empty>
         ) : (
           <>
             <div className="end-plate">
-              <div className="kicker">Happy Endings</div>
-              <h2 className="end-plate-title">Treasured Epilogues</h2>
+              <div className="kicker">{t('endings.kicker')}</div>
+              <h2 className="end-plate-title">{t('endings.plateTitle')}</h2>
               <div className="end-plate-rule">✦ ✦ ✦</div>
             </div>
             {endings.map((e) => {
@@ -64,7 +63,7 @@ export function EndingsApp() {
                     <div>
                       <div className="end-title">{e.title}</div>
                       <span className="end-by">
-                        {c?.name ?? 'Someone'} · Day {e.day}
+                        {t('endings.by', { name: c?.name ?? t('endings.someone'), day: e.day })}
                       </span>
                     </div>
                   </div>

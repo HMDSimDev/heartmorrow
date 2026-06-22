@@ -1,0 +1,391 @@
+{
+  "chooseImage": "Choose image",
+  "remove": "Remove",
+  "back": "Back",
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "pleaseConfirm": "Please confirm",
+  "tagPlaceholder": "Type and press Enter…",
+  "removeTag": "Remove {tag}",
+  "unsupportedImage": "Unsupported image type. Please choose a {label} image.",
+  "asset": {
+    "noImages": "No images uploaded yet",
+    "noPortrait": "No portrait",
+    "none": "None",
+    "uploading": "Uploading…",
+    "uploadImage": "Upload image"
+  },
+  "draft": {
+    "notSavedTitle": "Couldn't auto-save this draft (storage full). Press Save to keep your work.",
+    "notSaved": "Draft not saved",
+    "autoKeptTitle": "Your changes are auto-kept as a draft until you press Save.",
+    "unsaved": "Unsaved draft",
+    "restoreAria": "Restore unsaved draft",
+    "unsavedNounDraft": "Unsaved {noun} draft",
+    "unsavedChanges": "Unsaved changes",
+    "startedNamed": "You started {titled} {when} but never saved it.",
+    "startedNew": "You started a new {noun} {when} but never saved it.",
+    "wereEditing": "You were editing {titled} {when} — those changes were never saved.",
+    "restore": "Restore",
+    "discardDraft": "Discard draft",
+    "dismiss": "Dismiss",
+    "thisNoun": "this {noun}"
+  },
+  "relTime": {
+    "justNow": "just now",
+    "minutes": "{m}m ago",
+    "hours": "{h}h ago",
+    "days": "{d}d ago"
+  },
+  "casinoGame": {
+    "slots": "Lucky Sevens",
+    "blackjack": "Blackjack",
+    "roulette": "Roulette",
+    "videoPoker": "Video Poker"
+  },
+  "relationshipStatus": {
+    "none": "Unattached",
+    "dating": "Dating",
+    "exclusive": "Exclusive",
+    "cohabiting": "Living together"
+  },
+  "intent": {
+    "flirt": "Flirt",
+    "tease": "Tease",
+    "reassure": "Reassure",
+    "open_up": "Open Up",
+    "apologize": "Apologize"
+  },
+  "relationshipStyle": {
+    "monogamous": "Monogamous",
+    "polyamorous": "Polyamorous"
+  },
+  "characterLink": {
+    "friend": "Friend",
+    "rival": "Rival",
+    "ex": "Ex",
+    "family": "Family",
+    "partner": "Partner",
+    "acquaintance": "Acquaintance"
+  },
+  "itemRarity": {
+    "common": "common",
+    "uncommon": "uncommon",
+    "rare": "rare",
+    "legendary": "legendary"
+  },
+  "itemCategory": {
+    "gift": "gift",
+    "consumable": "consumable",
+    "apparel": "apparel",
+    "book": "book",
+    "special": "special"
+  },
+  "careerSkill": {
+    "service": "Service",
+    "hustle": "Hustle",
+    "craft": "Craft",
+    "knowledge": "Knowledge"
+  },
+  "videoPokerRank": {
+    "none": "No pay",
+    "jacksOrBetter": "Jacks or Better",
+    "twoPair": "Two Pair",
+    "threeKind": "Three of a Kind",
+    "straight": "Straight",
+    "flush": "Flush",
+    "fullHouse": "Full House",
+    "fourKind": "Four of a Kind",
+    "straightFlush": "Straight Flush",
+    "royalFlush": "Royal Flush"
+  },
+  "casinoBlurb": {
+    "slots": "Three reels. Match the line and the lamps light up.",
+    "blackjack": "Beat the dealer to 21. Hit, stand, or double down.",
+    "roulette": "One green zero. Place your chips and watch the wheel.",
+    "videoPoker": "Jacks or better pays. Hold the keepers, draw the rest."
+  },
+  "nav": {
+    "home": "Home",
+    "people": "People",
+    "world": "World",
+    "date": "Date",
+    "phone": "Phone",
+    "settings": "Settings",
+    "switchWorld": "Switch world",
+    "worldsShort": "Worlds",
+    "debug": "Debug"
+  },
+  "phase": {
+    "morning": "Morning",
+    "afternoon": "Afternoon",
+    "evening": "Evening",
+    "night": "Night"
+  },
+  "season": {
+    "Spring": "Spring",
+    "Summer": "Summer",
+    "Autumn": "Autumn",
+    "Winter": "Winter"
+  },
+  "seasonAbbr": {
+    "Spring": "Spr",
+    "Summer": "Sum",
+    "Autumn": "Aut",
+    "Winter": "Win"
+  },
+  "weekday": {
+    "Monday": "Monday",
+    "Tuesday": "Tuesday",
+    "Wednesday": "Wednesday",
+    "Thursday": "Thursday",
+    "Friday": "Friday",
+    "Saturday": "Saturday",
+    "Sunday": "Sunday"
+  },
+  "weekdayAbbr": {
+    "Monday": "Mon",
+    "Tuesday": "Tue",
+    "Wednesday": "Wed",
+    "Thursday": "Thu",
+    "Friday": "Fri",
+    "Saturday": "Sat",
+    "Sunday": "Sun"
+  },
+  "weekday2": {
+    "Monday": "Mo",
+    "Tuesday": "Tu",
+    "Wednesday": "We",
+    "Thursday": "Th",
+    "Friday": "Fr",
+    "Saturday": "Sa",
+    "Sunday": "Su"
+  },
+  "weekend": "weekend",
+  "minigame": {
+    "progressAria": "{current} of {total}",
+    "howSure": "How sure?",
+    "conf": {
+      "low": "a hunch",
+      "medium": "fairly sure",
+      "high": "I'd bet on it"
+    },
+    "memoryMatch": "Memory Match",
+    "moves": "Moves",
+    "youRemembered": "You remembered — {match}",
+    "timingMeter": "Timing Meter",
+    "lastHit": "last hit",
+    "done": "Done!",
+    "stopInZone": "Stop in the zone!",
+    "loreQuiz": "Lore Quiz",
+    "loreLead": "{name} leans in, eyes glinting. \"Let's see how well you know me…\"",
+    "sweetAndSour": "Sweet & Sour",
+    "readBetween": "Read Between the Lines",
+    "twoTruthsLead": "They lean in. \"Two of these are true. One's a bluff…\"",
+    "callIt": "Call it",
+    "pickBluff": "Pick the bluff",
+    "copyDesk": "The Copy Desk",
+    "copyPlaceholder": "Set the copy above, exactly as written…",
+    "transcribeAria": "Transcribe the dispatch",
+    "accuracy": "accuracy",
+    "set": "set",
+    "sendToPress": "Send to press",
+    "fileEarly": "File it early",
+    "woodlot": "The Woodlot",
+    "cleanCombo": "🔥 {n}× clean",
+    "clean": "CLEAN",
+    "graze": "GRAZE",
+    "miss": "MISS",
+    "lastSwing": "last swing",
+    "timber": "Timber!",
+    "swing": "🪓 Swing!",
+    "rest": "Rest!",
+    "perfect": "Perfect",
+    "great": "Great",
+    "good": "Good",
+    "go": "Go!",
+    "combo": "combo",
+    "tapToBeat": "Tap to the beat",
+    "pressSpace": "(or press Space)"
+  },
+  "weather": {
+    "sunny": "sunny",
+    "clear": "clear and mild",
+    "cloudy": "overcast",
+    "rainy": "rainy",
+    "windy": "breezy",
+    "foggy": "foggy",
+    "snowy": "snowing",
+    "stormy": "stormy"
+  },
+  "gender": {
+    "unspecified": "Prefer not to say",
+    "male": "Male",
+    "female": "Female",
+    "nonbinary": "Non-binary"
+  },
+  "sexuality": {
+    "unspecified": "Unspecified / private",
+    "straight": "Straight",
+    "gay": "Gay / Lesbian",
+    "bisexual": "Bisexual"
+  },
+  "propertyCategory": {
+    "residence": "Residence",
+    "retreat": "Retreat",
+    "social": "Social spot",
+    "estate": "Estate",
+    "land": "Land"
+  },
+  "rentCadence": {
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly"
+  },
+  "rentCadencePer": {
+    "daily": "day",
+    "weekly": "week",
+    "monthly": "month"
+  },
+  "datingStat": {
+    "charm": "Charm",
+    "empathy": "Empathy",
+    "humor": "Humor",
+    "confidence": "Confidence",
+    "intellect": "Intellect",
+    "style": "Style"
+  },
+  "datingStatDesc": {
+    "charm": "Attractiveness and social spark. Favors the timing-meter minigame.",
+    "empathy": "Emotional attunement. Boosts quiet/heart-to-heart Together activities; favors the sweet-and-sour minigame.",
+    "humor": "Wit and playfulness. Boosts goofing-off Together activities; favors the two-truths-and-a-lie minigame.",
+    "confidence": "Self-assurance and boldness. Boosts active outings; favors the rhythm-serenade minigame.",
+    "intellect": "Depth and curiosity. Boosts deep-talk and culture Together activities; favors the lore-quiz minigame.",
+    "style": "Aesthetic sense and refinement. Boosts outings and culture activities; favors the memory-match minigame."
+  },
+  "expression": {
+    "neutral": "Neutral",
+    "happy": "Happy",
+    "smiling": "Smiling",
+    "laughing": "Laughing",
+    "flirty": "Flirty",
+    "tender": "Tender",
+    "shy": "Shy",
+    "blushing": "Blushing",
+    "thoughtful": "Thoughtful",
+    "surprised": "Surprised",
+    "excited": "Excited",
+    "bored": "Bored",
+    "uncomfortable": "Uncomfortable",
+    "worried": "Worried",
+    "annoyed": "Annoyed",
+    "sad": "Sad",
+    "hurt": "Hurt",
+    "angry": "Angry"
+  },
+  "guardedness": {
+    "veryGuarded": "very guarded",
+    "guarded": "guarded",
+    "reserved": "a little reserved",
+    "fairlyOpen": "fairly open",
+    "openBook": "an open book"
+  },
+  "venueTier": {
+    "0": "Free",
+    "1": "Modest",
+    "2": "Nice",
+    "3": "Lavish"
+  },
+  "worldNoteScope": {
+    "global": "global",
+    "location": "location",
+    "faction": "faction",
+    "lore": "lore",
+    "rule": "rule",
+    "character": "character",
+    "misc": "misc"
+  },
+  "relationshipStat": {
+    "affection": "Affection",
+    "trust": "Trust",
+    "chemistry": "Chemistry",
+    "comfort": "Comfort",
+    "respect": "Respect",
+    "curiosity": "Curiosity",
+    "tension": "Tension"
+  },
+  "stockSector": {
+    "tech": "Technology",
+    "finance": "Finance",
+    "industry": "Industry",
+    "consumer": "Consumer",
+    "energy": "Energy",
+    "media": "Media",
+    "health": "Health",
+    "realty": "Real estate"
+  },
+  "hud": {
+    "activeWorld": "Active world",
+    "clockTitle": "{phase} · {weekday} · {season}",
+    "dayPhase": "Day {day} · {phase}",
+    "weekendSuffix": " · weekend",
+    "energy": "Energy",
+    "energyTitle": "{stamina} of {max} actions left today",
+    "energyAria": "Energy: {stamina} of {max}",
+    "cashOnHand": "Cash on hand",
+    "netWorth": "Net worth — Cash ◈{cash} · Property ◈{property} · Stocks ◈{stocks}",
+    "sleep": "Sleep",
+    "endDay": "End day",
+    "onDateWith": "On a date with {name}",
+    "dateInProgress": "Date in progress with {name}",
+    "endDayDateBlock": "You're on a date with {name} — finish it on the Date tab before ending the day.",
+    "onDateNote": "On a date — finish it to end the day."
+  },
+  "recap": {
+    "newDay": "A new day dawns",
+    "recapError": "(Couldn't generate a recap: {error})",
+    "rested": "You rest and wake refreshed.",
+    "aroundTown": "Around town",
+    "weekendBadgeSuffix": " · weekend ⚡",
+    "income": "💰 +{income}",
+    "decayed": "You haven't seen {names} in a while — they're starting to feel neglected.",
+    "decayedItem": "{name} ({days}d)",
+    "goodMorning": "Good morning, Day {day}"
+  },
+  "phone": {
+    "home": "Home",
+    "almanac": "The Almanac",
+    "day": "Day {day}",
+    "twilight": "Twilight",
+    "energyPct": "Energy {pct}%",
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "night": "Still awake?",
+      "welcome": "Welcome back"
+    },
+    "hintWaiting": "{count, plural, one {# thing is waiting for you.} other {# things are waiting for you.}}",
+    "hintLowEnergy": "The lamp runs low — end the day to rest.",
+    "hintAmbient": "Texts and mail arrive as the days pass.",
+    "app": {
+      "messages": "Messages",
+      "email": "Mail",
+      "faces": "Faces",
+      "moments": "Moments",
+      "calendar": "Almanac",
+      "social": "Social",
+      "weather": "Weather",
+      "endings": "Endings",
+      "work": "Work",
+      "together": "Together",
+      "property": "Property",
+      "market": "Market",
+      "gambling": "Casino",
+      "shop": "Shop",
+      "games": "Games",
+      "bag": "Bag",
+      "settings": "Settings"
+    }
+  }
+}

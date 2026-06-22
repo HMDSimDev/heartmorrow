@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SweetAndSourConfig, SweetAndSourSubmission } from '@dsim/shared';
 import { MinigameShell, ConfidenceControl, type ConfidenceLevel, levelToNumeric } from './MinigameShell';
 
@@ -12,6 +13,7 @@ export function SweetAndSourGame({
   config: SweetAndSourConfig;
   onComplete: (submission: SweetAndSourSubmission) => void;
 }) {
+  const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const [confidence, setConfidence] = useState<ConfidenceLevel>('medium');
   const placements = useRef<SweetAndSourSubmission['placements']>([]);
@@ -42,7 +44,7 @@ export function SweetAndSourGame({
 
   return (
     <MinigameShell
-      title="Sweet & Sour"
+      title={t('minigame.sweetAndSour')}
       progress={{ current: index + 1, total: config.cards.length }}
     >
       <div className="mg-board mga-board sns-board">

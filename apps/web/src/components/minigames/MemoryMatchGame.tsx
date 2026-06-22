@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { MemoryMatchConfig, MemoryMatchSubmission } from '@dsim/shared';
 import { MinigameShell } from './MinigameShell';
 
@@ -9,6 +10,7 @@ export function MemoryMatchGame({
   config: MemoryMatchConfig;
   onComplete: (submission: MemoryMatchSubmission) => void;
 }) {
+  const { t } = useTranslation();
   const [flipped, setFlipped] = useState<string[]>([]);
   const [matched, setMatched] = useState<Set<string>>(new Set());
   const [moves, setMoves] = useState(0);
@@ -53,16 +55,16 @@ export function MemoryMatchGame({
 
   return (
     <MinigameShell
-      title="Memory Match"
+      title={t('minigame.memoryMatch')}
       progress={{ current: matchedPairs, total: config.totalPairs }}
     >
       <div className="mg-board mga-board">
         <div className="row end">
           <span className="readout">
-            Moves <span className="num">{moves}</span>
+            {t('minigame.moves')} <span className="num">{moves}</span>
           </span>
         </div>
-        {lastMatch && <div className="mm-caption">You remembered — {lastMatch}</div>}
+        {lastMatch && <div className="mm-caption">{t('minigame.youRemembered', { match: lastMatch })}</div>}
         <div className="mg-cards">
           {config.cards.map((card) => {
             const isUp = flipped.includes(card.id) || matched.has(card.pairKey);

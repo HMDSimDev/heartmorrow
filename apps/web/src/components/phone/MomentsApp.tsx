@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Character, Moment } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { useAppData } from '../../state/app-context';
+import { relativeTime } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PortraitPicker } from '../PortraitPicker';
@@ -33,18 +35,9 @@ const KIND_EXPRESSION: Record<Moment['kind'], string> = {
   memory: 'thoughtful',
 };
 
-function ago(ts: number): string {
-  const s = Math.max(0, Math.floor((Date.now() - ts) / 1000));
-  if (s < 60) return 'just now';
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
 /** A scrapbook of your story with one character — milestones, dates, and keepsakes. */
 export function MomentsApp() {
+  const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, dayTick } = useAppData();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -85,10 +78,10 @@ export function MomentsApp() {
   if (characters.length === 0) {
     return (
       <div className="phone-app">
-        <PhoneAppBar title="Moments" kicker="Scrapbook" icon="moments" />
+        <PhoneAppBar title={t('moments.title')} kicker={t('moments.kicker')} icon="moments" />
         <div className="mom-shell">
-          <Empty icon={<Icon name="moments" size={36} />} title="No one to remember yet">
-            <p className="muted">Create a character and go on a date to start a scrapbook.</p>
+          <Empty icon={<Icon name="moments" size={36} />} title={t('moments.noOneTitle')}>
+            <p className="muted">{t('moments.noOneBody')}</p>
           </Empty>
         </div>
       </div>
@@ -99,10 +92,10 @@ export function MomentsApp() {
 
   return (
     <div className="phone-app">
-      <PhoneAppBar title="Moments" kicker="Scrapbook" icon="moments" />
+      <PhoneAppBar title={t('moments.title')} kicker={t('moments.kicker')} icon="moments" />
       <div className="mom-shell">
         <div className="mom-pick">
-          <div className="kicker">Choose someone</div>
+          <div className="kicker">{t('moments.chooseSomeone')}</div>
           <PortraitPicker
             options={pickerOptions}
             value={selected}
@@ -118,10 +111,10 @@ export function MomentsApp() {
             </div>
             <div className="mom-cover-text">
               <h3 className="mom-name">{character.name}</h3>
-              <span className="mom-since">Your story together</span>
+              <span className="mom-since">{t('moments.storyTogether')}</span>
               {moments.length > 0 && (
                 <span className="mom-count">
-                  {moments.length} {moments.length === 1 ? 'memory' : 'memories'}
+                  {t('moments.memoryCount', { count: moments.length })}
                 </span>
               )}
             </div>
@@ -129,8 +122,8 @@ export function MomentsApp() {
         )}
 
         {loading ? null : moments.length === 0 ? (
-          <Empty icon={<Icon name="moments" size={36} />} title="No moments yet">
-            <p className="muted">Go on a date and end it to fill your scrapbook.</p>
+          <Empty icon={<Icon name="moments" size={36} />} title={t('moments.emptyTitle')}>
+            <p className="muted">{t('moments.emptyBody')}</p>
           </Empty>
         ) : (
           <div className="mom-reel">
@@ -145,7 +138,7 @@ export function MomentsApp() {
                 <div className="flex-fill">
                   <div className="mom-title">{m.title}</div>
                   {m.body && <div className="mom-body">{m.body}</div>}
-                  <div className="mom-when">{m.day != null ? `Day ${m.day}` : ago(m.createdAt)}</div>
+                  <div className="mom-when">{m.day != null ? t('moments.day', { day: m.day }) : relativeTime(m.createdAt)}</div>
                 </div>
               </div>
             ))}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { describeItemEffect, isGiftableItem, type InventoryItem, type ShopItem } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
@@ -13,6 +14,7 @@ interface Entry {
 }
 
 export function Inventory() {
+  const { t } = useTranslation(['pages', 'common']);
   const { reloadPlayer, activeWorldId, dayTick } = useAppData();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +56,7 @@ export function Inventory() {
       await api.useItem(entry.inventoryItem.id, null, activeWorldId ?? undefined);
       await reloadPlayer();
       await load();
-      setNote(`Used ${entry.item.name}.`);
+      setNote(t('inventory.used', { name: entry.item.name }));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -74,12 +76,12 @@ export function Inventory() {
             <Icon name="bag" size={26} />
           </div>
           <div className="inv-satchel-titles">
-            <span className="kicker">The Satchel</span>
-            <h1>Inventory</h1>
-            <p>Your keepsakes. Give a gift in person on a date, or send one in a text.</p>
+            <span className="kicker">{t('inventory.kicker')}</span>
+            <h1>{t('inventory.title')}</h1>
+            <p>{t('inventory.blurb')}</p>
           </div>
           <div className="readout inv-satchel-readout">
-            held <span className="num">{slots}</span>
+            {t('inventory.held')} <span className="num">{slots}</span>
           </div>
         </div>
       </div>
@@ -88,8 +90,8 @@ export function Inventory() {
       {error && <Banner kind="error">{error}</Banner>}
 
       {entries.length === 0 ? (
-        <Empty icon={<Icon name="bag" size={34} />} title="Your bag is empty">
-          <p>Buy something from the shop first.</p>
+        <Empty icon={<Icon name="bag" size={34} />} title={t('inventory.emptyTitle')}>
+          <p>{t('inventory.emptyBody')}</p>
         </Empty>
       ) : (
         <div className="inv-grid">
@@ -104,7 +106,7 @@ export function Inventory() {
                 <div className="inv-pocket-head">
                   <div className="inv-pocket-meta">
                     {item && <span className="inv-pocket-kick">{item.category}</span>}
-                    <h3 className="inv-pocket-name">{item?.name ?? 'Unknown item'}</h3>
+                    <h3 className="inv-pocket-name">{item?.name ?? t('inventory.unknownItem')}</h3>
                   </div>
                   <span className="inv-qty">
                     <span className="x">×</span>
@@ -140,10 +142,10 @@ export function Inventory() {
                           onClick={() => use(entry)}
                           disabled={usingId !== null}
                         >
-                          {usingId === entry.inventoryItem.id ? 'Using…' : 'Use'}
+                          {usingId === entry.inventoryItem.id ? t('inventory.using') : t('inventory.use')}
                         </button>
                       ) : isGiftableItem(item) ? (
-                        <p className="inv-hint"><Icon name="gift" size={13} /> Give on a date or by text</p>
+                        <p className="inv-hint"><Icon name="gift" size={13} /> {t('inventory.giveHint')}</p>
                       ) : null}
                     </div>
                   </>

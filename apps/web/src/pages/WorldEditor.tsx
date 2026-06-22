@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   VENUE_TIERS,
   GAMBLING,
@@ -11,6 +12,7 @@ import {
 } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import { venueTierLabel, worldNoteScopeLabel } from '../i18n/labels';
 import { Banner, ConfirmDialog, Empty, Field, Spinner, TagInput } from '../components/ui';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
 import { useDraft } from '../lib/useDraft';
@@ -41,6 +43,7 @@ const editableWorld = (w: World): EditableWorld => ({
 });
 
 export function WorldEditor() {
+  const { t } = useTranslation(['pages', 'common']);
   const [worlds, setWorlds] = useState<World[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [world, setWorld] = useState<World | null>(null);
@@ -125,7 +128,7 @@ export function WorldEditor() {
       scopeId: selectedId ?? '',
       worldId: selectedId,
       isNew: false,
-      label: () => world?.name?.trim() || 'Untitled world',
+      label: () => world?.name?.trim() || t('pages:worldEditor.untitledWorld'),
     },
   });
 
@@ -167,7 +170,7 @@ export function WorldEditor() {
       setBaseline(updated); // saved → the world is clean again
       draft.clear();
       await loadWorlds();
-      setSavedNote('World saved!');
+      setSavedNote(t('pages:worldEditor.worldSaved'));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -215,11 +218,9 @@ export function WorldEditor() {
       const res = await api.generateLocations(world.id, { count: genCount, prompt: genPrompt });
       if (res.ok) {
         setField('locations', [...(world.locations ?? []), ...res.data]);
-        setSavedNote(
-          `Added ${res.data.length} generated location${res.data.length === 1 ? '' : 's'} below — review, then Save world to keep them.`,
-        );
+        setSavedNote(t('pages:worldEditor.generatedAdded', { count: res.data.length }));
       } else {
-        setError(`Location generation failed: ${res.error}`);
+        setError(t('pages:worldEditor.locGenFailed', { error: res.error }));
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -238,22 +239,26 @@ export function WorldEditor() {
       <div className="framed creator-head">
         <div className="creator-head-titles">
           <div className="creator-meta">
-            <span className="kicker">World workbench</span>
-            {world && <span className="creator-tool-tag">{world.locations.length} locations</span>}
+            <span className="kicker">{t('pages:worldEditor.workbench')}</span>
+            {world && (
+              <span className="creator-tool-tag">
+                {t('pages:worldEditor.locationsTag', { count: world.locations.length })}
+              </span>
+            )}
           </div>
-          <h1>World editor</h1>
-          <p>Define the setting. World/lore notes are sent to the model as reference data, not as instructions.</p>
+          <h1>{t('pages:worldEditor.title')}</h1>
+          <p>{t('pages:worldEditor.intro')}</p>
         </div>
         <div className="creator-head-actions">
           <button className="btn primary" onClick={createWorld} disabled={creatingWorld}>
             <Icon name="plus" size={14} />
-            New world
+            {t('pages:worldEditor.newWorld')}
           </button>
           {world && <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />}
           {world && (
             <button className="btn primary" onClick={save} disabled={saving}>
               <Icon name="save" size={14} />
-              {saving ? 'Saving…' : 'Save world'}
+              {saving ? t('pages:worldEditor.saving') : t('pages:worldEditor.saveWorld')}
             </button>
           )}
         </div>
@@ -265,7 +270,7 @@ export function WorldEditor() {
       {draft.found && (
         <DraftRestoreBar
           env={draft.found}
-          noun="world"
+          noun={t('pages:worldEditor.noun')}
           onRestore={() => {
             const d = draft.restore();
             if (d) setWorld((w) => (w ? { ...w, ...d } : w)); // merge editable fields, keep id/timestamps
@@ -283,10 +288,10 @@ export function WorldEditor() {
         {/* World list sidebar */}
         <aside className="we-sidebar">
           <div className="we-sidebar-header">
-            <span className="kicker">Worlds</span>
+            <span className="kicker">{t('pages:worldEditor.worldsHeader')}</span>
           </div>
           {worlds.length === 0 ? (
-            <p className="muted we-sidebar-empty">No worlds yet.</p>
+            <p className="muted we-sidebar-empty">{t('pages:worldEditor.noWorlds')}</p>
           ) : (
             <ul className="we-world-list">
               {worlds.map((w) => (
@@ -299,7 +304,7 @@ export function WorldEditor() {
                     <Icon name="location" size={14} />
                     <span className="we-world-name">{w.name}</span>
                     {w.id !== selectedId && draftedWorldIds.has(w.id) && (
-                      <span className="we-world-draft-dot" title="Has unsaved changes" aria-label="Has unsaved changes" />
+                      <span className="we-world-draft-dot" title={t('pages:worldEditor.hasUnsaved')} aria-label={t('pages:worldEditor.hasUnsaved')} />
                     )}
                   </button>
                 </li>
@@ -311,11 +316,11 @@ export function WorldEditor() {
         {/* Detail pane */}
         <div className="we-detail stack">
           {!world ? (
-            <Empty title="No world selected">
-              <p className="hint">Pick a world from the list, or create one.</p>
+            <Empty title={t('pages:worldEditor.noWorldSelected')}>
+              <p className="hint">{t('pages:worldEditor.pickOrCreate')}</p>
               <button className="btn primary" onClick={createWorld} disabled={creatingWorld}>
                 <Icon name="plus" size={14} />
-                Create a world
+                {t('pages:worldEditor.createWorld')}
               </button>
             </Empty>
           ) : (
@@ -324,19 +329,19 @@ export function WorldEditor() {
                 <div className="card">
                   <div className="creator-sec">
                     <span className="creator-index">01</span>
-                    <h2>Setting</h2>
+                    <h2>{t('pages:worldEditor.secSetting')}</h2>
                     <span className="trail" />
                   </div>
-                  <Field label="Name">
+                  <Field label={t('pages:worldEditor.name')}>
                     <input value={world.name} onChange={(e) => setField('name', e.target.value)} />
                   </Field>
-                  <Field label="Summary">
+                  <Field label={t('pages:worldEditor.summary')}>
                     <textarea value={world.summary} onChange={(e) => setField('summary', e.target.value)} />
                   </Field>
-                  <Field label="Tone">
+                  <Field label={t('pages:worldEditor.tone')}>
                     <input value={world.tone} onChange={(e) => setField('tone', e.target.value)} />
                   </Field>
-                  <Field label="Global notes">
+                  <Field label={t('pages:worldEditor.globalNotes')}>
                     <textarea value={world.globalNotes} onChange={(e) => setField('globalNotes', e.target.value)} />
                   </Field>
                 </div>
@@ -344,24 +349,21 @@ export function WorldEditor() {
                 <div className="card">
                   <div className="creator-sec">
                     <span className="creator-index">02</span>
-                    <h2>Lore & rules</h2>
+                    <h2>{t('pages:worldEditor.secLoreRules')}</h2>
                     <span className="trail" />
                   </div>
-                  <Field label="Lore">
+                  <Field label={t('pages:worldEditor.lore')}>
                     <textarea value={world.lore} onChange={(e) => setField('lore', e.target.value)} />
                   </Field>
-                  <Field label="Rules (in-fiction)">
+                  <Field label={t('pages:worldEditor.rulesInFiction')}>
                     <textarea value={world.rules} onChange={(e) => setField('rules', e.target.value)} />
                   </Field>
                   <div className="divider" />
                   <div className="creator-sec">
-                    <h3>Game features</h3>
+                    <h3>{t('pages:worldEditor.gameFeatures')}</h3>
                     <span className="trail" />
                   </div>
-                  <p className="muted" style={{ marginTop: 0 }}>
-                    Optional life-and-money systems. Turn these off for a world where they wouldn&apos;t fit — the
-                    apps disappear and authored property/companies simply lie dormant.
-                  </p>
+                  <p className="muted" style={{ marginTop: 0 }}>{t('pages:worldEditor.featuresNote')}</p>
                   <div className="creator-flags">
                     <label className="creator-flag">
                       <input
@@ -369,7 +371,7 @@ export function WorldEditor() {
                         checked={world.featureFlags.property}
                         onChange={(e) => setFeature('property', e.target.checked)}
                       />
-                      Property — rent or buy places, collect rent, date there for a buff
+                      {t('pages:worldEditor.featureProperty')}
                     </label>
                     <label className="creator-flag">
                       <input
@@ -377,7 +379,7 @@ export function WorldEditor() {
                         checked={world.featureFlags.stockMarket}
                         onChange={(e) => setFeature('stockMarket', e.target.checked)}
                       />
-                      Stock market — invest in fictional in-world companies
+                      {t('pages:worldEditor.featureStock')}
                     </label>
                     <label className="creator-flag">
                       <input
@@ -385,12 +387,12 @@ export function WorldEditor() {
                         checked={world.featureFlags.gambling}
                         onChange={(e) => setFeature('gambling', e.target.checked)}
                       />
-                      Casino — wager money on slots, blackjack, roulette &amp; video poker
+                      {t('pages:worldEditor.featureCasino')}
                     </label>
                   </div>
                   {world.featureFlags.gambling && (
                     <div className="row" style={{ gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
-                      <Field label="Max bet (◈)" hint={`Flat per-bet cap · up to ${GAMBLING.ABSOLUTE_MAX_BET}`}>
+                      <Field label={t('pages:worldEditor.maxBet')} hint={t('pages:worldEditor.maxBetHint', { max: GAMBLING.ABSOLUTE_MAX_BET })}>
                         <input
                           type="number"
                           min={GAMBLING.MIN_BET}
@@ -401,7 +403,7 @@ export function WorldEditor() {
                           }
                         />
                       </Field>
-                      <Field label="Daily wager cap (◈)" hint={`Total staked per day · up to ${GAMBLING.ABSOLUTE_MAX_DAILY_WAGER}`}>
+                      <Field label={t('pages:worldEditor.dailyCap')} hint={t('pages:worldEditor.dailyCapHint', { max: GAMBLING.ABSOLUTE_MAX_DAILY_WAGER })}>
                         <input
                           type="number"
                           min={world.gamblingConfig.maxBet}
@@ -420,11 +422,11 @@ export function WorldEditor() {
               <div className="card">
                 <div className="creator-sec">
                   <span className="creator-index">03</span>
-                  <h2>Locations</h2>
+                  <h2>{t('pages:worldEditor.secLocations')}</h2>
                   <span className="trail" />
                   <button className="btn sm creator-sec-action" onClick={addLocation}>
                     <Icon name="plus" size={13} />
-                    Add location
+                    {t('pages:worldEditor.addLocation')}
                   </button>
                 </div>
 
@@ -433,23 +435,20 @@ export function WorldEditor() {
                   <div className="creator-sec">
                     <h3>
                       <Icon name="generate" size={14} />
-                      {' '}Generate with AI
+                      {' '}{t('pages:worldEditor.generateWithAI')}
                     </h3>
                     <span className="trail" />
                   </div>
-                  <p className="muted" style={{ marginTop: 0 }}>
-                    Describe what you want. The model uses this world&apos;s tone, lore, and existing locations to invent new
-                    ones — they appear below for you to review and edit before saving.
-                  </p>
-                  <Field label="Prompt">
+                  <p className="muted" style={{ marginTop: 0 }}>{t('pages:worldEditor.genNote')}</p>
+                  <Field label={t('pages:worldEditor.promptLabel')}>
                     <textarea
-                      placeholder="e.g. cozy rainy-evening spots near the old harbor district"
+                      placeholder={t('pages:worldEditor.promptPlaceholder')}
                       value={genPrompt}
                       onChange={(e) => setGenPrompt(e.target.value)}
                     />
                   </Field>
                   <div className="we-gen-row">
-                    <Field label="How many">
+                    <Field label={t('pages:worldEditor.howMany')}>
                       <select value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
                         {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
                           <option key={n} value={n}>
@@ -460,12 +459,12 @@ export function WorldEditor() {
                     </Field>
                     <button className="btn primary we-gen-btn" onClick={generateLocations} disabled={generating}>
                       <Icon name="generate" size={14} />
-                      {generating ? 'Generating…' : 'Generate locations'}
+                      {generating ? t('pages:worldEditor.generating') : t('pages:worldEditor.generateLocations')}
                     </button>
                   </div>
                 </div>
 
-                {world.locations.length === 0 && <p className="muted">No locations yet.</p>}
+                {world.locations.length === 0 && <p className="muted">{t('pages:worldEditor.noLocations')}</p>}
 
                 {/* Location list — each one is a collapsible card */}
                 <div className="we-locations">
@@ -483,11 +482,11 @@ export function WorldEditor() {
               <div className="row end">
                 <button className="btn danger ghost" onClick={() => setConfirmDelete(true)}>
                   <Icon name="trash" size={14} />
-                  Delete world
+                  {t('pages:worldEditor.deleteWorld')}
                 </button>
                 <button className="btn primary" onClick={save} disabled={saving}>
                   <Icon name="save" size={14} />
-                  {saving ? 'Saving…' : 'Save world'}
+                  {saving ? t('pages:worldEditor.saving') : t('pages:worldEditor.saveWorld')}
                 </button>
               </div>
 
@@ -500,11 +499,11 @@ export function WorldEditor() {
       {/* ConfirmDialog for world deletion */}
       {confirmDelete && world && (
         <ConfirmDialog
-          kicker="Destructive action"
-          title={`Delete "${world.name}"?`}
+          kicker={t('pages:worldEditor.deleteKicker')}
+          title={t('pages:worldEditor.deleteTitle', { name: world.name })}
           body={
             <>
-              The world, its notes, and your progress in it are removed. This cannot be undone.
+              {t('pages:worldEditor.deleteBody')}
               <label
                 style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 12 }}
               >
@@ -514,14 +513,11 @@ export function WorldEditor() {
                   onChange={(e) => setDeleteChars(e.target.checked)}
                   style={{ marginTop: 3 }}
                 />
-                <span>
-                  Also delete this world's characters. Leave unchecked to keep them — they'll move to Unassigned
-                  (People → Unassigned) so you can place them in another world.
-                </span>
+                <span>{t('pages:worldEditor.deleteCharsLabel')}</span>
               </label>
             </>
           }
-          confirmLabel="Delete world"
+          confirmLabel={t('pages:worldEditor.deleteWorld')}
           danger
           busy={deletingWorld}
           onConfirm={deleteWorld}
@@ -548,6 +544,7 @@ function LocationCard({
   onUpdate: (patch: Partial<Location>) => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const [open, setOpen] = useState(false);
 
   return (
@@ -561,16 +558,16 @@ function LocationCard({
           aria-expanded={open}
         >
           <Icon name={open ? 'chevronDown' : 'chevronRight'} size={14} />
-          <span className="we-loc-name">{location.name || 'Untitled location'}</span>
-          {location.indoor && <span className="badge we-loc-badge">Indoor</span>}
-          {location.tags.slice(0, 3).map((t) => (
-            <span className="badge" key={t}>{t}</span>
+          <span className="we-loc-name">{location.name || t('worldEditor.untitledLocation')}</span>
+          {location.indoor && <span className="badge we-loc-badge">{t('worldEditor.indoorBadge')}</span>}
+          {location.tags.slice(0, 3).map((tag) => (
+            <span className="badge" key={tag}>{tag}</span>
           ))}
           {location.tags.length > 3 && (
             <span className="badge">+{location.tags.length - 3}</span>
           )}
         </button>
-        <button className="btn sm danger" onClick={onRemove} title="Remove location">
+        <button className="btn sm danger" onClick={onRemove} title={t('worldEditor.removeLocation')}>
           <Icon name="trash" size={13} />
         </button>
       </div>
@@ -578,18 +575,18 @@ function LocationCard({
       {/* Expandable detail */}
       {open && (
         <div className="we-loc-body stack">
-          <Field label="Name">
+          <Field label={t('worldEditor.locName')}>
             <input value={location.name} onChange={(e) => onUpdate({ name: e.target.value })} />
           </Field>
-          <Field label="Description">
+          <Field label={t('worldEditor.locDescription')}>
             <textarea
-              placeholder="Describe the vibe, sights, and feel of this place."
+              placeholder={t('worldEditor.locDescPlaceholder')}
               value={location.description}
               onChange={(e) => onUpdate({ description: e.target.value })}
             />
           </Field>
-          <Field label="Tags">
-            <TagInput value={location.tags} onChange={(tags) => onUpdate({ tags })} placeholder="tags…" />
+          <Field label={t('worldEditor.locTags')}>
+            <TagInput value={location.tags} onChange={(tags) => onUpdate({ tags })} placeholder={t('worldEditor.tagsPlaceholder')} />
           </Field>
           <label className="we-loc-indoor">
             <input
@@ -597,29 +594,31 @@ function LocationCard({
               checked={location.indoor}
               onChange={(e) => onUpdate({ indoor: e.target.checked })}
             />
-            Indoor (sheltered from the weather)
+            {t('worldEditor.indoorLabel')}
           </label>
-          <Field label="Cost to date here">
+          <Field label={t('worldEditor.costToDate')}>
             <select
               value={location.priceTier ?? 0}
               onChange={(e) => onUpdate({ priceTier: Number(e.target.value) })}
             >
-              {VENUE_TIERS.map((t) => (
-                <option key={t.tier} value={t.tier}>
-                  {t.label}
-                  {t.cost > 0 ? ` (${t.symbol} ${t.cost})` : ' (no cost)'}
+              {VENUE_TIERS.map((tier) => (
+                <option key={tier.tier} value={tier.tier}>
+                  {venueTierLabel(tier.tier)}
+                  {tier.cost > 0
+                    ? t('worldEditor.tierCost', { symbol: tier.symbol, cost: tier.cost })
+                    : t('worldEditor.tierNoCost')}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Photo (optional)">
+          <Field label={t('worldEditor.photoOptional')}>
             <AssetPicker
               value={location.imageAssetId ?? null}
               onChange={(imageAssetId) => onUpdate({ imageAssetId })}
               uploadType="location"
               filterType="location"
             />
-            <small className="muted">Upload a photo of this place — it shows in the date location picker and the scene.</small>
+            <small className="muted">{t('worldEditor.photoHint')}</small>
           </Field>
         </div>
       )}
@@ -642,6 +641,7 @@ function WorldNotes({
   onChange: (notes: WorldNote[]) => void;
   onError: (e: string) => void;
 }) {
+  const { t } = useTranslation('pages');
   const [draft, setDraft] = useState({ title: '', body: '', scope: 'global' as WorldNoteScope, importance: 3 });
   const [adding, setAdding] = useState(false);
 
@@ -671,34 +671,34 @@ function WorldNotes({
     <div className="card">
       <div className="creator-sec">
         <span className="creator-index">04</span>
-        <h2>World notes</h2>
+        <h2>{t('worldEditor.secNotes')}</h2>
         <span className="trail" />
       </div>
       <div className="creator-callout">
         <span className="creator-callout-mark">
           <Icon name="info" size={13} />
         </span>
-        <span>Notes are reference data the model can read — not instructions. Higher importance surfaces sooner.</span>
+        <span>{t('worldEditor.notesCallout')}</span>
       </div>
       <div className="rule" />
       <div className="grid cols-2">
-        <Field label="Title">
+        <Field label={t('worldEditor.noteTitle')}>
           <input value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} />
         </Field>
         <div className="inline-fields">
-          <Field label="Scope">
+          <Field label={t('worldEditor.noteScope')}>
             <select
               value={draft.scope}
               onChange={(e) => setDraft((d) => ({ ...d, scope: e.target.value as WorldNoteScope }))}
             >
               {SCOPES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {worldNoteScopeLabel(s)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Importance">
+          <Field label={t('worldEditor.noteImportance')}>
             <select
               value={draft.importance}
               onChange={(e) => setDraft((d) => ({ ...d, importance: Number(e.target.value) }))}
@@ -712,21 +712,21 @@ function WorldNotes({
           </Field>
         </div>
       </div>
-      <Field label="Body">
+      <Field label={t('worldEditor.noteBody')}>
         <textarea value={draft.body} onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))} />
       </Field>
       <button className="btn" onClick={add} disabled={adding || !draft.title.trim()}>
         <Icon name="plus" size={14} />
-        {adding ? 'Adding…' : 'Add note'}
+        {adding ? t('worldEditor.adding') : t('worldEditor.addNote')}
       </button>
 
       <div className="divider" />
       {notes.length === 0 ? (
-        <p className="muted">No notes yet.</p>
+        <p className="muted">{t('worldEditor.noNotes')}</p>
       ) : (
         notes.map((n) => (
           <div className="list-item" key={n.id}>
-            <span className="badge">{n.scope}</span>
+            <span className="badge">{worldNoteScopeLabel(n.scope)}</span>
             <span className="badge accent">{n.importance}</span>
             <div className="flex-fill">
               <strong>{n.title}</strong>
@@ -741,7 +741,7 @@ function WorldNotes({
                 onChange(await api.listWorldNotes(worldId));
               }}
             >
-              Delete
+              {t('worldEditor.delete')}
             </button>
           </div>
         ))

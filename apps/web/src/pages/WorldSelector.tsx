@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   PHASE_ICONS,
-  PHASE_LABELS,
   GENDER_LABELS,
   SEXUALITY_LABELS,
   deriveCalendar,
@@ -18,6 +18,7 @@ import {
 import { api } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
+import { phaseLabel, genderLabel, sexualityLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { Icon, type IconName } from '../components/Icon';
 import { Banner, ConfirmDialog, Field, Spinner } from '../components/ui';
@@ -30,6 +31,7 @@ import './worldselect.page.css';
 /** The deliberate "which world am I playing?" landing page. Reachable at any time
  *  via the "Switch world" link, and the app's entry point when no world is active. */
 export function WorldSelector() {
+  const { t } = useTranslation(['pages', 'common']);
   const { worlds, worldsLoaded, activeWorldId, setActiveWorld, reloadWorlds, creatorMode } = useAppData();
   const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<World | null>(null);
@@ -94,12 +96,9 @@ export function WorldSelector() {
     <div className="wsel">
       <div className="wsel-atmosphere" aria-hidden="true" />
       <header className="wsel-head">
-        <div className="kicker">A lamplit almanac of the heart</div>
-        <h1 className="wsel-title">Choose a world</h1>
-        <p className="wsel-sub">
-          Each world is its own story — its own people, its own calendar, its own you. Step into one to begin, and
-          come back here any time to switch.
-        </p>
+        <div className="kicker">{t('pages:worldSelector.kicker')}</div>
+        <h1 className="wsel-title">{t('pages:worldSelector.title')}</h1>
+        <p className="wsel-sub">{t('pages:worldSelector.sub')}</p>
       </header>
 
       {error && <Banner kind="error">{error}</Banner>}
@@ -110,18 +109,18 @@ export function WorldSelector() {
             <ShareImportButton
               targetWorldId={activeWorldId ?? null}
               onImported={onImported}
-              label="Import a share file"
+              label={t('pages:worldSelector.importFile')}
             />
             {worlds.length > 0 && (
               <button className="btn ghost" type="button" onClick={() => setSelecting(true)}>
-                <Icon name="download" size={16} /> Export worlds…
+                <Icon name="download" size={16} /> {t('pages:worldSelector.exportWorlds')}
               </button>
             )}
           </>
         ) : (
           <>
             <span className="muted" style={{ alignSelf: 'center' }}>
-              {selected.size} selected
+              {t('pages:worldSelector.nSelected', { count: selected.size })}
             </span>
             <button
               className="btn primary"
@@ -129,10 +128,13 @@ export function WorldSelector() {
               disabled={selected.size === 0}
               onClick={() => setExportOpen(true)}
             >
-              <Icon name="download" size={16} /> Export {selected.size > 0 ? selected.size : ''}…
+              <Icon name="download" size={16} />{' '}
+              {selected.size > 0
+                ? t('pages:worldSelector.exportN', { count: selected.size })
+                : t('pages:worldSelector.export')}
             </button>
             <button className="btn ghost" type="button" onClick={cancelSelecting}>
-              Cancel
+              {t('pages:worldSelector.cancel')}
             </button>
           </>
         )}
@@ -155,14 +157,12 @@ export function WorldSelector() {
           <span className="wsel-new-mark">
             <Icon name="plus" size={30} />
           </span>
-          <span className="wsel-new-title">Start a new world</span>
-          <span className="wsel-new-sub">Set up a fresh story and persona</span>
+          <span className="wsel-new-title">{t('pages:worldSelector.startNew')}</span>
+          <span className="wsel-new-sub">{t('pages:worldSelector.startNewSub')}</span>
         </button>
       </div>
 
-      {worlds.length === 0 && (
-        <p className="wsel-empty-note">Your almanac is empty. Start your first world above to begin.</p>
-      )}
+      {worlds.length === 0 && <p className="wsel-empty-note">{t('pages:worldSelector.emptyNote')}</p>}
 
       {exportOpen && selectedWorlds.length > 0 && (
         <ShareExportDialog worlds={selectedWorlds} characters={[]} onClose={cancelSelecting} />
@@ -170,12 +170,11 @@ export function WorldSelector() {
 
       {pendingDelete && (
         <ConfirmDialog
-          kicker="Delete world"
-          title={`Delete ${pendingDelete.name}?`}
+          kicker={t('pages:worldSelector.deleteKicker')}
+          title={t('pages:worldSelector.deleteTitle', { name: pendingDelete.name })}
           body={
             <>
-              This permanently removes the world and your progress in it — relationships, money, messages, and
-              history. This cannot be undone.
+              {t('pages:worldSelector.deleteBody')}
               <label
                 style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 12 }}
               >
@@ -185,14 +184,11 @@ export function WorldSelector() {
                   onChange={(e) => setDeleteChars(e.target.checked)}
                   style={{ marginTop: 3 }}
                 />
-                <span>
-                  Also delete this world's characters. Leave unchecked to keep them — they'll move to Unassigned
-                  (People → Unassigned) so you can place them in another world.
-                </span>
+                <span>{t('pages:worldSelector.deleteCharsLabel')}</span>
               </label>
             </>
           }
-          confirmLabel="Delete forever"
+          confirmLabel={t('pages:worldSelector.deleteConfirm')}
           danger
           busy={deleting}
           onConfirm={doDelete}
@@ -223,6 +219,7 @@ function WorldCard({
   isSelected?: boolean;
   onToggleSelect?: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const data = useAsync(
     () =>
       Promise.all([api.getWorldState(world.id), api.listCharacters(world.id), api.phoneInbox(world.id)]) as Promise<
@@ -240,7 +237,7 @@ function WorldCard({
       className={`wsel-card framed bracketed${isActive ? ' is-active' : ''}`}
       style={isSelected ? { outline: '2px solid var(--accent, #c9a36a)', outlineOffset: 3 } : undefined}
     >
-      {isActive && <span className="wsel-current">Currently playing</span>}
+      {isActive && <span className="wsel-current">{t('worldSelector.currentlyPlaying')}</span>}
       <div className="wsel-card-body">
         <div className="wsel-card-head">
           <h2 className="wsel-card-name">{world.name}</h2>
@@ -257,26 +254,26 @@ function WorldCard({
             <div className="wsel-stats">
               {state && (
                 <div className="wsel-stat">
-                  <span className="wsel-stat-k">Day</span>
+                  <span className="wsel-stat-k">{t('worldSelector.day')}</span>
                   <span className="wsel-stat-v">
                     <span className="wsel-phase">{PHASE_ICONS[state.phase]}</span> {state.day}
                   </span>
                   <span className="wsel-stat-sub">
-                    {PHASE_LABELS[state.phase]}
-                    {cal ? ` · ${cal.dayOfWeek}` : ''}
+                    {phaseLabel(state.phase)}
+                    {cal ? ` · ${weekdayLabel(cal.dayOfWeek)}` : ''}
                   </span>
                 </div>
               )}
               <div className="wsel-stat">
-                <span className="wsel-stat-k">People</span>
+                <span className="wsel-stat-k">{t('worldSelector.people')}</span>
                 <span className="wsel-stat-v">{cast?.length ?? 0}</span>
-                <span className="wsel-stat-sub">in your circle</span>
+                <span className="wsel-stat-sub">{t('worldSelector.inCircle')}</span>
               </div>
               {unread > 0 && (
                 <div className="wsel-stat">
-                  <span className="wsel-stat-k">Phone</span>
+                  <span className="wsel-stat-k">{t('worldSelector.phone')}</span>
                   <span className="wsel-stat-v wsel-unread">{unread}</span>
-                  <span className="wsel-stat-sub">unread</span>
+                  <span className="wsel-stat-sub">{t('worldSelector.unread')}</span>
                 </div>
               )}
             </div>
@@ -298,15 +295,22 @@ function WorldCard({
       <div className="wsel-card-actions">
         {selecting ? (
           <button className="btn ghost flex-fill" type="button" onClick={onToggleSelect} aria-pressed={isSelected}>
-            {isSelected ? 'Selected' : 'Select to export'} <Icon name={isSelected ? 'check' : 'plus'} size={16} />
+            {isSelected ? t('worldSelector.selected') : t('worldSelector.selectToExport')}{' '}
+            <Icon name={isSelected ? 'check' : 'plus'} size={16} />
           </button>
         ) : (
           <>
             <button className="btn primary flex-fill" onClick={onEnter}>
-              {isActive ? 'Continue' : 'Enter'} <Icon name="chevronRight" size={16} />
+              {isActive ? t('worldSelector.continue') : t('worldSelector.enter')}{' '}
+              <Icon name="chevronRight" size={16} />
             </button>
             {onDelete && (
-              <button className="btn danger ghost" onClick={onDelete} title="Delete world" aria-label="Delete world">
+              <button
+                className="btn danger ghost"
+                onClick={onDelete}
+                title={t('worldSelector.deleteWorld')}
+                aria-label={t('worldSelector.deleteWorld')}
+              >
                 <Icon name="trash" size={16} />
               </button>
             )}
@@ -321,16 +325,16 @@ function WorldCard({
 
 const PRONOUN_OPTIONS = ['she/her', 'he/him', 'they/them'];
 
-const HOW_TO_PLAY: { icon: IconName; text: string }[] = [
-  { icon: 'date', text: 'Spend your days meeting people — dates and shared activities each cost a little energy.' },
-  { icon: 'people', text: 'Talk, and they remember. Relationships warm or cool over time, and drift if you neglect them.' },
-  { icon: 'phone', text: 'Your phone holds texts, mail, and a living social feed that keeps moving as the days pass.' },
-  { icon: 'shop', text: 'Buy gifts and keepsakes from the shop — your money and bag are yours alone in this world.' },
-  { icon: 'recap', text: 'When your energy is spent, end the day to rest, advance time, and see what happened around town.' },
-  { icon: 'worlds', text: 'Switch worlds any time from the selector — each one is a completely separate story and save.' },
+const HOW_TO_PLAY: { icon: IconName; key: string }[] = [
+  { icon: 'date', key: 'howToPlay.date' },
+  { icon: 'people', key: 'howToPlay.people' },
+  { icon: 'phone', key: 'howToPlay.phone' },
+  { icon: 'shop', key: 'howToPlay.shop' },
+  { icon: 'recap', key: 'howToPlay.recap' },
+  { icon: 'worlds', key: 'howToPlay.worlds' },
 ];
 
-const STEP_TITLES = ['Set the scene', 'Who are you here?', 'Bring people in', 'How it works'];
+const STEP_TITLE_KEYS = ['stepTitles.setScene', 'stepTitles.whoAreYou', 'stepTitles.bringPeople', 'stepTitles.howItWorks'];
 
 /** Only step 1's pre-commit choices are a true unsaved draft — past step 1 the
  *  world is created server-side and lives in the world list. */
@@ -348,6 +352,7 @@ const ONBOARDING_EMPTY: OnboardingDraft = {
 /** A guided first-run for a new world: set the scene (blank or cloned from a save),
  *  set up your persona, import people from other worlds, then a how-to-play welcome. */
 export function WorldOnboarding() {
+  const { t } = useTranslation(['pages', 'common']);
   const { worlds, reloadWorlds, setActiveWorld, reloadPlayer } = useAppData();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -398,7 +403,7 @@ export function WorldOnboarding() {
       scopeId: 'singleton',
       worldId: null,
       isNew: true,
-      label: () => worldForm.name.trim() || 'Untitled world',
+      label: () => worldForm.name.trim() || t('pages:worldOnboarding.untitledWorld'),
     },
   });
 
@@ -416,11 +421,11 @@ export function WorldOnboarding() {
       return;
     }
     if (!worldForm.name.trim()) {
-      setError('Give your world a name to continue.');
+      setError(t('pages:worldOnboarding.nameRequired'));
       return;
     }
     if (mode === 'clone' && !sourceWorldId) {
-      setError('Choose a world to start from.');
+      setError(t('pages:worldOnboarding.chooseSource'));
       return;
     }
     setBusy(true);
@@ -482,7 +487,7 @@ export function WorldOnboarding() {
           notes: res.data.notes,
         });
       } else {
-        setError(`World generation failed: ${res.error}`);
+        setError(t('pages:worldOnboarding.genFailed', { error: res.error }));
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -559,8 +564,14 @@ export function WorldOnboarding() {
     <div className="wsel wonb">
       <div className="wsel-atmosphere" aria-hidden="true" />
       <header className="wsel-head">
-        <div className="kicker">New world · step {step} of 4</div>
-        <h1 className="wsel-title">{step === 4 ? `Welcome to ${world?.name ?? 'your world'}` : STEP_TITLES[step - 1]}</h1>
+        <div className="kicker">{t('pages:worldOnboarding.stepOf', { step })}</div>
+        <h1 className="wsel-title">
+          {step === 4
+            ? t('pages:worldOnboarding.welcome', {
+                name: world?.name ?? t('pages:worldOnboarding.yourWorldFallback'),
+              })
+            : t(`pages:worldOnboarding.${STEP_TITLE_KEYS[step - 1]}` as 'pages:worldOnboarding.stepTitles.setScene')}
+        </h1>
       </header>
 
       <div className="wonb-steps" aria-hidden="true">
@@ -574,7 +585,7 @@ export function WorldOnboarding() {
       {step === 1 && draft.found && (
         <DraftRestoreBar
           env={draft.found}
-          noun="new world"
+          noun={t('pages:worldOnboarding.nounNewWorld')}
           onRestore={() => {
             const d = draft.restore();
             if (d) {
@@ -598,26 +609,23 @@ export function WorldOnboarding() {
                   onClick={() => setMode('blank')}
                   type="button"
                 >
-                  <span className="wonb-mode-title">A fresh world</span>
-                  <span className="wonb-mode-sub">Start from a blank page</span>
+                  <span className="wonb-mode-title">{t('pages:worldOnboarding.modeFreshTitle')}</span>
+                  <span className="wonb-mode-sub">{t('pages:worldOnboarding.modeFreshSub')}</span>
                 </button>
                 <button
                   className={`wonb-mode-opt${mode === 'clone' ? ' on' : ''}`}
                   onClick={() => setMode('clone')}
                   type="button"
                 >
-                  <span className="wonb-mode-title">Start from a save</span>
-                  <span className="wonb-mode-sub">Copy an existing world &amp; its cast</span>
+                  <span className="wonb-mode-title">{t('pages:worldOnboarding.modeCloneTitle')}</span>
+                  <span className="wonb-mode-sub">{t('pages:worldOnboarding.modeCloneSub')}</span>
                 </button>
               </div>
             )}
 
             {mode === 'clone' && canClone ? (
               <>
-                <p className="wonb-flavor">
-                  Pick a world to copy. Its setting, lore, and the people in it are duplicated into a brand-new save —
-                  your money, relationships, and history start fresh.
-                </p>
+                <p className="wonb-flavor">{t('pages:worldOnboarding.cloneFlavor')}</p>
                 <div className="wonb-sources">
                   {worlds.map((w) => (
                     <button
@@ -631,75 +639,79 @@ export function WorldOnboarding() {
                     </button>
                   ))}
                 </div>
-                <Field label="Name your new save">
+                <Field label={t('pages:worldOnboarding.nameNewSave')}>
                   <input
                     value={worldForm.name}
-                    placeholder="e.g. The Lumen Quarter — take two"
+                    placeholder={t('pages:worldOnboarding.nameNewSavePlaceholder')}
                     onChange={(e) => setWorldForm({ ...worldForm, name: e.target.value })}
                   />
                 </Field>
               </>
             ) : (
               <>
-                <p className="wonb-flavor">
-                  A world is the stage your story plays out on — a town, a season, a mood. You can flesh out its lore,
-                  locations, and people later; for now, just give it a name and a feeling.
-                </p>
-                <Field label="World name">
+                <p className="wonb-flavor">{t('pages:worldOnboarding.blankFlavor')}</p>
+                <Field label={t('pages:worldOnboarding.worldName')}>
                   <input
                     autoFocus
                     value={worldForm.name}
-                    placeholder="e.g. The Lumen Quarter"
+                    placeholder={t('pages:worldOnboarding.worldNamePlaceholder')}
                     onChange={(e) => setWorldForm({ ...worldForm, name: e.target.value })}
                   />
                 </Field>
-                <Field label="A one-line summary" hint="Optional — what kind of place is this?">
+                <Field
+                  label={t('pages:worldOnboarding.summaryLabel')}
+                  hint={t('pages:worldOnboarding.summaryHint')}
+                >
                   <input
                     value={worldForm.summary}
-                    placeholder="A cozy arts district where neighbors become something more."
+                    placeholder={t('pages:worldOnboarding.summaryPlaceholder')}
                     onChange={(e) => setWorldForm({ ...worldForm, summary: e.target.value })}
                   />
                 </Field>
-                <Field label="Tone" hint="Optional — the emotional key of the story.">
+                <Field label={t('pages:worldOnboarding.toneLabel')} hint={t('pages:worldOnboarding.toneHint')}>
                   <input
                     value={worldForm.tone}
-                    placeholder="Warm, hopeful, character-driven romance."
+                    placeholder={t('pages:worldOnboarding.tonePlaceholder')}
                     onChange={(e) => setWorldForm({ ...worldForm, tone: e.target.value })}
                   />
                 </Field>
 
                 <div className="wonb-gen">
                   <div className="wonb-cast-head">
-                    <span className="kicker">Or conjure it with AI</span>
+                    <span className="kicker">{t('pages:worldOnboarding.conjureKicker')}</span>
                     <span className="trail" />
                   </div>
-                  <p className="wonb-flavor">
-                    Give a spark — a vibe, a place, a premise — and generate a whole setting, lore, and locations to
-                    start from. No people are created; you'll bring those in later. Edit anything before you continue.
-                  </p>
-                  <Field label="Your idea" hint="Optional — the more you give, the more it has to work with.">
+                  <p className="wonb-flavor">{t('pages:worldOnboarding.conjureFlavor')}</p>
+                  <Field label={t('pages:worldOnboarding.ideaLabel')} hint={t('pages:worldOnboarding.ideaHint')}>
                     <textarea
                       value={genPrompt}
                       rows={3}
-                      placeholder="e.g. A storm-battered lighthouse town where everyone keeps a secret — autumn, slow-burn, a little melancholy."
+                      placeholder={t('pages:worldOnboarding.ideaPlaceholder')}
                       onChange={(e) => setGenPrompt(e.target.value)}
                     />
                   </Field>
                   <button className="btn" type="button" onClick={generateTheWorld} disabled={generating || busy}>
                     <Icon name="generate" size={14} />
-                    {generating ? 'Generating…' : generated ? 'Regenerate world' : 'Generate world'}
+                    {generating
+                      ? t('pages:worldOnboarding.generating')
+                      : generated
+                        ? t('pages:worldOnboarding.regenerate')
+                        : t('pages:worldOnboarding.generate')}
                   </button>
 
                   {generated && (
                     <div className="wonb-gen-preview">
-                      <Field label="Lore" hint="The setting's backstory — edit freely.">
+                      <Field label={t('pages:worldOnboarding.loreLabel')} hint={t('pages:worldOnboarding.loreHint')}>
                         <textarea
                           value={generated.lore}
                           rows={5}
                           onChange={(e) => setGenerated((g) => (g ? { ...g, lore: e.target.value } : g))}
                         />
                       </Field>
-                      <Field label="World rules" hint="How this world works — may be blank for an ordinary setting.">
+                      <Field
+                        label={t('pages:worldOnboarding.rulesLabel')}
+                        hint={t('pages:worldOnboarding.rulesHint')}
+                      >
                         <textarea
                           value={generated.rules}
                           rows={3}
@@ -707,8 +719,8 @@ export function WorldOnboarding() {
                         />
                       </Field>
                       <Field
-                        label="Global notes"
-                        hint="The always-in-mind briefing the narrator keeps for every scene."
+                        label={t('pages:worldOnboarding.globalNotesLabel')}
+                        hint={t('pages:worldOnboarding.globalNotesHint')}
                       >
                         <textarea
                           value={generated.globalNotes}
@@ -717,11 +729,13 @@ export function WorldOnboarding() {
                         />
                       </Field>
                       <div className="wonb-cast-head">
-                        <span className="kicker">Locations · {generated.locations.length}</span>
+                        <span className="kicker">
+                          {t('pages:worldOnboarding.locationsCount', { count: generated.locations.length })}
+                        </span>
                         <span className="trail" />
                       </div>
                       {generated.locations.length === 0 ? (
-                        <p className="wonb-flavor">No locations — regenerate to get some.</p>
+                        <p className="wonb-flavor">{t('pages:worldOnboarding.noLocations')}</p>
                       ) : (
                         <div className="wonb-gen-locs">
                           {generated.locations.map((loc, i) => (
@@ -735,7 +749,7 @@ export function WorldOnboarding() {
                                 <button
                                   className="btn ghost sm"
                                   type="button"
-                                  title="Remove location"
+                                  title={t('pages:worldOnboarding.removeLocation')}
                                   onClick={() => removeGenLocation(i)}
                                 >
                                   <Icon name="trash" size={13} />
@@ -748,9 +762,9 @@ export function WorldOnboarding() {
                               />
                               {loc.tags.length > 0 && (
                                 <div className="wonb-gen-loc-tags">
-                                  {loc.tags.map((t) => (
-                                    <span key={t} className="wonb-chip">
-                                      {t}
+                                  {loc.tags.map((tag) => (
+                                    <span key={tag} className="wonb-chip">
+                                      {tag}
                                     </span>
                                   ))}
                                 </div>
@@ -761,11 +775,13 @@ export function WorldOnboarding() {
                       )}
 
                       <div className="wonb-cast-head">
-                        <span className="kicker">World notes · {generated.notes.length}</span>
+                        <span className="kicker">
+                          {t('pages:worldOnboarding.worldNotesCount', { count: generated.notes.length })}
+                        </span>
                         <span className="trail" />
                       </div>
                       {generated.notes.length === 0 ? (
-                        <p className="wonb-flavor">No notes — regenerate to get some.</p>
+                        <p className="wonb-flavor">{t('pages:worldOnboarding.noNotes')}</p>
                       ) : (
                         <div className="wonb-gen-locs">
                           {generated.notes.map((note, i) => (
@@ -780,7 +796,7 @@ export function WorldOnboarding() {
                                 <button
                                   className="btn ghost sm"
                                   type="button"
-                                  title="Remove note"
+                                  title={t('pages:worldOnboarding.removeNote')}
                                   onClick={() => removeGenNote(i)}
                                 >
                                   <Icon name="trash" size={13} />
@@ -804,10 +820,11 @@ export function WorldOnboarding() {
             <div className="row end wonb-actions">
               <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />
               <button className="btn ghost" onClick={() => navigate('/worlds')} disabled={busy}>
-                Back
+                {t('pages:worldOnboarding.back')}
               </button>
               <button className="btn primary" onClick={createTheWorld} disabled={busy}>
-                {busy ? 'Creating…' : 'Continue'} <Icon name="chevronRight" size={16} />
+                {busy ? t('pages:worldOnboarding.creating') : t('pages:worldOnboarding.continue')}{' '}
+                <Icon name="chevronRight" size={16} />
               </button>
             </div>
           </>
@@ -815,19 +832,16 @@ export function WorldOnboarding() {
 
         {step === 2 && (
           <>
-            <p className="wonb-flavor">
-              This is a fresh start — a separate you, with your own money, keepsakes, and history in this world. Tell
-              us who you are here.
-            </p>
-            <Field label="Your name">
+            <p className="wonb-flavor">{t('pages:worldOnboarding.personaFlavor')}</p>
+            <Field label={t('pages:worldOnboarding.yourName')}>
               <input
                 autoFocus
                 value={persona.name}
-                placeholder="What should people call you?"
+                placeholder={t('pages:worldOnboarding.yourNamePlaceholder')}
                 onChange={(e) => setPersona({ ...persona, name: e.target.value })}
               />
             </Field>
-            <Field label="Pronouns">
+            <Field label={t('pages:worldOnboarding.pronouns')}>
               <select value={persona.pronouns} onChange={(e) => setPersona({ ...persona, pronouns: e.target.value })}>
                 {PRONOUN_OPTIONS.map((p) => (
                   <option key={p} value={p}>
@@ -837,41 +851,42 @@ export function WorldOnboarding() {
               </select>
             </Field>
             <div className="inline-fields">
-              <Field label="Gender" hint="Separate from pronouns.">
+              <Field label={t('pages:worldOnboarding.gender')} hint={t('pages:worldOnboarding.genderHint')}>
                 <select value={persona.gender} onChange={(e) => setPersona({ ...persona, gender: e.target.value as Gender })}>
-                  {Object.entries(GENDER_LABELS).map(([k, label]) => (
+                  {Object.keys(GENDER_LABELS).map((k) => (
                     <option key={k} value={k}>
-                      {label}
+                      {genderLabel(k)}
                     </option>
                   ))}
                 </select>
               </Field>
-              <Field label="Sexuality" hint="Decides which characters a romance can deepen with. Leave unspecified to date freely.">
+              <Field label={t('pages:worldOnboarding.sexuality')} hint={t('pages:worldOnboarding.sexualityHint')}>
                 <select
                   value={persona.sexuality}
                   onChange={(e) => setPersona({ ...persona, sexuality: e.target.value as Sexuality })}
                 >
-                  {Object.entries(SEXUALITY_LABELS).map(([k, label]) => (
+                  {Object.keys(SEXUALITY_LABELS).map((k) => (
                     <option key={k} value={k}>
-                      {label}
+                      {sexualityLabel(k)}
                     </option>
                   ))}
                 </select>
               </Field>
             </div>
-            <Field label="A little about you" hint="Optional — a sentence or two the people you date will sense about you.">
+            <Field label={t('pages:worldOnboarding.aboutYou')} hint={t('pages:worldOnboarding.aboutYouHint')}>
               <textarea
                 value={persona.personaNotes}
-                placeholder="A sound engineer who just moved to town. A good listener; bad at sitting still."
+                placeholder={t('pages:worldOnboarding.aboutYouPlaceholder')}
                 onChange={(e) => setPersona({ ...persona, personaNotes: e.target.value })}
               />
             </Field>
             <div className="row end wonb-actions">
               <button className="btn ghost" onClick={() => setStep(1)} disabled={busy}>
-                Back
+                {t('pages:worldOnboarding.back')}
               </button>
               <button className="btn primary" onClick={savePersona} disabled={busy}>
-                {busy ? 'Saving…' : 'Continue'} <Icon name="chevronRight" size={16} />
+                {busy ? t('pages:worldOnboarding.saving') : t('pages:worldOnboarding.continue')}{' '}
+                <Icon name="chevronRight" size={16} />
               </button>
             </div>
           </>
@@ -910,6 +925,7 @@ function ImportPeopleStep({
   onBack: () => void;
   onContinue: () => void;
 }) {
+  const { t } = useTranslation('pages');
   const { worlds } = useAppData();
   const all = useAsync(() => api.listCharacters(), []);
   // Anyone not already in the new world is importable — including unassigned
@@ -925,27 +941,24 @@ function ImportPeopleStep({
     byWorld.set(key, arr);
   }
   const worldName = (id: string) =>
-    id === UNASSIGNED ? 'Unassigned' : worlds.find((w) => w.id === id)?.name ?? 'Another world';
+    id === UNASSIGNED ? t('worldOnboarding.unassigned') : worlds.find((w) => w.id === id)?.name ?? t('worldOnboarding.anotherWorld');
 
   return (
     <>
-      <p className="wonb-flavor">
-        Know someone from another world you'd like to meet again? Copy them in as a fresh face — a new beginning, no
-        history carried over. Skip this and your world stays as it is.
-      </p>
+      <p className="wonb-flavor">{t('worldOnboarding.importFlavor')}</p>
 
       {all.loading ? (
         <Spinner />
       ) : others.length === 0 ? (
         <div className="wonb-blank">
-          <p>You don't have anyone to import yet. Skip ahead — you can always create people once you're in.</p>
+          <p>{t('worldOnboarding.noImport')}</p>
         </div>
       ) : (
         <div className="wonb-import">
           {[...byWorld.entries()].map(([wid, chars]) => (
             <div key={wid} className="wonb-import-world">
               <div className="wonb-cast-head">
-                <span className="kicker">From {worldName(wid)}</span>
+                <span className="kicker">{t('worldOnboarding.fromWorld', { world: worldName(wid) })}</span>
                 <span className="trail" />
               </div>
               <div className="wonb-import-grid">
@@ -977,10 +990,14 @@ function ImportPeopleStep({
 
       <div className="row end wonb-actions">
         <button className="btn ghost" onClick={onBack} disabled={busy}>
-          Back
+          {t('worldOnboarding.back')}
         </button>
         <button className="btn primary" onClick={onContinue} disabled={busy}>
-          {busy ? 'Importing…' : selected.size > 0 ? `Import ${selected.size} & continue` : 'Skip'}{' '}
+          {busy
+            ? t('worldOnboarding.importing')
+            : selected.size > 0
+              ? t('worldOnboarding.importN', { count: selected.size })
+              : t('worldOnboarding.skip')}{' '}
           <Icon name="chevronRight" size={16} />
         </button>
       </div>
@@ -990,6 +1007,7 @@ function ImportPeopleStep({
 
 /** The final onboarding beat: how-to-play + a preview of who lives in this world. */
 function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: string; onEnter: () => void }) {
+  const { t } = useTranslation('pages');
   const { creatorMode } = useAppData();
   const cast = useAsync(() => api.listCharacters(world.id), [world.id]);
   const people = cast.data ?? [];
@@ -997,8 +1015,10 @@ function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: st
   return (
     <>
       <p className="wonb-flavor">
-        The lamps are lit, {persona}. {world.summary || 'A new chapter is yours to write.'} Here's the shape of a day
-        before you step in:
+        {t('worldOnboarding.welcomeFlavor', {
+          persona,
+          summary: world.summary || t('worldOnboarding.newChapter'),
+        })}
       </p>
 
       <ul className="wonb-howto">
@@ -1007,13 +1027,13 @@ function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: st
             <span className="wonb-howto-icon">
               <Icon name={h.icon} size={18} />
             </span>
-            <span>{h.text}</span>
+            <span>{t(`worldOnboarding.${h.key}` as 'worldOnboarding.howToPlay.date')}</span>
           </li>
         ))}
       </ul>
 
       <div className="wonb-cast-head">
-        <span className="kicker">The people you could meet</span>
+        <span className="kicker">{t('worldOnboarding.peopleYouCouldMeet')}</span>
         <span className="trail" />
       </div>
 
@@ -1032,17 +1052,16 @@ function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: st
       ) : (
         <div className="wonb-blank">
           <p>
-            This world is a blank page — no one lives here yet.{' '}
             {creatorMode
-              ? 'Once you step inside, head to People to create the characters who call it home.'
-              : 'Turn on Creator mode in the phone’s Settings to populate it with people to meet.'}
+              ? t('worldOnboarding.blankPageCreator')
+              : t('worldOnboarding.blankPagePlayer')}
           </p>
         </div>
       )}
 
       <div className="row end wonb-actions">
         <button className="btn primary lg" onClick={onEnter}>
-          Enter {world.name} <Icon name="chevronRight" size={18} />
+          {t('worldOnboarding.enterWorld', { name: world.name })} <Icon name="chevronRight" size={18} />
         </button>
       </div>
     </>
