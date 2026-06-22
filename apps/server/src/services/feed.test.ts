@@ -573,6 +573,48 @@ describe('unread badge', () => {
     markFeedSeen(world.id, DEFAULT_PLAYER_ID);
     expect(feedUnreadCount(world.id, DEFAULT_PLAYER_ID)).toBe(0);
   });
+
+  it('a comment on the player\'s OWN post does not relight the badge', async () => {
+    const { world, character } = seedWorldAndCharacter();
+    markDated(character.id);
+    warmUp(character.id);
+    ensureWorldState(world.id);
+    setAdapterOverride(new ScriptedAdapter([commentReply('love this for you!! 💛')]));
+
+    // Player is viewing Faces → feed marked seen, nothing unread.
+    markFeedSeen(world.id, DEFAULT_PLAYER_ID);
+    expect(feedUnreadCount(world.id, DEFAULT_PLAYER_ID)).toBe(0);
+
+    // Player makes a post; an engaged NPC comments on it synchronously.
+    const { post } = await createPlayerPost({ body: 'best day in ages', worldId: world.id }, DEFAULT_PLAYER_ID);
+    expect(post.comments.some((c) => c.authorId === character.id)).toBe(true);
+
+    // The player just watched that comment appear, so it must NOT light the badge.
+    expect(feedUnreadCount(world.id, DEFAULT_PLAYER_ID)).toBe(0);
+  });
+
+  it('a reply to the player\'s comment on an NPC post does not relight the badge', async () => {
+    const { world, character } = seedWorldAndCharacter();
+    markDated(character.id);
+    warmUp(character.id);
+    ensureWorldState(world.id);
+    // A jealousy beat gives the character something to post about (event-driven).
+    recordEvent('jealousy_triggered', { characterId: character.id, link: null, committed: false, day: 1 });
+    // One scripted draft for the NPC's own post, one for its reply to the player.
+    setAdapterOverride(new ScriptedAdapter([postReply('out for a walk.'), commentReply('glad you came by 💛')]));
+
+    await generateFeedForDay(world.id, 2);
+    const npcPost = getFeedView(world.id, DEFAULT_PLAYER_ID).posts.find((p) => p.authorType === 'character');
+    expect(npcPost).toBeDefined();
+
+    // Player opens Faces → everything so far is seen.
+    markFeedSeen(world.id, DEFAULT_PLAYER_ID);
+    expect(feedUnreadCount(world.id, DEFAULT_PLAYER_ID)).toBe(0);
+
+    // Player comments on the NPC post; the NPC may reply synchronously.
+    await commentOnPost(npcPost!.id, 'nice!', DEFAULT_PLAYER_ID);
+    expect(feedUnreadCount(world.id, DEFAULT_PLAYER_ID)).toBe(0);
+  });
 });
 
 describe('NARRATIVE-ONLY — a full feed cycle never changes stats', () => {
