@@ -22,6 +22,7 @@ import { charactersRepo, chroniclesRepo, messagesRepo, sessionsRepo, threadsRepo
 import { getDb } from '../db/index';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest } from '../lib/errors';
+import { withKeyedLock } from '../lib/keyed-lock';
 import { getCharacter, listAcquaintances } from './character-service';
 import { readAssetFile } from './asset-service';
 import { getCharacterAvailability, currentAvailabilityFor, currentAvailabilityMap } from './availability-service';
@@ -323,28 +324,33 @@ export async function sendPlayerText(
     imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
   }
 
-  const thread = getOrCreateThread(characterId, playerId);
-  const now = Date.now();
+  // Serialize per character so the player-insert + reply generation can't interleave
+  // with a concurrent send/retry for the same thread (two tabs, a double-fire) — which
+  // would otherwise duplicate the reply and double-apply the judge delta.
+  return withKeyedLock(`text-reply:${characterId}`, async () => {
+    const thread = getOrCreateThread(characterId, playerId);
+    const now = Date.now();
 
-  const playerMessage = textMessagesRepo.insert(
-    TextMessageSchema.parse({
-      id: newId('txt'),
-      threadId: thread.id,
-      sender: 'player',
-      body: text,
-      status: 'delivered',
-      dayNumber: day,
-      imageAssetId,
-      deliveredAt: now,
-      createdAt: now,
-    }),
-  );
-  threadsRepo.update({ ...thread, lastMessageAt: now, updatedAt: now });
+    const playerMessage = textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: newId('txt'),
+        threadId: thread.id,
+        sender: 'player',
+        body: text,
+        status: 'delivered',
+        dayNumber: day,
+        imageAssetId,
+        deliveredAt: now,
+        createdAt: now,
+      }),
+    );
+    threadsRepo.update({ ...thread, lastMessageAt: now, updatedAt: now });
 
-  // Texting counts as staying in touch — reset the neglect clock.
-  if (character.worldId) stampLastSeen(characterId, day ?? 1);
+    // Texting counts as staying in touch — reset the neglect clock.
+    if (character.worldId) stampLastSeen(characterId, day ?? 1);
 
-  return generateTextReply(character, thread, playerMessage, day, imageDataUrl, playerId);
+    return generateTextReply(character, thread, playerMessage, day, imageDataUrl, playerId);
+  });
 }
 
 /**
@@ -485,31 +491,36 @@ export async function retryPlayerTextReply(
   if (!hasDated(characterId)) {
     throw badRequest(`You can only text someone you've been on a date with.`);
   }
-  const thread = getOrCreateThread(characterId, playerId);
-  const msgs = textMessagesRepo.listDeliveredByThread(thread.id);
-  const last = msgs[msgs.length - 1];
-  if (!last) throw badRequest('There’s nothing here to reply to yet.');
-  // Already answered — return the existing reply (and its prompting player text)
-  // so a double-tap / race is a harmless no-op rather than a duplicate reply.
-  if (last.sender === 'character') {
-    const lastPlayer = [...msgs].reverse().find((m) => m.sender === 'player');
-    return { playerMessage: lastPlayer ?? last, reply: last, error: null, relationshipDelta: {} };
-  }
-  // A gift text always persists its reaction reply atomically with the player
-  // message, so an unanswered trailing text is never a gift — guard anyway.
-  if (last.attachment) throw badRequest('That message has already been handled.');
-  const day = character.worldId ? ensureWorldState(character.worldId).day : null;
-  // Rebuild the attached photo (if any) so the regenerated reply still reacts to it.
-  let imageDataUrl: string | null = null;
-  if (last.imageAssetId) {
-    try {
-      const { buffer, mimeType } = readAssetFile(last.imageAssetId);
-      imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
-    } catch {
-      imageDataUrl = null; // the asset is gone — reply to the text alone
+  // Same per-character lock as sendPlayerText: re-evaluate the trailing message
+  // INSIDE the critical section so two concurrent retries (or a retry racing a
+  // send) can't both generate — the second sees the reply and no-ops.
+  return withKeyedLock(`text-reply:${characterId}`, async () => {
+    const thread = getOrCreateThread(characterId, playerId);
+    const msgs = textMessagesRepo.listDeliveredByThread(thread.id);
+    const last = msgs[msgs.length - 1];
+    if (!last) throw badRequest('There’s nothing here to reply to yet.');
+    // Already answered — return the existing reply (and its prompting player text)
+    // so a double-tap / race is a harmless no-op rather than a duplicate reply.
+    if (last.sender === 'character') {
+      const lastPlayer = [...msgs].reverse().find((m) => m.sender === 'player');
+      return { playerMessage: lastPlayer ?? last, reply: last, error: null, relationshipDelta: {} };
     }
-  }
-  return generateTextReply(character, thread, last, day, imageDataUrl, playerId);
+    // A gift text always persists its reaction reply atomically with the player
+    // message, so an unanswered trailing text is never a gift — guard anyway.
+    if (last.attachment) throw badRequest('That message has already been handled.');
+    const day = character.worldId ? ensureWorldState(character.worldId).day : null;
+    // Rebuild the attached photo (if any) so the regenerated reply still reacts to it.
+    let imageDataUrl: string | null = null;
+    if (last.imageAssetId) {
+      try {
+        const { buffer, mimeType } = readAssetFile(last.imageAssetId);
+        imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+      } catch {
+        imageDataUrl = null; // the asset is gone — reply to the text alone
+      }
+    }
+    return generateTextReply(character, thread, last, day, imageDataUrl, playerId);
+  });
 }
 
 export function claimTextGift(textId: string, playerId: string = DEFAULT_PLAYER_ID) {

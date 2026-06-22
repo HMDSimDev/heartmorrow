@@ -24,6 +24,7 @@ import {
 import { attemptDtr } from '../services/dtr-service';
 import { giveGiftOnDate } from '../services/gift-service';
 import { docSchema } from '../lib/openapi-schema';
+import { withKeyedLock } from '../lib/keyed-lock';
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'Create a conversation session', body: ConversationCreateSchema }) }, async (req, reply) => {
@@ -236,42 +237,45 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     };
 
     try {
-      const { session, messages } = getSessionWithMessages(id);
-      if (session.ended) {
-        send('error', { message: 'This date has already ended.' });
-        finish();
-        return;
-      }
-      const last = messages[messages.length - 1];
-      // Already answered (a prior retry landed, or the original reply actually
-      // persisted before the connection dropped) — replay it as a clean success.
-      if (last && last.role === 'character') {
-        send('done', { message: last });
-        finish();
-        return;
-      }
-      if (!last || last.role !== 'player') {
-        send('error', { message: 'There’s no message here to reply to.' });
-        finish();
-        return;
-      }
-
-      const { content, finishReason } = await streamReply(id, (delta) => send('delta', { text: delta }), ac.signal, null);
-      if (!content.trim()) {
-        send('error', {
-          message:
-            finishReason === 'length'
-              ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
-              : 'The model returned an empty reply.',
-        });
-      } else {
-        const message = persistStreamedReply(id, content);
-        if (finishReason === 'length') {
-          send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
+      // Serialize reply production per session and re-check the trailing message
+      // INSIDE the lock, so two concurrent retry-streams (two tabs, a double-fire)
+      // can't both pass the player-turn check and persist two replies — the second
+      // sees the freshly-persisted reply and replays it instead.
+      await withKeyedLock(`conv-reply:${id}`, async () => {
+        const { session, messages } = getSessionWithMessages(id);
+        if (session.ended) {
+          send('error', { message: 'This date has already ended.' });
+          return;
         }
-        send('done', { message });
-        void maybeAutoSummarize(id);
-      }
+        const last = messages[messages.length - 1];
+        // Already answered (a prior retry landed, or the original reply actually
+        // persisted before the connection dropped) — replay it as a clean success.
+        if (last && last.role === 'character') {
+          send('done', { message: last });
+          return;
+        }
+        if (!last || last.role !== 'player') {
+          send('error', { message: 'There’s no message here to reply to.' });
+          return;
+        }
+
+        const { content, finishReason } = await streamReply(id, (delta) => send('delta', { text: delta }), ac.signal, null);
+        if (!content.trim()) {
+          send('error', {
+            message:
+              finishReason === 'length'
+                ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
+                : 'The model returned an empty reply.',
+          });
+        } else {
+          const message = persistStreamedReply(id, content);
+          if (finishReason === 'length') {
+            send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
+          }
+          send('done', { message });
+          void maybeAutoSummarize(id);
+        }
+      });
     } catch (err) {
       if (!ac.signal.aborted) send('error', { message: (err as Error).message });
     } finally {

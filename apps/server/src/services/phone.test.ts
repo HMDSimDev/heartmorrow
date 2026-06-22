@@ -272,6 +272,30 @@ describe('player texting', () => {
     expect(msgs[msgs.length - 1]!.sender).toBe('character');
   });
 
+  it('two concurrent retries produce exactly one reply (no duplicate, no double-applied delta)', async () => {
+    const { character } = seedWorldAndCharacter();
+    dateOnce(character.id);
+    // Save an unanswered player text (the reply fails on unparseable JSON).
+    setAdapterOverride(new ScriptedAdapter(['not json at all']));
+    await sendPlayerText(character.id, 'are you around?');
+
+    // Heal the model and fire two retries at once. The per-character lock must
+    // serialize them: the first generates the reply; the second re-reads, sees the
+    // reply already there, and no-ops (so the judge delta is applied only once).
+    setAdapterOverride(
+      new ScriptedAdapter([
+        JSON.stringify({ body: 'hey! yeah, what’s up?', tone: 'warm' }),
+        JSON.stringify({ engagement: 2, hostile: false, note: 'warm' }),
+      ]),
+    );
+    await Promise.all([retryPlayerTextReply(character.id), retryPlayerTextReply(character.id)]);
+
+    const thread = threadsRepo.getByCharacter(character.id, DEFAULT_PLAYER_ID)!;
+    const msgs = textMessagesRepo.listDeliveredByThread(thread.id);
+    expect(msgs.filter((m) => m.sender === 'player').length).toBe(1);
+    expect(msgs.filter((m) => m.sender === 'character').length).toBe(1);
+  });
+
   it('retry is a no-op that returns the existing reply when one is already there', async () => {
     const { character } = seedWorldAndCharacter();
     dateOnce(character.id);

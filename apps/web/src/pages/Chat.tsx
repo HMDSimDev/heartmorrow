@@ -136,7 +136,13 @@ export function Chat() {
   // A turn that didn't land, with how to recover it. 'reply' = your message was
   // saved but the reply failed/dropped → regenerate it (no duplicate). 'send' =
   // nothing saved → resend the original text + intent (kept here).
-  const [failed, setFailed] = useState<{ kind: 'reply' } | { kind: 'send'; text: string; intent?: Intent } | null>(null);
+  const [failed, setFailed] = useState<
+    | { kind: 'reply' }
+    // priorPlayerTurns: player-turn count BEFORE this send — lets a retry tell "my
+    // turn was saved" (count grew) from "a stale prior reply is trailing".
+    | { kind: 'send'; text: string; intent?: Intent; priorPlayerTurns: number }
+    | null
+  >(null);
   const [walkout, setWalkout] = useState<string | null>(null);
   // Live "how it's going" read: the vibe word, the numeric trajectory (0..100,
   // internal — center 50), and the signed change this turn for the +N/−N flourish.
@@ -472,7 +478,11 @@ export function Chat() {
     abortRef.current = controller;
     let playerPersisted = false;
     let settled = false; // a terminal event (done/error/walkout/…) arrived
-    const recover = () => (playerPersisted ? { kind: 'reply' as const } : { kind: 'send' as const, text, intent: chosenIntent });
+    // Baseline to detect (on a retry) whether THIS turn persisted despite a missed
+    // 'player' event — by the player-turn count growing, not the trailing role.
+    const priorPlayerTurns = messages.filter((m) => m.role === 'player').length;
+    const recover = () =>
+      playerPersisted ? { kind: 'reply' as const } : { kind: 'send' as const, text, intent: chosenIntent, priorPlayerTurns };
     try {
       await streamChat(
         session.id,
@@ -555,12 +565,43 @@ export function Chat() {
   // player's message was saved but the reply failed (no duplicate player turn).
   const retry = async () => {
     if (!session || !failed || streaming.active || busy) return;
+    // Regenerating a reply never adds a player turn; resending re-POSTs /stream and
+    // WOULD duplicate the turn if the server actually saved it (we may have missed
+    // the 'player' event on a drop). So for a presumed-lost send, reconcile with
+    // server truth first and only resend when there's no unanswered player turn.
+    let action: 'reply' | 'send' | 'abort' = failed.kind === 'reply' ? 'reply' : 'send';
     if (failed.kind === 'send') {
+      setBusy(true);
+      try {
+        const sm = await api.getConversation(session.id);
+        const newPlayerTurns = sm.messages.filter((m) => m.role === 'player').length;
+        const last = sm.messages[sm.messages.length - 1];
+        if (newPlayerTurns > failed.priorPlayerTurns) {
+          // The turn WAS saved (count grew). If a reply also landed, we're done.
+          if (last && last.role === 'character') {
+            setMessages(sm.messages);
+            setFailed(null);
+            return;
+          }
+          action = 'reply'; // saved but unanswered → regenerate
+        } else {
+          action = 'send'; // genuinely not saved → resend
+        }
+      } catch {
+        action = 'abort'; // couldn't verify — keep the retry, don't risk a dup
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    if (action === 'abort') return; // payload preserved in `failed`; they can retry again
+    if (action === 'send' && failed.kind === 'send') {
       const { text, intent: keptIntent } = failed;
       setFailed(null);
       await send({ text, intent: keptIntent });
       return;
     }
+
     setFailed(null);
     setError(undefined);
     setNotice(undefined);

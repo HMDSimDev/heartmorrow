@@ -345,7 +345,15 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
   // (network/blocked) → resend the original payload, which we keep here.
   const [failed, setFailed] = useState<
     | { kind: 'reply' }
-    | { kind: 'send'; text: string; image: { assetId: string; url: string } | null; gift: { inventoryItem: InventoryItem; item: ShopItem } | null }
+    | {
+        kind: 'send';
+        text: string;
+        image: { assetId: string; url: string } | null;
+        gift: { inventoryItem: InventoryItem; item: ShopItem } | null;
+        // Player-message count in the thread BEFORE this send — lets a retry tell
+        // "my text was saved" (count grew) from "a stale prior reply is trailing".
+        priorPlayerCount: number;
+      }
     | null
   >(null);
   const [feeling, setFeeling] = useState<{ text: string; warm: boolean } | null>(null);
@@ -468,6 +476,9 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       setPendingGift(null);
       setGiftOpen(false);
     }
+    // Baseline (server truth, no optimistic yet) to detect on failure whether THIS
+    // text actually persisted — by the player count growing, not the trailing sender.
+    const priorPlayerCount = messages.filter((m) => m.sender === 'player').length;
     setFailed(null);
     setSending(true);
     setError(undefined);
@@ -498,20 +509,30 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       }
       showFeeling(res.relationshipDelta ?? {});
     } catch (e) {
-      // Reconcile (this drops the optimistic bubble), then decide how to recover:
-      // if the text actually persisted, a retry regenerates the reply; otherwise
-      // nothing was saved, so keep the payload for a true resend.
+      // Reconcile (this drops the optimistic bubble), then classify by whether THIS
+      // text persisted — detected by the player-message count growing, NOT by the
+      // trailing sender (which is a stale prior reply for any follow-up message).
       const data = await load();
-      const last = data?.messages[data.messages.length - 1];
-      if (last && last.sender === 'character') {
-        // The exchange actually completed (the connection dropped late) — no error.
-        setError(undefined);
-      } else if (last && last.sender === 'player') {
+      if (!data) {
+        // Couldn't verify — keep the payload so a later retry can re-check safely.
         setError(errorMessage(e));
-        setFailed({ kind: 'reply' });
+        setFailed({ kind: 'send', text, image, gift, priorPlayerCount });
       } else {
-        setError(errorMessage(e));
-        setFailed({ kind: 'send', text, image, gift });
+        const newPlayerCount = data.messages.filter((m) => m.sender === 'player').length;
+        const last = data.messages[data.messages.length - 1];
+        if (newPlayerCount > priorPlayerCount) {
+          // The text WAS saved. If a reply also landed, we're done; else regenerate.
+          if (last && last.sender === 'character') {
+            setError(undefined);
+          } else {
+            setError(errorMessage(e));
+            setFailed({ kind: 'reply' });
+          }
+        } else {
+          // Nothing persisted → keep the payload for a true resend.
+          setError(errorMessage(e));
+          setFailed({ kind: 'send', text, image, gift, priorPlayerCount });
+        }
       }
     } finally {
       setSending(false);
@@ -520,14 +541,40 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
 
   const retry = async () => {
     if (!failed || sending || uploadingImage) return;
+    // Decide what to do. Regenerating a reply is always safe (it never duplicates
+    // the player text); resending re-POSTs and WOULD duplicate it if the server
+    // already saved it. So for a presumed-lost send, reconcile with server truth
+    // first and only resend when there's genuinely no unanswered player text.
+    let action: 'reply' | 'send' | 'abort' = failed.kind === 'reply' ? 'reply' : 'send';
     if (failed.kind === 'send') {
+      setSending(true);
+      setError(undefined);
+      const data = await load();
+      setSending(false);
+      if (!data) return; // couldn't verify — keep the retry, don't risk a dup
+      const newPlayerCount = data.messages.filter((m) => m.sender === 'player').length;
+      const last = data.messages[data.messages.length - 1];
+      if (newPlayerCount > failed.priorPlayerCount) {
+        // The text WAS saved after all.
+        if (last && last.sender === 'character') {
+          setFailed(null); // already fully answered
+          return;
+        }
+        action = 'reply'; // saved but unanswered → regenerate (never duplicates)
+      } else {
+        action = 'send'; // genuinely not saved → resend
+      }
+    }
+
+    if (action === 'send' && failed.kind === 'send') {
       const { text, image, gift } = failed;
       setFailed(null);
       await send({ text, image, gift });
       return;
     }
-    // 'reply': the text is saved server-side — regenerate the reply (no duplicate).
-    if (!availability.available) return;
+
+    // Regenerate the reply for the saved player text. Not gated on availability:
+    // the text was already accepted, so we only need its reply.
     setSending(true);
     setError(undefined);
     setFailed(null);
