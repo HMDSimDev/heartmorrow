@@ -733,12 +733,18 @@ export async function judgeTurn(sessionId: string, signal?: AbortSignal): Promis
     TurnReactionSchema,
     buildTurnReactionMessages({
       character,
+      relationship: getRelationship(character.id),
       needJudge: need?.judge ?? '',
       vibe: rapportLabel(getRapport(sessionId)),
       recentMessages: all.slice(-8),
+      // More memories than the text judge (5): the date judge sees only 8 lines of the
+      // live exchange, so it relies on shared history to recognize callbacks/inside jokes.
+      memories: selectTopMemories(character.id, 8),
       playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name,
     }),
-    { settings, role: 'evaluator', task: 'Judge how the last message landed on this date.', schemaName: 'TurnReaction', signal },
+    // Floor the output budget so a chatty `note` can't truncate the JSON mid-string
+    // under the evaluator role's small maxTokens (truncation → parse fail → no rapport change).
+    { settings, role: 'evaluator', minMaxTokens: 512, task: 'Judge how the last message landed on this date.', schemaName: 'TurnReaction', signal },
   );
   if (!result.ok) return null; // fail-safe — no rapport change
 

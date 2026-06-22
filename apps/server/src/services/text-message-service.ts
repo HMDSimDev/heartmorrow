@@ -434,7 +434,10 @@ async function generateTextReply(
   const judge = await callStructuredLlm(
     TextJudgeSchema,
     buildTextJudgeMessages({ character, relationship: getRelationship(character.id), recentTexts, playerName, memories, imageDataUrl }),
-    { settings: effectiveSettings, role: 'evaluator', task: "Judge how the player's most recent text landed for this character.", schemaName: 'TextJudge' },
+    // Floor the output budget so a chatty `note` can't truncate the JSON mid-string
+    // (the evaluator role runs a small maxTokens; without this the parse fails and
+    // the player's text silently costs nothing). See the session evaluator for the same guard.
+    { settings: effectiveSettings, role: 'evaluator', minMaxTokens: 512, task: "Judge how the player's most recent text landed for this character.", schemaName: 'TextJudge' },
   );
   if (judge.ok) {
     const base = textEngagementDelta(judge.data.engagement);

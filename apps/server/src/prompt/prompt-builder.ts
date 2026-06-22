@@ -459,15 +459,19 @@ export function buildSystemPrompt(ctx: PromptContext, guardrails: string): strin
     const e = ctx.turnVerdict.engagement;
     const note = ctx.turnVerdict.note.trim();
     const read =
-      e <= -2
-        ? `That landed BADLY — it came across as dismissive, dull, self-absorbed, or off. You're put off: cooler, shorter, more guarded, or visibly less into it now. Do NOT gush, fawn, or act delighted — show that it didn't land (pull back, get quieter, change the subject, or name it in character).`
-        : e === -1
-          ? `That was a bit flat or off, and your interest dips a little. Don't fake enthusiasm — let some air out of the moment and be a touch less warm.`
-          : e === 0
-            ? `That was forgettable filler — it did nothing for you. Respond honestly: a little bored, distracted, or unmoved is fine. Do NOT pretend it sparkled.`
-            : e === 1
-              ? `That was pleasant — a mild, genuine warmth, nothing over the top.`
-              : `That really landed — you're warmed and drawn in. Let your genuine interest show.`;
+      e <= -3
+        ? `That was genuinely heinous — cruel, contemptuous, demeaning, or a real line crossed. This did not merely fall flat; it wounded, disgusted, or insulted you. React IN KIND, as your character would when truly hurt or disrespected: go sharp, cold, or angry; stand up for yourself — push back hard, call out exactly what they did, turn icy and withdrawn, or make plain you will not sit there and take it. Do NOT soften it, make excuses for them, fish for a way to move past it, or show one drop of warmth. Whatever warmth existed is gone — they have to earn their way back from this, if at all.`
+        : e === -2
+          ? `That landed BADLY — it came across as dismissive, dull, self-absorbed, or off. You're put off: cooler, shorter, more guarded, or visibly less into it now. Do NOT gush, fawn, or act delighted — show that it didn't land (pull back, get quieter, change the subject, or name it in character).`
+          : e === -1
+            ? `That was a bit flat or off, and your interest dips a little. Don't fake enthusiasm — let some air out of the moment and be a touch less warm.`
+            : e === 0
+              ? `That was forgettable filler — it did nothing for you. Respond honestly: a little bored, distracted, or unmoved is fine. Do NOT pretend it sparkled.`
+              : e === 1
+                ? `That was pleasant — a mild, genuine warmth, nothing over the top.`
+                : e === 2
+                  ? `That really landed — you're warmed and drawn in. Let your genuine interest show.`
+                  : `That was extraordinary — it swept you up: a real spark, butterflies, the kind of moment that makes you fall a little. Let it show fully — lean in, light up, get warmer, closer, more open and unguarded than you've been. React IN KIND to how good it felt, in your own voice (some glow quietly rather than gush — but don't undersell it; this one truly got to you).`;
     directiveParts.push(
       `=== HOW THEIR LAST MESSAGE LANDED (react truthfully) ===\n` +
         `${read}${note ? ` (What stood out: ${note}.)` : ''} ` +
@@ -949,7 +953,8 @@ export function buildTextReplyMessages(args: {
 export function buildTextJudgeMessages(args: {
   character: Character;
   relationship: Relationship;
-  recentTexts: Array<{ sender: 'player' | 'character'; body: string }>;
+  /** Each entry's `day` (when known) lets the judge weigh the gap before this text. */
+  recentTexts: Array<{ sender: 'player' | 'character'; body: string; day?: number | null }>;
   playerName: string;
   /** A few top memories so the judge can weigh shared history. */
   memories?: CharacterMemory[];
@@ -960,17 +965,33 @@ export function buildTextJudgeMessages(args: {
   const stage = relationshipStage(relationship);
   const status = currentStatus(relationship);
   const statusLine = status !== 'none' ? ` You are ${STATUS_PHRASE[status] ?? RELATIONSHIP_STATUS_LABELS[status]}.` : '';
+  // Current emotional weather (recent breakup / jealous / offended / on-the-rocks),
+  // in the judge register — so the same nice text reads cooler the day after a fight
+  // instead of being scored as if nothing happened.
+  const stateNote = relationshipStateNote(relationship.flags, playerName, 'judge');
   const convo = recentTexts.map((t) => `${t.sender === 'player' ? playerName : c.name}: ${t.body}`).join('\n');
   const memoryBlock = memories.length ? `\n\nThings ${c.name} remembers about ${playerName}:\n${bullet(memories.map((m) => m.text))}` : '';
+  // Gap before this text: re-opening warmly after a lull is a plus; a curt reply
+  // after going quiet reads cooler. Computed from the last two messages' in-world days.
+  const curDay = recentTexts[recentTexts.length - 1]?.day;
+  const prevDay = recentTexts[recentTexts.length - 2]?.day;
+  const gap = typeof curDay === 'number' && typeof prevDay === 'number' ? curDay - prevDay : 0;
+  const gapLine =
+    gap >= 1
+      ? `\n\n(It had been ${gap} day${gap === 1 ? '' : 's'} since the previous message — weigh the gap.)`
+      : '';
   const traits: string[] = [];
   if (c.likes.length) traits.push(`Likes: ${c.likes.join(', ')}`);
   if (c.dislikes.length) traits.push(`Dislikes / turn-offs: ${c.dislikes.join(', ')}`);
   if (c.boundaries.length) traits.push(`Boundaries: ${c.boundaries.join(', ')}`);
+  if (c.loveLanguage) traits.push(`Love language: ${c.loveLanguage}`);
+  if (c.insecurities.length) traits.push(`Insecurities (poking one stings; easing one warms): ${c.insecurities.join(', ')}`);
+  if (c.goals.length) traits.push(`Goals: ${c.goals.join(', ')}`);
   const photoLine = imageDataUrl
     ? `${playerName}'s most recent text included a PHOTO (shown below) — judge the gesture AND what's actually in it. `
     : '';
   const userText =
-    `Text conversation so far:\n${convo || '(no messages yet)'}${memoryBlock}\n\n` +
+    `Text conversation so far:\n${convo || '(no messages yet)'}${memoryBlock}${gapLine}\n\n` +
     `${photoLine}Judge how ${playerName}'s MOST RECENT text landed for ${c.name} right now, per the schema.`;
   return [
     {
@@ -978,7 +999,7 @@ export function buildTextJudgeMessages(args: {
       content:
         `${TEXT_JUDGE_GUARDRAILS}\n\nThe character: ${characterBrief(c)}\n` +
         (traits.length ? `${traits.join('. ')}.\n` : '') +
-        `Relationship with ${playerName}: ${stage.label}.${statusLine}`,
+        `Relationship with ${playerName}: ${stage.label}.${statusLine}${stateNote}`,
     },
     {
       role: 'user',
@@ -1425,15 +1446,35 @@ export function buildWalkoutReactionMessages(args: {
  */
 export function buildTurnReactionMessages(args: {
   character: Character;
+  /** Stage/status + emotional weather, so the same bold line reads differently on a
+   *  nervous first date than with an established partner (the date judge was blind to
+   *  the relationship's altitude before). */
+  relationship: Relationship;
   /** This date's need, phrased as what the judge should reward/penalize. */
   needJudge: string;
   /** Qualitative read of how the date is going so far (e.g. "enjoying this"). */
   vibe: string;
   recentMessages: Message[];
   playerName: string;
+  /** Shared history so a callback/inside-joke in the player's line reads as warmth,
+   *  not a non-sequitur. Deliberately MORE than the text judge gets: a live date can
+   *  reference anything the two have done together, and the judge sees only 8 lines
+   *  of context, so it leans harder on memory to recognize what's being invoked. */
+  memories?: CharacterMemory[];
 }): ChatMessage[] {
-  const { character: c, needJudge, vibe, recentMessages, playerName } = args;
+  const { character: c, relationship, needJudge, vibe, recentMessages, playerName, memories = [] } = args;
+  const stage = relationshipStage(relationship);
+  const status = currentStatus(relationship);
+  const statusLine = status !== 'none' ? ` You are ${STATUS_PHRASE[status] ?? RELATIONSHIP_STATUS_LABELS[status]}.` : '';
+  const stateNote = relationshipStateNote(relationship.flags, playerName, 'judge');
   const convo = transcript(recentMessages.slice(-8), c.name);
+  const memoryBlock = memories.length
+    ? `\n\nThings ${c.name} remembers about ${playerName} (a callback to one of these is warmth, not randomness):\n${bullet(memories.map((m) => m.text))}`
+    : '';
+  const extraTraits: string[] = [];
+  if (c.loveLanguage) extraTraits.push(`Love language: ${c.loveLanguage}`);
+  if (c.insecurities.length) extraTraits.push(`Insecurities (poking one stings; easing one warms): ${c.insecurities.join(', ')}`);
+  if (c.goals.length) extraTraits.push(`Goals: ${c.goals.join(', ')}`);
   return [
     {
       role: 'system',
@@ -1441,13 +1482,15 @@ export function buildTurnReactionMessages(args: {
         `${TURN_JUDGE_GUARDRAILS}\n\nThe character: ${characterBrief(c, 'speech')}\n` +
         `Likes: ${c.likes.length ? c.likes.join(', ') : '—'}. Dislikes: ${c.dislikes.length ? c.dislikes.join(', ') : '—'}. ` +
         `Boundaries: ${c.boundaries.length ? c.boundaries.join(', ') : 'none stated'}.\n` +
+        (extraTraits.length ? `${extraTraits.join('. ')}.\n` : '') +
+        `Relationship with ${playerName}: ${stage.label}.${statusLine}${stateNote}\n` +
         (needJudge ? `What ${c.name} wants tonight: ${needJudge}\n` : '') +
         `So far this date feels: ${vibe}.`,
     },
     {
       role: 'user',
       content:
-        `Recent exchange:\n${convo || '(no messages yet)'}\n\n` +
+        `Recent exchange:\n${convo || '(no messages yet)'}${memoryBlock}\n\n` +
         `Judge how ${playerName}'s most recent message landed for ${c.name} right now, per the schema.`,
     },
   ];

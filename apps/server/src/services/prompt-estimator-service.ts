@@ -306,6 +306,7 @@ export async function estimatePrompts(req: PromptEstimateRequest): Promise<Promp
       description: 'Per-message rapport read during a date (structured).',
       messages: buildTurnReactionMessages({
         character,
+        relationship: dateCtx.relationship,
         needJudge: dateCtx.dateNeed ?? '',
         vibe: 'warming up nicely',
         recentMessages: dateCtx.recentMessages,

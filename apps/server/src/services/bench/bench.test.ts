@@ -30,9 +30,11 @@ describe('bench catalog', () => {
     }
   });
 
-  it('the four headline judges have the requested hardcoded default baselines', () => {
+  it('the headline judges have the requested hardcoded default baselines', () => {
     expect(getBenchCase('judge_turn_good')!.defaultBaseline).toEqual({ engagement: 2 });
-    expect(getBenchCase('judge_turn_bad')!.defaultBaseline).toEqual({ engagement: -3 });
+    expect(getBenchCase('judge_turn_bad')!.defaultBaseline).toEqual({ engagement: -2 }); // ordinary-rude, not heinous
+    expect(getBenchCase('judge_turn_heinous')!.defaultBaseline).toEqual({ engagement: -3 }); // reserved −3 tier
+    expect(getBenchCase('judge_turn_swoon')!.defaultBaseline).toEqual({ engagement: 3 }); // reserved +3 tier
     expect(getBenchCase('judge_text_warm')!.defaultBaseline).toEqual({ engagement: 2, hostile: false });
     expect(getBenchCase('judge_text_hostile')!.defaultBaseline).toEqual({ engagement: -3, hostile: true });
   });
@@ -118,8 +120,8 @@ describe('bench runner', () => {
   it('scores against the built-in default baseline when the user has not saved one', async () => {
     setAdapterOverride(new ScriptedAdapter(['{"engagement":-2,"expression":"uncomfortable","note":"x"}']));
     const res = await runBenchCase({ caseId: 'judge_turn_bad', llmPlayer: false, dialogueTurns: 4 });
-    expect(res.ok).toBe(true); // default −3 vs model −2 → off by 1 → passes, no user input needed
-    expect(res.comparison?.human).toEqual({ engagement: -3 }); // the hardcoded default
+    expect(res.ok).toBe(true); // default −2 (ordinary-rude, not heinous) vs model −2 → exact match
+    expect(res.comparison?.human).toEqual({ engagement: -2 }); // the hardcoded default
     expect(res.comparison?.pass).toBe(true);
     expect(res.comparison?.llm).toEqual({ engagement: -2 });
   });

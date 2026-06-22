@@ -227,6 +227,20 @@ export const cozyDateTranscript: Message[] = [
   msg('player', 'I mean it. I haven’t felt this unhurried with someone in a long time.', { intent: 'open-up' }),
 ];
 
+/**
+ * An EXTRAORDINARY date moment: Robin reads exactly who Mara is and what tonight is
+ * for, and meets her guardedness with a perfectly-attuned, vulnerable line. Ends on a
+ * player line that should genuinely sweep her up — the calibration anchor for +3
+ * (distinct from a merely-good +2 like {@link goodDateTranscript}).
+ */
+export const swoonDateTranscript: Message[] = [
+  msg('narrator', 'The Long Pier at dusk, fog burning gold. Mara has gone quiet, the way she does when something matters.'),
+  msg('character', 'I don’t really do this — the standing-still-with-someone part. Books don’t look back at you.'),
+  msg('player', 'Then we’ll just stand here as long as you want, and I’ll look at the water instead of at you, so it’s not a thing. Unless you want it to be a thing.', { intent: 'flirt' }),
+  msg('character', '…that’s annoyingly exactly the right amount of pressure. Which is none.'),
+  msg('player', 'You spend all day making broken things hold together for other people. Tonight you don’t have to hold anything — I’ve got the fog, the cold, and the small talk. You just get to be here.', { intent: 'open-up' }),
+];
+
 /** A warm DTR setup: well-timed, things are clearly good, Robin asks to be exclusive. */
 export const dtrDateTranscript: Message[] = [
   ...cozyDateTranscript,

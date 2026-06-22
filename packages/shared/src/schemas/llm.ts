@@ -588,8 +588,9 @@ export const TurnReactionSchema = z.object({
   engagement: z.number().int().min(-3).max(3),
   /** Canonical expression the UI maps to a portrait; off-list → neutral. */
   expression: ExpressionSchema.catch(DEFAULT_EXPRESSION),
-  /** Brief internal reason (not shown to the player). */
-  note: z.string().max(120).default(''),
+  /** Internal reason (not shown to the player). Roomy cap: models routinely write
+   * a 1–2 sentence rationale, and a tighter limit rejected otherwise-valid verdicts. */
+  note: z.string().max(600).default(''),
 });
 export type TurnReaction = z.infer<typeof TurnReactionSchema>;
 
@@ -605,8 +606,9 @@ export const TextJudgeSchema = z.object({
   engagement: z.number().int().min(-3).max(3),
   /** True when the player's text was hostile, insulting, demeaning, or cruel. */
   hostile: z.boolean().default(false),
-  /** Brief internal reason (not shown to the player). */
-  note: z.string().max(120).default(''),
+  /** Internal reason (not shown to the player). Roomy cap: models routinely write
+   * a 1–2 sentence rationale, and a tighter limit rejected otherwise-valid verdicts. */
+  note: z.string().max(600).default(''),
 });
 export type TextJudge = z.infer<typeof TextJudgeSchema>;
 

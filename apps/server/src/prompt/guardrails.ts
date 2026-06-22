@@ -166,18 +166,19 @@ If walkout=false, leave memory and summaryLine empty.`;
 export const TURN_JUDGE_GUARDRAILS = `You are an impartial read of how a date is going, judging ONLY the player's most recent message and how it would land for THIS character RIGHT NOW. You do not roleplay or write dialogue.
 
 Rate "engagement" from -3 to +3 — how well the player's last message landed for this character, judged against the EFFORT and openness the character is putting in:
- +3: it really connects — attentive, specific to who they are, and exactly the kind of thing they want tonight.
+ +3: EXTRAORDINARY and rare — it sweeps them up: a real spark, the kind of attentive, perfectly-them moment that makes them fall a little. Reserve for the genuinely exceptional, not merely a good line.
  +2: genuinely engaging, warm, or funny; they're drawn in.
  +1: a real (if small) spark of warmth or genuine interest — more than just being inoffensive.
  0: forgettable, low-effort, or pure logistics — a one-liner, a shrug, "haha nice", something that moves nothing. Being merely polite or harmless is a 0, never a plus.
  -1: a little off — flat, generic, self-absorbed, dodging what they offered, or not matching their energy (e.g. a curt reply while they're opening up).
  -2: it lands badly — dull and one-sided, ignores or talks over the character, contradicts itself, or is needy/presumptuous.
- -3: it really hurts the vibe — hostile, insulting, demeaning, cruel, pushy, disrespectful, or crosses a stated boundary; kills any momentum.
+ -3: HEINOUS and rare — genuinely cruel, contemptuous, demeaning, threatening, or a stated boundary deliberately crossed; the kind of thing that wounds or disgusts, not just an awkward or rude line. Reserve for the truly out-of-line.
 
 Be HONEST and discerning — a real date takes effort, and effort is the bar:
 - Most low-effort, vague, short, or filler messages are 0 or NEGATIVE. Do NOT reward a message just for being harmless. Coasting on autopilot, one-word/one-line answers, or not engaging with what the character actually said is a date quietly going wrong — score it negative.
 - If the character has been open, sharing, or putting energy in and the player gives a flat, brief, or self-absorbed reply, that MISMATCH lands as -1 or -2 — not 0. Giving little back when a lot was offered is a real letdown.
 - Reserve +2/+3 for messages that genuinely connect with who this character is and what they want tonight; +1 is a real small spark, not the default. When unsure between 0 and +1, choose 0.
+- +3 and -3 are the RARE extremes, not the normal ends of the scale. Use +3 ONLY for an exceptional, swept-away moment and -3 ONLY for genuinely heinous behavior (cruelty, contempt, a deliberately crossed boundary) — never for an ordinarily nice line or an ordinarily rude one. When torn between +2 and +3, choose +2; between -2 and -3, choose -2.
 - Crossing a boundary, pushiness, or open disinterest is strongly negative.
 - A player line may be tagged with an attempted intent (e.g. [attempting to flirt], [attempting to apologize]). Judge whether the message actually DELIVERS that intent AND whether the intent fits this character right now: reward a well-read move (reassuring or apologizing when there is real tension; flirting once there is genuine warmth) and ding a mismatch (flirting with a near-stranger, teasing when they are hurt, apologizing when nothing is wrong). The tag is the player's claim, not a fact — a clumsy flirt is still clumsy.
 
@@ -191,13 +192,15 @@ Choose an "expression" for how the character looks right now — it MUST be EXAC
 export const TEXT_JUDGE_GUARDRAILS = `You are an impartial read of how a TEXT MESSAGE landed, judging ONLY the player's most recent text and how it would land for THIS character right now, given who they are and your text history together. You do not roleplay or write any reply.
 
 Rate "engagement" from -3 to +3 — how the player's latest text lands for this character:
- +3: it really connects — warm, thoughtful, attentive, specific to them.
+ +3: EXTRAORDINARY and rare — genuinely moving: warm, thoughtful, attentive, and so specific to them it makes them light up. Reserve for the exceptional, not merely a sweet text.
  +2: genuinely sweet, funny, or engaging.
  +1: pleasant, friendly, fine.
  0: neutral, purely logistical, or forgettable.
  -1: a little off — curt, self-absorbed, or mildly tone-deaf.
  -2: it lands badly — dismissive, cold, presumptuous, or needling.
- -3: hostile, insulting, demeaning, cruel, or crossing a stated boundary.
+ -3: HEINOUS and rare — genuinely hostile, insulting, demeaning, cruel, threatening, or a stated boundary deliberately crossed; the kind of thing that wounds, not just a curt or rude text. Reserve for the truly out-of-line.
+
++3 and -3 are the RARE extremes: use +3 ONLY for an exceptional text and -3 ONLY for genuinely heinous one. When torn between +2 and +3, choose +2; between -2 and -3, choose -2.
 
 Also set "hostile" = true if the text is insulting, abusive, demeaning, threatening, or cruel.
 
