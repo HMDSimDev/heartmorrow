@@ -7,11 +7,17 @@
 }
 
 /* 5-column grid so the hand always fits one row inside the narrow felt
-   (fixed-width cards used to wrap to two rows at ≤360px). */
-.vp-hand {
+   (fixed-width cards used to wrap to two rows at ≤360px). The `.vp` prefix
+   raises specificity above the shared `.gmb-hand { display:flex }` rule — the
+   element carries both classes, and phone-gambling.css loads last, so an equal-
+   specificity `.vp-hand` lost the cascade and collapsed the cards to slivers. */
+.vp .vp-hand {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 5px;
+  /* Cap each card so a wide (desktop) felt doesn't blow them up to ~150px, while
+     minmax's 0 floor still lets all five shrink to fit a narrow phone felt. */
+  grid-template-columns: repeat(5, minmax(0, 88px));
+  justify-content: center;
+  gap: 8px;
   align-items: flex-start;
 }
 

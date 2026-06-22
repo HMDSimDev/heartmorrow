@@ -126,7 +126,7 @@ export function ResultBanner({ outcome, title, net }: { outcome: 'win' | 'lose' 
   const shown = useCountUp(Math.abs(net));
   return (
     <div className={`gmb-result ${outcome}`}>
-      <span className="gmb-result-head">{title}</span>
+      {title && <span className="gmb-result-head">{title}</span>}
       <span className="gmb-result-sub">
         {outcome === 'win' ? <>+ <b>{formatCoin(shown)}</b></> : outcome === 'push' ? t('gambling.betReturned') : <>− {formatCoin(shown)}</>}
       </span>

@@ -72,7 +72,11 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
     setHeld((h) => h.map((v, j) => (j === i ? !v : v)));
   };
 
-  const won = done && hand && hand.payout > 0;
+  // Classify by NET, not gross payout: a Jacks-or-Better hand pays 1× = your stake
+  // back (net 0), which is a PUSH, not a win. Keying off payout>0 mislabeled it a
+  // "win" and rendered "+◈0". Mirrors the roulette settlement convention.
+  const outcome: 'win' | 'lose' | 'push' =
+    done && hand ? (hand.net > 0 ? 'win' : hand.net < 0 ? 'lose' : 'push') : 'lose';
 
   return (
     <div className="vp">
@@ -101,8 +105,10 @@ export function VideoPokerGame({ worldId, wallet, onSettled, resume }: Props) {
       {error && <Banner kind="error">{error}</Banner>}
       {done && hand && (
         <ResultBanner
-          outcome={won ? 'win' : 'lose'}
-          title={hand.rank && hand.rank !== 'none' ? videoPokerRankLabel(hand.rank) : t('gambling.noPay')}
+          outcome={outcome}
+          // On a push (Jacks-or-Better pays the stake back) just say "Bet returned" —
+          // showing the winning-hand name read like a win for a net-0 result.
+          title={outcome === 'push' ? '' : hand.rank && hand.rank !== 'none' ? videoPokerRankLabel(hand.rank) : t('gambling.noPay')}
           net={hand.net}
         />
       )}
