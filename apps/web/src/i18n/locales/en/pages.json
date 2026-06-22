@@ -1067,7 +1067,7 @@
       "baseUrl": "Base URL",
       "baseUrlHintAnthropic": "e.g. https://api.anthropic.com/v1 (or your compatible proxy)",
       "baseUrlHintLmstudio": "e.g. http://localhost:1234/api/v0 (LM Studio native API)",
-      "baseUrlHintDefault": "e.g. http://localhost:1234/v1",
+      "baseUrlHintDefault": "e.g. http://localhost:1234/v1 or http://localhost:1234/",
       "apiKey": "API key",
       "apiKeyHintSet": "A key is set. Leave blank to keep it.",
       "apiKeyHintAnthropic": "Required for the Anthropic API.",

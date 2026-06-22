@@ -185,43 +185,57 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(155deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  /* A vivid, filled app icon — the tile IS the color, like a real phone. */
+  background: linear-gradient(155deg, var(--ph-c1, var(--panel-2)), var(--ph-c2, var(--panel)));
+  border: 1px solid color-mix(in oklab, var(--ph-c2, var(--border)) 60%, rgba(0, 0, 0, 0.45));
+  box-shadow:
+    var(--shadow-sm),
+    0 7px 18px -8px color-mix(in oklab, var(--ph-c2, #000) 75%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
   overflow: hidden;
   transition: transform 0.12s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
-/* subtle top sheen */
+/* glossy top sheen — sells the saturated, lit "app icon" look */
 .ph-app-tile::before {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 42%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent);
+  height: 52%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.04) 70%, transparent);
   pointer-events: none;
 }
-/* colored corner accent wash, set per category */
+/* a soft inner-bottom shade for depth */
 .ph-app-tile::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: radial-gradient(120% 90% at 100% 100%, var(--ph-tint, transparent) 0%, transparent 55%);
-  opacity: 0.5;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.22), transparent 42%);
   pointer-events: none;
 }
 .ph-app:hover .ph-app-tile {
-  border-color: var(--border-bright);
-  box-shadow: var(--shadow-sm), 0 0 14px -2px var(--ph-tint, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border-color: color-mix(in oklab, var(--ph-c1, var(--border-bright)) 70%, transparent);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 20px -2px color-mix(in oklab, var(--ph-c1, transparent) 75%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
-.ph-app-glyph { position: relative; z-index: 1; }
+/* White glyph on the saturated tile, with a shadow so it reads on lighter hues. */
+.ph-app-glyph {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+}
 
-/* category tints */
-.ph-app.is-brass { --ph-tint: rgba(230, 177, 94, 0.55); }
-.ph-app.is-rose  { --ph-tint: rgba(224, 137, 160, 0.55); }
-.ph-app.is-moon  { --ph-tint: rgba(140, 170, 224, 0.55); }
-.ph-app.is-sage  { --ph-tint: rgba(140, 198, 158, 0.5); }
+/* category tints — a two-stop gradient per hue (light top → deep bottom). */
+.ph-app.is-rose  { --ph-c1: #ef74a0; --ph-c2: #c63f6e; }
+.ph-app.is-brass { --ph-c1: #edaa4c; --ph-c2: #bd7716; }
+.ph-app.is-moon  { --ph-c1: #6f9fe6; --ph-c2: #4059bb; }
+.ph-app.is-sage  { --ph-c1: #56bd81; --ph-c2: #34875f; }
+.ph-app.is-ember { --ph-c1: #f0806f; --ph-c2: #cb443d; }
+.ph-app.is-plum  { --ph-c1: #b27ce2; --ph-c2: #7c45b6; }
+.ph-app.is-teal  { --ph-c1: #3bb8b3; --ph-c2: #1c8b85; }
 
 .ph-app-label {
   font-family: var(--font-body);

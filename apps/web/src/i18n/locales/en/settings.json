@@ -2,7 +2,15 @@
   "title": "Settings",
   "wallpaper": {
     "head": "Phone wallpaper",
-    "hint": "Sets the background of your in-game phone. Language and accent color live in the main Settings menu."
+    "hint": "Sets the background of your in-game phone. Language and accent color live in the main Settings menu.",
+    "scaling": "Scaling",
+    "fit": {
+      "fit": "Fit — whole image",
+      "fill": "Fill — crop to fill",
+      "stretch": "Stretch to fit",
+      "center": "Center — actual size",
+      "tile": "Tile"
+    }
   },
   "mode": {
     "head": "Mode",
@@ -23,7 +31,7 @@
     "confirm": "Reset everything"
   },
   "toast": {
-    "wallpaperTooLarge": "Image too large — pick one under 1.5 MB.",
+    "wallpaperTooLarge": "Image too large — pick one under 20 MB.",
     "wallpaperSet": "Wallpaper set.",
     "progressReset": "Progress reset. Back to Day 1."
   }

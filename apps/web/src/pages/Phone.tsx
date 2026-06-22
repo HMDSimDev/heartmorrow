@@ -27,34 +27,37 @@ import { Inventory } from './Inventory';
 
 type AppId = 'home' | 'messages' | 'email' | 'faces' | 'moments' | 'social' | 'weather' | 'calendar' | 'endings' | 'work' | 'together' | 'property' | 'market' | 'gambling' | 'shop' | 'games' | 'bag' | 'settings';
 
-type Tint = 'rose' | 'brass' | 'moon' | 'sage';
+type Tint = 'rose' | 'brass' | 'moon' | 'sage' | 'ember' | 'plum' | 'teal';
 
 type CommonKey = ParseKeys<'common'>;
 type AppDef = { id: Exclude<AppId, 'home'>; icon: string; labelKey: CommonKey; tint: Tint };
 
+// Each app gets a vivid, distinct hue — like a real phone home screen. Tints are
+// chosen for both theme (messages=rose, weather=sky, market=green…) and variety,
+// so no two adjacent grid tiles share a color.
 const APPS: AppDef[] = [
   { id: 'messages', icon: 'messages', labelKey: 'phone.app.messages', tint: 'rose' },
   { id: 'email', icon: 'mail', labelKey: 'phone.app.email', tint: 'moon' },
-  { id: 'faces', icon: 'faces', labelKey: 'phone.app.faces', tint: 'moon' },
-  { id: 'moments', icon: 'moments', labelKey: 'phone.app.moments', tint: 'rose' },
-  { id: 'calendar', icon: 'calendar', labelKey: 'phone.app.calendar', tint: 'brass' },
-  { id: 'social', icon: 'social', labelKey: 'phone.app.social', tint: 'moon' },
+  { id: 'faces', icon: 'faces', labelKey: 'phone.app.faces', tint: 'plum' },
+  { id: 'moments', icon: 'moments', labelKey: 'phone.app.moments', tint: 'ember' },
+  { id: 'calendar', icon: 'calendar', labelKey: 'phone.app.calendar', tint: 'teal' },
+  { id: 'social', icon: 'social', labelKey: 'phone.app.social', tint: 'plum' },
   { id: 'weather', icon: 'weather', labelKey: 'phone.app.weather', tint: 'moon' },
   { id: 'endings', icon: 'endings', labelKey: 'phone.app.endings', tint: 'brass' },
-  { id: 'work', icon: 'work', labelKey: 'phone.app.work', tint: 'brass' },
+  { id: 'work', icon: 'work', labelKey: 'phone.app.work', tint: 'sage' },
   { id: 'together', icon: 'together', labelKey: 'phone.app.together', tint: 'rose' },
-  { id: 'property', icon: 'property', labelKey: 'phone.app.property', tint: 'brass' },
+  { id: 'property', icon: 'property', labelKey: 'phone.app.property', tint: 'teal' },
   { id: 'market', icon: 'stocks', labelKey: 'phone.app.market', tint: 'sage' },
-  { id: 'gambling', icon: 'gambling', labelKey: 'phone.app.gambling', tint: 'rose' },
+  { id: 'gambling', icon: 'gambling', labelKey: 'phone.app.gambling', tint: 'ember' },
   { id: 'shop', icon: 'shop', labelKey: 'phone.app.shop', tint: 'brass' },
-  { id: 'games', icon: 'games', labelKey: 'phone.app.games', tint: 'sage' },
+  { id: 'games', icon: 'games', labelKey: 'phone.app.games', tint: 'plum' },
   { id: 'bag', icon: 'bag', labelKey: 'phone.app.bag', tint: 'sage' },
 ];
 
 // Pinned to the dock, in order; the rest fill the home grid.
 const DOCK_IDS: Array<AppDef['id']> = ['messages', 'email', 'moments', 'settings'];
 
-const SETTINGS_APP: AppDef = { id: 'settings', icon: 'settings', labelKey: 'phone.app.settings', tint: 'sage' };
+const SETTINGS_APP: AppDef = { id: 'settings', icon: 'settings', labelKey: 'phone.app.settings', tint: 'moon' };
 const ALL_APPS: AppDef[] = [...APPS, SETTINGS_APP];
 
 /** Derive a plausible battery % from the world's daily stamina consumption.

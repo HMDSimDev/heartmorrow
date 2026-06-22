@@ -1,17 +1,17 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAppData } from '../../state/app-context';
+import { useAppData, WALLPAPER_FITS, type WallpaperFit } from '../../state/app-context';
 import { errorMessage } from '../../lib/hooks';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { Banner, ConfirmDialog } from '../ui';
 import '../../pages/settings.page.css';
 
-const MAX_WALLPAPER_BYTES = 1.5 * 1024 * 1024;
+const MAX_WALLPAPER_BYTES = 20 * 1024 * 1024;
 
 export function SettingsApp() {
   const { t } = useTranslation(['settings', 'common']);
-  const { theme, setTheme, creatorMode, setCreatorMode, resetProgress } = useAppData();
+  const { theme, setTheme, setWallpaper, creatorMode, setCreatorMode, resetProgress } = useAppData();
   const [note, setNote] = useState<string>();
   const [error, setError] = useState<string>();
   const [resetting, setResetting] = useState(false);
@@ -24,16 +24,14 @@ export function SettingsApp() {
       setError(t('toast.wallpaperTooLarge'));
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        setTheme({ ...theme, wallpaper: String(reader.result) });
-        setNote(t('toast.wallpaperSet'));
-      } catch (e) {
-        setError(errorMessage(e));
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      // Hand the image Blob straight to the store — it's persisted in IndexedDB
+      // and surfaced as a short blob: URL (no megabyte data URL anywhere).
+      setWallpaper(file);
+      setNote(t('toast.wallpaperSet'));
+    } catch (e) {
+      setError(errorMessage(e));
+    }
   };
 
   const totalReset = async () => {
@@ -98,12 +96,26 @@ export function SettingsApp() {
                     />
                   </label>
                   {theme.wallpaper && (
-                    <button className="btn sm ghost" onClick={() => setTheme({ ...theme, wallpaper: null })}>
+                    <button className="btn sm ghost" onClick={() => setWallpaper(null)}>
                       {t('common:remove')}
                     </button>
                   )}
                 </div>
               </div>
+              {theme.wallpaper && (
+                <div className="pset-custom">
+                  <span>{t('wallpaper.scaling')}</span>
+                  <select
+                    aria-label={t('wallpaper.scaling')}
+                    value={theme.wallpaperFit}
+                    onChange={(e) => setTheme({ ...theme, wallpaperFit: e.target.value as WallpaperFit })}
+                  >
+                    {WALLPAPER_FITS.map((f) => (
+                      <option key={f} value={f}>{t(`wallpaper.fit.${f}`)}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 

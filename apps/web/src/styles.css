@@ -956,7 +956,14 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 .phone-home {
   flex: 1; height: 0; overflow-y: auto; padding: 20px 18px;
   background-image: var(--phone-wallpaper, none);
-  background-size: cover; background-position: center;
+  /* Scaling is driven by the user's chosen fit mode (Settings → wallpaper). The
+     default `contain` shows the WHOLE image — an extremely wide/tall photo would
+     otherwise be zoomed until only an unrecognizable sliver is visible. Letterbox
+     gaps fall back to the dark phone-screen behind, and the .has-wallpaper scrim
+     (a gradient, which always fills regardless of background-size) keeps text legible. */
+  background-size: var(--phone-wallpaper-size, contain);
+  background-position: var(--phone-wallpaper-position, center);
+  background-repeat: var(--phone-wallpaper-repeat, no-repeat);
 }
 .phone-home::before { content: none; }
 /* A user wallpaper can be any image — light, busy, low-contrast — which buries
