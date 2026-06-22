@@ -41,6 +41,7 @@ import {
   QuizGenerationSchema,
   WriterCommissionGenSchema,
   ProfileGenerationSchema,
+  CharacterTemplateGenerationSchema,
   RoomDescriptionSchema,
   NpcFeedPostSchema,
   FeedCommentDraftSchema,
@@ -90,6 +91,7 @@ import {
   buildCompanyGenMessages,
   buildMarketNewsMessages,
   buildRoomMessages,
+  buildCharacterFromSourcesMessages,
   buildNpcFeedPostMessages,
   buildFeedCommentMessages,
   buildDialogueMessages,
@@ -397,6 +399,30 @@ function buildProfileGenMessages(): ChatMessage[] {
         '\nFlesh out their profile fields.',
     },
   ];
+}
+
+/**
+ * A realistic "uploaded" reference for the from-text character generator — a
+ * SillyTavern-style character card with the framing tokens such cards carry, so the
+ * bench measures how well the model distills messy real-world source material into a
+ * complete, fitted character draft.
+ */
+const CHARACTER_SOURCE_TEXT = `Name: Bramwell "Bram" Ashby
+Age: 29
+Description: {{char}} is a former lamplighter turned clockmaker's apprentice in a foggy canal town. Gruff on the surface, soft underneath. Half-deaf in one ear after a workshop accident, so he reads lips and hates being pitied for it. Obsessively tinkers and keeps a notebook of half-finished inventions.
+Personality: stubborn, loyal, secretly romantic; warms up the moment the talk turns to craft.
+Likes: strong black tea, arguing about bridges, the smell of machine oil.
+Dislikes: pity, idle gossip, being rushed.
+Speech: clipped and technical, softening into unexpected warmth.
+Scenario: {{user}} first met him when a pocket-watch repair went sideways.`;
+
+/** Faithful mirror of the from-text branch of the unified character generator. */
+function buildCharacterGenMessages(): ChatMessage[] {
+  return buildCharacterFromSourcesMessages({
+    world: { name: benchWorld.name, summary: benchWorld.summary, tone: benchWorld.tone, lore: benchWorld.lore, rules: benchWorld.rules, globalNotes: benchWorld.globalNotes },
+    sourceText: CHARACTER_SOURCE_TEXT,
+    existingCharacters: [{ name: benchMara.name, shortDescription: benchMara.shortDescription }],
+  });
 }
 
 // --- the catalog ------------------------------------------------------------
@@ -1181,6 +1207,31 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Flesh out a character profile.',
       maxTokens: 3000,
     }),
+  },
+  {
+    id: 'gen_character',
+    label: 'Character generation (from text)',
+    description: 'Build a WHOLE character draft from pasted/uploaded reference text (a SillyTavern-style card), fitted to the world — how well the model turns messy source material into a complete, coherent character.',
+    kind: 'generation',
+    group: 'Creator generation',
+    setup: { characterName: 'Bramwell Ashby', characterBrief: 'From a pasted character sheet — a half-deaf clockmaker’s apprentice with a soft heart.', relationshipLine: '', note: 'Drafting a full character from uploaded text, fitted to Lanternford.', transcript: [] },
+    structured: () => ({
+      messages: buildCharacterGenMessages(),
+      schema: CharacterTemplateGenerationSchema,
+      schemaName: 'CharacterTemplateGeneration',
+      task: 'Design a complete character draft from a text reference, fitting the world.',
+      // A large object plus a long source — give it generous headroom like the runtime does.
+      maxTokens: 3500,
+    }),
+    // The schema `.catch()`-defaults every field, so a model that ignored the brief
+    // still parses — to blank fields. Fail those: a usable draft must at least name a
+    // real, fleshed-out person.
+    validate: (data) => {
+      const d = (data ?? {}) as { name?: unknown; personality?: unknown };
+      if (!nonBlank(d.name)) return 'Empty name — the model returned no usable character.';
+      if (!nonBlank(d.personality)) return 'Empty personality — the generated draft has no character to it.';
+      return null;
+    },
   },
   {
     id: 'gen_room',

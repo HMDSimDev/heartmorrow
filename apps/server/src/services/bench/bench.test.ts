@@ -200,6 +200,25 @@ describe('bench runner', () => {
     expect(res.error.toLowerCase()).toContain('tone');
   });
 
+  it('PASSES from-text character generation when a fleshed-out draft comes back', async () => {
+    setAdapterOverride(
+      new ScriptedAdapter([
+        '{"name":"Bramwell Ashby","personality":"Stubborn and gruff, secretly romantic; lights up talking craft.","speechStyle":"clipped, warms up over tea"}',
+      ]),
+    );
+    const res = await runBenchCase({ caseId: 'gen_character', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(true);
+  });
+
+  it('FAILS from-text character generation when no usable character comes back (blank name)', async () => {
+    // A model that ignored the brief still parses (every field .catch-defaults), but
+    // leaves the name blank — the validate gate fails it as an unusable draft.
+    setAdapterOverride(new ScriptedAdapter(['{"name":"","personality":"whatever"}']));
+    const res = await runBenchCase({ caseId: 'gen_character', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(false);
+    expect(res.error.toLowerCase()).toContain('name');
+  });
+
   it('honors an aborted signal — stops a dialogue before sending any turn', async () => {
     setAdapterOverride(new ScriptedAdapter(['{"body":"hi","tone":"warm"}']));
     const ac = new AbortController();
