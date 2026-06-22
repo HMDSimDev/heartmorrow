@@ -10,6 +10,7 @@ import {
   type LlmHealthResult,
   type LlmModelInfo,
   type LlmRoleConnection,
+  type ImageGenSettings,
   type EndpointMode,
 } from '@dsim/shared';
 import { api } from '../lib/api';
@@ -44,13 +45,18 @@ const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'anthrop
 type RoleKey = 'evaluator' | 'vision';
 const ROLE_KEYS: RoleKey[] = ['evaluator', 'vision'];
 
+/** The connection tabs: the base config, the role overrides, and the standalone
+ *  Image (Stable Diffusion) endpoint — which is NOT an LLM connection. */
+type TabKey = 'base' | RoleKey | 'image';
+
 /** The base config: a connection (shared with the role consoles) plus the
- *  game-level toggles and the per-role overrides. Vision has its own role tab. */
+ *  game-level toggles, the per-role overrides, and the image endpoint. */
 type Form = ConnectionForm & {
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
   tragicOutcomesEnabled: boolean;
   roleOverrides: Record<RoleKey, LlmRoleConnection>;
+  image: ImageGenSettings;
 };
 
 /** Keys of one connection, used to project a connection into a settings patch. */
@@ -92,8 +98,11 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const [models, setModels] = useState<Record<string, LlmModelInfo[]>>({});
   const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
   const [testing, setTesting] = useState<Record<string, boolean>>({});
-  // Which connection tab is showing: the main config or one of the role overrides.
-  const [tab, setTab] = useState<'base' | RoleKey>('base');
+  // Samplers advertised by the image (SD) endpoint, for the sampler picker.
+  const [samplers, setSamplers] = useState<string[]>([]);
+  const [loadingSamplers, setLoadingSamplers] = useState(false);
+  // Which connection tab is showing: the main config, a role override, or Image.
+  const [tab, setTab] = useState<TabKey>('base');
   const [health, setHealth] = useState<LlmHealthResult | null>(null);
   const [error, setError] = useState<string>();
   const [savedNote, setSavedNote] = useState<string>();
@@ -145,6 +154,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           rapportCadence: s.rapportCadence,
           tragicOutcomesEnabled: s.tragicOutcomesEnabled,
           roleOverrides: { evaluator: s.roleOverrides.evaluator, vision: s.roleOverrides.vision },
+          image: s.image,
         });
       } catch (e) {
         if (!cancelled) setError(errorMessage(e));
@@ -156,14 +166,19 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   }, [activeWorldId]);
 
   if (!form) return <Spinner />;
-  // The connection backing the active tab — drives the header status readout.
-  const activeConn: ConnectionForm = tab === 'base' ? form : form.roleOverrides[tab];
+  // The LLM connection backing the active tab (null for the Image tab, which is
+  // not an LLM connection) — drives the header status readout.
+  const activeConn: ConnectionForm | null =
+    tab === 'base' ? form : tab === 'image' ? null : form.roleOverrides[tab];
   const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
   // Patch into one role's override connection.
   const setRole = (role: RoleKey, patch: Partial<ConnectionForm>) =>
     setForm((f) =>
       f ? { ...f, roleOverrides: { ...f.roleOverrides, [role]: { ...f.roleOverrides[role], ...patch } } } : f,
     );
+  // Patch into the standalone image (Stable Diffusion) endpoint config.
+  const setImage = (patch: Partial<ImageGenSettings>) =>
+    setForm((f) => (f ? { ...f, image: { ...f.image, ...patch } } : f));
 
   // The full PATCH body: base connection (+ blank key dropped) + base-only fields +
   // both role overrides whole (a blank role key is preserved server-side).
@@ -173,6 +188,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
     rapportCadence: form.rapportCadence,
     tragicOutcomesEnabled: form.tragicOutcomesEnabled,
     roleOverrides: { evaluator: form.roleOverrides.evaluator, vision: form.roleOverrides.vision },
+    image: form.image,
   });
 
   const save = async () => {
@@ -221,6 +237,40 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
       setError(errorMessage(e));
     } finally {
       setTesting((m) => ({ ...m, [key]: false }));
+    }
+  };
+
+  // Ping the image (SD) endpoint with the URL currently typed in. Reuses the same
+  // `health` banner + a 'image' slot in the `testing` map as the LLM consoles.
+  const testImage = async () => {
+    setTesting((m) => ({ ...m, image: true }));
+    setHealth(null);
+    setError(undefined);
+    try {
+      setHealth(await api.testImage(form.image.baseUrl));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setTesting((m) => ({ ...m, image: false }));
+    }
+  };
+
+  // Load the sampler list from the SD endpoint currently typed in (no Save needed).
+  const loadSamplers = async () => {
+    if (loadingSamplers) return;
+    setLoadingSamplers(true);
+    setError(undefined);
+    setSavedNote(undefined);
+    try {
+      const res = await api.listImageSamplers(form.image.baseUrl);
+      setSamplers(res.samplers);
+      if (!res.ok && res.error) setError(res.error);
+      else if (res.samplers.length === 0) setSavedNote(t('settings.image.noSamplers'));
+      else setSavedNote(t('settings.image.loadedSamplers', { count: res.samplers.length }));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setLoadingSamplers(false);
     }
   };
 
@@ -555,16 +605,25 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             <div className="set-console-title">{t('settings.console.title')}</div>
           </div>
           <span className="set-console-dot">
-            {tab !== 'base' && !form.roleOverrides[tab].enabled ? (
+            {tab === 'image' ? (
+              <>
+                {t('settings.image.provider')} ·{' '}
+                {!form.image.enabled
+                  ? t('settings.image.disabledShort')
+                  : form.image.baseUrl
+                    ? t('settings.console.endpointSet')
+                    : t('settings.console.noEndpoint')}
+              </>
+            ) : tab !== 'base' && !form.roleOverrides[tab].enabled ? (
               t('settings.console.usingMain')
-            ) : (
+            ) : activeConn ? (
               <>
                 {PROVIDER_MODES.includes(activeConn.endpointMode)
                   ? t(`settings.providers.${activeConn.endpointMode}.name`)
                   : t('settings.console.providerFallback')}{' '}
                 · {activeConn.baseUrl ? t('settings.console.endpointSet') : t('settings.console.noEndpoint')}
               </>
-            )}
+            ) : null}
           </span>
         </div>
 
@@ -591,6 +650,16 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
               {form.roleOverrides[role].enabled && <span className="set-tab-dot" aria-hidden="true" />}
             </button>
           ))}
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'image'}
+            className={`set-tab ${tab === 'image' ? 'active' : ''}`}
+            onClick={() => setTab('image')}
+          >
+            {t('settings.image.tab')}
+            {form.image.enabled && <span className="set-tab-dot" aria-hidden="true" />}
+          </button>
         </div>
 
         {tab === 'base' ? (
@@ -617,6 +686,118 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
               </Field>
             }
           />
+        ) : tab === 'image' ? (
+          <>
+            <div className="set-role-bar">
+              <p className="set-lede" style={{ margin: 0 }}>
+                {t('settings.image.blurb')}
+              </p>
+              <label className="set-role-toggle">
+                <input
+                  type="checkbox"
+                  checked={form.image.enabled}
+                  onChange={(e) => setImage({ enabled: e.target.checked })}
+                />
+                <span>{form.image.enabled ? t('settings.roles.on') : t('settings.roles.off')}</span>
+              </label>
+            </div>
+            {form.image.enabled ? (
+              <div className="set-console-grid">
+                <div className="set-console-col">
+                  <div className="set-col-label">{t('settings.image.connection')}</div>
+                  <Field label={t('settings.fields.baseUrl')} hint={t('settings.image.baseUrlHint')}>
+                    <input
+                      value={form.image.baseUrl}
+                      onChange={(e) => setImage({ baseUrl: e.target.value })}
+                      placeholder="http://127.0.0.1:7861"
+                    />
+                  </Field>
+                  <Field label={t('settings.image.negativePrompt')} hint={t('settings.image.negativePromptHint')}>
+                    <textarea
+                      value={form.image.negativePrompt}
+                      onChange={(e) => setImage({ negativePrompt: e.target.value })}
+                    />
+                  </Field>
+                  <Field label={t('settings.image.sampler')} hint={t('settings.image.samplerHint')}>
+                    <input
+                      value={form.image.samplerName}
+                      onChange={(e) => setImage({ samplerName: e.target.value })}
+                      list="image-sampler-list"
+                      placeholder="Euler"
+                    />
+                    {samplers.length > 0 && (
+                      <select
+                        className="set-model-picker"
+                        value={samplers.includes(form.image.samplerName) ? form.image.samplerName : ''}
+                        onChange={(e) => e.target.value && setImage({ samplerName: e.target.value })}
+                      >
+                        <option value="">{t('settings.image.pickSampler', { count: samplers.length })}</option>
+                        {samplers.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <datalist id="image-sampler-list">
+                      {samplers.map((s) => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+                  </Field>
+                  <button className="btn sm" onClick={loadSamplers} disabled={loadingSamplers}>
+                    {loadingSamplers ? t('settings.fields.loading') : t('settings.image.loadSamplers')}
+                  </button>
+                </div>
+                <div className="set-console-col">
+                  <div className="set-col-label">{t('settings.image.generation')}</div>
+                  <div className="inline-fields">
+                    <Field label={t('settings.image.width')}>
+                      <input
+                        type="number"
+                        min={64}
+                        max={2048}
+                        step={64}
+                        value={form.image.width}
+                        onChange={(e) => setImage({ width: Number(e.target.value) })}
+                      />
+                    </Field>
+                    <Field label={t('settings.image.height')}>
+                      <input
+                        type="number"
+                        min={64}
+                        max={2048}
+                        step={64}
+                        value={form.image.height}
+                        onChange={(e) => setImage({ height: Number(e.target.value) })}
+                      />
+                    </Field>
+                  </div>
+                  <Field label={t('settings.image.steps')} hint={t('settings.image.stepsHint')}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={150}
+                      value={form.image.steps}
+                      onChange={(e) => setImage({ steps: Number(e.target.value) })}
+                    />
+                  </Field>
+                  <Field label={t('settings.image.cfgScale')} hint={t('settings.image.cfgScaleHint')}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      step={0.5}
+                      value={form.image.cfgScale}
+                      onChange={(e) => setImage({ cfgScale: Number(e.target.value) })}
+                    />
+                  </Field>
+                </div>
+              </div>
+            ) : (
+              <p className="hint">{t('settings.image.disabledHint')}</p>
+            )}
+          </>
         ) : (
           (() => {
             const role = tab;
@@ -661,14 +842,26 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           <button className="btn primary" onClick={save} disabled={saving}>
             {saving ? t('settings.foot.saving') : t('settings.foot.save')}
           </button>
-          {(tab === 'base' || form.roleOverrides[tab].enabled) && (
-            <button className="btn" onClick={() => test(tab)} disabled={!!testing[tab]}>
-              {testing[tab] ? t('settings.foot.testing') : (
-                <>
-                  <Icon name="refresh" size={15} /> {t('settings.foot.test')}
-                </>
-              )}
-            </button>
+          {tab === 'image' ? (
+            form.image.enabled && (
+              <button className="btn" onClick={testImage} disabled={!!testing.image}>
+                {testing.image ? t('settings.foot.testing') : (
+                  <>
+                    <Icon name="refresh" size={15} /> {t('settings.foot.test')}
+                  </>
+                )}
+              </button>
+            )
+          ) : (
+            (tab === 'base' || form.roleOverrides[tab].enabled) && (
+              <button className="btn" onClick={() => test(tab)} disabled={!!testing[tab]}>
+                {testing[tab] ? t('settings.foot.testing') : (
+                  <>
+                    <Icon name="refresh" size={15} /> {t('settings.foot.test')}
+                  </>
+                )}
+              </button>
+            )
           )}
         </div>
       </div>

@@ -131,6 +131,31 @@ export type LlmRoleOverrides = z.infer<typeof LlmRoleOverridesSchema>;
 /** The roles a model call can take. `prose` is the default (base config). */
 export type LlmRole = 'prose' | 'evaluator' | 'vision';
 
+/**
+ * Image-generation endpoint settings. Independent of the LLM connection above:
+ * this points at an AUTOMATIC1111 / Stable Diffusion WebUI compatible server and
+ * is called via its `POST {baseUrl}/sdapi/v1/txt2img` API (the same shape vLLM-style
+ * SD forks and many extensions expose). The fields below mirror that payload's
+ * common knobs, so a saved config can be dropped straight into a txt2img request.
+ * `enabled` defaults false, so an install without an SD server is unaffected.
+ */
+export const ImageGenSettingsSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    baseUrl: z
+      .string()
+      .url('Base URL must be a valid URL, e.g. http://127.0.0.1:7861')
+      .default('http://127.0.0.1:7861'),
+    negativePrompt: z.string().default('blurry, low quality, distorted'),
+    steps: z.number().int().min(1).max(150).default(20),
+    width: z.number().int().min(64).max(2048).default(1024),
+    height: z.number().int().min(64).max(2048).default(1024),
+    samplerName: z.string().min(1).default('Euler'),
+    cfgScale: z.number().min(1).max(30).default(7),
+  })
+  .default({});
+export type ImageGenSettings = z.infer<typeof ImageGenSettingsSchema>;
+
 export const LlmSettingsSchema = z.object({
   ...llmConnectionShape,
   /**
@@ -164,6 +189,9 @@ export const LlmSettingsSchema = z.object({
   /** Optional per-role endpoint/model overrides (evaluator, vision). See
    *  {@link LlmRoleOverridesSchema}; absent/disabled → the base config is used. */
   roleOverrides: LlmRoleOverridesSchema,
+  /** AUTOMATIC1111 / Stable Diffusion txt2img endpoint for image generation.
+   *  Independent of the LLM connection; see {@link ImageGenSettingsSchema}. */
+  image: ImageGenSettingsSchema,
 });
 export type LlmSettings = z.infer<typeof LlmSettingsSchema>;
 

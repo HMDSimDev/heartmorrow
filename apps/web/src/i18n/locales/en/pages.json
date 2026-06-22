@@ -1068,6 +1068,30 @@
         "blurb": "Image-based generation, like drafting a character from a portrait or reacting to an image text. Enable to use a vision-capable model on a wholly separate endpoint; otherwise the base vision model on the Main tab is used."
       }
     },
+    "image": {
+      "tab": "Image",
+      "provider": "Stable Diffusion",
+      "disabledShort": "off",
+      "blurb": "Generate images with an AUTOMATIC1111 / Stable Diffusion WebUI server (called via its /sdapi/v1/txt2img API). Enable to point Heartmorrow at your SD endpoint; leave off to skip image generation entirely.",
+      "disabledHint": "Image generation is off. Turn it on to configure a Stable Diffusion endpoint.",
+      "connection": "Endpoint",
+      "generation": "Defaults",
+      "baseUrlHint": "AUTOMATIC1111 / SD WebUI API root, e.g. http://127.0.0.1:7861 (the API must be enabled with --api).",
+      "negativePrompt": "Negative prompt",
+      "negativePromptHint": "Sent with every image — things to steer away from.",
+      "sampler": "Sampler",
+      "samplerHint": "Type any sampler name, or load the list from your endpoint and pick one.",
+      "loadSamplers": "Load samplers",
+      "pickSampler": "{count, plural, one {Pick from # sampler…} other {Pick from # samplers…}}",
+      "loadedSamplers": "{count, plural, one {Loaded # sampler — pick one in the Sampler field.} other {Loaded # samplers — pick one in the Sampler field.}}",
+      "noSamplers": "Connected, but the endpoint returned no samplers.",
+      "width": "Width",
+      "height": "Height",
+      "steps": "Steps",
+      "stepsHint": "Sampling steps (1–150). More steps = slower, often cleaner.",
+      "cfgScale": "CFG scale",
+      "cfgScaleHint": "How strictly the image follows the prompt (typically 5–9)."
+    },
     "fields": {
       "baseUrl": "Base URL",
       "baseUrlHintAnthropic": "e.g. https://api.anthropic.com/v1 (or your compatible proxy)",

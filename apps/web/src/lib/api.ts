@@ -369,6 +369,11 @@ export const api = {
     post<{ ok: boolean; models: LlmModelInfo[]; error?: string }>('/settings/models', override ?? {}),
   estimatePrompts: (input: Partial<PromptEstimateRequest>) =>
     post<PromptEstimateResult>('/settings/prompt-estimate', input),
+  /** Ping an AUTOMATIC1111 / SD txt2img endpoint (lists samplers; generates nothing). */
+  testImage: (baseUrl: string) => post<LlmHealthResult>('/settings/image/test', { baseUrl }),
+  /** List the samplers advertised by an SD endpoint (for the sampler picker). */
+  listImageSamplers: (baseUrl: string) =>
+    post<{ ok: boolean; samplers: string[]; error?: string }>('/settings/image/samplers', { baseUrl }),
 
   // Heartmorrow Bench — model evaluation harness
   benchCatalog: () => get<BenchCatalog>('/bench/catalog'),
