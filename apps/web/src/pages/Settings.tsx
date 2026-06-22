@@ -45,9 +45,8 @@ type RoleKey = 'evaluator' | 'vision';
 const ROLE_KEYS: RoleKey[] = ['evaluator', 'vision'];
 
 /** The base config: a connection (shared with the role consoles) plus the
- *  base-only vision model, the game-level toggles, and the per-role overrides. */
+ *  game-level toggles and the per-role overrides. Vision has its own role tab. */
 type Form = ConnectionForm & {
-  visionModel: string;
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
   tragicOutcomesEnabled: boolean;
@@ -142,7 +141,6 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           endpointMode: s.endpointMode,
           anthropicVersion: s.anthropicVersion,
           maxRetries: s.maxRetries,
-          visionModel: s.visionModel,
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,
           tragicOutcomesEnabled: s.tragicOutcomesEnabled,
@@ -171,7 +169,6 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   // both role overrides whole (a blank role key is preserved server-side).
   const buildUpdate = (): Record<string, unknown> => ({
     ...connectionPatch(form),
-    visionModel: form.visionModel,
     nsfwEnabled: form.nsfwEnabled,
     rapportCadence: form.rapportCadence,
     tragicOutcomesEnabled: form.tragicOutcomesEnabled,
@@ -558,10 +555,16 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             <div className="set-console-title">{t('settings.console.title')}</div>
           </div>
           <span className="set-console-dot">
-            {PROVIDER_MODES.includes(activeConn.endpointMode)
-              ? t(`settings.providers.${activeConn.endpointMode}.name`)
-              : t('settings.console.providerFallback')}{' '}
-            · {activeConn.baseUrl ? t('settings.console.endpointSet') : t('settings.console.noEndpoint')}
+            {tab !== 'base' && !form.roleOverrides[tab].enabled ? (
+              t('settings.console.usingMain')
+            ) : (
+              <>
+                {PROVIDER_MODES.includes(activeConn.endpointMode)
+                  ? t(`settings.providers.${activeConn.endpointMode}.name`)
+                  : t('settings.console.providerFallback')}{' '}
+                · {activeConn.baseUrl ? t('settings.console.endpointSet') : t('settings.console.noEndpoint')}
+              </>
+            )}
           </span>
         </div>
 
@@ -602,16 +605,6 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             onTest={() => test('base')}
             testing={!!testing.base}
             hideFooter
-            connectionExtra={
-              <Field label={t('settings.fields.visionModel')} hint={t('settings.fields.visionModelHint')}>
-                <input
-                  value={form.visionModel}
-                  onChange={(e) => set({ visionModel: e.target.value })}
-                  list="model-list-base"
-                  placeholder={t('settings.fields.sameAsModel')}
-                />
-              </Field>
-            }
             generationExtra={
               <Field label={t('settings.fields.rapport')} hint={t('settings.fields.rapportHint')}>
                 <select
