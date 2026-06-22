@@ -32,7 +32,7 @@ import {
   type PropertyView,
   type ActiveDate,
 } from '@dsim/shared';
-import { api, streamChat, assetUrl } from '../lib/api';
+import { api, streamChat, streamRetry, assetUrl } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { intentLabel, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
@@ -133,6 +133,10 @@ export function Chat() {
   const [resuming, setResuming] = useState(false);
   const [resumeFailed, setResumeFailed] = useState(false);
   const [notice, setNotice] = useState<string>();
+  // A turn that didn't land, with how to recover it. 'reply' = your message was
+  // saved but the reply failed/dropped → regenerate it (no duplicate). 'send' =
+  // nothing saved → resend the original text + intent (kept here).
+  const [failed, setFailed] = useState<{ kind: 'reply' } | { kind: 'send'; text: string; intent?: Intent } | null>(null);
   const [walkout, setWalkout] = useState<string | null>(null);
   // Live "how it's going" read: the vibe word, the numeric trajectory (0..100,
   // internal — center 50), and the signed change this turn for the +N/−N flourish.
@@ -324,6 +328,7 @@ export function Chat() {
     setBrokeUp(false);
     setRapportPulse(null);
     setIntent(null);
+    setFailed(null);
     try {
       const [c, sm] = await Promise.all([api.getCharacter(ad.characterId), api.getConversation(ad.sessionId)]);
       // The context can briefly point at a session that just ended elsewhere — never
@@ -401,6 +406,7 @@ export function Chat() {
     setResumeFailed(false);
     setScene(null);
     setIntent(null);
+    setFailed(null);
     try {
       const c = await api.getCharacter(setup.characterId);
       const created = await api.createConversation({
@@ -446,39 +452,57 @@ export function Chat() {
     }
   };
 
-  const send = async () => {
-    const text = input.trim();
+  // `resend` carries a preserved payload for a retry; a normal send reads the live
+  // composer. `playerPersisted` tracks whether the server saved the player turn
+  // (the `player` event fired) so a failure can pick the right recovery: regenerate
+  // the reply (text saved) vs. resend the whole turn (nothing saved).
+  const send = async (resend?: { text: string; intent?: Intent }) => {
+    const text = (resend?.text ?? input).trim();
     if (!text || !session || streaming.active || busy) return;
-    const chosenIntent = intent ?? undefined;
-    setInput('');
-    setIntent(null);
+    const chosenIntent = resend ? resend.intent : intent ?? undefined;
+    if (!resend) {
+      setInput('');
+      setIntent(null);
+    }
     setError(undefined);
     setNotice(undefined);
+    setFailed(null);
     setStreaming({ active: true, text: '' });
     const controller = new AbortController();
     abortRef.current = controller;
+    let playerPersisted = false;
+    let settled = false; // a terminal event (done/error/walkout/…) arrived
+    const recover = () => (playerPersisted ? { kind: 'reply' as const } : { kind: 'send' as const, text, intent: chosenIntent });
     try {
       await streamChat(
         session.id,
         text,
         {
-          onPlayer: (m) => setMessages((prev) => [...prev, m]),
+          onPlayer: (m) => {
+            playerPersisted = true;
+            setMessages((prev) => [...prev, m]);
+          },
           onDelta: (delta) => setStreaming((s) => ({ active: true, text: s.text + delta })),
           onDone: (m) => {
-            setMessages((prev) => [...prev, m]);
+            settled = true;
+            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
             setStreaming({ active: false, text: '' });
           },
           onError: (msg) => {
+            settled = true;
             setError(msg);
             setStreaming({ active: false, text: '' });
+            setFailed(recover());
           },
           onNotice: (msg) => setNotice(msg),
           onWalkout: (m, reason) => {
+            settled = true;
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
             setWalkout(reason || t('chat.walkoutDefault'));
           },
           onBreakupIntent: (m, reaction) => {
+            settled = true;
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
             setBreakupPending({ reaction });
@@ -490,6 +514,7 @@ export function Chat() {
             if (delta) setRapportPulse((p) => ({ delta, key: (p?.key ?? 0) + 1 }));
           },
           onLeft: (m) => {
+            settled = true;
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
             setLeftEarly(true);
@@ -499,6 +524,7 @@ export function Chat() {
             // The player ended the date by chatting (a natural goodbye). Show the
             // character's send-off, then run the normal end-and-evaluate flow so the
             // date is scored in full — no need to click "End & evaluate".
+            settled = true;
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
             if (expr) setExpression(expr);
@@ -508,9 +534,70 @@ export function Chat() {
         controller.signal,
         chosenIntent,
       );
+      // The stream ended with no terminal event (the connection dropped mid-reply):
+      // recover instead of leaving the typing indicator spinning forever.
+      if (!settled && !controller.signal.aborted) {
+        setStreaming({ active: false, text: '' });
+        setError(t('chat.replyDropped'));
+        setFailed(recover());
+      }
     } catch (e) {
       // Aborts are expected when the user resets/navigates; ignore them.
-      if (!controller.signal.aborted) setError(errorMessage(e));
+      if (!controller.signal.aborted) {
+        setError(errorMessage(e));
+        setFailed(recover());
+      }
+      setStreaming({ active: false, text: '' });
+    }
+  };
+
+  // Recover a failed turn: resend a lost message, or regenerate a reply when the
+  // player's message was saved but the reply failed (no duplicate player turn).
+  const retry = async () => {
+    if (!session || !failed || streaming.active || busy) return;
+    if (failed.kind === 'send') {
+      const { text, intent: keptIntent } = failed;
+      setFailed(null);
+      await send({ text, intent: keptIntent });
+      return;
+    }
+    setFailed(null);
+    setError(undefined);
+    setNotice(undefined);
+    setStreaming({ active: true, text: '' });
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let settled = false;
+    try {
+      await streamRetry(
+        session.id,
+        {
+          onDelta: (delta) => setStreaming((s) => ({ active: true, text: s.text + delta })),
+          onDone: (m) => {
+            settled = true;
+            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+            setStreaming({ active: false, text: '' });
+          },
+          onError: (msg) => {
+            settled = true;
+            setError(msg);
+            setStreaming({ active: false, text: '' });
+            setFailed({ kind: 'reply' });
+          },
+          onNotice: (msg) => setNotice(msg),
+        },
+        controller.signal,
+      );
+      if (!settled && !controller.signal.aborted) {
+        setStreaming({ active: false, text: '' });
+        setError(t('chat.replyDropped'));
+        setFailed({ kind: 'reply' });
+      }
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        setError(errorMessage(e));
+        setFailed({ kind: 'reply' });
+      }
       setStreaming({ active: false, text: '' });
     }
   };
@@ -537,6 +624,7 @@ export function Chat() {
     setBrokeUp(false);
     setScene(null);
     setIntent(null);
+    setFailed(null);
   };
 
   // A world switch must not leave a different world's date streaming into view.
@@ -1273,6 +1361,18 @@ export function Chat() {
             <Banner kind="error"><Icon name="breakup" size={14} /> {evalResult.jealousy.message}</Banner>
           )}
 
+          {failed && !locked && !breakupPending && (
+            <div className="date-retry" role="alert">
+              <span className="date-retry-msg">
+                <Icon name="warn" size={14} />
+                {failed.kind === 'reply' ? t('chat.replyFailed') : t('chat.sendFailed')}
+              </span>
+              <button className="btn sm date-retry-btn" onClick={() => void retry()} disabled={streaming.active || busy}>
+                <Icon name="refresh" size={14} /> {streaming.active ? t('chat.retrying') : t('chat.retry')}
+              </button>
+            </div>
+          )}
+
           {locked ? (
             <div className="date-restart">
               <button className="btn" onClick={newConversation}>
@@ -1325,7 +1425,7 @@ export function Chat() {
                     }
                   }}
                 />
-                <button className="btn primary date-send" onClick={send} disabled={streaming.active || !input.trim()}>
+                <button className="btn primary date-send" onClick={() => void send()} disabled={streaming.active || !input.trim()}>
                   <Icon name="send" size={15} />
                 </button>
               </div>

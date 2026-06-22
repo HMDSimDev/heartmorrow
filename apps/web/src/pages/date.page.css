@@ -622,6 +622,25 @@
 }
 .date-foot .banner:last-child { margin-bottom: 0; }
 
+/* Failed-reply recovery bar — shown above the composer when a turn errored or the
+   stream dropped, so the player can re-run it instead of losing their message. */
+.date-retry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 13px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: #f3c4c8;
+  background: rgba(224, 122, 130, 0.12);
+  border: 1px solid rgba(224, 122, 130, 0.42);
+}
+.date-retry-msg { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.date-retry-msg svg { flex-shrink: 0; color: var(--ember); }
+.date-retry-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; }
+
 /* Bespoke emotional-moment card — a "keepsake" vellum surface for the big beats.
    Used for endings, milestones, breakups, walkouts. */
 .date-moment {

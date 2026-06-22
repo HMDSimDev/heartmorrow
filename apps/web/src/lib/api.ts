@@ -253,7 +253,34 @@ export async function streamChat(
     handlers.onError?.(`Server returned ${res.status}`);
     return;
   }
-  const reader = res.body.getReader();
+  await pumpSse(res, handlers);
+}
+
+/**
+ * Re-run ONLY the character's reply for a date whose player turn is already saved
+ * but whose reply failed (errored, or the stream dropped). Does not send a new
+ * player message — the server replies to the existing last player turn. Emits the
+ * same delta/done/error/notice events as {@link streamChat} (no walkout/rapport/etc).
+ */
+export async function streamRetry(
+  sessionId: string,
+  handlers: StreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/retry-stream`, {
+    method: 'POST',
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    handlers.onError?.(`Server returned ${res.status}`);
+    return;
+  }
+  await pumpSse(res, handlers);
+}
+
+/** Read an SSE response body to completion, dispatching each event to handlers. */
+async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
+  const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 
@@ -564,6 +591,16 @@ export const api = {
       relationshipDelta: Partial<Record<string, number>>;
       giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
     }>(`/phone/threads/${characterId}/send`, { text, imageAssetId, giftId }),
+  /** Regenerate a reply when a prior send saved the player's text but the model
+   *  failed to answer — no new player message is created. Same shape as phoneSend. */
+  phoneRetryReply: (characterId: string) =>
+    post<{
+      playerMessage: TextMessage;
+      reply: TextMessage | null;
+      error: string | null;
+      relationshipDelta: Partial<Record<string, number>>;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+    }>(`/phone/threads/${characterId}/retry-reply`),
   phoneClaimGift: (textId: string) =>
     post<{ item: ShopItem; inventoryItem: InventoryItem }>(`/phone/messages/${textId}/claim-gift`),
   phoneEmails: (worldId?: string) => get<Email[]>(`/phone/emails${worldQuery(worldId)}`),

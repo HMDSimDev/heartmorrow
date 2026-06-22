@@ -201,6 +201,84 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  // Retry the character's reply via SSE when a prior turn saved the player's
+  // message but the reply failed (errored, or the stream dropped mid-reply). The
+  // player message is already persisted, so this regenerates ONLY the reply — it
+  // does NOT add a player message (no duplicate) and deliberately skips the
+  // walkout/breakup/farewell/rapport pre-screens (they already ran, and re-judging
+  // would double-move rapport). Streams delta → done|error|notice, just like /stream.
+  app.post('/conversations/:id/retry-stream', { schema: docSchema({ tags: ['conversations'], summary: 'Retry a failed reply, stream via SSE' }) }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const send = (event: string, data: unknown) => {
+      raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const ac = new AbortController();
+    let finished = false;
+    const onClose = () => {
+      if (!finished) ac.abort();
+    };
+    raw.on('close', onClose);
+
+    const finish = () => {
+      finished = true;
+      raw.off('close', onClose);
+      raw.end();
+    };
+
+    try {
+      const { session, messages } = getSessionWithMessages(id);
+      if (session.ended) {
+        send('error', { message: 'This date has already ended.' });
+        finish();
+        return;
+      }
+      const last = messages[messages.length - 1];
+      // Already answered (a prior retry landed, or the original reply actually
+      // persisted before the connection dropped) — replay it as a clean success.
+      if (last && last.role === 'character') {
+        send('done', { message: last });
+        finish();
+        return;
+      }
+      if (!last || last.role !== 'player') {
+        send('error', { message: 'There’s no message here to reply to.' });
+        finish();
+        return;
+      }
+
+      const { content, finishReason } = await streamReply(id, (delta) => send('delta', { text: delta }), ac.signal, null);
+      if (!content.trim()) {
+        send('error', {
+          message:
+            finishReason === 'length'
+              ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
+              : 'The model returned an empty reply.',
+        });
+      } else {
+        const message = persistStreamedReply(id, content);
+        if (finishReason === 'length') {
+          send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
+        }
+        send('done', { message });
+        void maybeAutoSummarize(id);
+      }
+    } catch (err) {
+      if (!ac.signal.aborted) send('error', { message: (err as Error).message });
+    } finally {
+      finish();
+    }
+  });
+
   app.post('/conversations/:id/summarize', { schema: docSchema({ tags: ['conversations'], summary: 'Summarize a conversation session' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return summarizeSession(id);

@@ -227,6 +227,24 @@
 .pcom-dnd-bar svg { flex-shrink: 0; margin-top: 1px; color: var(--moon); }
 .pcom-compose input:disabled { opacity: 0.6; cursor: not-allowed; }
 
+/* Failed-send recovery bar — sits just above the composer when a text or its
+   reply didn't land, offering a one-tap retry so nothing is lost. */
+.pcom-retry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #f3c4c8;
+  background: rgba(224, 122, 130, 0.12);
+  border-top: 1px solid rgba(224, 122, 130, 0.42);
+}
+.pcom-retry-msg { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.pcom-retry-msg svg { flex-shrink: 0; color: var(--ember); }
+.pcom-retry-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; }
+
 /* --- Empty / hint states --------------------------------------------- */
 /* Icon variant — replaces the emoji glyph with an <Icon> component. */
 .pcom-empty-icon {

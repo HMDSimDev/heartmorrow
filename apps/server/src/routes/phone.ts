@@ -6,6 +6,7 @@ import {
   getThreadView,
   listContactableCharacters,
   listThreadSummaries,
+  retryPlayerTextReply,
   sendPlayerText,
   unreadTextCount,
 } from '../services/text-message-service';
@@ -65,6 +66,13 @@ export async function phoneRoutes(app: FastifyInstance): Promise<void> {
     const { text, imageAssetId, giftId } = parseInput(SendTextSchema, req.body);
     // `undefined` keeps the per-world playerId resolution sendPlayerText does itself.
     return sendPlayerText(characterId, text, imageAssetId, undefined, giftId);
+  });
+
+  // Regenerate a reply when the previous send saved the player's text but the
+  // model failed to answer — no new player message is created (no duplicate).
+  app.post('/phone/threads/:characterId/retry-reply', { schema: docSchema({ tags: ['phone'], summary: 'Retry generating a reply to the last unanswered text' }) }, async (req) => {
+    const { characterId } = req.params as { characterId: string };
+    return retryPlayerTextReply(characterId);
   });
 
   app.post('/phone/messages/:textId/claim-gift', { schema: docSchema({ tags: ['phone'], summary: 'Claim a gift from a text message' }) }, async (req) => {

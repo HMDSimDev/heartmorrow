@@ -340,6 +340,14 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
+  // A send that didn't land, with how to recover it. 'reply' = your text saved but
+  // the reply failed → regenerate it (no duplicate text). 'send' = nothing saved
+  // (network/blocked) → resend the original payload, which we keep here.
+  const [failed, setFailed] = useState<
+    | { kind: 'reply' }
+    | { kind: 'send'; text: string; image: { assetId: string; url: string } | null; gift: { inventoryItem: InventoryItem; item: ShopItem } | null }
+    | null
+  >(null);
   const [feeling, setFeeling] = useState<{ text: string; warm: boolean } | null>(null);
   const [claimingId, setClaimingId] = useState<string | null>(null);
   // A downscaled photo staged to send with the next text (uploaded already so the
@@ -361,8 +369,10 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       setAvailability({ available: data.available, reason: data.unavailableReason });
       setMessages(data.messages);
       void refreshInbox(); // opening the thread zeroed unread server-side; sync the badge
+      return data;
     } catch (e) {
       setError(errorMessage(e));
+      return null;
     }
   };
 
@@ -377,6 +387,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
     setGiftOpen(false);
     setGiftItems([]);
     setPendingGift(null);
+    setFailed(null);
   }, [characterId]);
 
   useEffect(() => {
@@ -430,18 +441,34 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
     }
   };
 
-  const send = async () => {
-    const text = input.trim();
-    const image = pendingImage;
-    const gift = pendingGift;
+  // Subtle "warmer / cooler" cue from a relationship delta.
+  const showFeeling = (d: Partial<Record<string, number>>) => {
+    const net =
+      (d.affection ?? 0) + (d.comfort ?? 0) + (d.chemistry ?? 0) + (d.trust ?? 0) + (d.respect ?? 0) - (d.tension ?? 0);
+    if (net !== 0) {
+      setFeeling({ text: net > 0 ? t('messages.thread.warmer') : t('messages.thread.cooler'), warm: net > 0 });
+      setTimeout(() => setFeeling(null), 2200);
+    }
+  };
+
+  // `resend` carries a preserved payload for a retry; a normal send reads the live
+  // compose box. Either way the player's text is shown optimistically, then the
+  // thread is reconciled from the server (which is the source of truth).
+  const send = async (resend?: { text: string; image: { assetId: string; url: string } | null; gift: { inventoryItem: InventoryItem; item: ShopItem } | null }) => {
+    const text = (resend?.text ?? input).trim();
+    const image = resend ? resend.image : pendingImage;
+    const gift = resend ? resend.gift : pendingGift;
     if ((!text && !image && !gift) || sending || uploadingImage) return;
     // Defensive: the compose box is disabled when unavailable, but never POST a
     // text the server will reject (it 400s for a busy character).
     if (!availability.available) return;
-    setInput('');
-    setPendingImage(null);
-    setPendingGift(null);
-    setGiftOpen(false);
+    if (!resend) {
+      setInput('');
+      setPendingImage(null);
+      setPendingGift(null);
+      setGiftOpen(false);
+    }
+    setFailed(null);
     setSending(true);
     setError(undefined);
     // Show the player's message immediately (reconciled by load() afterward).
@@ -464,18 +491,58 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       await load();
       // A gift was consumed from the bag — keep the held-money/inventory in sync.
       if (gift) await reloadPlayer();
-      if (res.error) setError(t('messages.thread.noReply', { error: res.error }));
-      // Subtle cue that the exchange shifted how they feel.
-      const d = res.relationshipDelta ?? {};
-      const net =
-        (d.affection ?? 0) + (d.comfort ?? 0) + (d.chemistry ?? 0) + (d.trust ?? 0) + (d.respect ?? 0) - (d.tension ?? 0);
-      if (net !== 0) {
-        setFeeling({ text: net > 0 ? t('messages.thread.warmer') : t('messages.thread.cooler'), warm: net > 0 });
-        setTimeout(() => setFeeling(null), 2200);
+      if (res.error) {
+        // Your text saved, but the reply failed — offer to regenerate it.
+        setError(t('messages.thread.noReply', { error: res.error }));
+        setFailed({ kind: 'reply' });
+      }
+      showFeeling(res.relationshipDelta ?? {});
+    } catch (e) {
+      // Reconcile (this drops the optimistic bubble), then decide how to recover:
+      // if the text actually persisted, a retry regenerates the reply; otherwise
+      // nothing was saved, so keep the payload for a true resend.
+      const data = await load();
+      const last = data?.messages[data.messages.length - 1];
+      if (last && last.sender === 'character') {
+        // The exchange actually completed (the connection dropped late) — no error.
+        setError(undefined);
+      } else if (last && last.sender === 'player') {
+        setError(errorMessage(e));
+        setFailed({ kind: 'reply' });
+      } else {
+        setError(errorMessage(e));
+        setFailed({ kind: 'send', text, image, gift });
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const retry = async () => {
+    if (!failed || sending || uploadingImage) return;
+    if (failed.kind === 'send') {
+      const { text, image, gift } = failed;
+      setFailed(null);
+      await send({ text, image, gift });
+      return;
+    }
+    // 'reply': the text is saved server-side — regenerate the reply (no duplicate).
+    if (!availability.available) return;
+    setSending(true);
+    setError(undefined);
+    setFailed(null);
+    try {
+      const res = await api.phoneRetryReply(characterId);
+      await load();
+      if (res.error) {
+        setError(t('messages.thread.noReply', { error: res.error }));
+        setFailed({ kind: 'reply' });
+      } else {
+        showFeeling(res.relationshipDelta ?? {});
       }
     } catch (e) {
       setError(errorMessage(e));
-      await load(); // drop the optimistic bubble if the send failed
+      setFailed({ kind: 'reply' }); // still recoverable
     } finally {
       setSending(false);
     }
@@ -507,7 +574,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
           </button>
         }
       />
-      {error && <Banner kind="error">{error}</Banner>}
+      {error && !failed && <Banner kind="error">{error}</Banner>}
       <div className="pcom-thread">
         {messages.map((m, i) => {
           const label = dayLabel(m);
@@ -620,6 +687,17 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
           </span>
         </div>
       )}
+      {failed && (
+        <div className="pcom-retry" role="alert">
+          <span className="pcom-retry-msg">
+            <Icon name="warn" size={13} />
+            {failed.kind === 'reply' ? t('messages.thread.replyFailed') : t('messages.thread.sendFailed')}
+          </span>
+          <button className="btn sm pcom-retry-btn" onClick={() => void retry()} disabled={sending || uploadingImage}>
+            <Icon name="refresh" size={13} /> {sending ? t('messages.thread.retrying') : t('messages.thread.retry')}
+          </button>
+        </div>
+      )}
       <div className="pcom-compose">
         <input
           ref={fileRef}
@@ -671,7 +749,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
         />
         <button
           className="btn primary sm pcom-send"
-          onClick={send}
+          onClick={() => void send()}
           disabled={sending || uploadingImage || !availability.available || (!input.trim() && !pendingImage && !pendingGift)}
           aria-label={t('messages.thread.send')}
           title={t('messages.thread.send')}

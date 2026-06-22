@@ -53,7 +53,11 @@
       "addCaption": "Add a caption…",
       "addNote": "Add a note…",
       "textPlaceholder": "Text {name}",
-      "unsupportedImage": "Unsupported image type. Please choose a {label} image."
+      "unsupportedImage": "Unsupported image type. Please choose a {label} image.",
+      "retry": "Retry",
+      "retrying": "Retrying…",
+      "sendFailed": "Message didn't send.",
+      "replyFailed": "No reply came through."
     }
   },
   "property": {
