@@ -15,32 +15,32 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
     return getRedactedLlmSettings();
   });
 
-  // Test connectivity using the current settings merged with any provided
-  // overrides (overrides are NOT persisted — this is a dry-run).
-  app.post('/settings/test', async (req) => {
-    const patch = req.body ? parseInput(LlmSettingsUpdateSchema, req.body) : {};
+  // Resolve a dry-run connection from the current settings + a typed-in override
+  // body (NOT persisted). When `role` is given (evaluator/vision), a blank key
+  // falls back to THAT role's stored key, not the base one — so the UI can test a
+  // role's saved endpoint without re-typing its key.
+  const dryRunSettings = (body: unknown) => {
     const current = getLlmSettings();
-    const effective = LlmSettingsSchema.parse({
+    const role = (body as { role?: string } | null)?.role;
+    const fallbackKey =
+      role === 'evaluator' || role === 'vision' ? current.roleOverrides[role].apiKey : current.apiKey;
+    const patch = body ? parseInput(LlmSettingsUpdateSchema, body) : {};
+    return LlmSettingsSchema.parse({
       ...current,
       ...patch,
-      apiKey: patch.apiKey && patch.apiKey.length > 0 ? patch.apiKey : current.apiKey,
+      apiKey: patch.apiKey && patch.apiKey.length > 0 ? patch.apiKey : fallbackKey,
     });
-    return runHealthCheck(effective);
-  });
+  };
+
+  // Test connectivity using the current settings merged with any provided overrides.
+  app.post('/settings/test', async (req) => runHealthCheck(dryRunSettings(req.body)));
 
   // List models from the endpoint. Accepts an optional override body (same shape
   // as the test route) so the UI can list against the values currently typed into
   // the form WITHOUT having to save them first. POST (not GET) so a body is allowed.
   app.post('/settings/models', async (req) => {
-    const current = getLlmSettings();
-    const patch = req.body ? parseInput(LlmSettingsUpdateSchema, req.body) : {};
-    const settings = LlmSettingsSchema.parse({
-      ...current,
-      ...patch,
-      apiKey: patch.apiKey && patch.apiKey.length > 0 ? patch.apiKey : current.apiKey,
-    });
     try {
-      const models = await getAdapter(settings).listModels(AbortSignal.timeout(10_000));
+      const models = await getAdapter(dryRunSettings(req.body)).listModels(AbortSignal.timeout(10_000));
       return { ok: true, models };
     } catch (err) {
       return { ok: false, models: [], error: (err as Error).message };

@@ -107,7 +107,7 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
       recentMessages: recent,
       playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name,
     }),
-    { settings, task: 'Decide how the character responds to defining the relationship.', schemaName: 'DtrReaction', signal },
+    { settings, role: 'evaluator', task: 'Decide how the character responds to defining the relationship.', schemaName: 'DtrReaction', signal },
   );
   if (!result.ok) {
     // FAIL SAFE: do not mutate state (no status change, no cooldown).

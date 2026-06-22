@@ -45,8 +45,8 @@ import type {
   ItemEffect,
   LlmHealthResult,
   LlmModelInfo,
-  LlmSettings,
   LlmSettingsUpdate,
+  RedactedLlmSettings,
   PromptEstimateRequest,
   PromptEstimateResult,
   BenchCatalog,
@@ -328,9 +328,7 @@ export async function streamChat(
   }
 }
 
-export interface SettingsResponse extends LlmSettings {
-  apiKeySet: boolean;
-}
+export type SettingsResponse = RedactedLlmSettings;
 
 export const api = {
   health: () => get<{ ok: boolean }>('/health'),
@@ -338,8 +336,9 @@ export const api = {
   // settings
   getSettings: () => get<SettingsResponse>('/settings'),
   updateSettings: (update: LlmSettingsUpdate) => patch<SettingsResponse>('/settings', update),
-  testLlm: (override?: LlmSettingsUpdate) => post<LlmHealthResult>('/settings/test', override ?? {}),
-  listModels: (override?: LlmSettingsUpdate) =>
+  testLlm: (override?: LlmSettingsUpdate & { role?: 'evaluator' | 'vision' }) =>
+    post<LlmHealthResult>('/settings/test', override ?? {}),
+  listModels: (override?: LlmSettingsUpdate & { role?: 'evaluator' | 'vision' }) =>
     post<{ ok: boolean; models: LlmModelInfo[]; error?: string }>('/settings/models', override ?? {}),
   estimatePrompts: (input: Partial<PromptEstimateRequest>) =>
     post<PromptEstimateResult>('/settings/prompt-estimate', input),

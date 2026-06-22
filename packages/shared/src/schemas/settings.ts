@@ -40,20 +40,22 @@ export const LlmModelInfoSchema = z.object({
 });
 export type LlmModelInfo = z.infer<typeof LlmModelInfoSchema>;
 
-export const LlmSettingsSchema = z.object({
+/**
+ * The fields that define HOW to reach one model on one endpoint — the wire
+ * protocol, the credentials, the model name, and every generation/decoding knob.
+ * Factored out so the base settings AND each per-role override (see
+ * {@link LlmRoleConnectionSchema}) share a single source of truth: a role override
+ * is just one of these connections plus an `enabled` flag. The GAME-level toggles
+ * (NSFW / rapport cadence / tragic outcomes) live on {@link LlmSettingsSchema} only
+ * — they are global, never per-role.
+ */
+const llmConnectionShape = {
   baseUrl: z
     .string()
     .url('Base URL must be a valid URL, e.g. http://localhost:1234/v1')
     .default('http://localhost:1234/v1'),
   apiKey: z.string().default(''),
   model: z.string().min(1, 'Model name is required').default('local-model'),
-  /**
-   * Optional vision-capable model used for image-based generation (e.g. building a
-   * character template from a portrait). Reuses the same baseUrl + apiKey. When
-   * blank, image calls fall back to `model` — so a single multimodal model needs
-   * no extra config, while text-only setups can point this at a separate VLM.
-   */
-  visionModel: z.string().default(''),
   temperature: z.number().min(0).max(2).default(0.8),
   maxTokens: z.number().int().positive().max(32_000).default(2048),
   /**
@@ -91,6 +93,54 @@ export const LlmSettingsSchema = z.object({
    */
   anthropicVersion: z.string().default('2023-06-01'),
   maxRetries: z.number().int().min(0).max(10).default(3),
+} as const;
+
+/** The connection-shape keys, used to project a role override onto base settings. */
+const LLM_CONNECTION_KEYS = Object.keys(llmConnectionShape) as (keyof typeof llmConnectionShape)[];
+
+/**
+ * A per-role connection override. Same full set of connection/generation params as
+ * the base config, plus `enabled`: when false (the default) the role inherits the
+ * base config entirely; when true, ALL of these fields replace the base ones for
+ * that role's calls. This is what lets, say, the evaluator run on a small local
+ * model via LM Studio while prose runs on Anthropic — fully independent endpoints,
+ * credentials, models, and decoding params.
+ */
+export const LlmRoleConnectionSchema = z.object({
+  enabled: z.boolean().default(false),
+  ...llmConnectionShape,
+});
+export type LlmRoleConnection = z.infer<typeof LlmRoleConnectionSchema>;
+
+/**
+ * Optional per-role endpoint/model overrides. A "role" is the JOB a model call is
+ * doing: `evaluator` (the relationship judges — session eval, per-turn / text
+ * judge, DTR, gift, walkout, breakup, farewell) and `vision` (image-based
+ * generation). `prose` (everything that writes player-facing text) always uses the
+ * base config and so has no override slot. Both default to disabled, so an existing
+ * install behaves exactly as before until a role is explicitly turned on.
+ */
+export const LlmRoleOverridesSchema = z
+  .object({
+    evaluator: LlmRoleConnectionSchema.default({}),
+    vision: LlmRoleConnectionSchema.default({}),
+  })
+  .default({});
+export type LlmRoleOverrides = z.infer<typeof LlmRoleOverridesSchema>;
+
+/** The roles a model call can take. `prose` is the default (base config). */
+export type LlmRole = 'prose' | 'evaluator' | 'vision';
+
+export const LlmSettingsSchema = z.object({
+  ...llmConnectionShape,
+  /**
+   * Optional vision-capable model used for image-based generation (e.g. building a
+   * character template from a portrait) when no full `vision` role override is
+   * enabled. Reuses the base baseUrl + apiKey + endpoint. When blank, image calls
+   * fall back to `model` — so a single multimodal model needs no extra config. For
+   * a vision model on a DIFFERENT endpoint, enable `roleOverrides.vision` instead.
+   */
+  visionModel: z.string().default(''),
   /**
    * When true, the SERVER permits mature/explicit content in date dialogue —
    * but ONLY once the relationship is advanced enough (see `intimacyAllowed`);
@@ -111,6 +161,9 @@ export const LlmSettingsSchema = z.object({
    * UI behind an explicit content-warning acknowledgment with crisis resources.
    */
   tragicOutcomesEnabled: z.boolean().default(false),
+  /** Optional per-role endpoint/model overrides (evaluator, vision). See
+   *  {@link LlmRoleOverridesSchema}; absent/disabled → the base config is used. */
+  roleOverrides: LlmRoleOverridesSchema,
 });
 export type LlmSettings = z.infer<typeof LlmSettingsSchema>;
 
@@ -119,6 +172,42 @@ export const LlmSettingsUpdateSchema = LlmSettingsSchema.partial();
 export type LlmSettingsUpdate = z.infer<typeof LlmSettingsUpdateSchema>;
 
 export const DEFAULT_LLM_SETTINGS: LlmSettings = LlmSettingsSchema.parse({});
+
+/**
+ * Resolve the EFFECTIVE settings for a given model-call role. `prose` (and any
+ * call that doesn't specify a role) uses the base config unchanged. `evaluator`
+ * and `vision` use their full override connection when it is enabled; otherwise
+ * they fall back to the base config — with `vision` additionally honoring the
+ * legacy `visionModel` (a model-only override on the base endpoint). The returned
+ * object is a complete `LlmSettings`, so it drops straight into `getAdapter` and
+ * the structured caller. Pure: never mutates its input.
+ */
+export function resolveLlmRole(settings: LlmSettings, role: LlmRole): LlmSettings {
+  if (role === 'prose') return settings;
+  const override = settings.roleOverrides[role];
+  if (override.enabled) {
+    const connection: Partial<LlmSettings> = {};
+    for (const key of LLM_CONNECTION_KEYS) {
+      // Copy each connection/generation field off the override onto the base.
+      (connection as Record<string, unknown>)[key] = override[key];
+    }
+    return { ...settings, ...connection };
+  }
+  if (role === 'vision') {
+    return { ...settings, model: settings.visionModel.trim() || settings.model };
+  }
+  return settings;
+}
+
+/**
+ * Settings as returned to the browser: every API key (base + each role override)
+ * is blanked, with a parallel `*Set` flag so the UI can show "a key is set" without
+ * ever receiving the secret. The client echoes a blank key to keep the stored one.
+ */
+export type RedactedLlmSettings = LlmSettings & {
+  apiKeySet: boolean;
+  roleApiKeySet: Record<'evaluator' | 'vision', boolean>;
+};
 
 /** Result of a health-check / test-prompt request from the Settings UI. */
 export const LlmHealthResultSchema = z.object({

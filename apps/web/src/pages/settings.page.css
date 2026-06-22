@@ -62,6 +62,35 @@
   font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--text-mute);
 }
+/* Role tabs: Main / Judge / Vision, one connection per tab. */
+.set-tabs {
+  display: flex; gap: 4px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.set-tab {
+  position: relative; appearance: none; background: none; border: none; cursor: pointer;
+  padding: 9px 14px; margin-bottom: -1px;
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-mute);
+  border-bottom: 2px solid transparent;
+}
+.set-tab:hover { color: var(--text); }
+.set-tab.active { color: var(--brass); border-bottom-color: var(--brass); }
+.set-tab-dot {
+  display: inline-block; width: 6px; height: 6px; margin-left: 7px; border-radius: 50%;
+  vertical-align: middle; background: var(--brass); box-shadow: 0 0 7px rgba(230, 177, 94, 0.7);
+}
+/* The role's blurb + enable toggle, above that role's connection fields. */
+.set-role-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.set-role-toggle {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-mute); white-space: nowrap;
+}
+.set-role-toggle input { cursor: pointer; }
 .set-console-dot::before {
   content: ''; width: 8px; height: 8px; border-radius: 50%;
   background: var(--brass); box-shadow: 0 0 9px rgba(230, 177, 94, 0.7);

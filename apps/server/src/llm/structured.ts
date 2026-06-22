@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { LlmSettings, StructuredResult } from '@dsim/shared';
+import { resolveLlmRole, type LlmRole, type LlmSettings, type StructuredResult } from '@dsim/shared';
 import { parseJsonStrict, JsonParseError } from '../lib/json';
 import { getAdapter } from './provider';
 import type { ChatAdapter, ChatMessage, ResponseFormat, TokenUsage } from './types';
@@ -25,6 +25,13 @@ import type { ChatAdapter, ChatMessage, ResponseFormat, TokenUsage } from './typ
 
 export interface StructuredCallOptions {
   settings: LlmSettings;
+  /**
+   * Which model-call role this is, so the right per-role endpoint/model override
+   * applies (see `resolveLlmRole`). The relationship JUDGES pass 'evaluator';
+   * everything else writes prose and uses the default. Ignored when `adapter` is
+   * injected (tests bypass routing).
+   */
+  role?: LlmRole;
   /** Human description of the task, embedded in repair prompts for context. */
   task: string;
   /** Name used for the JSON schema (json_schema mode). */
@@ -36,6 +43,11 @@ export interface StructuredCallOptions {
   /** Override the output token budget (defaults to settings.maxTokens). Needed
    * for tasks whose schema permits long output (e.g. the chronicle fold). */
   maxTokens?: number;
+  /** Floor for the output token budget: the effective maxTokens is raised to at
+   * least this when `maxTokens` isn't given an absolute override. Unlike `maxTokens`
+   * it respects the (possibly per-role) configured budget, only lifting it if the
+   * user set it lower than a task needs (e.g. the session evaluator). */
+  minMaxTokens?: number;
   /** Inject an adapter (used by tests). Defaults to one built from settings. */
   adapter?: ChatAdapter;
   signal?: AbortSignal;
@@ -152,10 +164,15 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
   messages: ChatMessage[],
   options: StructuredCallOptions,
 ): Promise<StructuredResult<z.output<S>>> {
-  const { settings, task } = options;
+  const { task } = options;
+  // Resolve the effective connection for this role (endpoint/model/decoding). An
+  // injected adapter (tests) bypasses routing, so the base config still drives the
+  // non-transport knobs there. Every reference below is to the RESOLVED settings.
+  const settings = options.adapter ? options.settings : resolveLlmRole(options.settings, options.role ?? 'prose');
   const schemaName = options.schemaName ?? 'Result';
   const maxRetries = options.maxRetries ?? settings.maxRetries;
   const baseTemp = options.baseTemperature ?? settings.temperature;
+  const maxTokens = options.maxTokens ?? Math.max(settings.maxTokens, options.minMaxTokens ?? 0);
   const adapter = options.adapter ?? getAdapter(settings);
 
   const jsonSchema = zodToJsonSchema(schema, { name: schemaName, $refStrategy: 'none' });
@@ -207,7 +224,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
     const callStarted = Date.now();
     try {
       const result = await adapter.chat(
-        { messages: attemptMessages, temperature, maxTokens: options.maxTokens ?? settings.maxTokens, responseFormat },
+        { messages: attemptMessages, temperature, maxTokens, responseFormat },
         options.signal,
       );
       content = result.content;

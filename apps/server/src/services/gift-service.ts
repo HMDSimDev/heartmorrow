@@ -93,7 +93,7 @@ export async function reactToGift(args: {
   const result = await callStructuredLlm(
     GiftReactionSchema,
     buildGiftReactionMessages({ character, relationship, item, scene, playerName, playerText, recentMessages }),
-    { settings, task: 'Decide how the character reacts to receiving a gift.', schemaName: 'GiftReaction', signal },
+    { settings, role: 'evaluator', task: 'Decide how the character reacts to receiving a gift.', schemaName: 'GiftReaction', signal },
   );
   if (!result.ok) {
     // FAIL SAFE: do not apply deltas, write a memory, or consume the item.

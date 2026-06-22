@@ -408,7 +408,7 @@ export async function sendPlayerText(
   const judge = await callStructuredLlm(
     TextJudgeSchema,
     buildTextJudgeMessages({ character, relationship: getRelationship(characterId), recentTexts, playerName, memories, imageDataUrl }),
-    { settings: effectiveSettings, task: "Judge how the player's most recent text landed for this character.", schemaName: 'TextJudge' },
+    { settings: effectiveSettings, role: 'evaluator', task: "Judge how the player's most recent text landed for this character.", schemaName: 'TextJudge' },
   );
   if (judge.ok) {
     const base = textEngagementDelta(judge.data.engagement);

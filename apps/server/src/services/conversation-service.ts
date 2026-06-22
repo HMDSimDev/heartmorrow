@@ -590,7 +590,7 @@ export async function attemptWalkout(
   const result = await callStructuredLlm(
     WalkoutReactionSchema,
     buildWalkoutReactionMessages({ character, relationship, recentMessages: recent, playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name }),
-    { settings, task: 'Decide whether the character ends the date now.', schemaName: 'WalkoutReaction', signal },
+    { settings, role: 'evaluator', task: 'Decide whether the character ends the date now.', schemaName: 'WalkoutReaction', signal },
   );
   if (!result.ok || !result.data.walkout) return null;
 
@@ -738,7 +738,7 @@ export async function judgeTurn(sessionId: string, signal?: AbortSignal): Promis
       recentMessages: all.slice(-8),
       playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name,
     }),
-    { settings, task: 'Judge how the last message landed on this date.', schemaName: 'TurnReaction', signal },
+    { settings, role: 'evaluator', task: 'Judge how the last message landed on this date.', schemaName: 'TurnReaction', signal },
   );
   if (!result.ok) return null; // fail-safe — no rapport change
 
@@ -891,7 +891,7 @@ export async function attemptPlayerBreakupIntent(
   const result = await callStructuredLlm(
     PlayerBreakupReactionSchema,
     buildPlayerBreakupMessages({ character, relationship, recentMessages: recent, playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name }),
-    { settings, task: 'Decide whether the player is genuinely breaking up, and react in character.', schemaName: 'PlayerBreakupReaction', signal },
+    { settings, role: 'evaluator', task: 'Decide whether the player is genuinely breaking up, and react in character.', schemaName: 'PlayerBreakupReaction', signal },
   );
   // Not genuine (joking/hypothetical/opposite) or a failed call → normal reply.
   if (!result.ok || !result.data.genuine) return null;
@@ -947,7 +947,7 @@ export async function attemptPlayerFarewell(
       recentMessages: recent,
       playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name,
     }),
-    { settings, task: 'Decide whether the player is ending the date, and voice the goodbye.', schemaName: 'PlayerFarewellReaction', signal },
+    { settings, role: 'evaluator', task: 'Decide whether the player is ending the date, and voice the goodbye.', schemaName: 'PlayerFarewellReaction', signal },
   );
   // Not genuine (stepping away / proposing more / musing) or a failed call → normal reply.
   if (!result.ok || !result.data.ending) return null;
@@ -1262,13 +1262,14 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
   const ctx = buildPromptContextForSession(session, evalMessages);
   const result = await callStructuredLlm(SessionEvaluationSchema, buildEvaluatorMessages(ctx), {
     settings,
+    role: 'evaluator',
     task: 'Evaluate how this dating-sim conversation affected the relationship and record memories.',
     schemaName: 'SessionEvaluation',
     // A maximal eval (summaryLine + up to 8 memories) plus a reasoning model's
     // think tokens can outgrow a user-lowered budget; the whole eval is fail-safe
     // DISCARDED on a truncated/invalid response (recap, memories, and deltas all
-    // lost), so floor the headroom.
-    maxTokens: Math.max(settings.maxTokens, 3000),
+    // lost), so floor the headroom (against the evaluator's own budget).
+    minMaxTokens: 3000,
   });
 
   // This real session is ending → decay temporary buffs by one session NOW that the

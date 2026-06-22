@@ -1022,6 +1022,22 @@
       "connection": "Connection",
       "generation": "Generation"
     },
+    "roles": {
+      "on": "On",
+      "off": "Off",
+      "usingMain": "This role uses the Main configuration. Turn it on to give it its own endpoint and model.",
+      "base": {
+        "tab": "Main"
+      },
+      "evaluator": {
+        "tab": "Judge",
+        "blurb": "The relationship judges — how a date scored, whether a text landed, and gift / breakup / farewell reactions. Route them to their own model or endpoint (say, a small fast local model) while prose stays on your main model."
+      },
+      "vision": {
+        "tab": "Vision",
+        "blurb": "Image-based generation, like drafting a character from a portrait or reacting to an image text. Enable to use a vision-capable model on a wholly separate endpoint; otherwise the base vision model on the Main tab is used."
+      }
+    },
     "fields": {
       "baseUrl": "Base URL",
       "baseUrlHintAnthropic": "e.g. https://api.anthropic.com/v1 (or your compatible proxy)",

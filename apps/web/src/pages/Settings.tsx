@@ -9,7 +9,7 @@ import {
   type Sexuality,
   type LlmHealthResult,
   type LlmModelInfo,
-  type StructuredOutputMode,
+  type LlmRoleConnection,
   type EndpointMode,
 } from '@dsim/shared';
 import { api } from '../lib/api';
@@ -19,6 +19,7 @@ import { genderLabel, sexualityLabel } from '../i18n/labels';
 import { Banner, Field, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { CrisisResources } from '../components/CrisisResources';
+import { ConnectionConsole, type ConnectionForm } from '../components/ConnectionConsole';
 import './settings.page.css';
 
 /** The endpoint-mode banner: each provider as a prominent, selectable chip with
@@ -27,27 +28,34 @@ import './settings.page.css';
  * the catalog key. */
 const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'anthropic', 'responses'];
 
-interface Form {
-  baseUrl: string;
-  apiKey: string;
-  model: string;
+/** Roles with an optional independent endpoint/model. `prose` always uses base. */
+type RoleKey = 'evaluator' | 'vision';
+const ROLE_KEYS: RoleKey[] = ['evaluator', 'vision'];
+
+/** The base config: a connection (shared with the role consoles) plus the
+ *  base-only vision model, the game-level toggles, and the per-role overrides. */
+type Form = ConnectionForm & {
   visionModel: string;
-  temperature: number;
-  maxTokens: number;
-  topP: number | null;
-  topK: number | null;
-  minP: number | null;
-  frequencyPenalty: number | null;
-  presencePenalty: number | null;
-  repeatPenalty: number | null;
-  structuredMode: StructuredOutputMode;
-  omitSchemaInPrompt: boolean;
-  endpointMode: EndpointMode;
-  anthropicVersion: string;
-  maxRetries: number;
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
   tragicOutcomesEnabled: boolean;
+  roleOverrides: Record<RoleKey, LlmRoleConnection>;
+};
+
+/** Keys of one connection, used to project a connection into a settings patch. */
+const CONNECTION_FIELDS = [
+  'baseUrl', 'apiKey', 'model', 'temperature', 'maxTokens', 'topP', 'topK', 'minP',
+  'frequencyPenalty', 'presencePenalty', 'repeatPenalty', 'structuredMode',
+  'omitSchemaInPrompt', 'endpointMode', 'anthropicVersion', 'maxRetries',
+] as const;
+
+/** A connection → settings-patch object, dropping a blank API key so the server
+ *  keeps the stored one (the field is redacted on load and only sent when changed). */
+function connectionPatch(c: ConnectionForm): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const k of CONNECTION_FIELDS) patch[k] = c[k];
+  if (!c.apiKey) delete patch.apiKey;
+  return patch;
 }
 
 interface PlayerForm {
@@ -65,14 +73,18 @@ export function Settings() {
   const [playerSaved, setPlayerSaved] = useState(false);
   const [playerSaving, setPlayerSaving] = useState(false);
   const [form, setForm] = useState<Form | null>(null);
-  const [apiKeySet, setApiKeySet] = useState(false);
-  const [models, setModels] = useState<LlmModelInfo[]>([]);
+  // API-key-is-set flags + model lists + load/test pending, keyed per connection
+  // ('base' | RoleKey) so each console manages its own endpoint independently.
+  const [apiKeySet, setApiKeySet] = useState<Record<string, boolean>>({});
+  const [models, setModels] = useState<Record<string, LlmModelInfo[]>>({});
+  const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
+  const [testing, setTesting] = useState<Record<string, boolean>>({});
+  // Which connection tab is showing: the main config or one of the role overrides.
+  const [tab, setTab] = useState<'base' | RoleKey>('base');
   const [health, setHealth] = useState<LlmHealthResult | null>(null);
   const [error, setError] = useState<string>();
   const [savedNote, setSavedNote] = useState<string>();
-  const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loadingModels, setLoadingModels] = useState(false);
   const [nsfwModalOpen, setNsfwModalOpen] = useState(false);
   const [ackContent, setAckContent] = useState(false);
   const [ackAge, setAckAge] = useState(false);
@@ -98,12 +110,11 @@ export function Settings() {
       try {
         const s = await api.getSettings();
         if (cancelled) return;
-        setApiKeySet(s.apiKeySet);
+        setApiKeySet({ base: s.apiKeySet, evaluator: s.roleApiKeySet.evaluator, vision: s.roleApiKeySet.vision });
         setForm({
           baseUrl: s.baseUrl,
           apiKey: '',
           model: s.model,
-          visionModel: s.visionModel,
           temperature: s.temperature,
           maxTokens: s.maxTokens,
           topP: s.topP,
@@ -117,9 +128,11 @@ export function Settings() {
           endpointMode: s.endpointMode,
           anthropicVersion: s.anthropicVersion,
           maxRetries: s.maxRetries,
+          visionModel: s.visionModel,
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,
           tragicOutcomesEnabled: s.tragicOutcomesEnabled,
+          roleOverrides: { evaluator: s.roleOverrides.evaluator, vision: s.roleOverrides.vision },
         });
       } catch (e) {
         if (!cancelled) setError(errorMessage(e));
@@ -131,51 +144,25 @@ export function Settings() {
   }, [activeWorldId]);
 
   if (!form) return <Spinner />;
-  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
-  const hasModel = (id: string) => models.some((m) => m.id === id);
-  // Compact "8K ctx · loaded · Q4_K_M" suffix from whatever metadata is present
-  // (LM Studio's native listing fills these in; other endpoints just give an id).
-  const modelMeta = (m: LlmModelInfo): string => {
-    const bits: string[] = [];
-    if (m.contextLength) bits.push(`${Math.round(m.contextLength / 1024)}K ctx`);
-    if (m.loaded != null) bits.push(m.loaded ? 'loaded' : 'not loaded');
-    if (m.quantization) bits.push(m.quantization);
-    return bits.length ? ` — ${bits.join(' · ')}` : '';
-  };
-  // Nullable sampling inputs: blank → null (field omitted from the request);
-  // any other value parses to a number (NaN guarded so partial typing is kept null).
-  const setNullable = (k: 'topP' | 'topK' | 'minP' | 'frequencyPenalty' | 'presencePenalty' | 'repeatPenalty', raw: string) => {
-    const trimmed = raw.trim();
-    if (trimmed === '') return set(k, null);
-    const n = Number(trimmed);
-    set(k, Number.isFinite(n) ? n : null);
-  };
+  // The connection backing the active tab — drives the header status readout.
+  const activeConn: ConnectionForm = tab === 'base' ? form : form.roleOverrides[tab];
+  const set = (patch: Partial<Form>) => setForm((f) => (f ? { ...f, ...patch } : f));
+  // Patch into one role's override connection.
+  const setRole = (role: RoleKey, patch: Partial<ConnectionForm>) =>
+    setForm((f) =>
+      f ? { ...f, roleOverrides: { ...f.roleOverrides, [role]: { ...f.roleOverrides[role], ...patch } } } : f,
+    );
 
-  const buildUpdate = () => {
-    const update: Record<string, unknown> = {
-      baseUrl: form.baseUrl,
-      model: form.model,
-      visionModel: form.visionModel,
-      temperature: form.temperature,
-      maxTokens: form.maxTokens,
-      topP: form.topP,
-      topK: form.topK,
-      minP: form.minP,
-      frequencyPenalty: form.frequencyPenalty,
-      presencePenalty: form.presencePenalty,
-      repeatPenalty: form.repeatPenalty,
-      structuredMode: form.structuredMode,
-      omitSchemaInPrompt: form.omitSchemaInPrompt,
-      endpointMode: form.endpointMode,
-      anthropicVersion: form.anthropicVersion,
-      maxRetries: form.maxRetries,
-      nsfwEnabled: form.nsfwEnabled,
-      rapportCadence: form.rapportCadence,
-      tragicOutcomesEnabled: form.tragicOutcomesEnabled,
-    };
-    if (form.apiKey) update.apiKey = form.apiKey;
-    return update;
-  };
+  // The full PATCH body: base connection (+ blank key dropped) + base-only fields +
+  // both role overrides whole (a blank role key is preserved server-side).
+  const buildUpdate = (): Record<string, unknown> => ({
+    ...connectionPatch(form),
+    visionModel: form.visionModel,
+    nsfwEnabled: form.nsfwEnabled,
+    rapportCadence: form.rapportCadence,
+    tragicOutcomesEnabled: form.tragicOutcomesEnabled,
+    roleOverrides: { evaluator: form.roleOverrides.evaluator, vision: form.roleOverrides.vision },
+  });
 
   const save = async () => {
     setSaving(true);
@@ -183,13 +170,64 @@ export function Settings() {
     setError(undefined);
     try {
       const s = await api.updateSettings(buildUpdate());
-      setApiKeySet(s.apiKeySet);
-      setForm((f) => (f ? { ...f, apiKey: '' } : f));
+      setApiKeySet({ base: s.apiKeySet, evaluator: s.roleApiKeySet.evaluator, vision: s.roleApiKeySet.vision });
+      // Re-blank every (now stored) key field so the inputs show "unchanged".
+      setForm((f) =>
+        f
+          ? {
+              ...f,
+              apiKey: '',
+              roleOverrides: {
+                evaluator: { ...f.roleOverrides.evaluator, apiKey: '' },
+                vision: { ...f.roleOverrides.vision, apiKey: '' },
+              },
+            }
+          : f,
+      );
       setSavedNote(t('settings.toast.saved'));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Test / list-models for one connection ('base' or a role). Uses the values
+  // currently typed in (no Save needed); a role passes its key so a blank field
+  // falls back to that role's stored key, not the base one.
+  const overrideFor = (key: string) =>
+    key === 'base'
+      ? connectionPatch(form)
+      : { ...connectionPatch(form.roleOverrides[key as RoleKey]), role: key as RoleKey };
+
+  const test = async (key: string) => {
+    setTesting((m) => ({ ...m, [key]: true }));
+    setHealth(null);
+    setError(undefined);
+    try {
+      setHealth(await api.testLlm(overrideFor(key)));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setTesting((m) => ({ ...m, [key]: false }));
+    }
+  };
+
+  const loadModels = async (key: string) => {
+    if (loadingModels[key]) return;
+    setLoadingModels((m) => ({ ...m, [key]: true }));
+    setError(undefined);
+    setSavedNote(undefined);
+    try {
+      const res = await api.listModels(overrideFor(key));
+      setModels((m) => ({ ...m, [key]: res.models }));
+      if (!res.ok && res.error) setError(res.error);
+      else if (res.models.length === 0) setSavedNote(t('settings.toast.noModels'));
+      else setSavedNote(t('settings.toast.loadedModels', { count: res.models.length }));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setLoadingModels((m) => ({ ...m, [key]: false }));
     }
   };
 
@@ -200,7 +238,6 @@ export function Settings() {
     setError(undefined);
     try {
       const s = await api.updateSettings({ nsfwEnabled: enabled });
-      setApiKeySet(s.apiKeySet);
       setForm((f) => (f ? { ...f, nsfwEnabled: s.nsfwEnabled } : f));
       return true;
     } catch (e) {
@@ -262,42 +299,6 @@ export function Settings() {
     }
   };
 
-  const test = async () => {
-    setTesting(true);
-    setHealth(null);
-    setError(undefined);
-    try {
-      setHealth(await api.testLlm(buildUpdate()));
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const loadModels = async () => {
-    if (loadingModels) return;
-    setLoadingModels(true);
-    setError(undefined);
-    setSavedNote(undefined);
-    try {
-      // Use the values currently typed into the form (like Test connection) so the
-      // user doesn't have to Save first to list against a freshly-entered endpoint.
-      const res = await api.listModels(buildUpdate());
-      setModels(res.models);
-      if (!res.ok && res.error) {
-        setError(res.error);
-      } else if (res.models.length === 0) {
-        setSavedNote(t('settings.toast.noModels'));
-      } else {
-        setSavedNote(t('settings.toast.loadedModels', { count: res.models.length }));
-      }
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setLoadingModels(false);
-    }
-  };
 
   return (
     <div className="stack set-page">
@@ -467,7 +468,8 @@ export function Settings() {
       </Link>
 
       {/* Signature element: the connection console — the technical heart of the
-          page, presented as a chamfered instrument panel. */}
+          page, presented as a chamfered instrument panel. One box, with a tab per
+          model role: the main config (prose), the judge (evaluator), and vision. */}
       <div className="framed set-console">
         <div className="set-console-head">
           <div>
@@ -475,278 +477,125 @@ export function Settings() {
             <div className="set-console-title">{t('settings.console.title')}</div>
           </div>
           <span className="set-console-dot">
-            {PROVIDER_MODES.includes(form.endpointMode)
-              ? t(`settings.providers.${form.endpointMode}.name`)
+            {PROVIDER_MODES.includes(activeConn.endpointMode)
+              ? t(`settings.providers.${activeConn.endpointMode}.name`)
               : t('settings.console.providerFallback')}{' '}
-            · {form.baseUrl ? t('settings.console.endpointSet') : t('settings.console.noEndpoint')}
+            · {activeConn.baseUrl ? t('settings.console.endpointSet') : t('settings.console.noEndpoint')}
           </span>
         </div>
 
-        {/* Provider selector — the first decision on this console: it picks the
-            wire protocol every field below speaks, so it spans the full width
-            above the two columns rather than hiding among the sampling knobs. */}
-        <div className="set-provider">
-          <div className="set-col-label">{t('settings.console.providerLabel')}</div>
-          <div className="set-provider-seg" role="group" aria-label={t('settings.console.endpointModeAria')}>
-            {PROVIDER_MODES.map((mode) => {
-              const active = form.endpointMode === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  className={`set-provider-chip ${active ? 'active' : ''}`}
-                  aria-pressed={active}
-                  onClick={() => set('endpointMode', mode)}
-                >
-                  <span className="set-provider-name">{t(`settings.providers.${mode}.name`)}</span>
-                  <span className="set-provider-tag">{t(`settings.providers.${mode}.tag`)}</span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="set-provider-desc">{t(`settings.providers.${form.endpointMode}.desc`)}</p>
+        <div className="set-tabs" role="tablist" aria-label={t('settings.console.title')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'base'}
+            className={`set-tab ${tab === 'base' ? 'active' : ''}`}
+            onClick={() => setTab('base')}
+          >
+            {t('settings.roles.base.tab')}
+          </button>
+          {ROLE_KEYS.map((role) => (
+            <button
+              key={role}
+              type="button"
+              role="tab"
+              aria-selected={tab === role}
+              className={`set-tab ${tab === role ? 'active' : ''}`}
+              onClick={() => setTab(role)}
+            >
+              {t(`settings.roles.${role}.tab`)}
+              {form.roleOverrides[role].enabled && <span className="set-tab-dot" aria-hidden="true" />}
+            </button>
+          ))}
         </div>
 
-        <div className="set-console-grid">
-          <div className="set-console-col">
-            <div className="set-col-label">{t('settings.console.connection')}</div>
-            <Field
-              label={t('settings.fields.baseUrl')}
-              hint={
-                form.endpointMode === 'anthropic'
-                  ? t('settings.fields.baseUrlHintAnthropic')
-                  : form.endpointMode === 'lmstudio'
-                    ? t('settings.fields.baseUrlHintLmstudio')
-                    : t('settings.fields.baseUrlHintDefault')
-              }
-            >
-              <input value={form.baseUrl} onChange={(e) => set('baseUrl', e.target.value)} />
-            </Field>
-            <Field
-              label={t('settings.fields.apiKey')}
-              hint={
-                apiKeySet
-                  ? t('settings.fields.apiKeyHintSet')
-                  : form.endpointMode === 'anthropic'
-                    ? t('settings.fields.apiKeyHintAnthropic')
-                    : t('settings.fields.apiKeyHintLocal')
-              }
-            >
-              <input
-                type="password"
-                placeholder={
-                  apiKeySet
-                    ? t('settings.fields.apiKeyPlaceholderSet')
-                    : form.endpointMode === 'anthropic'
-                      ? t('settings.fields.apiKeyPlaceholderRequired')
-                      : t('settings.fields.apiKeyPlaceholderOptional')
-                }
-                value={form.apiKey}
-                onChange={(e) => set('apiKey', e.target.value)}
-              />
-            </Field>
-            {form.endpointMode === 'anthropic' && (
-              <Field
-                label={t('settings.fields.anthropicVersion')}
-                hint={t('settings.fields.anthropicVersionHint')}
-              >
+        {tab === 'base' ? (
+          <ConnectionConsole
+            value={form}
+            onChange={set}
+            apiKeySet={!!apiKeySet.base}
+            idPrefix="base"
+            models={models.base ?? []}
+            loadingModels={!!loadingModels.base}
+            onLoadModels={() => loadModels('base')}
+            onTest={() => test('base')}
+            testing={!!testing.base}
+            hideFooter
+            connectionExtra={
+              <Field label={t('settings.fields.visionModel')} hint={t('settings.fields.visionModelHint')}>
                 <input
-                  value={form.anthropicVersion}
-                  onChange={(e) => set('anthropicVersion', e.target.value)}
-                  placeholder="2023-06-01"
+                  value={form.visionModel}
+                  onChange={(e) => set({ visionModel: e.target.value })}
+                  list="model-list-base"
+                  placeholder={t('settings.fields.sameAsModel')}
                 />
               </Field>
-            )}
-            <Field label={t('settings.fields.model')} hint={t('settings.fields.modelHint')}>
-              <input value={form.model} onChange={(e) => set('model', e.target.value)} list="model-list" />
-              {models.length > 0 && (
+            }
+            generationExtra={
+              <Field label={t('settings.fields.rapport')} hint={t('settings.fields.rapportHint')}>
                 <select
-                  className="set-model-picker"
-                  value={hasModel(form.model) ? form.model : ''}
-                  onChange={(e) => e.target.value && set('model', e.target.value)}
+                  value={form.rapportCadence}
+                  onChange={(e) => set({ rapportCadence: e.target.value as 'every' | 'periodic' })}
                 >
-                  <option value="">{t('settings.fields.pickFrom', { count: models.length })}</option>
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.id}
-                      {modelMeta(m)}
-                    </option>
-                  ))}
+                  <option value="every">{t('settings.fields.rapportEvery')}</option>
+                  <option value="periodic">{t('settings.fields.rapportPeriodic')}</option>
                 </select>
-              )}
-              <datalist id="model-list">
-                {models.map((m) => (
-                  <option key={m.id} value={m.id} />
-                ))}
-              </datalist>
-            </Field>
-            <Field
-              label={t('settings.fields.visionModel')}
-              hint={t('settings.fields.visionModelHint')}
-            >
-              <input
-                value={form.visionModel}
-                onChange={(e) => set('visionModel', e.target.value)}
-                list="model-list"
-                placeholder={t('settings.fields.sameAsModel')}
-              />
-              {models.length > 0 && (
-                <select
-                  className="set-model-picker"
-                  value={hasModel(form.visionModel) ? form.visionModel : ''}
-                  onChange={(e) => e.target.value && set('visionModel', e.target.value)}
-                >
-                  <option value="">{t('settings.fields.pickModel')}</option>
-                  {models.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.id}
-                      {modelMeta(m)}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </Field>
-            <button className="btn sm" onClick={loadModels} disabled={loadingModels}>
-              {loadingModels ? t('settings.fields.loading') : t('settings.fields.loadModels')}
-            </button>
-          </div>
-
-          <div className="set-console-col">
-            <div className="set-col-label">{t('settings.console.generation')}</div>
-            <Field label={t('settings.fields.temperature', { value: form.temperature })}>
-              <input
-                type="range"
-                min={0}
-                max={2}
-                step={0.1}
-                value={form.temperature}
-                onChange={(e) => set('temperature', Number(e.target.value))}
-              />
-            </Field>
-            <Field label={t('settings.fields.maxTokens')}>
-              <input type="number" value={form.maxTokens} onChange={(e) => set('maxTokens', Number(e.target.value))} />
-            </Field>
-            <Field
-              label={t('settings.fields.advancedSampling')}
-              hint={t('settings.fields.advancedSamplingHint')}
-            >
-              <div className="set-sampling-grid">
-                <label className="set-sampling-cell">
-                  <span>{t('settings.fields.topP')}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    placeholder={t('settings.fields.samplingDefault')}
-                    value={form.topP ?? ''}
-                    onChange={(e) => setNullable('topP', e.target.value)}
+              </Field>
+            }
+          />
+        ) : (
+          (() => {
+            const role = tab;
+            const conn = form.roleOverrides[role];
+            return (
+              <>
+                <div className="set-role-bar">
+                  <p className="set-lede" style={{ margin: 0 }}>
+                    {t(`settings.roles.${role}.blurb`)}
+                  </p>
+                  <label className="set-role-toggle">
+                    <input
+                      type="checkbox"
+                      checked={conn.enabled}
+                      onChange={(e) => setRole(role, { enabled: e.target.checked } as Partial<ConnectionForm>)}
+                    />
+                    <span>{conn.enabled ? t('settings.roles.on') : t('settings.roles.off')}</span>
+                  </label>
+                </div>
+                {conn.enabled ? (
+                  <ConnectionConsole
+                    value={conn}
+                    onChange={(patch) => setRole(role, patch)}
+                    apiKeySet={!!apiKeySet[role]}
+                    idPrefix={role}
+                    models={models[role] ?? []}
+                    loadingModels={!!loadingModels[role]}
+                    onLoadModels={() => loadModels(role)}
+                    onTest={() => test(role)}
+                    testing={!!testing[role]}
+                    hideFooter
                   />
-                </label>
-                <label className="set-sampling-cell">
-                  <span>{t('settings.fields.topK')}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={500}
-                    step={1}
-                    placeholder={t('settings.fields.samplingDefault')}
-                    value={form.topK ?? ''}
-                    onChange={(e) => setNullable('topK', e.target.value)}
-                  />
-                </label>
-                <label className="set-sampling-cell">
-                  <span>{t('settings.fields.minP')}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    placeholder={t('settings.fields.samplingDefault')}
-                    value={form.minP ?? ''}
-                    onChange={(e) => setNullable('minP', e.target.value)}
-                  />
-                </label>
-                <label className="set-sampling-cell">
-                  <span>{t('settings.fields.frequencyPenalty')}</span>
-                  <input
-                    type="number"
-                    min={-2}
-                    max={2}
-                    step={0.1}
-                    placeholder={t('settings.fields.samplingDefault')}
-                    value={form.frequencyPenalty ?? ''}
-                    onChange={(e) => setNullable('frequencyPenalty', e.target.value)}
-                  />
-                </label>
-                <label className="set-sampling-cell">
-                  <span>{t('settings.fields.presencePenalty')}</span>
-                  <input
-                    type="number"
-                    min={-2}
-                    max={2}
-                    step={0.1}
-                    placeholder={t('settings.fields.samplingDefault')}
-                    value={form.presencePenalty ?? ''}
-                    onChange={(e) => setNullable('presencePenalty', e.target.value)}
-                  />
-                </label>
-                <label className="set-sampling-cell">
-                  <span>{t('settings.fields.repeatPenalty')}</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={2}
-                    step={0.05}
-                    placeholder={t('settings.fields.samplingDefault')}
-                    value={form.repeatPenalty ?? ''}
-                    onChange={(e) => setNullable('repeatPenalty', e.target.value)}
-                  />
-                </label>
-              </div>
-            </Field>
-            <Field label={t('settings.fields.structuredMode')} hint={t('settings.fields.structuredModeHint')}>
-              <select value={form.structuredMode} onChange={(e) => set('structuredMode', e.target.value as StructuredOutputMode)}>
-                <option value="json_schema">json_schema</option>
-                <option value="json_object">json_object</option>
-                <option value="prompt_only">prompt_only</option>
-              </select>
-            </Field>
-            <Field
-              label={t('settings.fields.dropSchema')}
-              hint={t('settings.fields.dropSchemaHint')}
-            >
-              <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={form.omitSchemaInPrompt}
-                  onChange={(e) => set('omitSchemaInPrompt', e.target.checked)}
-                />
-                <span>{t('settings.fields.dropSchemaLabel')}</span>
-              </label>
-            </Field>
-            <Field label={t('settings.fields.retryLimit')} hint={t('settings.fields.retryLimitHint')}>
-              <input type="number" min={0} max={10} value={form.maxRetries} onChange={(e) => set('maxRetries', Number(e.target.value))} />
-            </Field>
-            <Field
-              label={t('settings.fields.rapport')}
-              hint={t('settings.fields.rapportHint')}
-            >
-              <select value={form.rapportCadence} onChange={(e) => set('rapportCadence', e.target.value as 'every' | 'periodic')}>
-                <option value="every">{t('settings.fields.rapportEvery')}</option>
-                <option value="periodic">{t('settings.fields.rapportPeriodic')}</option>
-              </select>
-            </Field>
-          </div>
-        </div>
+                ) : (
+                  <p className="hint">{t('settings.roles.usingMain')}</p>
+                )}
+              </>
+            );
+          })()
+        )}
 
         <div className="set-console-foot">
           <button className="btn primary" onClick={save} disabled={saving}>
             {saving ? t('settings.foot.saving') : t('settings.foot.save')}
           </button>
-          <button className="btn" onClick={test} disabled={testing}>
-            {testing ? t('settings.foot.testing') : <><Icon name="refresh" size={15} /> {t('settings.foot.test')}</>}
-          </button>
+          {(tab === 'base' || form.roleOverrides[tab].enabled) && (
+            <button className="btn" onClick={() => test(tab)} disabled={!!testing[tab]}>
+              {testing[tab] ? t('settings.foot.testing') : (
+                <>
+                  <Icon name="refresh" size={15} /> {t('settings.foot.test')}
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
       </section>

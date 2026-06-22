@@ -12,6 +12,7 @@ import {
   DATING_STAT_KEYS,
   MIN_CHARACTER_AGE,
   clampStat,
+  resolveLlmRole,
   type Character,
   type CharacterBundle,
   type CharacterCreate,
@@ -493,7 +494,7 @@ export async function generateCharacterFromSources(
   if (data.assetId) {
     const { buffer, mimeType } = readAssetFile(data.assetId); // throws notFound if the asset/file is gone
     const imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
-    const visionSettings = { ...settings, model: settings.visionModel.trim() || settings.model };
+    const visionSettings = resolveLlmRole(settings, 'vision');
     try {
       const res = await getAdapter(visionSettings).chat({
         messages: buildImageDescriptionMessages(imageDataUrl),
