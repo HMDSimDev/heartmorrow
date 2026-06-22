@@ -370,6 +370,19 @@ function relationLabel(a: Character, b: Character, promoted: boolean, sharePlace
       return 'friends';
     case 'rival':
       return 'rivals';
+    case 'roommate':
+      return 'roommates';
+    case 'coworker':
+      return 'coworkers';
+    case 'classmate':
+      return 'classmates';
+    case 'neighbor':
+      return 'neighbors';
+    case 'mentor':
+      return 'a mentor and their mentee';
+    case 'crush':
+      // One-sided by nature — don't out the crush as a mutual scene fact.
+      return 'acquaintances';
     default:
       break;
   }

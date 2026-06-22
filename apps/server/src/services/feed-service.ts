@@ -297,6 +297,16 @@ function milestoneSituation(linkKind: string, subjectName: string, playerName: s
       return `${subjectName} — your ${label} — is getting serious with ${playerName}. You're protective and a bit nosy about it.`;
     case 'partner':
       return `${subjectName}, your ${label}, is growing close with ${playerName}. It lands as a quiet wound.`;
+    case 'crush':
+      return `${subjectName} — someone you've quietly carried a torch for — is growing close with ${playerName}. It stings, but you keep it to yourself.`;
+    case 'roommate':
+      return `${subjectName}, your ${label}, is getting close with ${playerName}. You've had a front-row seat, so you're warm and a little teasing about it.`;
+    case 'mentor':
+      return `${subjectName} — your ${label} — is getting close with ${playerName}. You're quietly glad for them.`;
+    case 'coworker':
+    case 'classmate':
+    case 'neighbor':
+      return `${subjectName}, your ${label}, is getting close with ${playerName}. You're friendly and lightly happy for them.`;
     default:
       return `${subjectName} is getting close with ${playerName}.`;
   }
@@ -462,6 +472,10 @@ function npcReactionForLink(kind: CharacterLinkKind, postKind: FeedPostKind): Re
       return heavy ? 'sad' : 'like';
     case 'rival':
       return heavy ? 'laugh' : 'like';
+    case 'crush':
+      return heavy ? 'sad' : 'love';
+    case 'roommate':
+      return heavy ? 'sad' : 'love';
     default:
       return 'like';
   }

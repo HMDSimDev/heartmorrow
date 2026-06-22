@@ -66,6 +66,12 @@
     "ex": "Ex",
     "family": "Family",
     "partner": "Partner",
+    "crush": "Crush",
+    "roommate": "Roommate",
+    "coworker": "Coworker",
+    "classmate": "Classmate",
+    "neighbor": "Neighbor",
+    "mentor": "Mentor",
     "acquaintance": "Acquaintance"
   },
   "itemRarity": {

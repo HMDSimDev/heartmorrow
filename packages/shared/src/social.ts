@@ -25,7 +25,20 @@ export const RELATIONSHIP_STYLE_LABELS: Record<RelationshipStyle, string> = {
  * the world-sim minted (people who have simply crossed paths) — it carries low
  * weight so random encounters never drive drama like a hand-authored bond.
  */
-export const CharacterLinkKindSchema = z.enum(['friend', 'rival', 'ex', 'family', 'partner', 'acquaintance']);
+export const CharacterLinkKindSchema = z.enum([
+  'friend',
+  'rival',
+  'ex',
+  'family',
+  'partner',
+  'crush',
+  'roommate',
+  'coworker',
+  'classmate',
+  'neighbor',
+  'mentor',
+  'acquaintance',
+]);
 export type CharacterLinkKind = z.infer<typeof CharacterLinkKindSchema>;
 
 export const CHARACTER_LINK_LABELS: Record<CharacterLinkKind, string> = {
@@ -34,6 +47,12 @@ export const CHARACTER_LINK_LABELS: Record<CharacterLinkKind, string> = {
   ex: 'Ex',
   family: 'Family',
   partner: 'Partner',
+  crush: 'Crush',
+  roommate: 'Roommate',
+  coworker: 'Coworker',
+  classmate: 'Classmate',
+  neighbor: 'Neighbor',
+  mentor: 'Mentor',
   acquaintance: 'Acquaintance',
 };
 
@@ -43,6 +62,12 @@ export const CHARACTER_LINK_ICONS: Record<CharacterLinkKind, string> = {
   ex: '💔',
   family: '👪',
   partner: '💑',
+  crush: '💘',
+  roommate: '🛋️',
+  coworker: '💼',
+  classmate: '📚',
+  neighbor: '🏡',
+  mentor: '🧭',
   acquaintance: '👋',
 };
 
@@ -110,10 +135,20 @@ export interface TopicSignals {
 export function pickConversationTopic(signals: TopicSignals, roll: number): ConversationTopic {
   const weights: Array<{ topic: ConversationTopic; weight: number }> = [{ topic: 'catching-up', weight: 1 }];
   if (signals.involvesPlayer) weights.push({ topic: 'the-player', weight: 3 });
-  if (signals.relationKind === 'ex' || signals.relationKind === 'family' || signals.relationKind === 'partner') {
+  if (
+    signals.relationKind === 'ex' ||
+    signals.relationKind === 'family' ||
+    signals.relationKind === 'partner' ||
+    signals.relationKind === 'roommate'
+  ) {
     weights.push({ topic: 'the-past', weight: 2.5 });
   }
   if (signals.bothEmployed) weights.push({ topic: 'work', weight: 2 });
+  // Coworkers reliably talk shop; mentors and classmates orbit goals and what's next.
+  if (signals.relationKind === 'coworker') weights.push({ topic: 'work', weight: 2.5 });
+  if (signals.relationKind === 'mentor' || signals.relationKind === 'classmate') {
+    weights.push({ topic: 'plans', weight: 2 });
+  }
   if (signals.eitherHasGoals) weights.push({ topic: 'plans', weight: 1.5 });
   if (signals.sharesMutual) weights.push({ topic: 'someone', weight: 1.5 });
 
@@ -168,10 +203,16 @@ export type SocialWeb = z.infer<typeof SocialWebSchema>;
  */
 export const CHARACTER_LINK_ORDER: readonly CharacterLinkKind[] = [
   'partner',
+  'crush',
+  'ex',
   'family',
   'friend',
-  'ex',
+  'roommate',
+  'mentor',
+  'classmate',
+  'coworker',
   'rival',
+  'neighbor',
   'acquaintance',
 ];
 
@@ -200,11 +241,17 @@ export type Employment = z.infer<typeof EmploymentSchema>;
  * pick weight in the jealousy roll.
  */
 export const LINK_JEALOUSY_WEIGHT: Record<CharacterLinkKind, number> = {
+  crush: 4,
   ex: 4,
   rival: 4,
   partner: 3,
   family: 2,
   friend: 2,
+  roommate: 2,
+  classmate: 1,
+  coworker: 1,
+  neighbor: 1,
+  mentor: 1,
   acquaintance: 1,
 };
 
@@ -217,8 +264,14 @@ export const LINK_JEALOUSY_WEIGHT: Record<CharacterLinkKind, number> = {
  */
 export const FEED_NPC_COMMENT_CHANCE: Record<CharacterLinkKind, number> = {
   partner: 0.7,
+  crush: 0.55,
   friend: 0.5,
+  roommate: 0.5,
   family: 0.45,
+  mentor: 0.4,
+  classmate: 0.35,
+  coworker: 0.3,
+  neighbor: 0.2,
   ex: 0.18,
   rival: 0.15,
   acquaintance: 0.06,
@@ -231,8 +284,14 @@ export const FEED_NPC_COMMENT_CHANCE: Record<CharacterLinkKind, number> = {
  */
 export const FEED_NPC_REACT_CHANCE: Record<CharacterLinkKind, number> = {
   partner: 0.6,
+  crush: 0.6,
+  roommate: 0.5,
   friend: 0.5,
   family: 0.45,
+  mentor: 0.42,
+  classmate: 0.4,
+  coworker: 0.38,
+  neighbor: 0.28,
   ex: 0.2,
   rival: 0.18,
   acquaintance: 0.08,
@@ -247,8 +306,15 @@ export const VOUCH_DELTAS: Record<CharacterLinkKind, Partial<Record<Relationship
   friend: { affection: 4, comfort: 3 },
   family: { affection: 3, trust: 3 },
   partner: { affection: 4, trust: 4 },
+  roommate: { affection: 3, comfort: 3 },
+  mentor: { affection: 2, trust: 3 },
+  classmate: { affection: 2 },
+  coworker: { affection: 2 },
+  neighbor: { comfort: 1 },
   rival: { affection: -3, comfort: -2, tension: 2 },
   ex: { affection: -2, tension: 3 },
+  // Someone carrying a torch for the person you just committed to takes it hard.
+  crush: { affection: -3, tension: 3 },
   // A mere acquaintance doesn't vouch or sabotage — crossing paths isn't an endorsement.
   acquaintance: {},
 };

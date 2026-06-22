@@ -30,6 +30,12 @@ const KIND_ICON: Record<CharacterLinkKind, IconName> = {
   friend: 'people',
   ex: 'breakup',
   rival: 'rival',
+  crush: 'remember',
+  roommate: 'property',
+  coworker: 'work',
+  classmate: 'book',
+  neighbor: 'location',
+  mentor: 'star',
   acquaintance: 'acquaintance',
 };
 

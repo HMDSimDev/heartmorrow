@@ -164,6 +164,12 @@ const LINK_RELATION_PHRASE: Record<string, string> = {
   ex: 'your ex',
   family: 'family',
   partner: 'your partner',
+  crush: 'someone you have a quiet crush on',
+  roommate: 'your roommate',
+  coworker: 'a coworker of yours',
+  classmate: 'a classmate of yours',
+  neighbor: 'a neighbor of yours',
+  mentor: 'someone who mentors you',
   acquaintance: 'someone you know a little around town',
 };
 
@@ -1776,6 +1782,18 @@ function npcLinkToneSteer(kind: CharacterLinkKind, posterName: string): string {
       return `You and ${posterName} used to be together, so it's complicated — wistful, cool, or a little pointed, but never cruel.`;
     case 'rival':
       return `${posterName} is your rival — stay cool and a touch competitive; a wry, public-appropriate jab at most, nothing nasty.`;
+    case 'crush':
+      return `You have a quiet crush on ${posterName} — warm and a little eager, but keep it subtle; don't announce it.`;
+    case 'roommate':
+      return `You live with ${posterName} — easy, familiar, a little inside-joke-y about home life.`;
+    case 'coworker':
+      return `You work with ${posterName} — friendly and collegial, maybe a nod to the job or the grind.`;
+    case 'classmate':
+      return `You and ${posterName} are classmates — casual and peer-ish, maybe about school or shared plans.`;
+    case 'neighbor':
+      return `${posterName} is your neighbor — neighborly and pleasant, light and low-key.`;
+    case 'mentor':
+      return `${posterName} mentors you — respectful and appreciative, a touch of looking up to them.`;
     default:
       return `You only know ${posterName} a little — keep it light and friendly.`;
   }
