@@ -23,9 +23,10 @@ import {
 } from '../services/conversation-service';
 import { attemptDtr } from '../services/dtr-service';
 import { giveGiftOnDate } from '../services/gift-service';
+import { docSchema } from '../lib/openapi-schema';
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
-  app.post('/conversations', async (req, reply) => {
+  app.post('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'Create a conversation session', body: ConversationCreateSchema }) }, async (req, reply) => {
     const input = parseInput(ConversationCreateSchema, req.body);
     const session = createSession(input);
     // On a first date the character breaks the ice (best-effort; a no-op for plain
@@ -36,15 +37,15 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     return session;
   });
 
-  app.get('/conversations', async () => listSessions());
+  app.get('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'List conversation sessions' }) }, async () => listSessions());
 
-  app.get('/conversations/:id', async (req) => {
+  app.get('/conversations/:id', { schema: docSchema({ tags: ['conversations'], summary: 'Get a session with its messages' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return getSessionWithMessages(id);
   });
 
   // Non-streaming send: add player message, get a full reply.
-  app.post('/conversations/:id/messages', async (req) => {
+  app.post('/conversations/:id/messages', { schema: docSchema({ tags: ['conversations'], summary: 'Send a message and get a full reply', body: SendMessageSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { text, intent } = parseInput(SendMessageSchema, req.body);
     const playerMessage = addPlayerMessage(id, text, intent);
@@ -54,7 +55,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Streaming send via Server-Sent Events.
-  app.post('/conversations/:id/stream', async (req, reply) => {
+  app.post('/conversations/:id/stream', { schema: docSchema({ tags: ['conversations'], summary: 'Send a message, stream reply via SSE', body: SendMessageSchema }) }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const { text, intent } = parseInput(SendMessageSchema, req.body);
     const playerMessage = addPlayerMessage(id, text, intent);
@@ -200,24 +201,24 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
-  app.post('/conversations/:id/summarize', async (req) => {
+  app.post('/conversations/:id/summarize', { schema: docSchema({ tags: ['conversations'], summary: 'Summarize a conversation session' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return summarizeSession(id);
   });
 
-  app.post('/conversations/:id/end', async (req) => {
+  app.post('/conversations/:id/end', { schema: docSchema({ tags: ['conversations'], summary: 'End a conversation session' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return endSession(id);
   });
 
   // Define-the-Relationship: try to advance the commitment status.
-  app.post('/conversations/:id/dtr', async (req) => {
+  app.post('/conversations/:id/dtr', { schema: docSchema({ tags: ['conversations'], summary: 'Attempt to advance the relationship status' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return attemptDtr(id);
   });
 
   // Give a held item to your date in-session — triggers a structured gift reaction.
-  app.post('/conversations/:id/gift', async (req) => {
+  app.post('/conversations/:id/gift', { schema: docSchema({ tags: ['conversations'], summary: 'Give a held item to your date', body: GiftOnDateSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { inventoryItemId } = parseInput(GiftOnDateSchema, req.body);
     return giveGiftOnDate(id, inventoryItemId);
@@ -225,12 +226,12 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
 
   // Confirm a player-initiated breakup (the client first sees the reaction via
   // the `breakup_intent` stream event, then confirms here).
-  app.post('/conversations/:id/breakup', async (req) => {
+  app.post('/conversations/:id/breakup', { schema: docSchema({ tags: ['conversations'], summary: 'Confirm a player-initiated breakup' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return confirmPlayerBreakup(id);
   });
 
-  app.get('/conversations/:id/prompt-preview', async (req) => {
+  app.get('/conversations/:id/prompt-preview', { schema: docSchema({ tags: ['conversations'], summary: 'Preview the assembled session prompt' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return previewSessionPrompt(id);
   });

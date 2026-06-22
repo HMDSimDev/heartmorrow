@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
 import { AppDataProvider } from './state/app-context';
+import { ErrorBoundary, RouteErrorPage } from './components/ErrorBoundary';
 // Nocturne type system, bundled locally (no CDN) to keep the app offline-first.
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/hanken-grotesk';
@@ -24,15 +25,22 @@ const router = createBrowserRouter([
         <App />
       </AppDataProvider>
     ),
+    // Render errors thrown inside the route show the crash screen, not the router's
+    // default error UI.
+    errorElement: <RouteErrorPage />,
   },
 ]);
 
 createRoot(container).render(
   <React.StrictMode>
-    {/* Suspense covers the brief async load of a lazy locale-namespace chunk.
-        With no SSR there is no server HTML to mismatch, so this is safe. */}
-    <Suspense fallback={<div className="app-boot" aria-busy="true" style={{ minHeight: '100dvh' }} />}>
-      <RouterProvider router={router} />
-    </Suspense>
+    {/* The top-level boundary catches anything outside the router (provider init,
+        a failed lazy chunk, the router itself). */}
+    <ErrorBoundary>
+      {/* Suspense covers the brief async load of a lazy locale-namespace chunk.
+          With no SSR there is no server HTML to mismatch, so this is safe. */}
+      <Suspense fallback={<div className="app-boot" aria-busy="true" style={{ minHeight: '100dvh' }} />}>
+        <RouterProvider router={router} />
+      </Suspense>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

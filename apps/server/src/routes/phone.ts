@@ -25,10 +25,11 @@ import { getWorld } from '../services/world-service';
 import { featureEnabled } from '../services/world-feature-service';
 import { landlordNoticesRepo } from '../db/repositories';
 import { playerIdForWorld } from '../lib/ids';
+import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 
 export async function phoneRoutes(app: FastifyInstance): Promise<void> {
   // Badge counts for the phone home screen (scoped to the active world if given).
-  app.get('/phone/inbox', async (req) => {
+  app.get('/phone/inbox', { schema: docSchema({ tags: ['phone'], summary: 'Get phone badge counts', querystring: WorldScopedQuerySchema }) }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     const landlordUnread =
       worldId && featureEnabled(worldId, 'property')
@@ -43,76 +44,76 @@ export async function phoneRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // --- Messages ---
-  app.get('/phone/threads', async (req) => {
+  app.get('/phone/threads', { schema: docSchema({ tags: ['phone'], summary: 'List text message threads', querystring: WorldScopedQuerySchema }) }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     return listThreadSummaries(worldId);
   });
 
   // Characters the player may start a text with (only those they've dated).
-  app.get('/phone/contacts', async (req) => {
+  app.get('/phone/contacts', { schema: docSchema({ tags: ['phone'], summary: 'List contactable characters', querystring: WorldScopedQuerySchema }) }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     return listContactableCharacters(worldId);
   });
 
-  app.get('/phone/threads/:characterId', async (req) => {
+  app.get('/phone/threads/:characterId', { schema: docSchema({ tags: ['phone'], summary: 'Get a text thread with a character' }) }, async (req) => {
     const { characterId } = req.params as { characterId: string };
     return getThreadView(characterId);
   });
 
-  app.post('/phone/threads/:characterId/send', async (req) => {
+  app.post('/phone/threads/:characterId/send', { schema: docSchema({ tags: ['phone'], summary: 'Send a text to a character', body: SendTextSchema }) }, async (req) => {
     const { characterId } = req.params as { characterId: string };
     const { text, imageAssetId, giftId } = parseInput(SendTextSchema, req.body);
     // `undefined` keeps the per-world playerId resolution sendPlayerText does itself.
     return sendPlayerText(characterId, text, imageAssetId, undefined, giftId);
   });
 
-  app.post('/phone/messages/:textId/claim-gift', async (req) => {
+  app.post('/phone/messages/:textId/claim-gift', { schema: docSchema({ tags: ['phone'], summary: 'Claim a gift from a text message' }) }, async (req) => {
     const { textId } = req.params as { textId: string };
     return claimTextGift(textId);
   });
 
   // --- Email ---
-  app.get('/phone/emails', async (req) => {
+  app.get('/phone/emails', { schema: docSchema({ tags: ['phone'], summary: 'List emails', querystring: WorldScopedQuerySchema }) }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     return listEmails(worldId);
   });
 
-  app.post('/phone/emails/:id/read', async (req) => {
+  app.post('/phone/emails/:id/read', { schema: docSchema({ tags: ['phone'], summary: 'Mark an email as read' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return markEmailRead(id);
   });
 
   // --- Faces (social feed) ---
-  app.get('/phone/feed', async (req) => {
+  app.get('/phone/feed', { schema: docSchema({ tags: ['phone'], summary: 'Get the social feed', querystring: WorldScopedQuerySchema }) }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     return getFeedView(worldId ?? '');
   });
 
-  app.post('/phone/feed/posts', async (req) => {
+  app.post('/phone/feed/posts', { schema: docSchema({ tags: ['phone'], summary: 'Create a player feed post', body: CreateFeedPostSchema }) }, async (req) => {
     const input = parseInput(CreateFeedPostSchema, req.body);
     return createPlayerPost(input);
   });
 
-  app.post('/phone/feed/posts/:id/react', async (req) => {
+  app.post('/phone/feed/posts/:id/react', { schema: docSchema({ tags: ['phone'], summary: 'React to a feed post', body: FeedReactSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { kind } = parseInput(FeedReactSchema, req.body);
     return reactToPost(id, kind);
   });
 
-  app.post('/phone/feed/posts/:id/comment', async (req) => {
+  app.post('/phone/feed/posts/:id/comment', { schema: docSchema({ tags: ['phone'], summary: 'Comment on a feed post', body: FeedCommentInputSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { body } = parseInput(FeedCommentInputSchema, req.body);
     return commentOnPost(id, body);
   });
 
-  app.post('/phone/feed/seen', async (req) => {
+  app.post('/phone/feed/seen', { schema: docSchema({ tags: ['phone'], summary: 'Mark the feed as seen' }) }, async (req) => {
     const { worldId } = (req.body ?? {}) as { worldId?: string };
     if (worldId) markFeedSeen(worldId);
     return { ok: true };
   });
 
   // --- Dev/testing: force-generate today's texts + emails for a world ---
-  app.post('/phone/dev/generate', async (req) => {
+  app.post('/phone/dev/generate', { schema: docSchema({ tags: ['phone'], summary: 'Dev: force-generate daily phone content' }) }, async (req) => {
     const { worldId } = (req.body ?? {}) as { worldId?: string };
     if (!worldId) return { ok: false, error: 'worldId required' };
     getWorld(worldId); // 404 if the world doesn't exist (avoids a phantom clock row)

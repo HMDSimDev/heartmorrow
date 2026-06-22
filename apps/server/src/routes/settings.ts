@@ -5,11 +5,12 @@ import { getLlmSettings, getRedactedLlmSettings, updateLlmSettings } from '../se
 import { runHealthCheck } from '../llm/health';
 import { getAdapter } from '../llm/provider';
 import { estimatePrompts } from '../services/prompt-estimator-service';
+import { docSchema } from '../lib/openapi-schema';
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/settings', async () => getRedactedLlmSettings());
+  app.get('/settings', { schema: docSchema({ tags: ['settings'], summary: 'Get redacted LLM settings' }) }, async () => getRedactedLlmSettings());
 
-  app.patch('/settings', async (req) => {
+  app.patch('/settings', { schema: docSchema({ tags: ['settings'], summary: 'Update LLM settings', body: LlmSettingsUpdateSchema }) }, async (req) => {
     const update = parseInput(LlmSettingsUpdateSchema, req.body);
     updateLlmSettings(update);
     return getRedactedLlmSettings();
@@ -33,12 +34,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   };
 
   // Test connectivity using the current settings merged with any provided overrides.
-  app.post('/settings/test', async (req) => runHealthCheck(dryRunSettings(req.body)));
+  app.post('/settings/test', { schema: docSchema({ tags: ['settings'], summary: 'Test LLM connectivity with overrides', body: LlmSettingsUpdateSchema }) }, async (req) => runHealthCheck(dryRunSettings(req.body)));
 
   // List models from the endpoint. Accepts an optional override body (same shape
   // as the test route) so the UI can list against the values currently typed into
   // the form WITHOUT having to save them first. POST (not GET) so a body is allowed.
-  app.post('/settings/models', async (req) => {
+  app.post('/settings/models', { schema: docSchema({ tags: ['settings'], summary: 'List models from the endpoint', body: LlmSettingsUpdateSchema }) }, async (req) => {
     try {
       const models = await getAdapter(dryRunSettings(req.body)).listModels(AbortSignal.timeout(10_000));
       return { ok: true, models };
@@ -49,7 +50,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   // Build the REAL prompt for each common interaction and report its size. When
   // `live` is set, token counts are the model's exact usage.prompt_tokens.
-  app.post('/settings/prompt-estimate', async (req) => {
+  app.post('/settings/prompt-estimate', { schema: docSchema({ tags: ['settings'], summary: 'Estimate real prompt sizes', body: PromptEstimateRequestSchema }) }, async (req) => {
     const input = parseInput(PromptEstimateRequestSchema, req.body ?? {});
     return estimatePrompts(input);
   });

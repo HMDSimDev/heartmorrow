@@ -1257,6 +1257,51 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
   width: 56vw; height: 56vw; border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 201, 150, 0.08), transparent 62%);
 }
+/* --- Crash screen (top-level error boundary) ----------------------------- */
+/* Lives in styles.css (always loaded) so it renders even if a page-CSS chunk or
+   the i18n runtime is what failed. */
+.crash {
+  position: fixed; inset: 0; z-index: 1000; overflow: auto;
+  display: flex; align-items: center; justify-content: center;
+  padding: clamp(18px, 5vw, 48px); background: var(--ink, #0a0c18);
+}
+.crash-atmosphere {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% -5%, color-mix(in oklab, var(--ember, #e07a82) 16%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 12% 110%, color-mix(in oklab, var(--brass, #e6b15e) 10%, transparent), transparent 70%);
+}
+.crash-card {
+  position: relative; z-index: 1; width: 100%; max-width: 540px;
+  text-align: center; padding: clamp(24px, 5vw, 36px) clamp(20px, 4vw, 32px);
+}
+.crash-mark {
+  width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 1.9rem; font-weight: 700; line-height: 1;
+  color: var(--ember); border: 1px solid color-mix(in oklab, var(--ember) 45%, var(--border));
+  background: radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--ember) 24%, transparent), transparent 70%);
+}
+.crash-title { margin: 4px 0 14px; }
+.crash-lede { color: var(--text-dim); margin: 0 auto 12px; max-width: 46ch; }
+.crash-actions {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 22px 0 12px;
+}
+.crash-actions .btn { gap: 8px; }
+.crash-brand { width: 16px; height: 16px; flex: none; }
+.crash-reload { margin-top: 4px; }
+.crash-details { margin-top: 22px; text-align: left; }
+.crash-details summary {
+  cursor: pointer; font-family: var(--font-mono); font-size: 0.7rem;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-mute);
+}
+.crash-pre {
+  margin-top: 10px; max-height: 220px; overflow: auto; padding: 12px;
+  border-radius: var(--radius-sm); background: var(--ink-2, #0b0e1c);
+  border: 1px solid var(--border); font-family: var(--font-mono); font-size: 0.74rem;
+  line-height: 1.5; color: var(--text-dim); white-space: pre-wrap; word-break: break-word;
+}
+
 @keyframes atm-rain { to { transform: translateY(38px); } }
 @keyframes atm-snow { to { transform: translateY(240px); } }
 @keyframes atm-drift { from { transform: translateX(-3%); } to { transform: translateX(3%); } }

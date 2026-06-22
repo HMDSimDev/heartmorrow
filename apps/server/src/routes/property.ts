@@ -24,10 +24,17 @@ import { getLandlordInbox, markLandlordNoticesRead } from '../services/landlord-
 import { getWorld } from '../services/world-service';
 import { requireFeature } from '../services/world-feature-service';
 import { playerIdForWorld } from '../lib/ids';
+import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 
 export async function propertyRoutes(app: FastifyInstance): Promise<void> {
   // Player + creator view of a world's properties (ownership, active lease, affordability).
-  app.get('/properties', async (req) => {
+  app.get('/properties', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'List a world\'s properties with ownership/lease/affordability',
+      querystring: WorldScopedQuerySchema,
+    }),
+  }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     if (!worldId) throw badRequest('worldId is required.');
     requireFeature(worldId, 'property');
@@ -35,14 +42,27 @@ export async function propertyRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // --- authoring (creator) ---
-  app.post('/properties', async (req, reply) => {
+  app.post('/properties', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Create a property (creator authoring)',
+      body: PropertyCreateSchema,
+    }),
+  }, async (req, reply) => {
     const input = parseInput(PropertyCreateSchema, req.body);
     requireFeature(input.worldId, 'property');
     reply.code(201);
     return createProperty(input);
   });
 
-  app.post('/properties/generate', async (req) => {
+  app.post('/properties/generate', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Generate properties for a world via the LLM',
+      body: GeneratePropertiesInputSchema,
+      querystring: WorldScopedQuerySchema,
+    }),
+  }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     if (!worldId) throw badRequest('worldId is required.');
     requireFeature(worldId, 'property');
@@ -54,13 +74,24 @@ export async function propertyRoutes(app: FastifyInstance): Promise<void> {
     return generateProperties(input, worldId);
   });
 
-  app.patch('/properties/:id', async (req) => {
+  app.patch('/properties/:id', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Update a property (creator authoring)',
+      body: PropertyUpdateSchema,
+    }),
+  }, async (req) => {
     const { id } = req.params as { id: string };
     requireFeature(getProperty(id).worldId, 'property');
     return updateProperty(id, parseInput(PropertyUpdateSchema, req.body));
   });
 
-  app.delete('/properties/:id', async (req) => {
+  app.delete('/properties/:id', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Delete a property (creator authoring)',
+    }),
+  }, async (req) => {
     const { id } = req.params as { id: string };
     requireFeature(getProperty(id).worldId, 'property');
     deleteProperty(id);
@@ -68,45 +99,86 @@ export async function propertyRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // --- player actions ---
-  app.post('/properties/buy', async (req) => {
+  app.post('/properties/buy', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Buy a property',
+      body: PropertyActionSchema,
+    }),
+  }, async (req) => {
     const { worldId, propertyId } = parseInput(PropertyActionSchema, req.body);
     requireFeature(worldId, 'property');
     return buyProperty(worldId, propertyId);
   });
 
-  app.post('/properties/sell', async (req) => {
+  app.post('/properties/sell', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Sell an owned property',
+      body: PropertyActionSchema,
+    }),
+  }, async (req) => {
     const { worldId, propertyId } = parseInput(PropertyActionSchema, req.body);
     requireFeature(worldId, 'property');
     return sellProperty(worldId, propertyId);
   });
 
-  app.post('/properties/lease', async (req) => {
+  app.post('/properties/lease', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Lease a property',
+      body: PropertyActionSchema,
+    }),
+  }, async (req) => {
     const { worldId, propertyId } = parseInput(PropertyActionSchema, req.body);
     requireFeature(worldId, 'property');
     return leaseProperty(worldId, propertyId);
   });
 
-  app.post('/properties/pay-rent', async (req) => {
+  app.post('/properties/pay-rent', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Pay rent on a leased property',
+      body: PropertyActionSchema,
+    }),
+  }, async (req) => {
     const { worldId, propertyId } = parseInput(PropertyActionSchema, req.body);
     requireFeature(worldId, 'property');
     return payRent(worldId, propertyId);
   });
 
-  app.post('/properties/end-lease', async (req) => {
+  app.post('/properties/end-lease', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'End a lease on a leased property',
+      body: PropertyActionSchema,
+    }),
+  }, async (req) => {
     const { worldId, propertyId } = parseInput(PropertyActionSchema, req.body);
     requireFeature(worldId, 'property');
     return endLease(worldId, propertyId);
   });
 
   // --- landlord notices (the urgent "Property Management" text channel) ---
-  app.get('/properties/notices', async (req) => {
+  app.get('/properties/notices', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Get the landlord notices inbox',
+      querystring: WorldScopedQuerySchema,
+    }),
+  }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
     if (!worldId) throw badRequest('worldId is required.');
     requireFeature(worldId, 'property');
     return getLandlordInbox(worldId, playerIdForWorld(worldId));
   });
 
-  app.post('/properties/notices/read', async (req) => {
+  app.post('/properties/notices/read', {
+    schema: docSchema({
+      tags: ['property'],
+      summary: 'Mark landlord notices as read',
+    }),
+  }, async (req) => {
     const { worldId } = (req.body ?? {}) as { worldId?: string };
     if (!worldId) throw badRequest('worldId is required.');
     requireFeature(worldId, 'property');

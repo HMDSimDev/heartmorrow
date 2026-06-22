@@ -27,6 +27,8 @@ import './services/phone-bootstrap'; // registers world-clock → phone lifecycl
 
 export interface BuildAppOptions {
   logger?: boolean;
+  /** Register @fastify/swagger before routes so the docs generator can read them. */
+  withSwagger?: boolean;
 }
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
@@ -62,12 +64,33 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       reply.code(400).send({ error: 'Validation failed.', details: err.flatten() });
       return;
     }
+    // Fastify/AJV schema validation failures (from route `schema` options) —
+    // normalise to the same shape the manual parseInput() path returns.
+    const validation = (err as { validation?: unknown }).validation;
+    if (validation) {
+      reply.code(400).send({ error: 'Validation failed.', details: validation });
+      return;
+    }
     const statusCode = typeof err.statusCode === 'number' && err.statusCode >= 400 && err.statusCode < 600
       ? err.statusCode
       : 500;
     if (statusCode >= 500) req.log.error(err);
     reply.code(statusCode).send({ error: err.message || 'Internal server error.' });
   });
+
+  if (options.withSwagger) {
+    const { default: fastifySwagger } = await import('@fastify/swagger');
+    await app.register(fastifySwagger, {
+      openapi: {
+        info: {
+          title: 'DSim API',
+          description: 'Local-first LLM-powered dating simulator — HTTP API.',
+          version: '0.1.0',
+        },
+        servers: [{ url: `http://${config.host}:${config.port}` }],
+      },
+    });
+  }
 
   await app.register(
     async (api) => {

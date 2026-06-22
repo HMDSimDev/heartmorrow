@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { PACK_MIME, PackExportRequestSchema } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
+import { docSchema } from '../lib/openapi-schema';
 import { badRequest } from '../lib/errors';
 import { getCharacter } from '../services/character-service';
 import { getWorld } from '../services/world-service';
@@ -43,7 +45,7 @@ export async function packRoutes(app: FastifyInstance): Promise<void> {
   // --- export (download a share file) ---
 
   // One character -> .hmchr
-  app.get('/packs/character/:id', async (req, reply) => {
+  app.get('/packs/character/:id', { schema: docSchema({ tags: ['packs'], summary: 'Download a character as a .hmchr share file' }) }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const character = getCharacter(id); // 404s on a bad id
     return sendArchive(reply, `${slugFilename(character.name)}.hmchr`, exportCharacterPack([id]));
@@ -51,7 +53,7 @@ export async function packRoutes(app: FastifyInstance): Promise<void> {
 
   // One world -> .hmwrld. `?includeCharacters=false` ships just the world (its
   // setting, locations, and authored property/company content) WITHOUT its cast.
-  app.get('/packs/world/:id', async (req, reply) => {
+  app.get('/packs/world/:id', { schema: docSchema({ tags: ['packs'], summary: 'Download a world as a .hmwrld share file', querystring: z.object({ includeCharacters: z.string().optional() }) }) }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const { includeCharacters } = req.query as { includeCharacters?: string };
     const world = getWorld(id); // 404s on a bad id
@@ -64,7 +66,7 @@ export async function packRoutes(app: FastifyInstance): Promise<void> {
 
   // A selection (with optional title/note tweaks). The server picks the right file
   // type: one world -> .hmwrld, one loose character -> .hmchr, otherwise -> .hmpack.
-  app.post('/packs/export', async (req, reply) => {
+  app.post('/packs/export', { schema: docSchema({ tags: ['packs'], summary: 'Export a selection as a share file', body: PackExportRequestSchema }) }, async (req, reply) => {
     const { worldIds, characterIds, includeCharacters, title, note } = parseInput(
       PackExportRequestSchema,
       req.body,
@@ -89,7 +91,7 @@ export async function packRoutes(app: FastifyInstance): Promise<void> {
   // --- import ---
 
   // Read-only preview of an uploaded file (manifest + names) before committing.
-  app.post('/packs/inspect', async (req) => {
+  app.post('/packs/inspect', { schema: docSchema({ tags: ['packs'], summary: 'Preview an uploaded share file before import' }) }, async (req) => {
     const buffer = await readUploadedArchive(req);
     return inspectPack(buffer);
   });
@@ -97,7 +99,7 @@ export async function packRoutes(app: FastifyInstance): Promise<void> {
   // Import the file's content. ?targetWorldId scopes where loose characters land
   // (worlds are always created fresh). ?includeCharacters=false imports worlds only
   // (no cast / no loose people) — a standalone character file always imports.
-  app.post('/packs/import', async (req) => {
+  app.post('/packs/import', { schema: docSchema({ tags: ['packs'], summary: 'Import content from an uploaded share file', querystring: z.object({ targetWorldId: z.string().optional(), includeCharacters: z.string().optional() }) }) }, async (req) => {
     const { targetWorldId, includeCharacters } = req.query as {
       targetWorldId?: string;
       includeCharacters?: string;

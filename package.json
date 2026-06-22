@@ -12,7 +12,7 @@
     "dev": "pnpm -r --parallel run dev",
     "mock": "pnpm --filter @dsim/server run mock",
     "dev:mock": "pnpm -r --parallel run dev:mock",
-    "build": "pnpm --filter @dsim/shared run build && pnpm --filter @dsim/server run build && pnpm --filter @dsim/web run build",
+    "build": "pnpm --filter @dsim/shared run build && pnpm --filter @dsim/server run build && pnpm --filter @dsim/server run docs && pnpm --filter @dsim/web run build",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
     "seed": "pnpm --filter @dsim/server run seed",
