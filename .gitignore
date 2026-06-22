@@ -2,6 +2,9 @@
 node_modules/
 .pnpm-store/
 
+# Self-contained toolchain vendored by install.sh / install.ps1
+.runtime/
+
 # Build output
 dist/
 build/

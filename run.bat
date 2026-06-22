@@ -9,6 +9,13 @@ REM ============================================================================
 set "PROBLEMS=0"
 set "ROOT=%~dp0"
 
+REM Prefer the self-contained toolchain from install.ps1, if present, over any
+REM system Node/pnpm — so a vendored install "just runs".
+if exist "%ROOT%.runtime\node\node.exe" (
+  set "PATH=%ROOT%.runtime\node;%PATH%"
+  set "COREPACK_HOME=%ROOT%.runtime\corepack"
+)
+
 echo.
 echo ====================================================
 echo   Heartmorrow - environment preflight

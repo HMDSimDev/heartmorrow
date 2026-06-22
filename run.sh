@@ -8,6 +8,13 @@ set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROBLEMS=0
 
+# Prefer the self-contained toolchain from install.sh, if present, over any
+# system Node/pnpm — so a vendored install "just runs".
+if [ -x "$ROOT/.runtime/node/bin/node" ]; then
+  export PATH="$ROOT/.runtime/node/bin:$PATH"
+  export COREPACK_HOME="$ROOT/.runtime/corepack"
+fi
+
 # Colors (disabled if not a TTY).
 if [ -t 1 ]; then
   RED=$'\033[31m'; YEL=$'\033[33m'; GRN=$'\033[32m'; DIM=$'\033[2m'; RST=$'\033[0m'
