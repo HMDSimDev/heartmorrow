@@ -16,11 +16,23 @@ import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { genderLabel, sexualityLabel } from '../i18n/labels';
+import { SUPPORTED_LOCALES } from '../i18n/locales';
 import { Banner, Field, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { CrisisResources } from '../components/CrisisResources';
 import { ConnectionConsole, type ConnectionForm } from '../components/ConnectionConsole';
 import './settings.page.css';
+
+/** Accent presets — gem-like tints applied app-wide via the theme CSS variables.
+ *  `null` accent restores the default Rose. `nameKey` localizes the swatch name. */
+const ACCENT_PRESETS = [
+  { nameKey: 'settings.appearance.presets.rose', accent: null, accent2: null },
+  { nameKey: 'settings.appearance.presets.brass', accent: '#e6b15e', accent2: '#d98a3c' },
+  { nameKey: 'settings.appearance.presets.moonlight', accent: '#9db8de', accent2: '#6f8fd0' },
+  { nameKey: 'settings.appearance.presets.sage', accent: '#8fcf9f', accent2: '#4fa97e' },
+  { nameKey: 'settings.appearance.presets.ember', accent: '#e07a82', accent2: '#b23d52' },
+  { nameKey: 'settings.appearance.presets.plum', accent: '#b58bd6', accent2: '#e88aa6' },
+] as const;
 
 /** The endpoint-mode banner: each provider as a prominent, selectable chip with
  * a short tag and a one-line descriptor shown when it's active. Display strings
@@ -66,9 +78,11 @@ interface PlayerForm {
   personaNotes: string;
 }
 
-export function Settings() {
-  const { t } = useTranslation(['pages', 'common']);
-  const { reloadPlayer, creatorMode, setCreatorMode, activeWorldId } = useAppData();
+/** `embedded` drops the page's own header — used when the world selector renders
+ *  Settings under its own "Settings" heading, so the title isn't shown twice. */
+export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
+  const { t, i18n } = useTranslation(['pages', 'common']);
+  const { reloadPlayer, creatorMode, setCreatorMode, activeWorldId, theme, setTheme } = useAppData();
   const [player, setPlayer] = useState<PlayerForm | null>(null);
   const [playerSaved, setPlayerSaved] = useState(false);
   const [playerSaving, setPlayerSaving] = useState(false);
@@ -302,13 +316,80 @@ export function Settings() {
 
   return (
     <div className="stack set-page">
-      <div className="page-head">
-        <div className="kicker">{t('settings.head.kicker')}</div>
-        <h1>{t('settings.head.title')}</h1>
-        <p>{t('settings.head.blurb')}</p>
-      </div>
+      {!embedded && (
+        <div className="page-head">
+          <div className="kicker">{t('settings.head.kicker')}</div>
+          <h1>{t('settings.head.title')}</h1>
+          <p>{t('settings.head.blurb')}</p>
+        </div>
+      )}
       {error && <Banner kind="error">{error}</Banner>}
       {savedNote && <Banner kind="ok">{savedNote}</Banner>}
+
+      <section className="set-group">
+        <h2 className="set-group-head">{t('settings.groups.appearance')}</h2>
+
+        <div className="framed set-section">
+          <div className="section-head">
+            <div className="titles">
+              <div className="kicker">{t('settings.appearance.kicker')}</div>
+              <h2>{t('settings.appearance.head')}</h2>
+            </div>
+            <div className="trail" />
+          </div>
+          <p className="set-lede">{t('settings.appearance.lede')}</p>
+
+          <Field label={t('settings.appearance.language')} hint={t('settings.appearance.languageHint')}>
+            <select
+              value={i18n.resolvedLanguage ?? i18n.language}
+              onChange={(e) => { void i18n.changeLanguage(e.target.value); }}
+            >
+              {SUPPORTED_LOCALES.map((loc) => (
+                <option key={loc.code} value={loc.code}>{loc.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="set-accent">
+            <div className="set-col-label">{t('settings.appearance.accent')}</div>
+            <p className="hint" style={{ marginTop: 0 }}>{t('settings.appearance.accentHint')}</p>
+            <div className="set-swatches">
+              {ACCENT_PRESETS.map((p) => {
+                const active = (theme.accent ?? null) === p.accent;
+                return (
+                  <button
+                    key={p.nameKey}
+                    type="button"
+                    className={`set-swatch ${active ? 'active' : ''}`}
+                    aria-pressed={active}
+                    aria-label={t(p.nameKey)}
+                    onClick={() => setTheme({ ...theme, accent: p.accent, accent2: p.accent2 })}
+                  >
+                    <span
+                      className="set-gem"
+                      style={{
+                        background: p.accent
+                          ? `linear-gradient(135deg, ${p.accent}, ${p.accent2})`
+                          : 'linear-gradient(135deg, var(--rose), var(--brass))',
+                      }}
+                    />
+                    <span className="set-swatch-name">{t(p.nameKey)}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <label className="set-accent-custom">
+              <span>{t('settings.appearance.accentCustom')}</span>
+              {/* native color picker — a platform affordance */}
+              <input
+                type="color"
+                value={theme.accent ?? '#e88aa6'}
+                onChange={(e) => setTheme({ ...theme, accent: e.target.value, accent2: e.target.value })}
+              />
+            </label>
+          </div>
+        </div>
+      </section>
 
       <section className="set-group">
         <h2 className="set-group-head">{t('settings.groups.gameplay')}</h2>
@@ -393,7 +474,7 @@ export function Settings() {
         )}
       </div>
 
-      {player && (
+      {player && activeWorldId && (
         <div className="framed set-section">
           <div className="section-head">
             <div className="titles">

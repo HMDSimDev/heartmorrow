@@ -36,6 +36,20 @@
 
 /* Mode + adult-content toggles as a tidy choice row. */
 .set-choice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* --- Appearance: accent swatches (main page) ----------------------------- */
+/* The language select sits in a normal Field; the accent picker gets the
+   gem-swatch treatment, fenced under its own mono sub-label. */
+.set-accent { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+.set-accent .hint { margin-bottom: 12px; font-size: 0.82rem; }
+.set-accent-custom {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin-top: 14px; font-size: 0.84rem; color: var(--text-dim); cursor: pointer;
+}
+.set-accent-custom input[type="color"] {
+  width: 44px; height: 30px; padding: 0; border-radius: var(--radius-sm);
+  cursor: pointer; flex: none;
+}
 .set-status-line {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
   margin: 12px 0 0;
@@ -204,26 +218,28 @@
   padding: 13px; box-shadow: var(--shadow-sm), var(--rim);
 }
 
-/* Accent swatches — little gem chips you tap to re-tint your romance accent. */
-.pset-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 140px)); justify-content: start; gap: 9px; }
-.pset-swatch {
+/* Accent swatches — little gem chips you tap to re-tint your romance accent.
+   Shared by the phone Settings app (.pset-) and the main page Appearance group
+   (.set-) so both render identical gem chips from one source of truth. */
+.pset-swatches, .set-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 140px)); justify-content: start; gap: 9px; }
+.pset-swatch, .set-swatch {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   background: none; border: none; cursor: pointer; padding: 4px 2px;
   color: var(--text-dim); font: inherit;
 }
-.pset-gem {
+.pset-gem, .set-gem {
   width: 38px; height: 38px; border-radius: 12px;
   border: 1px solid var(--border-bright);
   box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   transition: transform 0.12s ease, box-shadow 0.2s ease;
 }
-.pset-swatch:hover .pset-gem { transform: translateY(-2px); }
-.pset-swatch:active { transform: scale(0.96); }
-.pset-swatch.active .pset-gem {
+.pset-swatch:hover .pset-gem, .set-swatch:hover .set-gem { transform: translateY(-2px); }
+.pset-swatch:active, .set-swatch:active { transform: scale(0.96); }
+.pset-swatch.active .pset-gem, .set-swatch.active .set-gem {
   box-shadow: 0 0 0 2px var(--brass), 0 0 14px rgba(230, 177, 94, 0.5);
 }
-.pset-swatch-name { font-size: 0.68rem; text-align: center; line-height: 1.2; }
-.pset-swatch.active .pset-swatch-name { color: var(--text); font-weight: 700; }
+.pset-swatch-name, .set-swatch-name { font-size: 0.68rem; text-align: center; line-height: 1.2; }
+.pset-swatch.active .pset-swatch-name, .set-swatch.active .set-swatch-name { color: var(--text); font-weight: 700; }
 
 .pset-custom {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

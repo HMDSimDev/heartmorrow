@@ -445,6 +445,11 @@
     "title": "Choose a world",
     "sub": "Each world is its own story — its own people, its own calendar, its own you. Step into one to begin, and come back here any time to switch.",
     "importFile": "Import a share file",
+    "openSettings": "Settings",
+    "settingsKicker": "Before you begin",
+    "settingsTitle": "Settings",
+    "settingsSub": "Set your language, accent, and the model endpoint Heartmorrow talks to. These apply to every world.",
+    "backToWorlds": "Back to worlds",
     "exportWorlds": "Export worlds…",
     "nSelected": "{count} selected",
     "exportN": "Export {count}…",
@@ -925,9 +930,10 @@
     "head": {
       "kicker": "The control desk",
       "title": "Settings",
-      "blurb": "Configure your model endpoint — OpenAI-compatible (LM Studio, Ollama, llama.cpp, …), LM Studio's native API, or an Anthropic-compatible one — via the Endpoint mode below. The browser never calls the model directly; the server does."
+      "blurb": "Configure various settings used by the game, including locale, appearance, and LLM endpoint and model settings."
     },
     "groups": {
+      "appearance": "Appearance",
       "gameplay": "Gameplay",
       "model": "Model & diagnostics"
     },
@@ -935,6 +941,24 @@
       "saved": "Settings saved.",
       "noModels": "Connected, but the endpoint returned no models.",
       "loadedModels": "{count, plural, one {Loaded # model — pick one in the Model field.} other {Loaded # models — pick one in the Model field.}}"
+    },
+    "appearance": {
+      "kicker": "Look & language",
+      "head": "Appearance",
+      "lede": "How Heartmorrow looks and reads — these apply across the whole app, not just your phone.",
+      "language": "Interface language",
+      "languageHint": "The language of the interface. Conversations and stories still play out in English, unless the character's profile specifically instructs them to speak another language.",
+      "accent": "Accent color",
+      "accentHint": "Tints highlights, buttons, and romance cues throughout the app.",
+      "accentCustom": "Custom tint",
+      "presets": {
+        "rose": "Rose",
+        "brass": "Brass",
+        "moonlight": "Moonlight",
+        "sage": "Sage",
+        "ember": "Ember",
+        "plum": "Plum"
+      }
     },
     "mode": {
       "kicker": "How you play",

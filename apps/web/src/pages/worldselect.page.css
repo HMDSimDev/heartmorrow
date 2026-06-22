@@ -51,6 +51,15 @@
   margin: 0 auto;
 }
 
+/* Settings, reached from the selector (before entering a world). The main
+   Settings page renders inside the lamplit frame; keep it readably narrow and
+   left-aligned, with a back-to-worlds pill above the heading. */
+.wsel-settings .wsel-head { display: flex; flex-direction: column; align-items: center; }
+.wsel-back { align-self: center; margin-bottom: 14px; }
+.wsel-settings .set-page {
+  width: 100%; max-width: 880px; margin-inline: auto; text-align: left;
+}
+
 .wsel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(310px, 100%), 1fr));

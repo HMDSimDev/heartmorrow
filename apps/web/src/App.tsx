@@ -10,7 +10,7 @@ import { Characters } from './pages/Characters';
 import { CharacterProfile } from './pages/CharacterProfile';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { WorldEditor } from './pages/WorldEditor';
-import { WorldSelector, WorldOnboarding } from './pages/WorldSelector';
+import { WorldSelector, WorldOnboarding, WorldSelectorSettings } from './pages/WorldSelector';
 import { Chat } from './pages/Chat';
 import { Shop } from './pages/Shop';
 import { Inventory } from './pages/Inventory';
@@ -70,6 +70,7 @@ export default function App() {
       <Routes>
         <Route path="/worlds" element={<WorldSelector />} />
         <Route path="/worlds/new" element={<WorldOnboarding />} />
+        <Route path="/worlds/settings" element={<WorldSelectorSettings />} />
         <Route path="*" element={<Navigate to="/worlds" replace />} />
       </Routes>
     );

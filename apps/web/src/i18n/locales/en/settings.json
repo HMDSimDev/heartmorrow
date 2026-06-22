@@ -1,24 +1,8 @@
 {
   "title": "Settings",
-  "language": {
-    "head": "Language",
-    "hint": "Interface language. Conversations and stories stay in English.",
-    "label": "Interface language"
-  },
-  "accent": {
-    "head": "Accent color",
-    "custom": "Custom tint",
-    "presets": {
-      "rose": "Rose (default)",
-      "brass": "Brass",
-      "moonlight": "Moonlight",
-      "sage": "Sage",
-      "ember": "Ember",
-      "plum": "Plum"
-    }
-  },
   "wallpaper": {
-    "head": "Wallpaper"
+    "head": "Phone wallpaper",
+    "hint": "Sets the background of your in-game phone. Language and accent color live in the main Settings menu."
   },
   "mode": {
     "head": "Mode",

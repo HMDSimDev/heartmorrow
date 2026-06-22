@@ -26,6 +26,7 @@ import { ShareImportButton, ShareExportDialog } from '../components/ShareTools';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
 import { useDraft } from '../lib/useDraft';
 import { draftKey } from '../lib/drafts';
+import { Settings } from './Settings';
 import './worldselect.page.css';
 
 /** The deliberate "which world am I playing?" landing page. Reachable at any time
@@ -106,6 +107,9 @@ export function WorldSelector() {
       <div className="wsel-share row" style={{ gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 18 }}>
         {!selecting ? (
           <>
+            <button className="btn ghost" type="button" onClick={() => navigate('/worlds/settings')}>
+              <Icon name="settings" size={16} /> {t('pages:worldSelector.openSettings')}
+            </button>
             <ShareImportButton
               targetWorldId={activeWorldId ?? null}
               onImported={onImported}
@@ -317,6 +321,29 @@ function WorldCard({
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The main Settings page, reachable from the world selector — so language,
+ *  accent, and the model endpoint can be set up BEFORE entering a world (the
+ *  in-app /settings route lives inside the world shell, which needs an active
+ *  world). Rendered full-screen in the selector's lamplit frame. */
+export function WorldSelectorSettings() {
+  const { t } = useTranslation('pages');
+  const navigate = useNavigate();
+  return (
+    <div className="wsel wsel-settings">
+      <div className="wsel-atmosphere" aria-hidden="true" />
+      <header className="wsel-head">
+        <button className="btn ghost wsel-back" type="button" onClick={() => navigate('/worlds')}>
+          <Icon name="worlds" size={16} /> {t('worldSelector.backToWorlds')}
+        </button>
+        <div className="kicker">{t('worldSelector.settingsKicker')}</div>
+        <h1 className="wsel-title">{t('worldSelector.settingsTitle')}</h1>
+        <p className="wsel-sub">{t('worldSelector.settingsSub')}</p>
+      </header>
+      <Settings embedded />
     </div>
   );
 }
