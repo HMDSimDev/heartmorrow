@@ -594,6 +594,12 @@ export async function attemptWalkout(
   );
   if (!result.ok || !result.data.walkout) return null;
 
+  // Atomically claim the session before applying the penalty/spend: the LLM await
+  // above is a yield point, so a concurrent walkout / lost-interest leave / manual
+  // end could otherwise ALSO penalize + spend for this one blow-up. If another path
+  // already ended it, bail without double-applying.
+  if (!sessionsRepo.claimEnd(sessionId)) return null;
+
   applyRelationshipChange(character.id, { ...WALKOUT_PENALTY }, { source: 'walkout', detail: { reason: result.data.reason } });
   setRelationshipFlag(character.id, 'state:offended', true, { source: 'walkout' });
   if (character.worldId) {
@@ -620,7 +626,7 @@ export async function attemptWalkout(
     }
   }
   const message = addCharacterMessage(sessionId, result.data.farewellLine.trim(), { walkout: true });
-  sessionsRepo.update(ConversationSessionSchema.parse({ ...session, ended: true, updatedAt: Date.now() }));
+  // (session already marked ended by claimEnd above)
   const walkoutDay = character.worldId ? ensureWorldState(character.worldId).day : 0;
   const walkoutEvent = recordEvent('walkout', {
     characterId: character.id,
@@ -787,6 +793,12 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
   }
   if (!line) line = `Hey — it's been a long week and I'm pretty wiped. I think I'm gonna call it a night. Take care, okay?`;
 
+  // Atomically claim the session before applying the leave penalty/spend (the line
+  // generation above is an LLM await — the yield point). A concurrent leave / walkout
+  // / manual end that already ended it loses this claim and bails, so the penalty +
+  // stamina spend land exactly once.
+  if (!sessionsRepo.claimEnd(sessionId)) return null;
+
   applyRelationshipChange(character.id, { ...RAPPORT_LEAVE_PENALTY }, { source: 'rapport', detail: { reason: 'lost_interest' } });
   // A real date occurred (rapport cratered over real turns): spend the daily action
   // + stamp last-seen like any ended date — this is the "real cost" the docstring
@@ -800,7 +812,7 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
     }
   }
   const message = addCharacterMessage(sessionId, line, { left: true });
-  sessionsRepo.update(ConversationSessionSchema.parse({ ...session, ended: true, updatedAt: Date.now() }));
+  // (session already marked ended by claimEnd above)
   clearRapport(sessionId);
   const leftEvent = recordEvent('date_left', { characterId: character.id, reason: 'lost_interest' });
   // A soft early-exit used to leave no trace either — so remember the fizzled date,
@@ -1179,29 +1191,59 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
 
   // A real date occurred: stamp "last seen" and spend a daily action (once,
   // before the session is marked ended). World-bound dates/events only.
-  if (!session.ended) {
-    const actor = getCharacter(session.characterId);
-    if (actor.worldId) {
-      stampLastDate(session.characterId, ensureWorldState(actor.worldId).day);
-      if (session.mode === 'date' || session.mode === 'event') {
-        // Funds were checked at createSession; re-check here in case the wallet was
-        // drained mid-date. A property you own or lease is FREE (the lease rent /
-        // purchase covers it); any other venue charges its full tier price.
-        const venue = resolveSessionLocation(session.locationId, actor, worldsRepo.get(actor.worldId) ?? null);
-        const propVenue = propertyVenueInfo(session.locationId, actor.worldId);
-        const cost = propVenue ? 0 : venueCost(venue?.priceTier);
-        const pid = playerIdForWorld(actor.worldId);
-        // Refuse to end the date if it can no longer be paid (mirrors the createSession
-        // gate), BEFORE spending stamina — rather than silently discounting the venue to
-        // whatever's left. The session stays open, so it's re-endable once funds return.
-        if (cost > 0 && getOrCreatePlayer(pid).money < cost) {
-          throw badRequest(
-            `You can no longer afford ${venue?.name ?? 'this venue'} (it costs ${cost}, you have ${getOrCreatePlayer(pid).money}). Settle up before ending the date.`,
-          );
-        }
-        spendStamina(actor.worldId);
-        if (cost > 0) spendMoney(cost, pid);
-      }
+  const endActor = getCharacter(session.characterId);
+
+  // Read-only affordability gate FIRST (no mutation, no claim): funds were checked
+  // at createSession; re-check here in case the wallet was drained mid-date. A
+  // property you own or lease is FREE (the lease rent / purchase covers it); any
+  // other venue charges its full tier price. Refusing here — BEFORE we claim/end
+  // the session — keeps it OPEN and re-endable once funds return, rather than
+  // ending it then bouncing the charge.
+  let pendingCharge: { worldId: string; cost: number; pid: string } | null = null;
+  if (endActor.worldId && (session.mode === 'date' || session.mode === 'event')) {
+    const venue = resolveSessionLocation(session.locationId, endActor, worldsRepo.get(endActor.worldId) ?? null);
+    const propVenue = propertyVenueInfo(session.locationId, endActor.worldId);
+    const cost = propVenue ? 0 : venueCost(venue?.priceTier);
+    const pid = playerIdForWorld(endActor.worldId);
+    if (cost > 0 && getOrCreatePlayer(pid).money < cost) {
+      throw badRequest(
+        `You can no longer afford ${venue?.name ?? 'this venue'} (it costs ${cost}, you have ${getOrCreatePlayer(pid).money}). Settle up before ending the date.`,
+      );
+    }
+    pendingCharge = { worldId: endActor.worldId, cost, pid };
+  }
+
+  // Atomically claim the session BEFORE the (multi-second) evaluator await below.
+  // Without this, two concurrent end requests (double-click, retry on a slow eval,
+  // or an auto-end racing a manual end) would BOTH pass the `session.ended` guard
+  // above, BOTH spend money/stamina, and BOTH apply the evaluation. claimEnd flips
+  // ended 0->1 in one statement; a request that loses the claim bails here.
+  if (!sessionsRepo.claimEnd(session.id)) {
+    clearRapport(sessionId);
+    return {
+      session: { ...session, ended: true },
+      evaluated: false,
+      relationship: null,
+      mood: null,
+      expression: null,
+      summaryLine: null,
+      memoriesWritten: 0,
+      evalError: 'This date has already ended.',
+      jealousy: null,
+      milestone: null,
+      breakup: null,
+      onTheRocks: false,
+      reconciled: false,
+      ending: null,
+    };
+  }
+
+  // Claimed: commit the one-time end costs (runs exactly once per session).
+  if (endActor.worldId) {
+    stampLastDate(session.characterId, ensureWorldState(endActor.worldId).day);
+    if (pendingCharge) {
+      spendStamina(pendingCharge.worldId);
+      if (pendingCharge.cost > 0) spendMoney(pendingCharge.cost, pendingCharge.pid);
     }
   }
 

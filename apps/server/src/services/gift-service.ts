@@ -13,6 +13,7 @@ import {
   type ShopItem,
 } from '@dsim/shared';
 import { inventoryRepo, messagesRepo, sessionsRepo } from '../db/repositories';
+import { getDb } from '../db/index';
 import { badRequest, notFound } from '../lib/errors';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { getCharacter } from './character-service';
@@ -120,50 +121,61 @@ export async function reactToGift(args: {
     if (v !== 0) applied[key] = v;
   }
 
-  let relAfter = relationship;
-  if (Object.keys(applied).length > 0) {
-    relAfter = applyRelationshipChange(characterId, applied, { source: 'gift', detail: { itemId: item.id, scene } });
-  }
-  setRelationshipFlag(characterId, 'gift:day', day, { source: 'gift' });
-  setRelationshipFlag(characterId, 'gift:count', giftsToday + 1, { source: 'gift' });
+  // Commit atomically, consuming the item FIRST. Consuming up front means a
+  // concurrent gift of the same last unit — or any later failure in this block —
+  // rolls back ALL deltas instead of crediting warmth + a keepsake for an item that
+  // was never actually given. (The LLM await above is the yield point; two requests
+  // both passed the quantity guard on the pre-await snapshot.) Mirrors
+  // shop-service.useItem: consume-then-apply, one transaction.
+  return getDb().transaction<ReactToGiftResult>(() => {
+    // Re-validates ownership + quantity > 0 and decrements; THROWS (rolling the
+    // transaction back) if the unit is already gone — the double-spend guard.
+    const inventoryItem = consumeInventoryItem(inventoryItemId, playerId);
 
-  const event = recordEvent('gift_given', {
-    characterId,
-    itemId: item.id,
-    itemName: item.name,
-    scene,
-    day,
-    deltas: applied,
-    expression: reaction.expression,
-  });
+    let relAfter = relationship;
+    if (Object.keys(applied).length > 0) {
+      relAfter = applyRelationshipChange(characterId, applied, { source: 'gift', detail: { itemId: item.id, scene } });
+    }
+    setRelationshipFlag(characterId, 'gift:day', day, { source: 'gift' });
+    setRelationshipFlag(characterId, 'gift:count', giftsToday + 1, { source: 'gift' });
 
-  let memoryWritten = false;
-  if (reaction.memory) {
-    addMemoriesFromEvaluation(characterId, [reaction.memory], event.id);
-    memoryWritten = true;
-  }
-  try {
-    appendChronicleLine(
+    const event = recordEvent('gift_given', {
       characterId,
+      itemId: item.id,
+      itemName: item.name,
+      scene,
       day,
-      scene === 'date' ? 'date' : 'chat',
-      `🎁 ${reaction.memory?.text ?? `${playerName} gave me ${item.name}.`}`,
-      { bumpSession: false },
-    );
-  } catch {
-    /* chronicle is best-effort; never block the gift */
-  }
+      deltas: applied,
+      expression: reaction.expression,
+    });
 
-  const inventoryItem = consumeInventoryItem(inventoryItemId, playerId);
-  return {
-    reaction,
-    appliedDeltas: applied,
-    sentiment: giftSentiment(applied),
-    relationship: relAfter,
-    item,
-    inventoryItem,
-    memoryWritten,
-  };
+    let memoryWritten = false;
+    if (reaction.memory) {
+      addMemoriesFromEvaluation(characterId, [reaction.memory], event.id);
+      memoryWritten = true;
+    }
+    try {
+      appendChronicleLine(
+        characterId,
+        day,
+        scene === 'date' ? 'date' : 'chat',
+        `🎁 ${reaction.memory?.text ?? `${playerName} gave me ${item.name}.`}`,
+        { bumpSession: false },
+      );
+    } catch {
+      /* chronicle is best-effort; never block the gift */
+    }
+
+    return {
+      reaction,
+      appliedDeltas: applied,
+      sentiment: giftSentiment(applied),
+      relationship: relAfter,
+      item,
+      inventoryItem,
+      memoryWritten,
+    };
+  });
 }
 
 /**

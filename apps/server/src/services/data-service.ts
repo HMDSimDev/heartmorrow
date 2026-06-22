@@ -42,7 +42,6 @@ import {
   marketNewsRepo,
   gamblingRoundsRepo,
 } from '../db/repositories';
-import { getOrCreatePlayer } from './player-service';
 import { recordEvent } from './event-service';
 import { ensureDayRecords } from './day-record-service';
 
@@ -74,10 +73,14 @@ export function exportAll(opts: { kind?: 'authoring' | 'savegame' } = {}): Expor
       .filter((r): r is NonNullable<typeof r> => Boolean(r)),
     conversationSessions,
     messages: conversationSessions.flatMap((s) => messagesRepo.listBySession(s.id)),
-    players: [getOrCreatePlayer()],
+    // Wallets/personas AND inventory are keyed PER WORLD (player:<worldId>) after the
+    // player-identity migration, so export EVERY row — exporting only the legacy
+    // DEFAULT_PLAYER_ID captured an empty default and made an import wipe every
+    // world's money + items. (Relationships/emails/threads stay on DEFAULT_PLAYER_ID.)
+    players: playersRepo.list(),
     assets: assetsRepo.list(),
     shopItems: shopItemsRepo.list(),
-    inventory: inventoryRepo.listAllByPlayer(DEFAULT_PLAYER_ID),
+    inventory: inventoryRepo.list(),
     minigameResults: minigameResultsRepo.list(),
     events: eventsRepo.list(1000),
     worldStates: worlds.map((w) => worldStatesRepo.get(w.id)).filter((s): s is NonNullable<typeof s> => Boolean(s)),

@@ -34,14 +34,33 @@ const ACCEPT_MEMORY: Record<RelationshipStatus, string> = {
   cohabiting: 'We decided to move in together.',
 };
 
+/** DTR attempts in flight, keyed by sessionId (= the POST /conversations/:id/dtr
+ *  path id). A second concurrent attempt on the same date — a double-click, or a
+ *  retry across the LLM await — is rejected so the accept branch can't double-apply
+ *  the commitment deltas, milestone memory, and social vouch. */
+const dtrInFlight = new Set<string>();
+
 /**
  * Attempt to advance the relationship status (the DTR ladder). Mirrors the
  * walkout/jealousy pattern: gate (rung unlocked + cooldown) → structured judge →
  * SERVER applies all deltas/flags. Accept advances `status`; deflect just sets a
  * cooldown; backfire stings (tension) and ends a date. Fails safe (no mutation)
- * if the structured call fails.
+ * if the structured call fails. Serialized per session (in-flight lock) so a
+ * double-fire across the LLM await can't double-commit.
  */
 export async function attemptDtr(sessionId: string, signal?: AbortSignal): Promise<DtrResponse> {
+  if (dtrInFlight.has(sessionId)) {
+    throw badRequest('Hang on — that question is still landing.');
+  }
+  dtrInFlight.add(sessionId);
+  try {
+    return await attemptDtrInner(sessionId, signal);
+  } finally {
+    dtrInFlight.delete(sessionId);
+  }
+}
+
+async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise<DtrResponse> {
   const session = sessionsRepo.get(sessionId);
   if (!session) throw notFound(`Session ${sessionId} not found.`);
   if (session.ended) throw badRequest('This date has already ended.');

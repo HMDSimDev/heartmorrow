@@ -75,4 +75,26 @@ describe('define-the-relationship', () => {
     setAdapterOverride(reply({ decision: 'accept', line: 'sure', reason: '' }));
     await expect(attemptDtr(session.id)).rejects.toThrow(/too soon|closer/i);
   });
+
+  it('a concurrent second DTR is rejected so the accept commits exactly once', async () => {
+    // Regression: cooldown + rung were read from the pre-await snapshot, so two
+    // overlapping attempts both ran the accept branch (double deltas, two milestone
+    // memories, double social vouch). The per-session in-flight lock rejects the
+    // second.
+    const { character } = seedWorldAndCharacter();
+    makeWarm(character.id, 50);
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    addPlayerMessage(session.id, 'I want to ask you something.');
+    const a0 = getRelationship(character.id).affection;
+    setAdapterOverride(reply({ decision: 'accept', line: "Yes — let's.", reason: 'ready' }));
+
+    const results = await Promise.allSettled([attemptDtr(session.id), attemptDtr(session.id)]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    // accept applied once: +5 affection, status dating, a single milestone memory.
+    expect(getRelationship(character.id).affection).toBe(a0 + 5);
+    expect(getRelationship(character.id).flags['status']).toBe('dating');
+    expect(listMemories(character.id).filter((m) => m.tags.includes('milestone'))).toHaveLength(1);
+  });
 });

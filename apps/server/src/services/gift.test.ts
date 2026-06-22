@@ -110,4 +110,35 @@ describe('gift reactions (on a date)', () => {
     const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
     await expect(giveGiftOnDate(session.id, inv.id)).rejects.toThrow(/gift/i);
   });
+
+  it('a concurrent double-gift of the LAST unit applies warmth + keepsake exactly once', async () => {
+    // Regression: deltas used to be applied BEFORE consuming the item, so two
+    // overlapping gifts of a quantity-1 item both credited warmth before the second
+    // consume failed. Now we consume-first inside a transaction, so the loser rolls
+    // back entirely.
+    const { world, character } = seedWorldAndCharacter();
+    const gift = createShopItem(item({ name: 'Single Rose' }));
+    const inv = grantItem(gift.id, 1, playerIdForWorld(world.id)).inventoryItem;
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    const before = getRelationship(character.id).affection;
+    setAdapterOverride(
+      reply({
+        expression: 'happy',
+        line: 'A rose — lovely!',
+        relationshipDeltas: { affection: 6 },
+        memory: { text: 'They gave me a single rose.', importance: 3, tags: ['gift'] },
+      }),
+    );
+
+    const results = await Promise.allSettled([
+      giveGiftOnDate(session.id, inv.id),
+      giveGiftOnDate(session.id, inv.id),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(1);
+    expect(getRelationship(character.id).affection).toBe(before + 6); // credited ONCE
+    expect(inventoryRepo.get(inv.id)?.quantity).toBe(0); // consumed once, never negative
+    expect(listMemories(character.id).filter((m) => m.tags.includes('gift'))).toHaveLength(1);
+  });
 });

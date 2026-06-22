@@ -389,6 +389,12 @@ export const playersRepo = {
     const r = getDb().get<Row>('SELECT * FROM players WHERE id = ?', id);
     return r ? rowToPlayer(r) : undefined;
   },
+  /** Every player row. Money/persona live under PER-WORLD ids (player:<worldId>),
+   *  so a faithful savegame export MUST enumerate all of them, not just the legacy
+   *  default. */
+  list(): PlayerProfile[] {
+    return getDb().all<Row>('SELECT * FROM players ORDER BY created_at').map(rowToPlayer);
+  },
   insert(p: PlayerProfile): PlayerProfile {
     getDb().run(
       `INSERT INTO players (id,name,pronouns,gender,sexuality,persona_notes,money,career,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)`,
@@ -492,6 +498,23 @@ export const sessionsRepo = {
       s.locationId, s.mode, s.summary, boolToInt(s.ended), s.updatedAt, s.id,
     );
     return s;
+  },
+  /**
+   * Atomically mark a session ended, but ONLY if it wasn't already. Returns true
+   * iff THIS call flipped it (so the caller may apply its one-time end effects —
+   * stamina/money spend, evaluation deltas, walkout penalty), false if it was
+   * already ended/gone. The single conditional UPDATE is the concurrency guard for
+   * endSession / attemptWalkout / maybeLeaveForLostInterest racing across an LLM
+   * await (two end-requests, a walkout racing a manual end, etc.).
+   */
+  claimEnd(id: string): boolean {
+    return (
+      getDb().run(
+        'UPDATE conversation_sessions SET ended = 1, updated_at = ? WHERE id = ? AND ended = 0',
+        Date.now(),
+        id,
+      ).changes === 1
+    );
   },
   delete(id: string): void {
     getDb().run('DELETE FROM conversation_sessions WHERE id = ?', id);
@@ -608,6 +631,12 @@ export const inventoryRepo = {
     return getDb()
       .all<Row>('SELECT * FROM inventory_items WHERE player_id = ? ORDER BY acquired_at DESC', playerId)
       .map(rowToInventory);
+  },
+  /** Every inventory row across ALL players, including quantity-0. Inventory is
+   *  keyed per-world (player:<worldId>), so a faithful savegame export needs them
+   *  all, not just the legacy default player's. */
+  list(): InventoryItem[] {
+    return getDb().all<Row>('SELECT * FROM inventory_items ORDER BY acquired_at DESC').map(rowToInventory);
   },
   getByPlayerAndItem(playerId: string, shopItemId: string): InventoryItem | undefined {
     const r = getDb().get<Row>(
