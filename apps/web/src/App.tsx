@@ -17,6 +17,7 @@ import { Inventory } from './pages/Inventory';
 import { Minigames } from './pages/Minigames';
 import { Phone } from './pages/Phone';
 import { Settings } from './pages/Settings';
+import { Help } from './pages/Help';
 import { Bench } from './pages/Bench';
 import { PromptEditor } from './pages/PromptEditor';
 import { Debug } from './pages/Debug';
@@ -25,13 +26,17 @@ import { Debug } from './pages/Debug';
 // sidebar always shows the full `labelKey`. Only set it where the full label is
 // long enough to risk overflowing an evenly-flexed bottom-nav cell.
 type CommonKey = ParseKeys<'common'>;
-const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonKey; end?: boolean; creatorOnly?: boolean }[] = [
+// `hideOnBottomNav` keeps an item out of the cramped mobile bottom bar (which must
+// stay fully on-screen, no scroll) while still showing it in the roomy sidebar.
+// Help lives there: desktop gets a permanent tab; mobile reaches it via Settings.
+const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonKey; end?: boolean; creatorOnly?: boolean; hideOnBottomNav?: boolean }[] = [
   { to: '/', icon: 'home', labelKey: 'nav.home', end: true },
   { to: '/characters', icon: 'people', labelKey: 'nav.people' },
   { to: '/world', icon: 'chronicle', labelKey: 'nav.world', creatorOnly: true },
   { to: '/chat', icon: 'date', labelKey: 'nav.date' },
   { to: '/phone', icon: 'phone', labelKey: 'nav.phone' },
   { to: '/settings', icon: 'settings', labelKey: 'nav.settings' },
+  { to: '/help', icon: 'info', labelKey: 'nav.help', hideOnBottomNav: true },
   { to: '/worlds', icon: 'worlds', labelKey: 'nav.switchWorld', shortKey: 'nav.worldsShort' },
   { to: '/debug', icon: 'debug', labelKey: 'nav.debug', creatorOnly: true },
 ];
@@ -47,6 +52,7 @@ function routeKey(path: string): string {
   if (path.startsWith('/inventory')) return 'bag';
   if (path.startsWith('/minigames')) return 'games';
   if (path.startsWith('/settings')) return 'settings';
+  if (path.startsWith('/help')) return 'settings';
   if (path.startsWith('/bench')) return 'settings';
   if (path.startsWith('/prompts')) return 'settings';
   if (path.startsWith('/world')) return 'world';
@@ -143,6 +149,7 @@ export default function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/minigames" element={<Minigames />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/help" element={<Help />} />
           <Route path="/bench" element={<Bench />} />
           <Route path="/prompts" element={<PromptEditor />} />
           <Route path="/debug" element={<CreatorRoute><Debug /></CreatorRoute>} />
@@ -151,7 +158,7 @@ export default function App() {
       </main>
 
       <nav className="bottomnav">
-        {nav.map((n) => (
+        {nav.filter((n) => !n.hideOnBottomNav).map((n) => (
           <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => (isActive ? 'active' : '')}>
             <span className="ico"><Icon name={n.icon} size={20} /></span>
             {t(n.shortKey ?? n.labelKey)}

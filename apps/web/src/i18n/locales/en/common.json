@@ -127,6 +127,7 @@
     "date": "Date",
     "phone": "Phone",
     "settings": "Settings",
+    "help": "Help",
     "switchWorld": "Switch world",
     "worldsShort": "Worlds",
     "debug": "Debug"

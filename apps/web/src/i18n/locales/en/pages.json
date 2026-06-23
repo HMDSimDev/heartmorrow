@@ -1215,6 +1215,477 @@
       "defaultPanelLabel": "Shipped default (read-only)",
       "selectHint": "Select a prompt to edit.",
       "backToSettings": "Back to Settings"
+    },
+    "help": {
+      "kicker": "New here?",
+      "head": "How to play",
+      "blurb": "A field guide to dating, scoring, your phone, money, and building worlds — everything Heartmorrow can do, explained.",
+      "open": "Open"
+    }
+  },
+  "help": {
+    "head": {
+      "kicker": "Field guide",
+      "title": "How to play",
+      "blurb": "Everything you need to play Heartmorrow well — from your first date to building a world of your own. Pick a topic to dive in."
+    },
+    "nav": {
+      "topics": "Topics"
+    },
+    "topicOf": "Topic {n} of {total}",
+    "cats": {
+      "getting-started": {
+        "label": "Getting started",
+        "title": "Getting started",
+        "overview": "Heartmorrow is a single-player dating sim you run on your own machine. You pick a world, meet the people who live there, and grow relationships by going on dates, texting, and calling them on an in-game phone. Before any of that works you connect a language model in Settings, because the model is what brings every character to life. Each in-game day gives you a small pool of energy to spend; when it runs out, you sleep to begin the next day.",
+        "sections": [
+          {
+            "heading": "Connect a model first",
+            "body": [
+              "Heartmorrow has no brain of its own. Every character's words come from a language model that you point it at, so until you connect one, dates and texts won't generate. This is the very first thing to set up. Open Settings (you can reach it straight from the world picker, before you even enter a world) and find the connection panel.",
+              "You have two broad choices. You can run a model locally on your own computer with something like LM Studio or Ollama, which is free and keeps everything on your machine. Or you can connect to a hosted service by choosing that provider and pasting in its API key.",
+              "Whichever you pick, use the Test button to confirm Heartmorrow can reach the model. A green result means you're connected and ready. From there, just enter a world and start playing."
+            ],
+            "bullets": [
+              "OpenAI-compatible: works with LM Studio, Ollama, llama.cpp, vLLM, and similar local servers. Point the Base URL at your own server.",
+              "LM Studio: its own native connection, with richer model details and per-response speed stats.",
+              "Anthropic: a hosted service that needs an API key.",
+              "Local models usually need no key; hosted services do.",
+              "There's a separate option for generating character portraits, but it's optional and not needed to play."
+            ]
+          },
+          {
+            "heading": "Pick a world",
+            "body": [
+              "Everything in Heartmorrow happens inside a world, each with its own setting, its own cast, its own calendar, and its own save. The world picker is your home base: every card shows the world's name, what day it's on, and how many people live there. Press Enter to step inside, or Continue if it's the world you were last in.",
+              "People belong to the world they live in, so the characters you meet, date, and text are the cast of that particular world. Switching worlds really means switching saves: your relationships, money, and progress in one world stay separate from the next.",
+              "Starting fresh? Use \"Start a new world\" for a short, four-step guided setup. You'll name the place and set its tone, create your own persona (the version of you the characters get to know), optionally bring people over from your other worlds, and read a quick how-to before you begin on Day 1."
+            ]
+          },
+          {
+            "heading": "The daily loop",
+            "body": [
+              "A day in Heartmorrow is a small, deliberate budget of energy. Going on a date or playing a minigame each spends one point, and you start each day with three. Spend them however you like: one big date, a few lighter activities, or a mix. Weekend days give you one extra point, for four.",
+              "As you spend energy, the clock visibly moves through the day, from morning to afternoon to evening, and finally to night once your energy is gone. Texting and calling people on your phone are always available, with no energy cost, so you can keep in touch between the bigger moments.",
+              "When you're ready to move on, press the day button in the status bar. It reads \"End day\" while you still have energy and \"Sleep\" once you've spent it all; either way it carries you into the next morning, refills your energy, and shows a short recap of how the day went and what happened around town. One catch: you can't end the day in the middle of an active date, so wrap up or leave the date first."
+            ],
+            "bullets": [
+              "Meet the people in your world and start a date with someone.",
+              "Text or call anyone, anytime, from the phone, at no energy cost.",
+              "Spend your daily energy on dates and activities.",
+              "End the day to advance to the next morning and refresh your energy."
+            ]
+          },
+          {
+            "heading": "Money: you earn it",
+            "body": [
+              "You begin with nothing in your pocket. There's no allowance and no daily handout. Money is something you earn by working shifts and playing for it, and it funds gifts, nicer date venues, and other extras down the line.",
+              "Because there's no free income, an empty wallet at the start is completely normal. Pick up some work, build a little cash, and spend it where it counts. (If you take up investing, stock dividends are the one form of passive income, but everything else is earned.) Jobs and spending get their own Help section."
+            ]
+          },
+          {
+            "heading": "Reading the status bar",
+            "body": [
+              "A compact status bar keeps the essentials in view at all times: which world you're in, the current day and time of day, the in-world weekday and season, your remaining energy (shown as little pips alongside a count), and your cash on hand.",
+              "The same bar holds the day button. While you still have energy it reads \"End day\"; once your energy reaches zero it becomes \"Sleep.\" Pressing it either way carries you into the next morning."
+            ]
+          }
+        ]
+      },
+      "dates": {
+        "label": "Going on dates",
+        "title": "Going on dates",
+        "overview": "A date is a real-time, free-form conversation with one of your characters. You set it up on the Date tab (who, where, and whether they're free), then talk by typing messages and reading their live replies. A trajectory bar shows whether the evening is warming up or cooling off, and how the night goes shapes where your relationship stands afterward.",
+        "sections": [
+          {
+            "heading": "Setting up a date",
+            "body": [
+              "Open the Date tab and tap \"Plan a date.\" Pick who you're seeing, then choose where to go. Each person shows whether they're free today; if someone is busy, their card is greyed out and you'll see why, so try them another day or text them instead.",
+              "For the place, the simplest choice is \"Anywhere\" — the game quietly puts you at the first free public spot in town, or the cheapest place you can afford if nothing's free. You can also pick a specific venue (some cost money), a property you own or lease (free to use), or, once you're getting close, their private room. You only pay a paid venue's cost when the date actually ends, so backing out early never costs you a coin.",
+              "Press \"Begin\" to start. On a first date the character breaks the ice and greets you; on a repeat date you'll get a short scene-setting beat describing where they are, and it's your turn to open."
+            ],
+            "bullets": [
+              "Free venues always exist, so you're never blocked from dating by money.",
+              "If someone is shown as unavailable, you can't take them out that day.",
+              "A paid venue is charged at the end of the date, not the start."
+            ]
+          },
+          {
+            "heading": "Talking, live",
+            "body": [
+              "A date is a back-and-forth conversation. Type whatever you want in the box and send it; the character types back in real time, with a typing indicator while they think and a portrait whose expression shifts to match their mood. There are no scripted choices — say anything, in your own words.",
+              "Above the box are optional intent chips that frame how a line is meant: Flirt, Tease, and Open Up are always there, and Reassure and Apologize appear when there's tension to smooth over. They're never required, and they don't move anything by themselves — they just tell the character how you meant a message to land, and a move that fits the moment reads better than one that doesn't."
+            ]
+          },
+          {
+            "heading": "Reading the vibe",
+            "body": [
+              "Above the conversation sits a live trajectory bar. It starts in the middle (neutral) and, after your messages, glides toward \"warming\" on the right when a line lands well or toward \"cooling\" on the left when it falls flat, with a little +N or −N flourish and a one-word read like \"warming to you\" or \"a bit awkward.\" The bar never shows numbers — just the feel of the moment.",
+              "Two biases are worth knowing. Warmth is harder to build than to lose, and you can't coast: a forgettable, going-nowhere message nudges the vibe down a touch even when it isn't bad. Reserved, guarded people also open cooler and warm more slowly, so they take real effort to win over.",
+              "How the night ends up shapes the aftermath. A genuinely great date boosts your bond; a flat or sour one costs you ground and adds tension — and repeated bad nights can put a committed relationship on the rocks."
+            ]
+          },
+          {
+            "heading": "When a date ends early",
+            "body": [
+              "Push too hard and the date can end before you're ready. If you're hostile or cruel — or come on crudely with someone you're not close to — the character may walk out, ending the evening on a sour note (and they'll remember it). It's rare, and it only happens for genuinely over-the-line behavior.",
+              "Separately, if the vibe craters all the way down, the character quietly loses interest and makes a polite excuse to call it a night. It's not an explosion — just a date that fizzled. Either way the evening is still scored in full, so an early exit still affects your standing and still spends your energy.",
+              "You can also wind a date down yourself just by saying so in the conversation (\"I should get going,\" \"good night\") — the character gives a natural goodbye and the date wraps up and is scored, no button needed."
+            ]
+          },
+          {
+            "heading": "Defining the relationship",
+            "body": [
+              "Once you've grown close enough, a button to define the relationship appears in the date sidebar — labeled for the next step you've unlocked: \"Ask them out,\" then \"Become exclusive,\" then \"Move in together.\" It only shows up after you've actually said something on the date and only when you're warm enough for that step.",
+              "Asking is a real moment: they might say yes (a milestone), gently deflect, or — if it's badly timed — be put off, which spikes tension and can even end the date. After any attempt they'll want a few days before you bring it up again, so pick your moment."
+            ]
+          },
+          {
+            "heading": "Ending, energy, and resuming",
+            "body": [
+              "When you're done, use \"End & evaluate\" in the sidebar. The game reads back over the whole conversation and settles the night: your relationship shifts, the character forms memories, and you'll see a recap of how it went.",
+              "A date only counts if you actually said something. If you start one and leave without sending a single message, you can back out with \"Cancel date\" — it's discarded for free, with no energy spent and nothing remembered. A real, finished date costs one of your daily actions (your energy). You normally have 3 actions a day, with an extra one on weekends, and dates share that pool with work and minigames; sleep to refresh it.",
+              "You can only have one date going at a time, and it's held for you. If you navigate away or refresh, the date isn't lost — return to the Date tab and it picks up right where you left off, vibe and all. While a date is underway, day-advancing actions like Sleep are locked until you finish it."
+            ],
+            "bullets": [
+              "Start a date but say nothing → \"Cancel date\" throws it out at no cost.",
+              "Finish a real date → costs 1 energy and is fully scored.",
+              "Leaving the tab mid-date is safe; it resumes when you come back."
+            ]
+          }
+        ]
+      },
+      "evaluation": {
+        "label": "How scoring works",
+        "title": "How dates are judged",
+        "overview": "Every date is judged on two separate layers. While you talk, a live read of the conversation warms or cools the vibe turn by turn, based on how engaged and kind each message is. Then, when the date ends, a second and completely separate judge looks back over the whole evening and adjusts your relationship for the moments that actually mattered, the real connection you made or the lines you crossed. Good dates lift your relationship, flat ones mostly leave it where it was, and genuinely bad ones set you back.",
+        "sections": [
+          {
+            "heading": "The live read: every message warms or cools the vibe",
+            "body": [
+              "While you are on a date, each message you send is read on its own for how it lands with this person right now, how engaged, warm, attentive, and genuine it is. A message that truly connects warms the vibe, a low-effort or self-absorbed one cools it, and an outright cruel or hostile line cools it hard.",
+              "There is no coasting. A flat, forgettable turn, a one-liner, a shrug, a quick \"haha nice\", does not hold the vibe steady. It quietly drifts it down. Effort is the bar: to keep a date warming, you have to keep actually showing up in what you say.",
+              "Warmth is harder to build than to lose. A good moment nudges the vibe up, but a bad one pulls it down by more, so one cold or careless message can undo a couple of nice ones. You can always feel where you stand from the live read on the date screen, which shows a mood like \"warming to you,\" \"a bit awkward,\" or \"cooling off\" rather than a number."
+            ]
+          },
+          {
+            "heading": "Let the vibe cool too far and they leave",
+            "body": [
+              "The vibe starts near the middle of its range. A date is something to earn up from neutral, not a full meter you slowly spend down. From there, every message moves it.",
+              "If you let it crater, the date is over. Once the vibe bottoms out, the read shows them \"losing interest,\" and on your next message they get up and leave. Being walked out on this way is a real setback to the relationship, so it is worth reading the room before things sink that low."
+            ]
+          },
+          {
+            "heading": "Guarded characters: slow to warm, just as quick to cool",
+            "body": [
+              "Some people are guarded, reserved and slow to open up, and they make you earn their warmth. A guarded character starts the date a little cooler than usual, and your good moves warm them up more slowly. You have to genuinely impress them to climb.",
+              "The slowness is only on the way up. Guarded people cool at full speed like anyone else, so a careless turn costs them just as much. That makes them easy to lose and hard to win, which means patience, attentiveness, and not rushing things matter most with them. You will not see a number, but a reserved person is meant to feel harder to delight."
+            ]
+          },
+          {
+            "heading": "The end-of-date judge: the moments that stick",
+            "body": [
+              "When the date ends, a separate judge looks back over the whole evening and adjusts your relationship for the specific, memorable beats, the things this person would actually carry with them. This is the part that genuinely moves a relationship forward or back.",
+              "It rewards real connection: a moment of honesty or vulnerability, truly meeting who this character is, or reading what they quietly hoped for that night. Those nudge the warmth between you upward. It penalizes what actually wounds or repels them: hitting a known dislike, crossing a stated boundary, coldness, pushiness, or cruelty. Those cool the relationship and add tension. Staying politely worded while doing something hurtful does not earn it back, the judge sees the hurt, not the manners.",
+              "One important thing: the end judge does not punish a date again just for being boring. Dullness was already handled by the live read during the date. So a merely flat, unremarkable night mostly just does not move the needle, while a warm, attentive one is actively rewarded. A single date rarely swings any one part of your relationship by more than a handful of points."
+            ]
+          },
+          {
+            "heading": "Dates can lose you ground, so earn them",
+            "body": [
+              "Both layers count, and both can be negative. A flat or hostile night cools the live vibe and can also draw a setback from the end judge, so a relationship can genuinely lose ground. You cannot trivially max someone out by spamming dates, effort is the price of progress, and a careless or cruel date will cost you.",
+              "The flip side is the reward: a warm, attentive, well-read date pays off twice. A warm vibe and a positive end-of-date read both push the relationship forward. Aim for genuine effort and you will feel it move."
+            ]
+          },
+          {
+            "heading": "The model you connect shapes how sharp the judging feels",
+            "body": [
+              "Both judges are run by the AI model you connect in Settings. A stronger, more capable model reads nuance more reliably. It is better at telling genuine warmth from filler, noticing when you hit a dislike or quietly nail what someone wanted, and scoring honestly in both directions.",
+              "A weaker model can be blunter or less consistent. If the judging ever feels off or too easy, connecting a better model is the most direct way to make dates feel as discerning as they are designed to be."
+            ]
+          }
+        ]
+      },
+      "relationships": {
+        "label": "Relationships",
+        "title": "Relationships & commitment",
+        "overview": "Every character keeps a private read on how they feel about you, built from five warm feelings and one cold one. Those feelings blend into a single sense of \"warmth\" that names where you stand, from near-strangers all the way to sweethearts. As you grow closer you can also climb a ladder of commitments, dating, exclusive, then living together, by asking at the right moment. Get it right and you hit milestones worth celebrating; get careless and a relationship can cool, go on the rocks, or break up.",
+        "sections": [
+          {
+            "heading": "How a character feels about you",
+            "body": [
+              "Each person you spend time with quietly tracks five warm feelings toward you: Affection (how much they like and care for you), Trust (how safe they feel being honest with you), Chemistry (the romantic spark), Comfort (how at ease they are around you), and Respect (how much they admire you). There is also one cold feeling, Tension, the friction left behind by an awkward, careless, or hurtful moment.",
+              "Everyone starts out barely knowing you, so all five warm feelings begin very low and Tension begins at zero. Good dates, thoughtful texts, and shared activities raise the warm feelings; rudeness, neglect, and badly-timed asks raise Tension. The five warm feelings together form your overall warmth, the single thing that decides where the relationship stands. Tension is held separately and works against you, especially right after a fight."
+            ]
+          },
+          {
+            "heading": "Relationship stages and milestones",
+            "body": [
+              "Your blended warmth places each relationship in a named stage. As you grow closer you climb through them:"
+            ],
+            "bullets": [
+              "Near-strangers, then acquaintances, warming up, getting close, close, and finally sweethearts.",
+              "Crossing into getting close, close, or sweethearts is a milestone, a moment worth celebrating.",
+              "When a milestone happens you will see a banner at the end of the date, the character usually texts you about it the next morning, and it is written into your Moments so you can look back on it.",
+              "Milestones only happen on the way up, and each one happens once. Slipping back and re-crossing the same line will not replay it."
+            ]
+          },
+          {
+            "heading": "Defining the relationship",
+            "body": [
+              "Beyond just growing closer, you can put a label on things. There is a three-rung commitment ladder, and each rung unlocks once your warmth reaches the matching stage:",
+              "Use the \"Define the relationship\" action on a date to ask. If the moment is right they may say yes, and the relationship moves up a rung. They might gently deflect instead, no harm done, but they will not entertain another ask for a few days. And if you ask far too soon, or after things have soured, it can backfire: it stings them, spikes Tension, and on a real date it ends the date on the spot. You also cannot climb two rungs in one sitting, and you have to actually talk to them on the date before you can ask."
+            ],
+            "bullets": [
+              "Ask them out to start Dating, which unlocks once you are getting close.",
+              "Become Exclusive, which unlocks once you are close.",
+              "Move in together, which unlocks once you are sweethearts.",
+              "After any ask, accepted or not, they will not revisit the question for about three days."
+            ]
+          },
+          {
+            "heading": "Seeing other people: jealousy",
+            "body": [
+              "You can date more than one person. A monogamous character who has grown to genuinely care about you (around the getting-close stage and up) may find out you have been seeing others lately and take it badly. While you are still casual it is a relatively small risk and a smaller sting. Once you are exclusive or living together, getting caught is far likelier and lands much harder, a real betrayal that costs a lot of Trust and Affection and spikes Tension.",
+              "Characters also care about who they catch you with: one of their exes, a crush of theirs, or a rival stings far more than a stranger. Polyamorous characters are the exception, they are open about loving more than one person and do not get jealous the way monogamous characters do."
+            ]
+          },
+          {
+            "heading": "Cooling off, breakups, and winning someone back",
+            "body": [
+              "Relationships need tending. If you ignore someone for a long stretch, their warm feelings slowly cool and a little Tension creeps in. The more committed you are, the shorter the leash: a casual connection can coast for about two weeks before it starts to drift, but a live-in partner begins to feel neglected after only a few days, and drifts faster once it does.",
+              "Commitment is not a finish line; a committed relationship has to be kept healthy. If warmth craters or Tension stays high, from bad dates, a hurtful ask, or prolonged neglect, it goes \"on the rocks.\" That is a warning, and you will get a \"we need to talk\" text. You have a few days to turn it around with a good date before it ends. A single catastrophic date can break things off immediately, with no warning.",
+              "A breakup is not always forever. After a cooling-off period you can win someone back by staying in touch and rebuilding warmth, and they will cautiously give it another go, though each breakup leaves a scar that makes the relationship a little more fragile the next time. Uncommitted relationships never break up outright; they just cool off if you neglect them."
+            ]
+          },
+          {
+            "heading": "Attraction and intimacy",
+            "body": [
+              "Romance only blooms where there is mutual attraction. If you have set an orientation and a character's orientation clearly rules you out, the bond can still grow into a friendly acquaintance, but it will not cross into the romantic stages, so there is no dating, milestones, jealousy, or intimacy. This is strictly opt-in: if you leave your orientation unset, or either of you is bisexual, non-binary, or unspecified, nothing is gated. When an incompatible pairing levels off, the character may warmly and honestly share their orientation and decline romance.",
+              "If you have turned on adult content in Settings (and are using a model that allows it), intimacy is still earned, not automatic. It only becomes possible once you are genuinely close, at the close stage or warmer, and things are calm between you, so a recent fight keeps it off the table until you have smoothed things over. Whatever happens always stays within the character's stated boundaries."
+            ]
+          }
+        ]
+      },
+      "phone": {
+        "label": "Your phone",
+        "title": "Your phone",
+        "overview": "Your phone is one tab on the bottom bar, and opening it drops you onto a home screen of apps — like a real phone, complete with the in-world day and time, a warm greeting that shifts with the hour, and a \"battery\" that quietly tracks how much energy you have left today. Each app is its own little tool: some keep you close to people, others run your life and your money. A few of the money apps only appear if the world you're playing was built to include them.",
+        "sections": [
+          {
+            "heading": "How the home screen works",
+            "body": [
+              "At the top, the phone always shows the current in-world day and time of day, plus a battery that fills green when you're rested and drains toward red as you spend energy across the day. The greeting under the clock changes with the time — morning, afternoon, evening, or night.",
+              "Apps sit in a grid, with four kept in the dock along the bottom: Messages, Mail, Moments, and Settings. A small number badge on an app means something is waiting for you — unread texts, unread mail, or new posts on Faces. Tap any app to open it; the round button below the screen takes you back home.",
+              "Three of the money apps — Property, Market, and Casino — only show up when the world you're in was set up to use them. In a world that doesn't, they simply aren't on your home screen."
+            ]
+          },
+          {
+            "heading": "Staying close — the people apps",
+            "body": [
+              "These are the apps for your relationships: texting, keepsakes, the town feed, and the map of who knows whom. Texting is completely free and never costs you energy, so reach out as often as you like."
+            ],
+            "bullets": [
+              "Messages — Text anyone you've been on a date with, any time, for free; it never costs energy. You can attach a photo or a gift to a message, and accept gifts a character sends you. If someone is unavailable that day, a small moon appears next to their name and you'll have to catch them another time.",
+              "Mail — Your in-world inbox of letters and notices from companies and strangers as the days pass. The people you date never email you — keep romance in Messages. Tap a letter to read it.",
+              "Faces — A town feed where you and the locals post short updates. You can write your own post (up to 500 characters), react six different ways, and leave comments on what other characters share.",
+              "Moments — A scrapbook of your story with one person: milestones, dates, and other keepsakes, each one a little snapshot. Pick a character at the top to flip through your memories together.",
+              "Constellation — A star-map of every relationship in the world, with you at the warm center and threads out to everyone you've met. Switch to the list to search and filter by the kind of connection, and tap anyone to open their full profile — their circle, their recent life, and what they've heard about you through the grapevine.",
+              "Endings — A gallery of keepsake epilogues for relationships you've seen all the way through. It stays empty until you complete a character's story.",
+              "Almanac — A calendar of every day you've lived, with its weather, what happened, and a recap of the day. Tap a past day to read its full story. Days you haven't reached yet are locked.",
+              "Weather — Today's sky, a week-ahead forecast, and how each character feels about the weather — some love a certain kind of day, some can't stand it."
+            ]
+          },
+          {
+            "heading": "Running your life — the activity and money apps",
+            "body": [
+              "These apps are how you spend your days and fill your purse. Together and Work both draw on your daily energy, and neither can be used while you're in the middle of a date.",
+              "The three wealth apps — Property, Market, and Casino — only appear in worlds that enable them, and they all spend and earn the same money you carry everywhere."
+            ],
+            "bullets": [
+              "Together — Spend low-key time with someone through small outings, like a coffee or a walk. Pick a person and a way to hang out, and it nudges where you stand with them. It costs energy and is paused while you're on a date.",
+              "Work — Take shifts for money. Some are simple jobs (each costs a set amount of energy, shown as a minus number), and some are graded skill shifts you actually play through. Your career skills level up the more you work them, and higher levels pay more. Keep an eye on your energy readout — you can't work with none left, or while you're on a date.",
+              "Market — A stock market that reacts to the world around you. Buy and sell shares, read the market news, and track your portfolio's value and your cash. Some companies pay dividends, which are the only truly hands-off income in the game.",
+              "Property — Browse places to rent or buy. Renting means keeping up with the rent — if it falls overdue, you'll get landlord notices in Messages — while buying makes a place yours outright. Some places give a small relationship boost when you bring a date there.",
+              "Casino — The House of Fortune, with slots, blackjack, roulette, and video poker. You wager your real in-game money, and a daily wager limit (shown as a ribbon at the top) keeps any single day in check. The house always keeps an edge, so play for fun.",
+              "Shop — Buy gifts and keepsakes; your money and your bag are your own in each world.",
+              "Games — The arcade of mini-games you can play just for fun.",
+              "Bag — Your inventory of items you're carrying, including gifts you can send.",
+              "Settings — The phone's own settings: set a custom wallpaper, switch between Play and Creator mode, and (carefully) reset your progress."
+            ]
+          }
+        ]
+      },
+      "life-money": {
+        "label": "Energy & money",
+        "title": "Energy, money & activities",
+        "overview": "Each in-world day gives you a small pool of energy to spend on real meetings -- dates, casual time together, and minigames. Texting and calling are always free. You start with an empty wallet and no allowance, so spending money comes from working jobs and playing the money-paying minigames; you spend it in the Shop, mostly on gifts. Where a world turns them on, you can also grow -- or gamble away -- your money through the stock market, property, and the casino.",
+        "sections": [
+          {
+            "heading": "Your daily energy",
+            "body": [
+              "Every day starts with a small pool of energy: 3 actions on a normal day, and one extra on weekends, for 4. Anything that's a real, in-person meeting spends energy. A date, an afternoon spent together with someone, and a minigame each cost one action. A heavier job can cost more.",
+              "Texting and calling people on your phone is always free -- it never touches your energy, so you can keep a conversation going as long as you like. When your energy runs out for the day, you can't start another date or work shift; tap Sleep to move to the next day, which fully refills your energy.",
+              "Because energy is the real limit on your day, spend it with intent. A heavy outdoor work shift, for instance, uses two of your three weekday actions, leaving room for just one more thing before bed."
+            ],
+            "bullets": [
+              "A date, time spent together, or a minigame: 1 action each.",
+              "The heavy outdoor day-labor shift: 2 actions.",
+              "Texting and calling: free and unlimited.",
+              "Sleep to begin a new day and refill your energy (3 on weekdays, 4 on weekends)."
+            ]
+          },
+          {
+            "heading": "Earning money",
+            "body": [
+              "You start with nothing, and there's no daily allowance -- money comes from work. Open the work options and pick the shift that fits your day. The more you repeat a kind of work, the better you get at it: your skill in that trade levels up and slowly raises its pay. No single shift can ever pay a runaway amount, so steady work is the honest road to a full wallet.",
+              "Two jobs are played as quick skill games -- the Woodlot (felling logs) and the Copy Desk (transcribing the day's news). They pay you purely for how well you play, up to a solid flat payout, and a good run there is as good as it gets for one shift.",
+              "Beyond work, the only money that arrives on its own is dividends from any stocks you're holding, in worlds that have a stock market. Nothing pays you just for sleeping."
+            ],
+            "bullets": [
+              "Work a shift -- steady, dependable pay with no surprises; builds your Service skill.",
+              "Hustle odd jobs -- the same pay on average but a wide swing, great on a good day and thin on a bad one; builds your Hustle skill.",
+              "Day-labor outdoors -- the biggest single payday, but it takes two actions and the weather sets the price (storms pay best, fair days least); unlocks once you've built up your Craft skill.",
+              "The Woodlot and the Copy Desk -- minigame jobs that pay you for how well you play."
+            ]
+          },
+          {
+            "heading": "Spending money: the Shop, your Bag, and gifts",
+            "body": [
+              "The Shop is where your earnings go -- gifts, keepsakes, clothing, books, and the occasional consumable. Anything you buy lands in your inventory (your Bag) at the listed price; nothing in the Shop ever leaves you with more money than you started with.",
+              "Gifts are how money turns into affection. You can hand someone a gift on a date or attach one to a text. They'll react in their own voice -- a spoken line, a feeling, sometimes a lasting keepsake memory -- and the gesture nudges your relationship. A single gift is only ever a small nudge (no more than a few points on any one feeling), and gifts can't be spammed: the first one you give someone in a day lands in full, a second the same day lands at about half, and a third or more that day does nothing. Thoughtful timing beats a pile of presents.",
+              "Items meant for your own use (consumables) stay in your Bag for you. Only true gifts, clothing, books, and keepsakes can actually be handed to someone."
+            ]
+          },
+          {
+            "heading": "Growing your money: market, property, and the casino",
+            "body": [
+              "Some worlds switch on extra wealth systems. They're optional, and a world that leaves them off simply won't show them.",
+              "The stock market lets you buy and sell shares in the world's fictional companies. Prices drift from day to day and can react to big relationship moments in your world, so a portfolio is a gamble, not a guarantee. Some companies pay a small dividend each day on shares you've held at least a full day -- the one bit of money that arrives without you working for it.",
+              "Property lets you lease a place -- paying rent on a set schedule, whether daily, weekly, or monthly -- or buy one outright. Owning or leasing a place lets you take dates there, and a date at a place you own gives a warmer boost than one you've only rented for the night. Watch your rent: miss a payment and you'll get a landlord warning and three days' grace before you're evicted. Selling a place you own simply refunds what you paid for it.",
+              "The casino, where enabled, offers slots, blackjack, roulette, and video poker. The house always has an edge, so treat it as risk and flavor, never an income plan. Each bet has a minimum (5) and a cap, and there's a limit on how much you can wager in a single day, so a bad streak can't wipe you out in one sitting."
+            ]
+          }
+        ]
+      },
+      "building": {
+        "label": "Building worlds",
+        "title": "Building your world",
+        "overview": "Heartmorrow has two modes. In Play mode you simply live in a world: date, text, work, and watch relationships grow. Creator mode unlocks the building tools on top of everything you can already do, so you can author your own people, places, and whole worlds. This page covers creating characters and worlds, turning optional systems on or off, the built-in AI helpers, sharing your creations as files, the adult-content toggle, and what a progress reset does (and doesn't) erase.",
+        "sections": [
+          {
+            "heading": "Play mode vs. Creator mode",
+            "body": [
+              "Heartmorrow runs in one of two modes, and you can switch between them at any time. Play mode keeps the building and editing tools out of the way so you can just enjoy the world. Creator mode adds those tools on top of everything Play mode already does.",
+              "You set the mode under the \"Mode\" heading on the main Settings page (reachable from the world list via \"Switch world\" → \"Settings,\" or the Settings tab once you're in a world). You can also flip it from your phone's Settings app, under \"Mode.\" Your choice is a personal preference saved on this device, not part of any world's save.",
+              "Turning on Creator mode reveals two extra spots in the main navigation: a \"World\" tab (a behind-the-scenes look at your world's cast and simulation) and a \"Debug\" area for diagnostics. It also unlocks editing controls throughout the app — for example, a \"Generate items\" button appears in the Shop, and a delete button appears on each card in the world list."
+            ],
+            "bullets": [
+              "Play mode: date and live in the world, with the editing tools tucked away.",
+              "Creator mode: everything in Play mode, plus the character and world editors, the World and Debug tabs, and in-place generate, edit, and delete controls.",
+              "Switch it under \"Mode\" in Settings, or in the phone's Settings app. It's a per-device preference, not part of your save."
+            ]
+          },
+          {
+            "heading": "Creating and editing characters",
+            "body": [
+              "The character workbench is organized into five tabs: Identity, Personality, Profile, Relationships, and World. A new character starts at age 18 (the minimum the game allows) and, unless you change it, belongs to the world you're currently playing.",
+              "Identity holds the basics: name, age, pronouns, gender, sexuality, which world they live in, their relationship style (Monogamous or Polyamorous), and a short description. Personality is where the writing lives — their personality, how they speak, what they're looking for in a relationship, plus tag lists for their likes, dislikes, goals, and boundaries. There's also a private \"creator notes\" field that the character itself never sees.",
+              "One trait worth understanding is Guardedness, a 0–100 slider running from \"an open book\" to \"walled off.\" It controls how slowly someone warms up to you on a date: guarded people open up more slowly and are harder to win over (and just as easy to lose). New characters start mildly reserved, and the label under the slider updates as you drag it.",
+              "The Profile tab fleshes out their appearance, texting style, online persona, love language, and intimate-chemistry details. The Relationships tab is where you wire social connections to other people in the same world — Friend, Rival, Ex, Family, Partner, Crush, Roommate, Coworker, Classmate, Neighbor, Mentor, or Mentee. Connections never cross worlds, so build a world's cast first, then link them together. (Their evolving relationship stats with you and their memories also live on this tab, once the character has been saved.)"
+            ],
+            "bullets": [
+              "Six dating stats — Charm, Empathy, Humor, Confidence, Intellect, and Style — each run 0–100 and default to 50. They color how a character talks, shape the \"Together\" activities, and decide their favorite minigame (their highest stat picks it).",
+              "Likes, dislikes, goals, and boundaries are free-text tags you add one at a time.",
+              "Social connections only link people who share a world — so create the cast first, then connect them."
+            ]
+          },
+          {
+            "heading": "Generating characters from a description or image",
+            "body": [
+              "You don't have to fill in every field by hand. The character workbench has a \"Generate\" button that drafts a whole character from a portrait image, a block of reference text, or both. Pick a portrait, paste or upload some descriptive text (up to 40,000 characters; an uploaded file is read as plain text), and let it draft the identity, personality, traits, profile, and starting dating stats.",
+              "Generating fills the written fields but keeps your chosen portrait, expression images, and world, and it never touches your private creator notes. If you've already written real content, you'll get a heads-up before it's overwritten.",
+              "There are also smaller, focused helpers. On the Profile section, a \"Generate from description\" button fills in the appearance, texting, and chemistry details from what you've already written, and the dating-stats section has its own button to suggest a stat spread. Both of those need a name filled in first. Everything generated arrives as a draft you can review and edit before saving, and all of it relies on the AI model you've connected in Settings."
+            ]
+          },
+          {
+            "heading": "Building worlds, locations, and optional systems",
+            "body": [
+              "The world workbench has a sidebar listing your worlds (with a \"New world\" button) and a detail pane for the one you've selected. Here you set the world's name, summary, tone, lore, in-fiction rules, and global notes. You can also add World Notes — scoped reference entries (global, location, faction, lore, rule, character, or misc) that are fed to the AI as background.",
+              "Locations are the venues your dates happen in. Each has a name, description, tags, an indoor/outdoor setting, an optional photo, and a \"cost to date there\" price tier. You can add them by hand or use \"Generate with AI,\" which drafts a batch (1 to 8 at a time) from your world's lore plus a free-form prompt. Generated locations drop straight into the editor for you to review and tweak — they're only kept once you click \"Save world.\"",
+              "Each world can turn three optional systems on or off independently, under \"Game features\": Property (rent or buy places), the Stock Market, and the Casino. All three are off by default, and the setting is enforced per world — if a world has a feature off, those screens simply aren't available there. When you enable the Casino, you can also set its betting limits.",
+              "Worlds are also where shop stock comes from: open the Shop in Creator mode and use \"Generate items\" to draft themed gifts and goods (your world's setting is woven in automatically), then keep the ones you like."
+            ],
+            "bullets": [
+              "Property, Stock Market, and Casino are per-world toggles, all off by default.",
+              "Casino limits you can set: a maximum single bet (up to 1,000) and a daily wager cap (up to 10,000), with a minimum bet of 5.",
+              "A location's price tier sets how much a date there costs; the \"Free\" tier costs nothing.",
+              "Deleting a world offers an optional checkbox to also delete its characters — leave it unchecked to keep the cast."
+            ]
+          },
+          {
+            "heading": "Sharing: export and import",
+            "body": [
+              "Your creations can be packaged into share files and handed to other players. There are three kinds: one or more characters as a .hmchr file, a whole world as a .hmwrld file, and a mixed bundle of worlds and loose characters as a .hmpack file. Share files carry definitions and images only — never your save. No relationships, money, memories, messages, or day history travels with them.",
+              "To export, go to the world list, choose \"Export worlds,\" pick what to share, then set a title and an optional note in the preview dialog. When you export a world, you can choose whether its cast of characters comes along.",
+              "To import, use the \"Import file\" button on the world list. You'll see a read-only preview of exactly what's inside — the worlds, the people, and the image counts — before anything is added. Importing is always additive: it creates fresh copies and never overwrites or deletes what you already have. When a file contains both worlds and people, you can choose to take just the worlds or bring the cast too."
+            ]
+          },
+          {
+            "heading": "Adult content, and resetting vs. keeping your work",
+            "body": [
+              "The adult-content toggle lives in Settings and is off by default. Turning it on requires confirming a short acknowledgment, including that you're of age. With it on, intimate scenes can unfold on dates once a relationship is genuinely close and not too tense — the game still gates intimacy by how warm and settled the bond is, so it never happens out of nowhere. With it off, characters keep things tasteful and will set a boundary if you push too far too soon. There's also an opt-in \"tragic outcomes\" sub-toggle (available only once adult content is on) that allows darker story endings; it shows support resources before you enable it.",
+              "Keep in mind that adult content is a global preference, and the kind of writing you actually get also depends on the AI model you've connected.",
+              "Finally, the \"Danger zone\" in your phone's Settings app has a reset that wipes your playthrough — relationships, memories, conversations, texts, emails, and inventory — and sends you back to Day 1 with your starting money. Crucially, it keeps everything you authored: your worlds, characters, world notes, shop items, and uploaded images all survive. A reset is a clean slate for playing, not for building."
+            ]
+          }
+        ]
+      },
+      "tips": {
+        "label": "Tips & help",
+        "title": "Tips & troubleshooting",
+        "overview": "A few habits make Heartmorrow click, and most snags have a quick explanation. Here are the things worth knowing and the answers to the questions that come up most.",
+        "sections": [
+          {
+            "heading": "Get the most out of the AI",
+            "body": [
+              "Every line of dialogue and every judgement comes from the language model you connect in Settings, so the model matters more than anything else. A stronger, more capable model writes characters who feel more like themselves and reads your dates more sharply — it is better at telling real warmth from filler and at noticing when you hit a like, a dislike, or a boundary.",
+              "If dates ever feel too easy, too generous, or a little off, connecting a better model is the most direct fix. A local model keeps everything on your own machine for free; a hosted model usually reads nuance more reliably. Adult content, if you turn it on, also depends on the model being willing to write it."
+            ]
+          },
+          {
+            "heading": "Habits that pay off",
+            "body": [],
+            "bullets": [
+              "Put real effort into what you say. Low-effort, going-nowhere messages quietly cool a date — there is no coasting.",
+              "Learn the person. Their likes, dislikes, and boundaries shape how the night is judged, so play to what they care about and steer clear of what they don't.",
+              "Time your gifts. A gift is a small, thoughtful nudge, not a shortcut — the first one a day lands in full, a second lands at about half, and more do nothing.",
+              "Tend your commitments. The closer you are, the sooner neglect stings — a live-in partner starts to feel ignored after only a few days.",
+              "Stay in touch. Texting and calling are free and never cost energy, so keep the conversation going between dates."
+            ]
+          },
+          {
+            "heading": "Common questions",
+            "body": [],
+            "bullets": [
+              "Dates feel too easy, or the scoring seems generous — the judging is only as discerning as the model reading it. Connect a more capable model in Settings.",
+              "Nobody texts me — you only hear from people you've already been on a date with. Someone you dated and then neglected may send a wistful message; people you've never met never text.",
+              "I can't sleep or end the day — you have a date in progress. Finish it with \"End & evaluate,\" or leave it, and the day button unlocks.",
+              "I'm out of money — there's no allowance. Open the Work app and take a shift; that's how you earn.",
+              "An app is missing from my phone — Property, Market, and Casino only appear in worlds that switch them on (a per-world setting in Creator mode).",
+              "They keep walking out on me — walkouts happen only for hostile or cruel behavior, or coming on strong with someone you're not close to yet. Ease off and let the vibe recover.",
+              "My ask to define the relationship failed — you need enough warmth and good timing. After any ask they want a few days before you bring it up again, so try again after a good date.",
+              "A character treats an old plan as if it is still on — texts can go stale; the game flags when a plan is days old, but smaller models occasionally miss it."
+            ]
+          },
+          {
+            "heading": "Starting over",
+            "body": [
+              "Want a clean slate? The Danger zone in your phone's Settings app resets your playthrough — relationships, memories, conversations, texts, emails, and inventory all clear, and you return to Day 1 with your starting money. Everything you authored survives: your worlds, characters, notes, shop items, and images are all kept. A reset is a fresh start for playing, not for building."
+            ]
+          }
+        ]
+      }
     }
   }
 }

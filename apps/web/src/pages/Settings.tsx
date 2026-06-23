@@ -373,6 +373,22 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
       {error && <Banner kind="error">{error}</Banner>}
       {savedNote && <Banner kind="ok">{savedNote}</Banner>}
 
+      {!embedded && (
+        <Link to="/help" className="set-bench-card framed">
+          <div className="set-bench-mark" aria-hidden="true">
+            <Icon name="info" size={22} />
+          </div>
+          <div className="set-bench-body">
+            <div className="kicker">{t('settings.help.kicker')}</div>
+            <h2>{t('settings.help.head')}</h2>
+            <p>{t('settings.help.blurb')}</p>
+          </div>
+          <div className="set-bench-go">
+            {t('settings.help.open')} <Icon name="chevronRight" size={15} />
+          </div>
+        </Link>
+      )}
+
       <section className="set-group">
         <h2 className="set-group-head">{t('settings.groups.appearance')}</h2>
 
