@@ -199,6 +199,10 @@ grant itself a cent.
 
 ## Requirements
 
+> **Using the [self-contained installer](#quick-start)?** You can skip the Node and pnpm
+> requirements below — `install.sh` / `install.ps1` download a pinned, local Node and activate
+> the right pnpm for you. The only thing you'd still want is an LLM server to actually play.
+
 - **Node.js 20+** (developed on Node 24). Uses Node's built-in `node:sqlite`, so installation
   never compiles a native C addon.
 - **pnpm** — the repo pins **`pnpm@11.7.0`** via `packageManager`, so running `corepack
@@ -208,6 +212,43 @@ grant itself a cent.
 ---
 
 ## Quick start
+
+The fastest way in is the **self-contained installer**. It needs *no prerequisites* — not
+even Node or pnpm. It downloads a pinned, official Node.js into a local `./.runtime/node`
+folder (verified against nodejs.org's SHA-256 checksums, nothing installed system-wide),
+activates the exact pnpm pinned in `package.json` via corepack, installs dependencies, and
+seeds the sample database. Then a matching `run` script starts the app.
+
+**macOS / Linux**
+
+```bash
+./install.sh      # one-time setup (downloads Node locally, installs, seeds)
+./run.sh          # start the server + web client
+```
+
+**Windows**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1   # one-time setup
+.\run.bat                                                # start the app
+```
+
+> **Unattended/CI?** Pass `-y`/`--yes` to `install.sh` (or `-Yes` to `install.ps1`), or set
+> `HEARTMORROW_YES=1`, to skip the Node-download confirmation prompt.
+
+> **📱 Works on Termux, too.** The Linux installer runs as-is under
+> [Termux](https://termux.dev/) on Android — `./install.sh` then `./run.sh` — so you can host
+> Heartmorrow right on your phone and play it from the device's browser. (Point it at a local
+> or remote LLM the same way you would anywhere else.)
+
+Both installers are **idempotent** — re-run them anytime; they skip the Node download if the
+vendored copy is already present.
+
+Then open **http://localhost:5173**.
+
+### Manual install
+
+Already have **Node.js 20+** and **pnpm**? Skip the installer and run the steps yourself:
 
 ```bash
 # 1. Install everything
