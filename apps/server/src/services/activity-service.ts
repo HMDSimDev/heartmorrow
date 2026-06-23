@@ -233,14 +233,14 @@ function performTogether(
     try {
       addMemoriesFromEvaluation(
         character.id,
-        [{ text: `We spent a lovely afternoon together — ${moment}.`, importance: 3, tags: ['sweet'] }],
+        [{ text: `We had a lovely time together — ${moment}.`, importance: 3, tags: ['sweet'] }],
         null,
       );
     } catch {
       /* memory write is best-effort; never break the activity */
     }
     try {
-      appendChronicleLine(character.id, day, 'event', `✨ A lovely afternoon together — ${moment}.`, { bumpSession: false });
+      appendChronicleLine(character.id, day, 'event', `✨ A lovely time together — ${moment}.`, { bumpSession: false });
     } catch {
       /* chronicle is best-effort */
     }

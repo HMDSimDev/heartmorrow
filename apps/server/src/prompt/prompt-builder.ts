@@ -584,7 +584,7 @@ export function buildSystemPrompt(ctx: PromptContext, guardrails: string): strin
     sceneLines.push(
       ctx.venueTier >= 3
         ? `${ctx.player.name} brought you somewhere lavish and clearly spent on it — react however fits your character (touched, impressed, or wary of the splurge).`
-        : `${ctx.player.name} took you somewhere nice tonight — they put real thought (and money) into it.`,
+        : `${ctx.player.name} took you somewhere nice for this date — they put real thought (and money) into it.`,
     );
   }
   parts.push(`=== SCENE ===\n${sceneLines.join('\n')}`);
@@ -683,7 +683,7 @@ export function buildEvaluatorMessages(ctx: PromptContext): ChatMessage[] {
   // The hidden "what they wanted tonight" read — the same need the date prompt
   // and per-turn judge use. Reward reading it; penalize trampling it.
   const wantedBlock = ctx.dateNeed
-    ? `What ${c.name} quietly hoped for tonight (they never said it aloud — reward the player for reading it, penalize ignoring or steamrolling it):\n${ctx.dateNeed}\n\n`
+    ? `What ${c.name} quietly hoped for from this date (they never said it aloud — reward the player for reading it, penalize ignoring or steamrolling it):\n${ctx.dateNeed}\n\n`
     : '';
 
   const content =
@@ -1527,7 +1527,7 @@ export function buildTurnReactionMessages(args: {
         `Boundaries: ${c.boundaries.length ? c.boundaries.join(', ') : 'none stated'}.\n` +
         (extraTraits.length ? `${extraTraits.join('. ')}.\n` : '') +
         `Relationship with ${playerName}: ${stage.label}.${statusLine}${stateNote}\n` +
-        (needJudge ? `What ${c.name} wants tonight: ${needJudge}\n` : '') +
+        (needJudge ? `What ${c.name} wants from this date: ${needJudge}\n` : '') +
         `So far this date feels: ${vibe}.`,
     },
     {

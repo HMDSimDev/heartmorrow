@@ -68,17 +68,17 @@ export const HOLIDAYS: Record<string, Holiday> = {
   '1:21': {
     name: 'Midsummer Night',
     blurb: 'A warm, late-night street party fills the boardwalk.',
-    tag: 'It is Midsummer Night — a warm, festive, slightly wild night out.',
+    tag: 'It is Midsummer Night — a warm, festive holiday that peaks in a slightly wild boardwalk street party after dark.',
   },
   '2:14': {
     name: 'The Lantern Festival',
     blurb: 'Paper lanterns drift down the river tonight — the most romantic night of the year.',
-    tag: 'It is the night of the Lantern Festival — paper lanterns float down the river and the mood is romantic and a little magical.',
+    tag: 'It is the Lantern Festival — a day of paper lanterns set adrift on the river, and the mood is romantic and a little magical.',
   },
   '3:25': {
     name: 'The Long Night',
     blurb: 'The coziest, quietest night of winter — everyone huddles close.',
-    tag: 'It is the Long Night — the coziest, quietest night of winter; people draw close for warmth.',
+    tag: 'It is the Long Night — the coziest, quietest stretch of winter, when people draw close for warmth.',
   },
 };
 

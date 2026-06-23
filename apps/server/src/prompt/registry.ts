@@ -98,9 +98,9 @@ const FR = {
   'date.firstMeeting':
     `=== MEETING FOR THE FIRST TIME ===\n` +
     `This is the very first time you and this person are meeting — a first date, and you're strangers. ` +
-    `You do NOT know their name, their history, or anything about them coming in (only what they tell you tonight). ` +
+    `You do NOT know their name, their history, or anything about them coming in (only what they tell you here). ` +
     `Do NOT greet them by name or act as if you already know them. Let it unfold like a real first meeting: ` +
-    `introduce yourself, be curious about who they are (as guarded or as open as your nature), and let them reveal themselves over the evening. If you'd like to know their name, just ask.`,
+    `introduce yourself, be curious about who they are (as guarded or as open as your nature), and let them reveal themselves over the course of this meeting. If you'd like to know their name, just ask.`,
 
   'date.contentPolicy.allowed':
     `=== CONTENT POLICY (directive — follow strictly) ===\n` +
@@ -137,8 +137,8 @@ const FR = {
   'date.guardedness.strong': ` — you do NOT warm up to people quickly, and you keep your guard up until it is genuinely earned`,
 
   'date.tonight':
-    `=== TONIGHT (let it shape you — never announce it) ===\n` +
-    `{{dateNeed}} Don't state this out loud or break character; just let it color how open, playful, or guarded you are tonight, and make {{playerName}} earn it by reading you.`,
+    `=== WHAT YOU WANT FROM THIS DATE (let it shape you — never announce it) ===\n` +
+    `{{dateNeed}} Don't state this out loud or break character; just let it color how open, playful, or guarded you are right now, and make {{playerName}} earn it by reading you.`,
 
   // The seven per-engagement "read" strings for HOW THEIR LAST MESSAGE LANDED.
   'date.verdict.heinous':
@@ -156,7 +156,7 @@ const FR = {
   'date.verdict.frame':
     `=== HOW THEIR LAST MESSAGE LANDED (react truthfully) ===\n` +
     `{{read}}{{noteClause}} ` +
-    `Your warmth THIS turn must track how the evening is actually going — never default to upbeat, affectionate, or eager when the moment didn't earn it.`,
+    `Your warmth THIS turn must track how the date is actually going — never default to upbeat, affectionate, or eager when the moment didn't earn it.`,
 
   'date.rightNow':
     `=== RIGHT NOW (the actual scene — keep every detail consistent with this) ===\n` +

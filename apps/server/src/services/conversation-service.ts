@@ -843,7 +843,7 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
       role: 'system',
       content:
         `OOC stage direction: this date isn't working for you — you've quietly lost interest and want to wrap it up now. ` +
-        `Give a brief, in-character send-off — a few sentences (roughly two or three), not a single clipped line — making a polite excuse to end the evening and leave (an early night, somewhere to be). ` +
+        `Give a brief, in-character send-off — a few sentences (roughly two or three), not a single clipped line — making a polite excuse to wrap things up and head out (somewhere else to be, an early start tomorrow). ` +
         `Not cruel, just done — no questions, and no plans to meet again.`,
     });
     const adapter = getAdapter(settings);
@@ -852,7 +852,7 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
   } catch {
     line = '';
   }
-  if (!line) line = `Hey — it's been a long week and I'm pretty wiped. I think I'm gonna call it a night. Take care, okay?`;
+  if (!line) line = `Hey — it's been a long week and I'm pretty wiped. I think I'm gonna head out. Take care, okay?`;
 
   // Apply the soft-leave's penalty + a memory of the fizzle, then voice the goodbye —
   // but DON'T end the session: like a natural farewell, the CLIENT runs the normal

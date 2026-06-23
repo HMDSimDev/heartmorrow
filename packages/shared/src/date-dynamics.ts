@@ -13,26 +13,26 @@ export interface DateNeed {
   judge: string;
 }
 
-/** What the character is quietly hoping for tonight — the thing to read. */
+/** What the character is quietly hoping for on this date — the thing to read. */
 export const DATE_NEEDS: DateNeed[] = [
   {
     key: 'listen',
-    behavior: 'Tonight you want to feel truly listened to — you bring up something on your mind and hope they actually engage with it rather than steering back to themselves.',
+    behavior: 'You want to feel truly listened to — you bring up something on your mind and hope they actually engage with it rather than steering back to themselves.',
     judge: 'Reward attentive listening, genuine follow-up questions, and remembering/responding to what the character actually said. Penalize self-absorption, ignoring their cues, and yanking the conversation back to the player.',
   },
   {
     key: 'levity',
-    behavior: "You've had a heavy week and want lightness tonight — easy banter, fun, a little flirtatious teasing, not an interrogation.",
+    behavior: "You've had a heavy week and want lightness — easy banter, fun, a little flirtatious teasing, not an interrogation.",
     judge: 'Reward playfulness, humor, warmth, and lightness. Penalize heaviness, relentless deep questions, moping, or negativity.',
   },
   {
     key: 'desire',
-    behavior: 'You want to feel wanted tonight — attention on you, warmth, sincere flirtation.',
+    behavior: 'You want to feel wanted — attention on you, warmth, sincere flirtation.',
     judge: 'Reward genuine flirtation, warmth, and attention aimed at the character. Penalize coldness, pure logistics, or making it all about the player.',
   },
   {
     key: 'depth',
-    behavior: 'You want something real tonight — honesty and a little vulnerability, not surface small talk.',
+    behavior: 'You want something real — honesty and a little vulnerability, not surface small talk.',
     judge: 'Reward openness, sincerity, real questions, and vulnerability. Penalize shallow small talk, deflection, and jokey avoidance.',
   },
   {
@@ -42,7 +42,7 @@ export const DATE_NEEDS: DateNeed[] = [
   },
   {
     key: 'guarded',
-    behavior: "You're a little guarded tonight — something's on your mind and they have to earn it before you fully warm up. Don't be hostile, just slower to open.",
+    behavior: "You're a little guarded — something's on your mind and they have to earn it before you fully warm up. Don't be hostile, just slower to open.",
     judge: 'Reward patience, respect, warmth, and not pushing. Penalize presumption, pushiness, crossing boundaries, or rushing intimacy.',
   },
 ];

@@ -111,7 +111,7 @@ export const ACTIVITIES: readonly ActivityDef[] = [
   {
     id: 'tg_in',
     kind: 'together',
-    label: 'A quiet evening in',
+    label: 'A quiet one in',
     description: 'Cook, talk, let the hours go slow. The safe, easy kind of closeness.',
     angle: 'cozy',
     icon: '☕',
