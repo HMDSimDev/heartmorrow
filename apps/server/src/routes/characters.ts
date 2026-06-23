@@ -11,6 +11,7 @@ import {
 import { parseInput } from '../lib/validate';
 import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 import {
+  composeConstellation,
   composeDossier,
   createCharacter,
   deleteCharacter,
@@ -53,7 +54,7 @@ export async function characterRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // The world's social web (authored links + world-sim-formed ties), grouped by
-  // character — the read model behind the phone "Social" view.
+  // character — the read model behind the phone Constellation view.
   app.get(
     '/social-web',
     {
@@ -66,6 +67,23 @@ export async function characterRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId } = req.query as { worldId?: string };
       return getSocialWeb(worldId);
+    },
+  );
+
+  // The player-centric layer of the Constellation map: the hearth + warmth-weighted
+  // threads to everyone the player has met (the NPC↔NPC web rides /social-web).
+  app.get(
+    '/constellation',
+    {
+      schema: docSchema({
+        tags: ['characters'],
+        summary: "Get the player's constellation edges (warmth to each met character)",
+        querystring: WorldScopedQuerySchema,
+      }),
+    },
+    async (req) => {
+      const { worldId } = req.query as { worldId?: string };
+      return composeConstellation(worldId);
     },
   );
 

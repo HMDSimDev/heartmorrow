@@ -943,6 +943,31 @@ export const CharacterDossierSchema = z.object({
 });
 export type CharacterDossier = z.infer<typeof CharacterDossierSchema>;
 
+// --- Constellation (the relationship map: the player hearth + the town's web) -
+
+/** The player's tie to one character — a hearth-thread in the constellation. */
+export const ConstellationEdgeSchema = z.object({
+  characterId: z.string(),
+  /** 0..100 player↔character warmth — drives the thread's brightness + thickness. */
+  warmth: z.number().int().min(0).max(100).default(0),
+  /** The warmth band (near-strangers … sweethearts) — colors the thread + node glow. */
+  band: z.string().default('near-strangers'),
+  status: RelationshipStatusSchema.default('none'),
+});
+export type ConstellationEdge = z.infer<typeof ConstellationEdgeSchema>;
+
+/**
+ * The player-centric layer of the relationship map: the player's name (the hearth at
+ * the center) and a warmth-weighted thread to every character they've actually met.
+ * The NPC↔NPC web is fetched separately (getSocialWeb); the client weaves the two
+ * layers into one breathing constellation.
+ */
+export const ConstellationViewSchema = z.object({
+  playerName: z.string().default(''),
+  edges: z.array(ConstellationEdgeSchema).default([]),
+});
+export type ConstellationView = z.infer<typeof ConstellationViewSchema>;
+
 // --- World clock (time / stamina / day) -------------------------------------
 
 export const NeglectedCharacterSchema = z.object({

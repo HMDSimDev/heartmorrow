@@ -27,6 +27,8 @@ import {
   type CharacterLink,
   type CharacterLinkKind,
   type CharacterUpdate,
+  type ConstellationEdge,
+  type ConstellationView,
   type DossierHeardEntry,
   type DossierTie,
   type DossierTimelineEntry,
@@ -46,6 +48,7 @@ import { charactersRepo, npcEdgesRepo, npcKnowledgeRepo, worldsRepo } from '../d
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { notFound } from '../lib/errors';
 import { ensureRelationship, getRelationship } from './relationship-service';
+import { getOrCreatePlayer } from './player-service';
 import { listMemories, NPC_LIFE_TAG } from './memory-service';
 import { getLlmSettings } from './settings-service';
 import { readAssetFile } from './asset-service';
@@ -227,10 +230,13 @@ export function composeDossier(characterId: string): CharacterDossier {
     .map(([k, v]) => humanizeStoryFlag(k, v))
     .filter((s): s is string => s != null);
 
-  // "Met" = any real signal the player has interacted with them. Avoids importing
-  // hasDated (text-message-service → character-service would cycle); the relationship
-  // carries enough signal (warmth / a commitment / an earned flag / a past breakup).
-  const hasMet = warmthOf(rel) > 0 || currentStatus(rel) !== 'none' || isBrokenUp(rel) || flags.length > 0;
+  // "Met" = a real signal the player has interacted with them: a date/text stamps
+  // lastSeenDay, or there's a commitment / earned flag / past breakup. NOT warmth —
+  // default stats give every relationship a baseline warmth, so it can't tell a
+  // stranger from an acquaintance. (Avoids importing hasDated: text-message-service →
+  // character-service would cycle.)
+  const hasMet =
+    rel.flags['lastSeenDay'] != null || currentStatus(rel) !== 'none' || isBrokenUp(rel) || flags.length > 0;
   const standing = hasMet ? { warmthBand: warmthBand(rel), status: currentStatus(rel), flags } : null;
 
   // Their place in the web (this node's ties), strongest bonds first then by name.
@@ -293,6 +299,33 @@ export function composeDossier(characterId: string): CharacterDossier {
     timeline,
     heardAboutYou,
   };
+}
+
+/**
+ * The player-centric layer of the constellation map: the player's display name (the
+ * hearth) and a warmth-weighted thread to every character they've actually met. A PURE
+ * read over relationships (the NPC↔NPC web rides getSocialWeb). "Met" mirrors
+ * composeDossier — any real signal the player has interacted with them.
+ */
+export function composeConstellation(worldId?: string): ConstellationView {
+  const playerName = getOrCreatePlayer(playerIdForWorldOrDefault(worldId ?? undefined)).name;
+  const edges: ConstellationEdge[] = [];
+  for (const c of listCharacters(worldId)) {
+    const rel = getRelationship(c.id);
+    const hasEarnedFlag = Object.entries(rel.flags).some(([k, v]) => !isInternalFlagKey(k) && humanizeStoryFlag(k, v) != null);
+    // "Met" = a real interaction. A date/text stamps lastSeenDay; a commitment, a
+    // breakup, or an earned story flag also counts. Default stats give EVERY relationship
+    // a small baseline warmth, so warmth alone can't tell a stranger from someone you know.
+    const met = rel.flags['lastSeenDay'] != null || currentStatus(rel) !== 'none' || isBrokenUp(rel) || hasEarnedFlag;
+    if (!met) continue;
+    edges.push({
+      characterId: c.id,
+      warmth: Math.round(Math.max(0, Math.min(100, warmthOf(rel)))),
+      band: warmthBand(rel),
+      status: currentStatus(rel),
+    });
+  }
+  return { playerName, edges };
 }
 
 /**

@@ -9,6 +9,7 @@ import type {
   CharacterDossier,
   CharacterMemory,
   CharacterUpdate,
+  ConstellationView,
   DatingStats,
   Email,
   Intent,
@@ -433,6 +434,7 @@ export const api = {
   // characters (optional worldId scopes the roster to the active save)
   listCharacters: (worldId?: string) => get<Character[]>(`/characters${worldQuery(worldId)}`),
   socialWeb: (worldId?: string) => get<SocialWeb>(`/social-web${worldQuery(worldId)}`),
+  constellation: (worldId?: string) => get<ConstellationView>(`/constellation${worldQuery(worldId)}`),
   getCharacter: (id: string) => get<Character>(`/characters/${id}`),
   getCharacterBundle: (id: string) => get<CharacterBundle>(`/characters/${id}/bundle`),
   createCharacter: (input: CharacterCreate) => post<Character>('/characters', input),

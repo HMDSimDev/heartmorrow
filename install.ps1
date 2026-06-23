@@ -7,7 +7,11 @@
 #
 # Run it once:   powershell -ExecutionPolicy Bypass -File .\install.ps1
 # Then play:     .\run.bat
+#
+# Pass -Yes (or set HEARTMORROW_YES=1) to skip the download confirmation when
+# running unattended.
 # ============================================================================
+param([switch]$Yes)
 $ErrorActionPreference = "Stop"
 
 # --- Pinned toolchain -------------------------------------------------------
@@ -39,6 +43,21 @@ $url  = "https://nodejs.org/dist/v$NodeVersion/$pkg.zip"
 if ((Test-Path (Join-Path $NodeDir "node.exe")) -and (Test-Path $Stamp)) {
   Ok "Vendored Node v$NodeVersion already present (.runtime\node)"
 } else {
+  # --- Tell the user exactly what is about to happen, and let them opt out ---
+  Write-Host ""
+  Write-Host "Node.js was not found in .runtime\node, so this installer needs to download it."
+  Write-Host "  What:  Node.js v$NodeVersion (win-$arch), the official build"
+  Write-Host "  From:  $url"
+  Write-Host "  Into:  $NodeDir  (local to this folder; nothing is installed system-wide)"
+  Info "The download is verified against nodejs.org's official SHA-256 checksums."
+  Write-Host ""
+  if (-not ($Yes -or $env:HEARTMORROW_YES)) {
+    $reply = Read-Host "Download Node.js now? [Y/n]"
+    if ($reply -and $reply -notmatch '^(y|yes)$') {
+      Die "Aborted at user request. No files were downloaded."
+    }
+  }
+
   New-Item -ItemType Directory -Force $Rt | Out-Null
   $zip = Join-Path $env:TEMP "$pkg.zip"
 

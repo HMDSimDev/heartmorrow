@@ -8,8 +8,14 @@
 #
 # Run it once:   ./install.sh
 # Then play:     ./run.sh
+#
+# Pass -y/--yes (or set HEARTMORROW_YES=1) to skip the download confirmation
+# when running unattended.
 # ============================================================================
 set -euo pipefail
+
+ASSUME_YES="${HEARTMORROW_YES:-}"
+case "${1:-}" in -y|--yes) ASSUME_YES=1 ;; esac
 
 # --- Pinned toolchain -------------------------------------------------------
 # Bump this to the current Node 24 LTS. The matching checksum is fetched from
@@ -71,6 +77,25 @@ if [ -x "$NODE_DIR/bin/node" ] && [ -f "$STAMP" ]; then
   ok "Vendored Node v$NODE_VERSION already present (.runtime/node)"
 else
   command -v curl >/dev/null 2>&1 || die "curl is required to download Node."
+
+  # --- Tell the user exactly what is about to happen, and let them opt out ---
+  echo
+  echo "Node.js was not found in .runtime/node, so this installer needs to download it."
+  echo "  What:  Node.js v$NODE_VERSION ($plat-$a), the official build"
+  echo "  From:  $url"
+  echo "  Into:  $NODE_DIR  (local to this folder; nothing is installed system-wide)"
+  info "The download is verified against nodejs.org's official SHA-256 checksums."
+  echo
+  if [ -z "$ASSUME_YES" ]; then
+    if [ -t 0 ]; then
+      printf "Download Node.js now? [Y/n] "
+      read -r reply
+      case "$reply" in ""|y|Y|yes|YES) ;; *) die "Aborted at user request. No files were downloaded." ;; esac
+    else
+      die "Node.js download needs confirmation but no terminal is attached. Re-run with -y (or HEARTMORROW_YES=1) to proceed."
+    fi
+  fi
+
   mkdir -p "$RT"
   tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' EXIT

@@ -4,7 +4,7 @@ import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers
 import { setAdapterOverride } from '../llm/provider';
 import { messagesRepo, sessionsRepo, textMessagesRepo, worldStatesRepo } from '../db/repositories';
 import { newId } from '../lib/ids';
-import { createCharacter, getCharacter, getSocialWeb, updateCharacter } from './character-service';
+import { composeConstellation, createCharacter, getCharacter, getSocialWeb, updateCharacter } from './character-service';
 import { npcEdgesRepo } from '../db/repositories';
 import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, applyTempBuff, setRelationshipFlag, stampLastSeen } from './stat-service';
@@ -397,6 +397,22 @@ describe('social web read model (getSocialWeb)', () => {
     // Scoped to the world, the run-in surfaces; unscoped, derived edges are skipped.
     expect(tieFor(getSocialWeb(world.id), a.id, b.id)).toMatchObject({ kind: 'acquaintance', derived: true });
     expect(getSocialWeb().nodes.find((n) => n.id === a.id)).toBeUndefined();
+  });
+});
+
+describe('player constellation edges (composeConstellation)', () => {
+  it('threads the hearth only to characters the player has actually met, with warmth + band', () => {
+    const { world, character: a } = seedWorldAndCharacter();
+    const unmet = createCharacter({ worldId: world.id, name: 'Unmet', age: 28, datingStats: DEFAULT_DATING_STATS });
+    applyRelationshipChange(a.id, { affection: 50, trust: 50, chemistry: 50, comfort: 50, respect: 50 }, { source: 'test' });
+    setRelationshipFlag(a.id, 'lastSeenDay', 1, { source: 'test' }); // the player has actually seen them
+
+    const cst = composeConstellation(world.id);
+    const edge = cst.edges.find((e) => e.characterId === a.id);
+    expect(edge).toBeTruthy();
+    expect(edge!.warmth).toBeGreaterThan(0);
+    expect(edge!.band).toBeTruthy();
+    expect(cst.edges.find((e) => e.characterId === unmet.id)).toBeUndefined(); // never met — no thread
   });
 });
 

@@ -1,0 +1,283 @@
+/* === Constellation — the relationship star-field ===========================
+   The map sits in the phone's breathing --ink night sky. You are a warm hearth at
+   the center; the people you've met are lamplit stars threaded to you in gold and
+   rose; the town's own web glints cooler beyond. Hovering a star lights its threads
+   and dims the rest. List + dossier styling lives in phone-life.css. */
+
+.cst-app {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 16px;
+}
+
+/* — Sky / List segmented toggle (in the app bar) — */
+.cst-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--ink);
+  border: 1px solid var(--border-soft);
+}
+.cst-seg button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-mute);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  min-height: 30px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.cst-seg button:hover { color: var(--text-dim); }
+.cst-seg button.is-on {
+  color: var(--on-accent);
+  background: linear-gradient(180deg, var(--accent-2), color-mix(in oklab, var(--accent-2) 78%, #000));
+  box-shadow: var(--glow-accent);
+}
+
+/* — The stage: a window on the sky (fills the space below the app bar, no scroll) — */
+.cst-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(125% 95% at 50% 44%, color-mix(in oklab, var(--accent-3) 8%, transparent), transparent 68%),
+    var(--ink);
+  touch-action: pan-y;
+}
+/* The warm bloom behind the hearth, scattered with two layers of far stars — a
+   fine still dust + a few brighter ones that gently breathe. All behind the
+   threads and the people (skyglow is the backdrop layer; never interactive). */
+.cst-skyglow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(38% 30% at 50% 50%, var(--halo-1), transparent 72%);
+}
+/* A still layer of far dust for depth, behind the twinkling stars. */
+.cst-skyglow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.42;
+  background-image:
+    radial-gradient(1px 1px at 9% 14%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 17% 67%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 24% 33%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 31% 88%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 43% 21%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 52% 79%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 61% 12%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 69% 49%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 77% 83%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 84% 27%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 91% 61%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 6% 45%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 37% 55%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 95% 9%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 49% 41%, var(--text-mute), transparent),
+    radial-gradient(1px 1px at 13% 92%, var(--text-mute), transparent);
+}
+
+/* The living starfield — individual stars, each twinkling on its own clock. */
+.cst-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.cst-bgstar {
+  position: absolute;
+  width: var(--sz, 1.5px);
+  height: var(--sz, 1.5px);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: color-mix(in oklab, var(--text) 72%, var(--moon));
+  box-shadow: 0 0 calc(var(--sz, 1.5px) * 2.2) color-mix(in oklab, var(--text) 45%, transparent);
+  animation: cst-bgtwinkle var(--d, 5s) ease-in-out var(--delay, 0s) infinite alternate;
+}
+@keyframes cst-bgtwinkle {
+  from {
+    opacity: calc(0.1 + var(--b, 0.5) * 0.18);
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  to {
+    opacity: calc(0.42 + var(--b, 0.5) * 0.5);
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+
+/* — Threads of light — */
+.cst-threads {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.cst-thread {
+  stroke: var(--kc, var(--border-bright));
+  stroke-width: calc(0.5px + var(--str, 0.3) * 2.1px);
+  stroke-linecap: round;
+  opacity: calc(0.13 + var(--str, 0.3) * 0.4);
+  transition: opacity 0.25s ease;
+}
+.cst-thread.is-player {
+  stroke: color-mix(in oklab, var(--accent-2) 68%, var(--rose));
+  opacity: calc(0.24 + var(--str, 0.3) * 0.55);
+}
+/* When a star is focused, its threads brighten and the rest recede. */
+.cst-stage.is-focusing .cst-thread { opacity: 0.05; }
+.cst-stage.is-focusing .cst-thread.is-lit { opacity: calc(0.42 + var(--str, 0.3) * 0.55); }
+
+/* — Stars — the button IS the avatar circle; name + glow float around it — */
+.cst-star {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: var(--r, 34px);
+  height: var(--r, 34px);
+  appearance: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  z-index: 1;
+  transition: opacity 0.25s ease, transform 0.18s ease;
+}
+.cst-star-glow {
+  position: absolute;
+  inset: -42%;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle, color-mix(in oklab, var(--star, var(--moon)) 42%, transparent), transparent 68%);
+  filter: blur(2px);
+  animation: cst-twinkle var(--tw, 4s) ease-in-out infinite alternate;
+}
+.cst-star-ava {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1.5px solid color-mix(in oklab, var(--star, var(--moon)) 60%, var(--border));
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--star, var(--moon)) 15%, transparent),
+    0 6px 16px rgba(4, 6, 16, 0.55);
+}
+.cst-star-ava .portrait { width: 100%; height: 100%; border-radius: 50%; }
+.cst-star-name {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  max-width: 92px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 5px var(--ink), 0 0 3px var(--ink);
+  pointer-events: none;
+}
+.cst-star:hover { transform: translate(-50%, -50%) scale(1.06); }
+.cst-star:focus-visible { outline: none; }
+.cst-star:focus-visible .cst-star-ava { box-shadow: 0 0 0 3px var(--accent-2), 0 6px 16px rgba(4, 6, 16, 0.55); }
+
+/* Warmth → glow colour: cool & faint for distant ties, warm gold/rose up close. */
+.cst-star.band-near-strangers { --star: var(--moon); }
+.cst-star.band-acquaintances { --star: var(--moon); }
+.cst-star.band-warming-up { --star: var(--brass); }
+.cst-star.band-getting-close { --star: var(--brass); }
+.cst-star.band-close { --star: var(--rose); }
+.cst-star.band-sweethearts { --star: var(--rose); }
+/* People in the town's web you haven't met yourself — faint, cool. */
+.cst-star.is-distant { --star: var(--border-bright); }
+.cst-star.is-distant .cst-star-name { color: var(--text-mute); font-weight: 500; }
+
+/* Focus highlight: the touched star + its neighbours brighten, the rest recede. */
+.cst-star.is-dim { opacity: 0.28; }
+.cst-star.is-lit { z-index: 2; }
+
+/* The selected star (tapped once) — a bright accent ring; tap it again to open. */
+.cst-star.is-selected {
+  transform: translate(-50%, -50%) scale(1.1);
+  z-index: 4;
+}
+.cst-star.is-selected .cst-star-ava {
+  border-color: var(--accent-2);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--accent-2) 38%, transparent),
+    var(--glow-accent),
+    0 6px 16px rgba(4, 6, 16, 0.55);
+}
+
+/* — The hearth: you, at the center of it all — */
+.cst-star.is-hearth {
+  --star: var(--brass);
+  --r: 48px;
+  z-index: 3;
+  cursor: default;
+}
+.cst-star.is-hearth .cst-star-glow {
+  inset: -55%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--brass) 50%, transparent), transparent 66%);
+  animation-duration: 5.5s;
+}
+.cst-hearth-flame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--on-accent);
+  background: radial-gradient(circle at 50% 38%, color-mix(in oklab, var(--brass) 92%, #fff 8%), color-mix(in oklab, var(--brass) 72%, #000));
+  border: 1.5px solid color-mix(in oklab, var(--brass) 80%, #fff);
+  box-shadow:
+    0 0 0 4px color-mix(in oklab, var(--brass) 22%, transparent),
+    var(--glow-warm);
+}
+.cst-star-name.is-you {
+  color: var(--brass);
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  letter-spacing: 0.01em;
+}
+
+.cst-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.05em;
+  color: var(--text-mute);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cst-star-glow,
+  .cst-bgstar { animation: none; }
+  .cst-bgstar { opacity: calc(0.3 + var(--b, 0.5) * 0.35); }
+}
+
+@keyframes cst-twinkle {
+  from { opacity: 0.55; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1.08); }
+}

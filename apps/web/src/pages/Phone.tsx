@@ -14,7 +14,7 @@ import { WorkApp } from '../components/phone/WorkApp';
 import { TogetherApp } from '../components/phone/TogetherApp';
 import { SettingsApp } from '../components/phone/SettingsApp';
 import { MomentsApp } from '../components/phone/MomentsApp';
-import { SocialApp } from '../components/phone/SocialApp';
+import { ConstellationApp } from '../components/phone/ConstellationApp';
 import { WeatherApp } from '../components/phone/WeatherApp';
 import { CalendarApp } from '../components/phone/CalendarApp';
 import { EndingsApp } from '../components/phone/EndingsApp';
@@ -25,7 +25,7 @@ import { Shop } from './Shop';
 import { Minigames } from './Minigames';
 import { Inventory } from './Inventory';
 
-type AppId = 'home' | 'messages' | 'email' | 'faces' | 'moments' | 'social' | 'weather' | 'calendar' | 'endings' | 'work' | 'together' | 'property' | 'market' | 'gambling' | 'shop' | 'games' | 'bag' | 'settings';
+type AppId = 'home' | 'messages' | 'email' | 'faces' | 'moments' | 'constellation' | 'weather' | 'calendar' | 'endings' | 'work' | 'together' | 'property' | 'market' | 'gambling' | 'shop' | 'games' | 'bag' | 'settings';
 
 type Tint = 'rose' | 'brass' | 'moon' | 'sage' | 'ember' | 'plum' | 'teal';
 
@@ -41,7 +41,7 @@ const APPS: AppDef[] = [
   { id: 'faces', icon: 'faces', labelKey: 'phone.app.faces', tint: 'plum' },
   { id: 'moments', icon: 'moments', labelKey: 'phone.app.moments', tint: 'ember' },
   { id: 'calendar', icon: 'calendar', labelKey: 'phone.app.calendar', tint: 'teal' },
-  { id: 'social', icon: 'social', labelKey: 'phone.app.social', tint: 'plum' },
+  { id: 'constellation', icon: 'constellation', labelKey: 'phone.app.constellation', tint: 'plum' },
   { id: 'weather', icon: 'weather', labelKey: 'phone.app.weather', tint: 'moon' },
   { id: 'endings', icon: 'endings', labelKey: 'phone.app.endings', tint: 'brass' },
   { id: 'work', icon: 'work', labelKey: 'phone.app.work', tint: 'sage' },
@@ -207,7 +207,7 @@ export function Phone() {
               {app === 'email' && <EmailApp />}
               {app === 'faces' && <FacesApp />}
               {app === 'moments' && <MomentsApp />}
-              {app === 'social' && <SocialApp />}
+              {app === 'constellation' && <ConstellationApp />}
               {app === 'weather' && <WeatherApp />}
               {app === 'calendar' && <CalendarApp />}
               {app === 'endings' && <EndingsApp />}
