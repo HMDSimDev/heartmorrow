@@ -27,6 +27,7 @@ import {
   type Character,
   type CharacterLinkKind,
   type CharacterMemory,
+  type NpcEdge,
   type FeedCommentView,
   type FeedPost,
   type FeedPostKind,
@@ -421,22 +422,30 @@ function edgeKey(a: string, b: string): string {
 
 /**
  * How `viewer` relates to `target`, from the viewer's side: their own AUTHORED
- * link wins, else a world-sim-derived edge (promoted → friend, else acquaintance).
- * Returns null when there's no tie at all (a stranger doesn't chime in). Authored
- * non-rival links are kept mutual elsewhere, so reading the viewer's own links is
- * enough; a one-sided rival is captured because the rival is the one who declared it.
+ * link wins, else a world-sim-derived edge — a grown couple → partner, a fall-out →
+ * rival, a sustained friendship → friend, a mere run-in → acquaintance. So an emergent
+ * couple gushes and a fallen-out pair snipes on each other's posts just like authored
+ * ones do. Returns null when there's no tie at all (a stranger doesn't chime in).
+ * Authored non-rival links are kept mutual elsewhere, so reading the viewer's own links
+ * is enough; a one-sided rival is captured because the rival is the one who declared it.
  * `edges` is the world's derived edges, preloaded once (no per-pair SQL).
  */
 function tieKind(
   viewer: Character,
   targetId: string,
-  edges: ReadonlyMap<string, { promoted: boolean }>,
+  edges: ReadonlyMap<string, Pick<NpcEdge, 'promoted' | 'soured' | 'romanceState'>>,
 ): CharacterLinkKind | null {
   const authored = linkTo(viewer.links, targetId);
   if (authored) return authored.kind;
   const edge = edges.get(edgeKey(viewer.id, targetId));
-  if (edge) return edge.promoted ? 'friend' : 'acquaintance';
-  return null;
+  if (!edge) return null;
+  return edge.romanceState === 'together'
+    ? 'partner'
+    : edge.soured
+      ? 'rival'
+      : edge.promoted
+        ? 'friend'
+        : 'acquaintance';
 }
 
 /** A few short things `knower` actually knows about `subject` — shared memories
@@ -498,7 +507,7 @@ async function generateNpcEngagement(
   const chars = charactersRepo.listByWorld(worldId);
   const byId = new Map(chars.map((c) => [c.id, c]));
   // Load the world's derived edges ONCE so candidate-building is pure in-memory.
-  const edges = new Map<string, { promoted: boolean }>();
+  const edges = new Map<string, NpcEdge>();
   for (const e of npcEdgesRepo.listByWorld(worldId)) edges.set(edgeKey(e.aId, e.bId), e);
 
   const todaysPosts = feedPostsRepo

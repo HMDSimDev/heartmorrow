@@ -11,6 +11,7 @@ import {
 import { parseInput } from '../lib/validate';
 import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 import {
+  composeDossier,
   createCharacter,
   deleteCharacter,
   duplicateCharacter,
@@ -285,6 +286,22 @@ export async function characterRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { id } = req.params as { id: string };
       return getRelationship(id);
+    },
+  );
+
+  // The Social app's tap-to-open person sheet: standing + ties + remembered life +
+  // the grapevine. A pure read-model composed from existing repos.
+  app.get(
+    '/characters/:id/dossier',
+    {
+      schema: docSchema({
+        tags: ['characters'],
+        summary: "Get a character's social dossier (standing, ties, timeline, gossip)",
+      }),
+    },
+    async (req) => {
+      const { id } = req.params as { id: string };
+      return composeDossier(id);
     },
   );
 

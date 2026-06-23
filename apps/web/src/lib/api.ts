@@ -6,6 +6,7 @@ import type {
   CharacterEnding,
   CharacterBundle,
   CharacterCreate,
+  CharacterDossier,
   CharacterMemory,
   CharacterUpdate,
   DatingStats,
@@ -455,6 +456,7 @@ export const api = {
   promptPreview: (id: string) => get<{ system: string; approxChars: number }>(`/characters/${id}/prompt-preview`),
   getChronicle: (id: string) => get<CharacterChronicle>(`/characters/${id}/chronicle`),
   getMoments: (id: string) => get<Moment[]>(`/characters/${id}/moments`),
+  dossier: (id: string) => get<CharacterDossier>(`/characters/${id}/dossier`),
   getRoom: (id: string) => get<{ name: string; description: string }>(`/characters/${id}/room`),
 
   // assets

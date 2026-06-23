@@ -11,14 +11,25 @@ import {
   RoomDescriptionSchema,
   DATING_STAT_KEYS,
   MIN_CHARACTER_AGE,
+  CHARACTER_LINK_ORDER,
   clampStat,
+  currentStatus,
+  humanizeStoryFlag,
+  isBrokenUp,
+  isInternalFlagKey,
   resolveLlmRole,
+  warmthBand,
+  warmthOf,
   type Character,
   type CharacterBundle,
   type CharacterCreate,
+  type CharacterDossier,
   type CharacterLink,
   type CharacterLinkKind,
   type CharacterUpdate,
+  type DossierHeardEntry,
+  type DossierTie,
+  type DossierTimelineEntry,
   type SocialTie,
   type SocialWeb,
   type CharacterTemplateGeneration,
@@ -31,11 +42,11 @@ import {
   type ProfileGeneration,
   type StructuredResult,
 } from '@dsim/shared';
-import { charactersRepo, npcEdgesRepo, worldsRepo } from '../db/repositories';
-import { newId } from '../lib/ids';
+import { charactersRepo, npcEdgesRepo, npcKnowledgeRepo, worldsRepo } from '../db/repositories';
+import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { notFound } from '../lib/errors';
-import { ensureRelationship } from './relationship-service';
-import { listMemories } from './memory-service';
+import { ensureRelationship, getRelationship } from './relationship-service';
+import { listMemories, NPC_LIFE_TAG } from './memory-service';
 import { getLlmSettings } from './settings-service';
 import { readAssetFile } from './asset-service';
 import { callStructuredLlm } from '../llm/structured';
@@ -144,11 +155,32 @@ export function getSocialWeb(worldId?: string): SocialWeb {
   if (worldId) {
     for (const e of npcEdgesRepo.listByWorld(worldId)) {
       if (e.aId === e.bId) continue;
-      const kind: CharacterLinkKind = e.promoted ? 'friend' : 'acquaintance';
+      // A world-sim-grown couple reads as partners; a fallen-out pair as rivals; a
+      // sustained friendship as friends; a mere run-in as an acquaintance.
+      const kind: CharacterLinkKind =
+        e.romanceState === 'together'
+          ? 'partner'
+          : e.soured
+            ? 'rival'
+            : e.promoted
+              ? 'friend'
+              : 'acquaintance';
+      // A 'partner' (a world-sim couple) UPGRADES an existing non-partner tie — couples
+      // usually grow out of an authored friend/coworker bond, so a stale "Friend" chip
+      // must not hide the new relationship. friend/acquaintance only fill GAPS, so an
+      // authored own link still wins. (An authored `partner` pair can never reach
+      // 'together' — they're already in coupledIds — so a real partner is never clobbered.)
+      const place = (m: Map<string, SocialTie>, target: string) => {
+        const existing = m.get(target);
+        if (!existing) m.set(target, { targetId: target, kind, derived: true });
+        else if (kind === 'partner' && existing.kind !== 'partner') {
+          m.set(target, { targetId: target, kind: 'partner', derived: true });
+        }
+      };
       const a = ties.get(e.aId);
       const b = ties.get(e.bId);
-      if (a && known.has(e.bId) && !a.has(e.bId)) a.set(e.bId, { targetId: e.bId, kind, derived: true });
-      if (b && known.has(e.aId) && !b.has(e.aId)) b.set(e.aId, { targetId: e.aId, kind, derived: true });
+      if (a && known.has(e.bId)) place(a, e.bId);
+      if (b && known.has(e.aId)) place(b, e.aId);
     }
   }
   // 3) Incoming authored ties (lowest precedence): if O authored a tie to C and C
@@ -169,6 +201,98 @@ export function getSocialWeb(worldId?: string): SocialWeb {
     .map((c) => ({ id: c.id, ties: [...ties.get(c.id)!.values()] }))
     .filter((n) => n.ties.length > 0);
   return { nodes };
+}
+
+/** Newest-first timeline entries to compose, and grapevine items to surface. */
+const DOSSIER_TIMELINE_MAX = 30;
+const DOSSIER_HEARD_MAX = 3;
+
+/**
+ * Compose a character's "dossier" — the read-model behind the Social app's
+ * tap-to-open person sheet: who they are, where the player stands with them, their
+ * place in the social web, their remembered recent life, and what's reached them
+ * about the player through the grapevine. A PURE projection over existing repos; it
+ * never mints events (the only write is the lazy relationship-ensure that the
+ * `/relationship` route already performs on read). 404s if the character is gone.
+ */
+export function composeDossier(characterId: string): CharacterDossier {
+  const character = getCharacter(characterId);
+  const worldId = character.worldId;
+  const playerId = playerIdForWorldOrDefault(worldId);
+  const rel = getRelationship(characterId, playerId);
+
+  // Earned, player-facing story flags (drop internal bookkeeping keys).
+  const flags = Object.entries(rel.flags)
+    .filter(([k]) => !isInternalFlagKey(k))
+    .map(([k, v]) => humanizeStoryFlag(k, v))
+    .filter((s): s is string => s != null);
+
+  // "Met" = any real signal the player has interacted with them. Avoids importing
+  // hasDated (text-message-service → character-service would cycle); the relationship
+  // carries enough signal (warmth / a commitment / an earned flag / a past breakup).
+  const hasMet = warmthOf(rel) > 0 || currentStatus(rel) !== 'none' || isBrokenUp(rel) || flags.length > 0;
+  const standing = hasMet ? { warmthBand: warmthBand(rel), status: currentStatus(rel), flags } : null;
+
+  // Their place in the web (this node's ties), strongest bonds first then by name.
+  const node = getSocialWeb(worldId ?? undefined).nodes.find((n) => n.id === characterId);
+  const ties: DossierTie[] = (node?.ties ?? [])
+    .map((t): DossierTie | null => {
+      const peer = charactersRepo.get(t.targetId);
+      if (!peer) return null;
+      return {
+        targetId: t.targetId,
+        name: peer.name,
+        portraitAssetId: peer.portraitAssetId,
+        kind: t.kind,
+        derived: t.derived,
+        incoming: t.incoming ?? false,
+      };
+    })
+    .filter((t): t is DossierTie => t != null)
+    .sort(
+      (a, b) =>
+        CHARACTER_LINK_ORDER.indexOf(a.kind) - CHARACTER_LINK_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name),
+    );
+
+  // Their remembered recent life + your shared history (memories come created_at DESC).
+  const timeline: DossierTimelineEntry[] = listMemories(characterId)
+    .slice(0, DOSSIER_TIMELINE_MAX)
+    .map((m): DossierTimelineEntry => {
+      const isLife = m.tags.includes(NPC_LIFE_TAG);
+      const peer = m.relatedCharacterId ? charactersRepo.get(m.relatedCharacterId) : null;
+      return {
+        id: m.id,
+        text: m.text,
+        kind: isLife ? 'life' : 'memory',
+        withName: peer && peer.id !== playerId ? peer.name : null,
+        importance: Math.max(1, Math.min(5, m.importance)),
+        createdAt: m.createdAt,
+      };
+    });
+
+  // Word about the player that reached them SECONDHAND (the grapevine), top by fidelity.
+  const heardAboutYou: DossierHeardEntry[] = npcKnowledgeRepo
+    .listByKnower(characterId)
+    .filter((k) => k.subjectId === playerId && k.sourceKnowerId != null && k.fidelity > 0)
+    .sort((a, b) => b.fidelity - a.fidelity)
+    .slice(0, DOSSIER_HEARD_MAX)
+    .map((k) => ({
+      claim: k.claim,
+      fidelity: k.fidelity,
+      fromName: k.sourceKnowerId ? charactersRepo.get(k.sourceKnowerId)?.name ?? null : null,
+    }));
+
+  return {
+    characterId,
+    name: character.name,
+    portraitAssetId: character.portraitAssetId,
+    shortDescription: character.shortDescription ?? '',
+    hasMet,
+    standing,
+    ties,
+    timeline,
+    heardAboutYou,
+  };
 }
 
 /**

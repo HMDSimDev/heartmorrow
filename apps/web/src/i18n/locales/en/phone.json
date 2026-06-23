@@ -414,7 +414,25 @@
     "someone": "someone",
     "tieIncoming": "{peer} considers {owner} a {label}",
     "tieDerived": "{peer} · {kind} (grew during play)",
-    "tiePlain": "{peer} · {kind}"
+    "tiePlain": "{peer} · {kind}",
+    "openProfile": "Open {name}'s profile",
+    "dossier": {
+      "kicker": "Profile",
+      "loadError": "Couldn't open this profile. {error}",
+      "notMet": "You haven't crossed paths yet.",
+      "circleHead": "Their circle",
+      "noTies": "No connections yet.",
+      "lifeHead": "Lately",
+      "noTimeline": "Nothing's happened with them yet.",
+      "with": "with {name}",
+      "incoming": "one-sided",
+      "derived": "grew during play",
+      "heardHead": "What they've heard about you",
+      "heardFrom": "from {name}",
+      "fidelityClear": "going around clearly",
+      "fidelityFuzzy": "getting fuzzy",
+      "fidelityGarbled": "barely a whisper"
+    }
   },
   "work": {
     "title": "Work",

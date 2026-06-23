@@ -83,6 +83,12 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
     throw badRequest("You've broken up — you'll have to win them back before you can define things again.");
   }
 
+  // They've started seeing someone else (an NPC poached a neglected interest) — the
+  // romance route is closed; you can't define a relationship with someone who's taken.
+  if (relationship.flags['state:seeingOther']) {
+    throw badRequest("They've started seeing someone else — that window has closed.");
+  }
+
   const next = nextDtrRung(relationship);
   if (!next) throw badRequest("You're already as committed as it gets.");
   if (!next.warmthMet) throw badRequest(`It's too soon to ${next.rung.label.toLowerCase()} — grow closer first.`);

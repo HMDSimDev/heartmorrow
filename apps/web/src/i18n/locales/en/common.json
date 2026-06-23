@@ -74,6 +74,14 @@
     "mentor": "Mentor",
     "acquaintance": "Acquaintance"
   },
+  "warmthBand": {
+    "near-strangers": "Near-strangers",
+    "acquaintances": "Acquaintances",
+    "warming-up": "Warming up",
+    "getting-close": "Getting close",
+    "close": "Close",
+    "sweethearts": "Sweethearts"
+  },
   "itemRarity": {
     "common": "common",
     "uncommon": "uncommon",

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ConversationSessionSchema, DEFAULT_DATING_STATS, MessageSchema, TextMessageSchema, deriveCalendar } from '@dsim/shared';
+import { ConversationSessionSchema, DEFAULT_DATING_STATS, MessageSchema, TextMessageSchema, deriveCalendar, type RomanceState } from '@dsim/shared';
 import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { messagesRepo, sessionsRepo, textMessagesRepo, worldStatesRepo } from '../db/repositories';
@@ -289,9 +289,27 @@ describe('mutual-friend vouching', () => {
 
 describe('social web read model (getSocialWeb)', () => {
   /** Upsert a derived world-sim edge (canonical aId < bId order). */
-  const addEdge = (worldId: string, x: string, y: string, promoted: boolean) => {
+  const addEdge = (
+    worldId: string,
+    x: string,
+    y: string,
+    promoted: boolean,
+    romanceState: RomanceState = 'none',
+    soured = false,
+  ) => {
     const [aId, bId] = x < y ? [x, y] : [y, x];
-    npcEdgesRepo.upsert({ worldId, aId, bId, warmth: 0, meetCount: 1, lastDay: 1, promoted });
+    npcEdgesRepo.upsert({
+      worldId,
+      aId,
+      bId,
+      warmth: 0,
+      meetCount: 1,
+      lastDay: 1,
+      promoted,
+      romanceState,
+      romanceSince: romanceState === 'none' ? 0 : 1,
+      soured,
+    });
   };
   const tieFor = (web: { nodes: Array<{ id: string; ties: Array<{ targetId: string; kind: string; derived: boolean; incoming?: boolean }> }> }, owner: string, target: string) =>
     web.nodes.find((n) => n.id === owner)?.ties.find((t) => t.targetId === target);
@@ -323,6 +341,34 @@ describe('social web read model (getSocialWeb)', () => {
     const web = getSocialWeb(world.id);
     expect(tieFor(web, a.id, b.id)).toMatchObject({ kind: 'acquaintance', derived: true });
     expect(tieFor(web, a.id, c.id)).toMatchObject({ kind: 'friend', derived: true });
+  });
+
+  it('surfaces a world-sim-grown couple as a mutual partner tie', () => {
+    const { world, character: a } = seedWorldAndCharacter();
+    const b = createCharacter({ worldId: world.id, name: 'Lover Lee', age: 29, datingStats: DEFAULT_DATING_STATS });
+    addEdge(world.id, a.id, b.id, true, 'together'); // the world-sim grew a couple here
+    const web = getSocialWeb(world.id);
+    expect(tieFor(web, a.id, b.id)).toMatchObject({ kind: 'partner', derived: true });
+    expect(tieFor(web, b.id, a.id)).toMatchObject({ kind: 'partner', derived: true });
+  });
+
+  it('surfaces a soured world-sim edge as a mutual rival tie', () => {
+    const { world, character: a } = seedWorldAndCharacter();
+    const b = createCharacter({ worldId: world.id, name: 'Sour Sam', age: 30, datingStats: DEFAULT_DATING_STATS });
+    addEdge(world.id, a.id, b.id, true, 'none', true); // they were friendly, then fell out
+    const web = getSocialWeb(world.id);
+    expect(tieFor(web, a.id, b.id)).toMatchObject({ kind: 'rival', derived: true });
+    expect(tieFor(web, b.id, a.id)).toMatchObject({ kind: 'rival', derived: true });
+  });
+
+  it('a world-sim couple upgrades an authored friendship to a partner tie (not hidden behind "Friend")', () => {
+    const { world, character: a } = seedWorldAndCharacter();
+    // They were authored friends (mirrored both ways); the world-sim then coupled them.
+    const b = createCharacter({ worldId: world.id, name: 'Sweetheart Sage', age: 29, datingStats: DEFAULT_DATING_STATS, links: [{ targetId: a.id, kind: 'friend' }] });
+    addEdge(world.id, a.id, b.id, true, 'together');
+    const web = getSocialWeb(world.id);
+    expect(tieFor(web, a.id, b.id)).toMatchObject({ kind: 'partner', derived: true });
+    expect(tieFor(web, b.id, a.id)).toMatchObject({ kind: 'partner', derived: true });
   });
 
   it('an authored own link always beats a derived edge for the same pair', () => {

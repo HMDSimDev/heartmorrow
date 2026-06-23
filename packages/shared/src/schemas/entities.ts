@@ -3,7 +3,7 @@ import { MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, GAMBLING } from '../constants';
 import { CasinoGameSchema } from '../gambling';
 import { DatingStatsSchema, RelationshipStatsSchema, RelationshipStatKeySchema } from '../stats';
 import { PhaseSchema } from '../time';
-import { RelationshipStyleSchema, CharacterLinkSchema, EmploymentSchema, GenderSchema, SexualitySchema } from '../social';
+import { RelationshipStyleSchema, CharacterLinkSchema, EmploymentSchema, GenderSchema, SexualitySchema, RomanceStateSchema } from '../social';
 import { PropertyCategorySchema, StockSectorSchema, RentCadenceSchema } from '../wealth';
 import { MemoryTagArraySchema } from '../vocab';
 import { ItemEffectSchema, ItemRaritySchema, ItemCategorySchema } from './items';
@@ -607,6 +607,12 @@ export const NpcEdgeSchema = z.object({
   lastDay: z.number().int().min(0).default(0),
   /** True once a friend edge has been minted from sustained meetings. */
   promoted: z.boolean().default(false),
+  /** Emergent romance state ('none'|'crush'|'together') the world-sim grew here. */
+  romanceState: RomanceStateSchema.default('none'),
+  /** In-world day the current romance state was reached (idempotency / recency). */
+  romanceSince: z.number().int().min(0).default(0),
+  /** True once a fall-out has demoted this edge to a rivalry (the cooling mirror of `promoted`). */
+  soured: z.boolean().default(false),
 });
 export type NpcEdge = z.infer<typeof NpcEdgeSchema>;
 

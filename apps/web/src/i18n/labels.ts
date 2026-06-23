@@ -54,6 +54,7 @@ export const videoPokerRankLabel = (r: VideoPokerRank | string): string => t(`co
 export const casinoGameLabel = (g: CasinoGame | string): string => t(`common:casinoGame.${g}`);
 export const careerSkillLabel = (s: CareerSkill | string): string => t(`common:careerSkill.${s}`);
 export const characterLinkLabel = (k: CharacterLinkKind | string): string => t(`common:characterLink.${k}`);
+export const warmthBandLabel = (k: string): string => t(`common:warmthBand.${k}`);
 export const relationshipStatusLabel = (s: RelationshipStatus | string): string => t(`common:relationshipStatus.${s}`);
 export const relationshipStyleLabel = (s: RelationshipStyle | string): string => t(`common:relationshipStyle.${s}`);
 export const intentLabel = (i: Intent | string): string => t(`common:intent.${i}`);

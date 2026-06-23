@@ -406,6 +406,22 @@ export function buildSystemPrompt(ctx: PromptContext, guardrails: string): strin
     const onTheRocks = flags['state:onTheRocks'] === true;
     const jealous = flags['state:jealous'] === true;
     const offended = flags['state:offended'] === true;
+    // An NPC paired off with someone while the player drifted away (contested singles).
+    // The flag carries the new partner's name; the romance route with the player is closed.
+    const seeingOther =
+      typeof flags['state:seeingOther'] === 'string'
+        ? (flags['state:seeingOther'] as string)
+        : flags['state:seeingOther']
+          ? 'someone'
+          : null;
+    if (seeingOther && !brokenUp) {
+      directiveParts.push(
+        `=== WHERE THINGS STAND NOW ===\n` +
+          `While you and ${ctx.player.name} drifted, you started seeing ${seeingOther} — you're with them now. ` +
+          `You're still genuinely fond of ${ctx.player.name} and glad to see them, but you are NOT romantically available: don't flirt back, rekindle, or pretend you're single. ` +
+          `If they reach for something romantic, be honest and kind about being taken — maybe a little wistful about the timing, but you're not going to betray ${seeingOther}.`,
+      );
+    }
     if (brokenUp) {
       // After the cooldown the player can meet again to try to win you back — but
       // you are NOT simply back together; the hurt is real and has to be earned past.

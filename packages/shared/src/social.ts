@@ -161,6 +161,96 @@ export function pickConversationTopic(signals: TopicSignals, roll: number): Conv
   return 'catching-up';
 }
 
+// --- NPC romance (emergent couples the world-sim forms) ---------------------
+
+/**
+ * The romance state of a world-sim NPC↔NPC edge — the love-side mirror of the
+ * friendship ladder (acquaintance→friend): a budding `crush` that, sustained,
+ * becomes a `together` couple. AUTHORED `partner` links live on the character, not
+ * here; this is only for couples the world-sim grows during play. `none` = default.
+ */
+export const RomanceStateSchema = z.enum(['none', 'crush', 'together']);
+export type RomanceState = z.infer<typeof RomanceStateSchema>;
+
+/**
+ * Server-owned tuning for emergent NPC romance. Deliberately conservative so the
+ * town moves but stays comprehensible (at most one new spark per world-day). All
+ * thresholds read against the derived edge `warmth` the world-sim already tracks.
+ */
+export const NPC_ROMANCE = {
+  /** Edge warmth before a crush can spark. */
+  crushWarmth: 20,
+  /** Edge warmth before a sustained crush becomes a couple. */
+  togetherWarmth: 40,
+  /** Seeded-roll ceiling for a crush sparking, scaled by affinity (0..1). */
+  crushBaseProb: 0.5,
+  /** Max NEW crushes that may spark in one world-day (pacing guard). */
+  maxNewPerDay: 1,
+  /** A player love-interest must be neglected this many in-world days before an NPC
+   *  can poach them — the "you snoozed, you lost" gate for contested singles. */
+  poachNeglectDays: 7,
+} as const;
+
+/** The authored fields `npcAffinity` reads to gauge two people's suitability. */
+export interface AffinityTraits {
+  likes: readonly string[];
+  dislikes: readonly string[];
+  goals: readonly string[];
+}
+
+/**
+ * A PURE 0..1 affinity between two people from authored overlap, so couples form on
+ * suitability rather than a coin flip: shared likes and goals raise it, a like the
+ * other can't stand lowers it. Symmetric and deterministic (same inputs → same score).
+ */
+export function npcAffinity(a: AffinityTraits, b: AffinityTraits): number {
+  const norm = (xs: readonly string[]) => new Set(xs.map((s) => s.trim().toLowerCase()).filter(Boolean));
+  const aLikes = norm(a.likes);
+  const bLikes = norm(b.likes);
+  const aDis = norm(a.dislikes);
+  const bDis = norm(b.dislikes);
+  const aGoals = norm(a.goals);
+  const bGoals = norm(b.goals);
+  let score = 0.5;
+  for (const l of aLikes) if (bLikes.has(l)) score += 0.12; // a shared passion
+  for (const g of aGoals) if (bGoals.has(g)) score += 0.1; // a shared direction
+  for (const l of aLikes) if (bDis.has(l)) score -= 0.15; // one loves what the other can't stand
+  for (const l of bLikes) if (aDis.has(l)) score -= 0.15;
+  return Math.max(0.1, Math.min(1, score));
+}
+
+// --- NPC friction (emergent fallings-out — the mirror of friend-promotion) --
+
+/**
+ * Server-owned tuning for emergent NPC fallings-out — the cooling mirror of
+ * friend-promotion. A clashing, world-sim-formed pair can have a COLD meeting that
+ * cools them, and once they've crossed paths enough while staying icy, fall out into
+ * rivals. Conservative (at most one new fall-out per world-day). Applies ONLY to
+ * derived (not hand-authored) relationships, so the world-sim never turns an authored
+ * bond sour. Same authored-affinity signal that grows couples drives this.
+ */
+export const NPC_FRICTION = {
+  /** Affinity at/above which a meeting basically never cools (compatible people warm up). */
+  warmPivot: 0.45,
+  /** Warmth a cold (frictional) meeting REMOVES instead of adding. */
+  coolStep: 6,
+  /** Meetings a pair must have crossed before a cold streak can turn them into rivals. */
+  rivalMeetings: 4,
+  /** At/below this edge warmth, a cold pair that's met enough becomes rivals (the fall-out). */
+  rivalFloor: 8,
+  /** Max new fallings-out (→ rival) per world-day. */
+  maxSouringPerDay: 1,
+} as const;
+
+/**
+ * PURE 0..1 chance a meeting brings FRICTION (cools the pair) rather than warmth, from
+ * authored (in)compatibility: compatible people (affinity ≥ warmPivot) essentially never
+ * clash, and the lower the affinity, the likelier a cold meeting. Same input → same chance.
+ */
+export function frictionChance(affinity: number): number {
+  return Math.max(0, Math.min(0.85, (NPC_FRICTION.warmPivot - affinity) * 1.5));
+}
+
 // --- Social-web read model (the phone "Social" view) ------------------------
 
 /**

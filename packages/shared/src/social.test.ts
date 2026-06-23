@@ -9,6 +9,7 @@ import {
   TEXT_DAILY_GAIN_CAP,
   pickConversationTopic,
   CONVERSATION_TOPICS,
+  npcAffinity,
   type TopicSignals,
 } from './social';
 
@@ -127,5 +128,37 @@ describe('pickConversationTopic', () => {
   it('leans exes toward the-past', () => {
     const exes: TopicSignals = { ...bare, relationKind: 'ex' };
     expect(pickConversationTopic(exes, 0.9)).toBe('the-past');
+  });
+});
+
+describe('npcAffinity', () => {
+  const traits = (likes: string[], dislikes: string[] = [], goals: string[] = []) => ({ likes, dislikes, goals });
+
+  it('is 0.5 for two people with no overlap', () => {
+    expect(npcAffinity(traits(['hiking']), traits(['baking']))).toBe(0.5);
+  });
+
+  it('rises with shared likes and goals', () => {
+    expect(npcAffinity(traits(['jazz', 'film']), traits(['jazz', 'film']))).toBeGreaterThan(0.5);
+    expect(npcAffinity(traits([], [], ['open a café']), traits([], [], ['open a café']))).toBeGreaterThan(0.5);
+  });
+
+  it('falls when one loves what the other can\'t stand', () => {
+    expect(npcAffinity(traits(['smoking']), traits([], ['smoking']))).toBeLessThan(0.5);
+  });
+
+  it('is symmetric and case/whitespace-insensitive', () => {
+    const a = traits([' Jazz ']);
+    const b = traits(['jazz']);
+    expect(npcAffinity(a, b)).toBe(npcAffinity(b, a));
+    expect(npcAffinity(a, b)).toBeGreaterThan(0.5);
+  });
+
+  it('clamps to [0.1, 1]', () => {
+    const clash = traits(['a', 'b', 'c', 'd', 'e'], [], []);
+    const hater = traits([], ['a', 'b', 'c', 'd', 'e'], []);
+    expect(npcAffinity(clash, hater)).toBeGreaterThanOrEqual(0.1);
+    const twins = traits(['a', 'b', 'c', 'd', 'e', 'f'], [], ['x', 'y', 'z']);
+    expect(npcAffinity(twins, twins)).toBeLessThanOrEqual(1);
   });
 });

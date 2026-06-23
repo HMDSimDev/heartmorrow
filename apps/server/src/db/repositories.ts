@@ -1377,6 +1377,9 @@ function rowToNpcEdge(r: Row): NpcEdge {
     meetCount: Number(r.meet_count),
     lastDay: Number(r.last_day),
     promoted: Number(r.promoted) === 1,
+    romanceState: r.romance_state ?? 'none',
+    romanceSince: Number(r.romance_since ?? 0),
+    soured: Number(r.soured ?? 0) === 1,
   });
 }
 
@@ -1402,12 +1405,14 @@ export const npcEdgesRepo = {
   upsert(e: NpcEdge): NpcEdge {
     const { aId, bId } = npcPairKey(e.aId, e.bId);
     getDb().run(
-      `INSERT INTO npc_edges (world_id,a_id,b_id,warmth,meet_count,last_day,promoted)
-       VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO npc_edges (world_id,a_id,b_id,warmth,meet_count,last_day,promoted,romance_state,romance_since,soured)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(world_id,a_id,b_id) DO UPDATE SET
          warmth = excluded.warmth, meet_count = excluded.meet_count,
-         last_day = excluded.last_day, promoted = excluded.promoted`,
-      e.worldId, aId, bId, e.warmth, e.meetCount, e.lastDay, e.promoted ? 1 : 0,
+         last_day = excluded.last_day, promoted = excluded.promoted,
+         romance_state = excluded.romance_state, romance_since = excluded.romance_since,
+         soured = excluded.soured`,
+      e.worldId, aId, bId, e.warmth, e.meetCount, e.lastDay, e.promoted ? 1 : 0, e.romanceState, e.romanceSince, e.soured ? 1 : 0,
     );
     return { ...e, aId, bId };
   },

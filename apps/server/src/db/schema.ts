@@ -328,6 +328,9 @@ CREATE TABLE IF NOT EXISTS npc_edges (
   meet_count INTEGER NOT NULL DEFAULT 0,
   last_day   INTEGER NOT NULL DEFAULT 0,
   promoted   INTEGER NOT NULL DEFAULT 0,
+  romance_state TEXT NOT NULL DEFAULT 'none',
+  romance_since INTEGER NOT NULL DEFAULT 0,
+  soured     INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (world_id, a_id, b_id)
 );
 CREATE INDEX IF NOT EXISTS idx_npc_edges_world ON npc_edges(world_id);
@@ -676,6 +679,25 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
     table: 'characters',
     column: 'sexuality',
     ddl: `ALTER TABLE characters ADD COLUMN sexuality TEXT NOT NULL DEFAULT 'unspecified'`,
+  },
+  // Emergent NPC romance: a world-sim NPC↔NPC edge can grow a crush → couple. Default
+  // 'none'/0 so every legacy edge decodes to an unattached pair (unchanged behavior).
+  {
+    table: 'npc_edges',
+    column: 'romance_state',
+    ddl: `ALTER TABLE npc_edges ADD COLUMN romance_state TEXT NOT NULL DEFAULT 'none'`,
+  },
+  {
+    table: 'npc_edges',
+    column: 'romance_since',
+    ddl: `ALTER TABLE npc_edges ADD COLUMN romance_since INTEGER NOT NULL DEFAULT 0`,
+  },
+  {
+    // Emergent fallings-out: a world-sim NPC↔NPC edge can sour into a rivalry. Default 0
+    // so every legacy edge decodes as un-soured (unchanged behavior).
+    table: 'npc_edges',
+    column: 'soured',
+    ddl: `ALTER TABLE npc_edges ADD COLUMN soured INTEGER NOT NULL DEFAULT 0`,
   },
   {
     table: 'players',

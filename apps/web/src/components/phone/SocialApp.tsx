@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   CHARACTER_LINK_ORDER,
   type Character,
+  type CharacterDossier,
   type CharacterLinkKind,
   type SocialTie,
   type SocialWebNode,
@@ -10,7 +11,7 @@ import {
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
-import { characterLinkLabel } from '../../i18n/labels';
+import { characterLinkLabel, relationshipStatusLabel, warmthBandLabel } from '../../i18n/labels';
 import { Icon, type IconName } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { Portrait } from '../Portrait';
@@ -78,6 +79,8 @@ export function SocialApp() {
   const [error, setError] = useState<string>();
   const [reloadKey, setReloadKey] = useState(0);
   const [query, setQuery] = useState('');
+  // The person whose dossier sheet is open (tap a card or a tie chip to open it).
+  const [dossierId, setDossierId] = useState<string | null>(null);
   // Every meaningful bond is shown by default; "crossed paths" starts collapsed.
   const [activeKinds, setActiveKinds] = useState<Set<CharacterLinkKind>>(
     () => new Set(CHARACTER_LINK_ORDER.filter((k) => k !== NOISE_KIND)),
@@ -160,6 +163,19 @@ export function SocialApp() {
   const acqCount = edges.byKind.get(NOISE_KIND) ?? 0;
   const showingAcq = activeKinds.has(NOISE_KIND);
 
+  // Tapping a person opens their dossier as a full screen (with a back button),
+  // replacing the list — not a popup. Tapping a tie inside re-points the screen.
+  if (dossierId) {
+    return (
+      <DossierScreen
+        id={dossierId}
+        charById={charById}
+        onBack={() => setDossierId(null)}
+        onOpen={setDossierId}
+      />
+    );
+  }
+
   return (
     <div className="phone-app">
       <PhoneAppBar title={t('social.title')} kicker={t('social.kicker')} icon="social" />
@@ -235,7 +251,7 @@ export function SocialApp() {
             ) : (
               <div className="sw-list">
                 {cards.map(({ character, ties }) => (
-                  <PersonCard key={character.id} character={character} ties={ties} charById={charById} />
+                  <PersonCard key={character.id} character={character} ties={ties} charById={charById} onOpen={setDossierId} />
                 ))}
               </div>
             )}
@@ -259,15 +275,18 @@ export function SocialApp() {
 }
 
 /** One person's row: portrait + name, then their ties grouped by kind (bonds
- *  first), each kind a tinted icon with that kind's people as avatar chips. */
+ *  first), each kind a tinted icon with that kind's people as avatar chips. Tapping
+ *  the header (or any peer chip) opens that person's dossier. */
 function PersonCard({
   character,
   ties,
   charById,
+  onOpen,
 }: {
   character: Character;
   ties: SocialTie[];
   charById: Map<string, Character>;
+  onOpen: (id: string) => void;
 }) {
   const { t } = useTranslation(['phone', 'common']);
   const groups = CHARACTER_LINK_ORDER.map((kind) => ({
@@ -279,7 +298,12 @@ function PersonCard({
 
   return (
     <article className="sw-person">
-      <div className="sw-person-head">
+      <button
+        type="button"
+        className="sw-person-head"
+        onClick={() => onOpen(character.id)}
+        title={t('social.openProfile', { name: character.name })}
+      >
         <span className="sw-person-portrait">
           <Portrait character={character} className="round" />
         </span>
@@ -287,7 +311,7 @@ function PersonCard({
         <span className="sw-person-count">
           {t('social.tiesCount', { count: ties.length })}
         </span>
-      </div>
+      </button>
       <div className="sw-groups">
         {groups.map(({ kind, peers }) => (
           <div className={`sw-group kind-${kind}`} key={kind}>
@@ -299,10 +323,12 @@ function PersonCard({
                 const peer = charById.get(tie.targetId);
                 const peerName = peer?.name ?? t('social.someone');
                 return (
-                  <span
+                  <button
+                    type="button"
                     key={tie.targetId}
                     className={`sw-peer${tie.derived ? ' is-derived' : ''}${tie.incoming ? ' is-incoming' : ''}`}
                     title={tieTitle(character.name, peerName, kind, tie, t as unknown as TFn)}
+                    onClick={() => onOpen(tie.targetId)}
                   >
                     {tie.incoming && (
                       <span className="sw-peer-dir" aria-hidden>
@@ -315,7 +341,7 @@ function PersonCard({
                       </span>
                     )}
                     <span className="sw-peer-name">{peerName}</span>
-                  </span>
+                  </button>
                 );
               })}
             </div>
@@ -323,5 +349,209 @@ function PersonCard({
         ))}
       </div>
     </article>
+  );
+}
+
+/** A confidence phrase for a piece of grapevine word, by its surviving fidelity. */
+function fidelityPhrase(fidelity: number, tt: TFn): string {
+  if (fidelity >= 70) return tt('social.dossier.fidelityClear');
+  if (fidelity >= 40) return tt('social.dossier.fidelityFuzzy');
+  return tt('social.dossier.fidelityGarbled');
+}
+
+/**
+ * A person's dossier as a full phone screen (with a back button) — who they are,
+ * where you stand, their circle, their remembered recent life, and what's reached
+ * them about you through the grapevine. Fetches the composed dossier read-model;
+ * tapping a tie re-points the screen at that person, so you can walk the web.
+ */
+function DossierScreen({
+  id,
+  charById,
+  onBack,
+  onOpen,
+}: {
+  id: string;
+  charById: Map<string, Character>;
+  onBack: () => void;
+  onOpen: (id: string) => void;
+}) {
+  const { t } = useTranslation(['phone', 'common']);
+  const [data, setData] = useState<CharacterDossier | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(undefined);
+    setData(null);
+    api
+      .dossier(id)
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(errorMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Prefer the full roster character (carries expression assets) for the portrait;
+  // fall back to the dossier's name + portrait id for anyone not in the loaded set.
+  const portraitFor = (cid: string, name: string, assetId: string | null) =>
+    charById.get(cid) ?? { name, portraitAssetId: assetId, expressionAssets: {} };
+
+  return (
+    <div className="phone-app">
+      <PhoneAppBar
+        title={data?.name ?? t('social.title')}
+        kicker={t('social.dossier.kicker')}
+        icon="social"
+        left={
+          <button
+            className="btn sm ghost pbar-iconbtn"
+            onClick={onBack}
+            aria-label={t('common:back')}
+            title={t('common:back')}
+          >
+            <Icon name="chevronDown" size={18} />
+          </button>
+        }
+      />
+      <div className="social-app">
+        {loading ? (
+          <Spinner />
+        ) : error ? (
+          <div className="sw-error">
+            <Banner kind="error">{t('social.dossier.loadError', { error })}</Banner>
+            <button type="button" className="btn ghost sm" onClick={onBack}>
+              <Icon name="chevronDown" size={14} /> {t('common:back')}
+            </button>
+          </div>
+        ) : data ? (
+          <div className="sw-dossier">
+            <header className="swd-head">
+              <span className="swd-portrait">
+                <Portrait character={portraitFor(data.characterId, data.name, data.portraitAssetId)} className="round" />
+              </span>
+              <div className="swd-id">
+                <h3 className="swd-name">{data.name}</h3>
+                {data.shortDescription && <p className="swd-desc">{data.shortDescription}</p>}
+                {data.standing ? (
+                  <div className="swd-standing">
+                    <span className={`swd-band band-${data.standing.warmthBand}`}>
+                      {warmthBandLabel(data.standing.warmthBand)}
+                    </span>
+                    {data.standing.status !== 'none' && (
+                      <>
+                        <span className="swd-dot" aria-hidden>
+                          ·
+                        </span>
+                        <span className="swd-status">{relationshipStatusLabel(data.standing.status)}</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <p className="swd-notmet">{t('social.dossier.notMet')}</p>
+                )}
+              </div>
+            </header>
+
+            {data.standing && data.standing.flags.length > 0 && (
+              <div className="swd-flags">
+                {data.standing.flags.map((f) => (
+                  <span className="swd-flag" key={f}>
+                    {f}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <section className="swd-section">
+              <h4 className="swd-section-head">{t('social.dossier.circleHead')}</h4>
+              {data.ties.length === 0 ? (
+                <p className="swd-empty">{t('social.dossier.noTies')}</p>
+              ) : (
+                <ul className="swd-ties">
+                  {data.ties.map((tie) => (
+                    <li key={tie.targetId}>
+                      <button
+                        type="button"
+                        className="swd-tie"
+                        onClick={() => onOpen(tie.targetId)}
+                        title={t('social.openProfile', { name: tie.name })}
+                      >
+                        <span className="swd-tie-ava">
+                          <Portrait
+                            character={portraitFor(tie.targetId, tie.name, tie.portraitAssetId)}
+                            className="round"
+                          />
+                        </span>
+                        <span className="swd-tie-body">
+                          <span className="swd-tie-name">{tie.name}</span>
+                          <span className={`swd-tie-kind kind-${tie.kind}`}>
+                            <Icon name={KIND_ICON[tie.kind]} size={12} /> {characterLinkLabel(tie.kind)}
+                            {tie.incoming
+                              ? ` · ${t('social.dossier.incoming')}`
+                              : tie.derived
+                                ? ` · ${t('social.dossier.derived')}`
+                                : ''}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="swd-section">
+              <h4 className="swd-section-head">{t('social.dossier.lifeHead')}</h4>
+              {data.timeline.length === 0 ? (
+                <p className="swd-empty">{t('social.dossier.noTimeline')}</p>
+              ) : (
+                <ul className="swd-timeline">
+                  {data.timeline.map((e) => (
+                    <li key={e.id} className={`swd-tl swd-tl-${e.kind}`}>
+                      <span className="swd-tl-dot" aria-hidden />
+                      <span className="swd-tl-text">
+                        {e.text}
+                        {e.withName && (
+                          <span className="swd-tl-with"> · {t('social.dossier.with', { name: e.withName })}</span>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {data.heardAboutYou.length > 0 && (
+              <section className="swd-section">
+                <h4 className="swd-section-head">{t('social.dossier.heardHead')}</h4>
+                <ul className="swd-heard">
+                  {data.heardAboutYou.map((h, i) => (
+                    <li className="swd-heard-item" key={i}>
+                      <span className="swd-heard-claim">“{h.claim}”</span>
+                      <span className="swd-heard-meta">
+                        {fidelityPhrase(h.fidelity, t as unknown as TFn)}
+                        {h.fromName ? ` · ${t('social.dossier.heardFrom', { name: h.fromName })}` : ''}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

@@ -45,7 +45,7 @@ import {
 } from './entities';
 import { DayRecapSchema, ITEM_GEN, LOCATION_GEN, PROPERTY_GEN, STOCK_GEN, WORLD_GEN } from './llm';
 import { ItemCategorySchema, ItemRaritySchema } from './items';
-import { RelationshipStatusSchema } from '../social';
+import { CharacterLinkKindSchema, RelationshipStatusSchema } from '../social';
 import { PropertyCategorySchema, StockSectorSchema } from '../wealth';
 import { CardSchema, CasinoGameSchema, RouletteBetSchema, VideoPokerRankSchema, SlotSymbolSchema } from '../gambling';
 import {
@@ -870,6 +870,79 @@ export const CharacterBundleSchema = z.object({
 });
 export type CharacterBundle = z.infer<typeof CharacterBundleSchema>;
 
+// --- Social dossier (the phone "Social" app's tap-to-open person sheet) ------
+
+/** One of a person's ties to another character, resolved for the dossier sheet. */
+export const DossierTieSchema = z.object({
+  targetId: z.string(),
+  name: z.string(),
+  portraitAssetId: z.string().nullable().default(null),
+  kind: CharacterLinkKindSchema,
+  /** The world-sim formed this tie during play (vs. a hand-authored one). */
+  derived: z.boolean().default(false),
+  /** Only the OTHER person declared this tie (a one-sided rivalry, surfaced here). */
+  incoming: z.boolean().default(false),
+});
+export type DossierTie = z.infer<typeof DossierTieSchema>;
+
+/** One remembered moment in a person's timeline (their off-screen life + your history). */
+export const DossierTimelineEntrySchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  /** 'life' = their own off-screen social life (a world-sim run-in); 'memory' = a
+   *  remembered moment, usually with the player. */
+  kind: z.enum(['life', 'memory']).default('memory'),
+  /** The other character a 'life' moment involves, resolved to a name (if any). */
+  withName: z.string().nullable().default(null),
+  importance: z.number().int().min(1).max(5).default(1),
+  createdAt: z.number().int().nonnegative(),
+});
+export type DossierTimelineEntry = z.infer<typeof DossierTimelineEntrySchema>;
+
+/** A bit of word about the PLAYER that has reached this person secondhand. */
+export const DossierHeardEntrySchema = z.object({
+  claim: z.string(),
+  /** 0–100 — how intact the rumor still is (lower = more garbled). */
+  fidelity: z.number().int().min(0).max(100).default(0),
+  /** Who they (most recently) heard it from. */
+  fromName: z.string().nullable().default(null),
+});
+export type DossierHeardEntry = z.infer<typeof DossierHeardEntrySchema>;
+
+/** The player's standing with a person, summarized for the dossier header. */
+export const DossierStandingSchema = z.object({
+  /** A WarmthBandKey (near-strangers … sweethearts). */
+  warmthBand: z.string().default('near-strangers'),
+  status: RelationshipStatusSchema.default('none'),
+  /** Humanized earned story flags ("Met their parents", "Said I love you", …). */
+  flags: z.array(z.string()).default([]),
+});
+export type DossierStanding = z.infer<typeof DossierStandingSchema>;
+
+/**
+ * The read-model behind the Social app's tap-to-open person sheet: who someone is,
+ * where the player stands with them, their place in the web, their remembered recent
+ * life, and what's reached them about the player through the grapevine. A PURE
+ * projection over existing repos — composed at read time, never mutates or mints events.
+ */
+export const CharacterDossierSchema = z.object({
+  characterId: z.string(),
+  name: z.string(),
+  portraitAssetId: z.string().nullable().default(null),
+  shortDescription: z.string().default(''),
+  /** Has the player actually met them, or do they only know OF them through the web? */
+  hasMet: z.boolean().default(false),
+  /** The player's standing with them (null until they've met). */
+  standing: DossierStandingSchema.nullable().default(null),
+  /** How this person relates to others in the world's social web. */
+  ties: z.array(DossierTieSchema).default([]),
+  /** Their remembered recent life + your shared history, newest first. */
+  timeline: z.array(DossierTimelineEntrySchema).default([]),
+  /** Word about the player that has filtered through to them secondhand (the grapevine). */
+  heardAboutYou: z.array(DossierHeardEntrySchema).default([]),
+});
+export type CharacterDossier = z.infer<typeof CharacterDossierSchema>;
+
 // --- World clock (time / stamina / day) -------------------------------------
 
 export const NeglectedCharacterSchema = z.object({
@@ -881,7 +954,7 @@ export type NeglectedCharacter = z.infer<typeof NeglectedCharacterSchema>;
 
 // What the NPC world did on a given day — surfaced in the end-of-day recap modal.
 export const WorldSimBeatSchema = z.object({
-  kind: z.enum(['met', 'worked', 'shared', 'linked']),
+  kind: z.enum(['met', 'worked', 'shared', 'linked', 'soured']),
   summary: z.string(),
 });
 export type WorldSimBeat = z.infer<typeof WorldSimBeatSchema>;
