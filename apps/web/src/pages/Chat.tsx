@@ -98,7 +98,8 @@ export function Chat() {
   const [setup, setSetup] = useState({
     characterId: params.get('character') ?? '',
     mode: 'date' as ConversationMode,
-    locationId: '',
+    // "Anywhere" (the server auto-picks a free venue, else the cheapest affordable one).
+    locationId: 'anywhere',
   });
   const [setupWorld, setSetupWorld] = useState<World | null>(null);
   const [setupProperties, setSetupProperties] = useState<PropertyView[]>([]);
@@ -929,7 +930,7 @@ export function Chat() {
                         key={c.id}
                         type="button"
                         className={`date-pick-card${selected ? ' selected' : ''}${unavailable ? ' unavailable' : ''}`}
-                        onClick={() => setSetup((s) => ({ ...s, characterId: c.id, locationId: '' }))}
+                        onClick={() => setSetup((s) => ({ ...s, characterId: c.id, locationId: 'anywhere' }))}
                         disabled={unavailable}
                         title={unavailable ? t('chat.cardTitleUnavailable', { name: c.name, reason: avail?.reason ?? t('chat.unavailableToday') }) : t('chat.cardTitleMeet', { name: c.name })}
                       >
@@ -964,8 +965,27 @@ export function Chat() {
                     glyph: string;
                     disabled?: boolean;
                   };
+                  // "Anywhere" lets the server pick: the first free public venue, else
+                  // the cheapest one you can afford. Mirror that here so the tile shows
+                  // the right cost (and disables when nothing's affordable).
+                  const locs = setupWorld?.locations ?? [];
+                  const anyFree = locs.some((l) => venueCost(l.priceTier) === 0);
+                  const cheapestAffordablePaid = [...locs]
+                    .filter((l) => venueCost(l.priceTier) > 0)
+                    .sort((a, b) => venueCost(a.priceTier) - venueCost(b.priceTier))
+                    .find((l) => venueCost(l.priceTier) <= wallet);
+                  const anywhereBroke = locs.length > 0 && !anyFree && !cheapestAffordablePaid;
+                  const anywhereSub =
+                    anyFree || locs.length === 0
+                      ? t('chat.free')
+                      : anywhereBroke
+                        ? t('chat.cantAffordAny')
+                        : t('chat.venueCost', {
+                            symbol: venueTierMeta(cheapestAffordablePaid!.priceTier).symbol,
+                            cost: venueCost(cheapestAffordablePaid!.priceTier),
+                          });
                   const tiles: Tile[] = [
-                    { value: '', label: t('chat.anywhere'), sub: t('chat.free'), glyph: '✨' },
+                    { value: 'anywhere', label: t('chat.anywhere'), sub: anywhereSub, glyph: '✨', disabled: anywhereBroke },
                   ];
                   for (const pv of setupProperties) {
                     // Date at a property you OWN or currently LEASE (both free — the

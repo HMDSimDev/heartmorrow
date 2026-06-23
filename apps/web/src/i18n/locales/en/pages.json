@@ -35,6 +35,7 @@
     "leased": "leased",
     "freeSuffix": " · free",
     "cantAffordSuffix": " · can't afford",
+    "cantAffordAny": "no spot you can afford",
     "venueCost": "{symbol} {cost}",
     "roomName": "{name}'s Room",
     "theirRoomName": "Their's Room",

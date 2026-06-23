@@ -108,12 +108,37 @@ import { ThinkStripper, stripThink } from '../lib/think-filter';
 
 // --- session CRUD -----------------------------------------------------------
 
+/**
+ * Resolve the date-setup "Anywhere" choice to a concrete venue: the first FREE public
+ * location, or — when the world has none free — the cheapest one the player can
+ * currently afford. Throws if every venue costs more than the wallet holds (and none
+ * are free), so "Anywhere" can't silently start a date you can't pay for. Returns null
+ * only when the world has no venues at all (a locationless date is the fallback then).
+ */
+function pickAnywhereVenue(locations: readonly Location[], money: number): string | null {
+  if (locations.length === 0) return null;
+  const free = locations.find((l) => venueCost(l.priceTier) === 0);
+  if (free) return free.id;
+  // No free venue exists — fall back to the cheapest one you can afford.
+  const cheapestFirst = [...locations].sort((a, b) => venueCost(a.priceTier) - venueCost(b.priceTier));
+  const affordable = cheapestFirst.find((l) => venueCost(l.priceTier) <= money);
+  if (affordable) return affordable.id;
+  const cheapest = cheapestFirst[0]!;
+  throw badRequest(
+    `Everywhere in town costs more than you have right now (the cheapest, ${cheapest.name}, is ${venueCost(cheapest.priceTier)} and you have ${money}). Earn a little first, or date somewhere you own.`,
+  );
+}
+
 export function createSession(input: ConversationCreate): ConversationSession {
   const character = getCharacter(input.characterId); // validates existence
   // A memorialized character is gone — no further dates or chats (a kept record).
   if (isMemorialized(getRelationship(character.id))) {
     throw badRequest(`${character.name} is no longer with us.`);
   }
+  // The location the date actually happens at. "Anywhere" (a date-setup directive,
+  // not a real id) is resolved to a concrete venue inside the date block below; it
+  // never reaches a chat or worldless session as a literal location.
+  let resolvedLocationId: string | null = input.locationId ?? null;
   // Real meetings (anything but a free-form chat) cost a daily action and require
   // the character to be available today (world-bound only). 'chat' is exempt.
   if (input.mode !== 'chat' && character.worldId) {
@@ -139,11 +164,16 @@ export function createSession(input: ConversationCreate): ConversationSession {
     // A property venue is only valid if you own or currently lease it — reject a
     // `prop:` location you have no claim to rather than silently degrading to a
     // locationless date.
-    const loc = input.locationId ?? null;
-    if (loc?.startsWith('prop:') && !propertyVenueInfo(loc, character.worldId)) {
+    const world = worldsRepo.get(character.worldId) ?? null;
+    // "Anywhere": auto-pick the first free public venue, else the cheapest the player
+    // can currently afford — refusing the date outright when nothing is affordable.
+    if (resolvedLocationId === 'anywhere') {
+      resolvedLocationId = pickAnywhereVenue(world?.locations ?? [], getOrCreatePlayer(playerIdForWorld(character.worldId)).money);
+    }
+    if (resolvedLocationId?.startsWith('prop:') && !propertyVenueInfo(resolvedLocationId, character.worldId)) {
       throw badRequest('You can only date at a place you own or lease.');
     }
-    const venue = resolveSessionLocation(loc, character, worldsRepo.get(character.worldId) ?? null);
+    const venue = resolveSessionLocation(resolvedLocationId, character, world);
     const cost = venueCost(venue?.priceTier);
     if (cost > 0) {
       const money = getOrCreatePlayer(playerIdForWorld(character.worldId)).money;
@@ -153,12 +183,14 @@ export function createSession(input: ConversationCreate): ConversationSession {
         );
       }
     }
+  } else if (resolvedLocationId === 'anywhere') {
+    resolvedLocationId = null; // "Anywhere" is meaningless outside a world-bound date
   }
   const now = Date.now();
   const session = ConversationSessionSchema.parse({
     id: newId('sess'),
     characterId: input.characterId,
-    locationId: input.locationId,
+    locationId: resolvedLocationId,
     mode: input.mode,
     summary: '',
     ended: false,

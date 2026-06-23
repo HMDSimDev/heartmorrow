@@ -117,6 +117,48 @@ describe('paid dates — charging', () => {
   });
 });
 
+describe('"Anywhere" auto-picks a venue', () => {
+  it('resolves to the first FREE public venue when one exists', () => {
+    const { character } = worldWithVenues();
+    const sess = createSession({ characterId: character.id, mode: 'date', locationId: 'anywhere' });
+    expect(sess.locationId).toBe('loc_free'); // not the literal string "anywhere"
+  });
+
+  it('falls back to the cheapest affordable venue when nothing is free', () => {
+    const world = createWorld({
+      name: 'Paywall',
+      locations: [
+        { id: 'loc_nice', name: 'Bistro', description: '', tags: [], indoor: true, priceTier: 2 }, // 100
+        { id: 'loc_lavish', name: 'Aurora', description: '', tags: [], indoor: true, priceTier: 3 }, // 200
+      ],
+    });
+    const character = createCharacter({
+      worldId: world.id,
+      name: 'Date',
+      age: 25,
+      datingStats: { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 },
+    });
+    addMoney(150, playerIdForWorld(world.id)); // affords the bistro (100), not the lavish (200)
+    const sess = createSession({ characterId: character.id, mode: 'date', locationId: 'anywhere' });
+    expect(sess.locationId).toBe('loc_nice'); // the cheapest one within budget
+  });
+
+  it('refuses the date when no venue is free and none is affordable', () => {
+    const world = createWorld({
+      name: 'Too Rich',
+      locations: [{ id: 'loc_lavish', name: 'Aurora', description: '', tags: [], indoor: true, priceTier: 3 }], // 200
+    });
+    const character = createCharacter({
+      worldId: world.id,
+      name: 'Date',
+      age: 25,
+      datingStats: { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 },
+    });
+    addMoney(20, playerIdForWorld(world.id)); // can't afford the only (paid) venue
+    expect(() => createSession({ characterId: character.id, mode: 'date', locationId: 'anywhere' })).toThrow(/costs more than you have/i);
+  });
+});
+
 describe('passive income', () => {
   it('hands out no free money on Sleep — you have to earn it', async () => {
     const { world, wallet } = worldWithVenues();
