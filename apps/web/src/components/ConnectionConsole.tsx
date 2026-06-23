@@ -34,6 +34,10 @@ interface Props {
   footerStart?: ReactNode;
   /** Hide the built-in footer entirely (when the parent owns a shared footer). */
   hideFooter?: boolean;
+  /** When false (the default), the power-user knobs (sampling grid, structured-output
+   *  mode, schema-drop, retry limit, anthropic-version) are hidden — casual users see
+   *  only temperature + max tokens. Driven by the app-wide advanced-mode toggle. */
+  advancedMode?: boolean;
 }
 
 /**
@@ -55,6 +59,7 @@ export function ConnectionConsole({
   generationExtra,
   footerStart,
   hideFooter,
+  advancedMode = false,
 }: Props) {
   const { t } = useTranslation(['pages', 'common']);
   const hasModel = (id: string) => models.some((m) => m.id === id);
@@ -152,7 +157,7 @@ export function ConnectionConsole({
               onChange={(e) => onChange({ apiKey: e.target.value })}
             />
           </Field>
-          {value.endpointMode === 'anthropic' && (
+          {advancedMode && value.endpointMode === 'anthropic' && (
             <Field label={t('settings.fields.anthropicVersion')} hint={t('settings.fields.anthropicVersionHint')}>
               <input
                 value={value.anthropicVersion}
@@ -205,45 +210,49 @@ export function ConnectionConsole({
           <Field label={t('settings.fields.maxTokens')}>
             <input type="number" value={value.maxTokens} onChange={(e) => onChange({ maxTokens: Number(e.target.value) })} />
           </Field>
-          <Field label={t('settings.fields.advancedSampling')} hint={t('settings.fields.advancedSamplingHint')}>
-            <div className="set-sampling-grid">
-              {nullableCell('topP', t('settings.fields.topP'), 0, 1, 0.05)}
-              {nullableCell('topK', t('settings.fields.topK'), 0, 500, 1)}
-              {nullableCell('minP', t('settings.fields.minP'), 0, 1, 0.01)}
-              {nullableCell('frequencyPenalty', t('settings.fields.frequencyPenalty'), -2, 2, 0.1)}
-              {nullableCell('presencePenalty', t('settings.fields.presencePenalty'), -2, 2, 0.1)}
-              {nullableCell('repeatPenalty', t('settings.fields.repeatPenalty'), 0, 2, 0.05)}
-            </div>
-          </Field>
-          <Field label={t('settings.fields.structuredMode')} hint={t('settings.fields.structuredModeHint')}>
-            <select
-              value={value.structuredMode}
-              onChange={(e) => onChange({ structuredMode: e.target.value as StructuredOutputMode })}
-            >
-              <option value="json_schema">json_schema</option>
-              <option value="json_object">json_object</option>
-              <option value="prompt_only">prompt_only</option>
-            </select>
-          </Field>
-          <Field label={t('settings.fields.dropSchema')} hint={t('settings.fields.dropSchemaHint')}>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={value.omitSchemaInPrompt}
-                onChange={(e) => onChange({ omitSchemaInPrompt: e.target.checked })}
-              />
-              <span>{t('settings.fields.dropSchemaLabel')}</span>
-            </label>
-          </Field>
-          <Field label={t('settings.fields.retryLimit')} hint={t('settings.fields.retryLimitHint')}>
-            <input
-              type="number"
-              min={0}
-              max={10}
-              value={value.maxRetries}
-              onChange={(e) => onChange({ maxRetries: Number(e.target.value) })}
-            />
-          </Field>
+          {advancedMode && (
+            <>
+              <Field label={t('settings.fields.advancedSampling')} hint={t('settings.fields.advancedSamplingHint')}>
+                <div className="set-sampling-grid">
+                  {nullableCell('topP', t('settings.fields.topP'), 0, 1, 0.05)}
+                  {nullableCell('topK', t('settings.fields.topK'), 0, 500, 1)}
+                  {nullableCell('minP', t('settings.fields.minP'), 0, 1, 0.01)}
+                  {nullableCell('frequencyPenalty', t('settings.fields.frequencyPenalty'), -2, 2, 0.1)}
+                  {nullableCell('presencePenalty', t('settings.fields.presencePenalty'), -2, 2, 0.1)}
+                  {nullableCell('repeatPenalty', t('settings.fields.repeatPenalty'), 0, 2, 0.05)}
+                </div>
+              </Field>
+              <Field label={t('settings.fields.structuredMode')} hint={t('settings.fields.structuredModeHint')}>
+                <select
+                  value={value.structuredMode}
+                  onChange={(e) => onChange({ structuredMode: e.target.value as StructuredOutputMode })}
+                >
+                  <option value="json_schema">json_schema</option>
+                  <option value="json_object">json_object</option>
+                  <option value="prompt_only">prompt_only</option>
+                </select>
+              </Field>
+              <Field label={t('settings.fields.dropSchema')} hint={t('settings.fields.dropSchemaHint')}>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={value.omitSchemaInPrompt}
+                    onChange={(e) => onChange({ omitSchemaInPrompt: e.target.checked })}
+                  />
+                  <span>{t('settings.fields.dropSchemaLabel')}</span>
+                </label>
+              </Field>
+              <Field label={t('settings.fields.retryLimit')} hint={t('settings.fields.retryLimitHint')}>
+                <input
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={value.maxRetries}
+                  onChange={(e) => onChange({ maxRetries: Number(e.target.value) })}
+                />
+              </Field>
+            </>
+          )}
           {generationExtra}
         </div>
       </div>

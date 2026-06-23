@@ -1,0 +1,198 @@
+/* Prompt Editor — a two-panel power-user tool (categorized list + editor). Matches
+   the Nocturne tokens; collapses to a single column on narrow screens. */
+
+.pe-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: var(--gap, 16px);
+  /* Stretch (default) so the editor card matches the taller list column instead of
+     leaving a dark void beneath a short prompt. The list opts out via align-self. */
+  align-items: stretch;
+}
+
+@media (max-width: 720px) {
+  .pe-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- left: categorized prompt list ---
+   A PLAIN scroll panel (not .framed): the chamfered clip-path + brass frame + absolute
+   ::before fill that .framed uses don't survive `overflow: auto` — scrolled rows collide
+   with the chamfer and the fill, leaving a diagonal notch. A simple bordered panel scrolls
+   cleanly. */
+.pe-list {
+  padding: 8px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 12px);
+  /* Don't stretch to the editor's height; stay capped to the viewport and scroll
+     internally so a long list never blows the page out vertically. */
+  align-self: start;
+  max-height: calc(100dvh - 168px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pe-group-head {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  padding: 4px 8px;
+}
+
+.pe-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.pe-row:hover {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+.pe-row.active {
+  background: var(--panel-2);
+  border-color: var(--border-bright, var(--border));
+  color: var(--text);
+}
+
+.pe-row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.pe-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, var(--rose));
+  box-shadow: 0 0 6px var(--glow-accent, transparent);
+}
+
+/* --- right: the editor --- */
+.pe-editor {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pe-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pe-editor-titles h2 {
+  margin: 0 0 4px;
+}
+
+.pe-editor-titles .hint {
+  margin: 0;
+}
+
+.pe-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pe-tokens-label {
+  font-size: 0.78rem;
+  color: var(--text-mute);
+  margin-right: 2px;
+}
+
+.pe-token {
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border-soft, var(--border));
+  color: var(--text-dim);
+}
+
+.pe-token.missing {
+  border-color: var(--bad, #d9534f);
+  color: var(--bad, #d9534f);
+}
+
+.pe-textarea {
+  width: 100%;
+  /* Grow to fill the stretched editor card so a short prompt doesn't leave dead space;
+     long prompts scroll inside the textarea, keeping the pane ~one screen tall. */
+  flex: 1 1 auto;
+  min-height: 240px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  tab-size: 2;
+}
+
+.pe-meta {
+  font-size: 0.74rem;
+  color: var(--text-mute);
+  text-align: right;
+  margin-top: -4px;
+}
+
+.pe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pe-default {
+  border: 1px solid var(--border-soft, var(--border));
+  border-radius: var(--radius-sm, 8px);
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.pe-default-head {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft, var(--border));
+}
+
+.pe-default-text {
+  margin: 0;
+  padding: 12px;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}

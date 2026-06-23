@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PromptOverrideMapSchema } from './prompts';
 
 /**
  * Heartmorrow Bench — the model-evaluation harness.
@@ -136,6 +137,11 @@ export const BenchRunCaseRequestSchema = z.object({
    *  `POST /bench/cancel { runId }` can abort the in-flight case server-side
    *  (independent of connection-close detection through the dev proxy). */
   runId: z.string().default(''),
+  /** Ephemeral Prompt-Editor overrides to PREVIEW for this run only (keyed by
+   *  prompt id). Applied to the registry just for this case and restored after, so
+   *  the player can test edits before saving them as installation defaults. Never
+   *  persisted. Absent/empty → the run uses the saved overrides + shipped defaults. */
+  promptOverrides: PromptOverrideMapSchema.default({}),
 });
 export type BenchRunCaseRequest = z.infer<typeof BenchRunCaseRequestSchema>;
 

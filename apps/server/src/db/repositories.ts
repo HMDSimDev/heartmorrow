@@ -1158,6 +1158,30 @@ export const settingsRepo = {
   },
 };
 
+// --- prompt overrides (Prompt Editor; global, never exported) ----------------
+
+export const promptOverridesRepo = {
+  /** All saved overrides as a plain { promptId: text } map (the cache shape). */
+  getAll(): Record<string, string> {
+    const rows = getDb().all<Row>('SELECT prompt_id, override_text FROM prompt_overrides');
+    const out: Record<string, string> = {};
+    for (const r of rows) out[String(r.prompt_id)] = String(r.override_text);
+    return out;
+  },
+  set(promptId: string, text: string, when: number): void {
+    getDb().run(
+      `INSERT INTO prompt_overrides (prompt_id, override_text, updated_at) VALUES (?,?,?)
+       ON CONFLICT(prompt_id) DO UPDATE SET override_text = excluded.override_text, updated_at = excluded.updated_at`,
+      promptId,
+      text,
+      when,
+    );
+  },
+  remove(promptId: string): void {
+    getDb().run('DELETE FROM prompt_overrides WHERE prompt_id = ?', promptId);
+  },
+};
+
 // --- Faces: social feed (posts / comments / reactions / seen marker) --------
 
 function rowToFeedPost(r: Row): FeedPost {

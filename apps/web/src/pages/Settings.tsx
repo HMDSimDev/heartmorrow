@@ -87,7 +87,7 @@ interface PlayerForm {
  *  Settings under its own "Settings" heading, so the title isn't shown twice. */
 export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, i18n } = useTranslation(['pages', 'common']);
-  const { reloadPlayer, creatorMode, setCreatorMode, activeWorldId, theme, setTheme } = useAppData();
+  const { reloadPlayer, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, activeWorldId, theme, setTheme } = useAppData();
   const [player, setPlayer] = useState<PlayerForm | null>(null);
   const [playerSaved, setPlayerSaved] = useState(false);
   const [playerSaving, setPlayerSaving] = useState(false);
@@ -581,6 +581,21 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
       <section className="set-group">
         <h2 className="set-group-head">{t('settings.groups.model')}</h2>
 
+      <div className="framed set-section">
+        <div className="section-head">
+          <div className="titles">
+            <div className="kicker">{t('settings.advanced.kicker')}</div>
+            <h2>{t('settings.advanced.head')}</h2>
+          </div>
+          <div className="trail" />
+        </div>
+        <p className="set-lede">{t('settings.advanced.lede')}</p>
+        <label className="set-role-toggle">
+          <input type="checkbox" checked={advancedMode} onChange={(e) => setAdvancedMode(e.target.checked)} />
+          <span>{advancedMode ? t('settings.advanced.on') : t('settings.advanced.off')}</span>
+        </label>
+      </div>
+
       <Link to="/bench" className="set-bench-card framed">
         <div className="set-bench-mark" aria-hidden="true">
           <Icon name="refresh" size={22} />
@@ -594,6 +609,22 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           {t('settings.bench.open')} <Icon name="date" size={15} />
         </div>
       </Link>
+
+      {advancedMode && (
+        <Link to="/prompts" className="set-bench-card framed">
+          <div className="set-bench-mark" aria-hidden="true">
+            <Icon name="edit" size={22} />
+          </div>
+          <div className="set-bench-body">
+            <div className="kicker">{t('settings.prompts.kicker')}</div>
+            <h2>{t('settings.prompts.head')}</h2>
+            <p>{t('settings.prompts.blurb')}</p>
+          </div>
+          <div className="set-bench-go">
+            {t('settings.prompts.open')} <Icon name="date" size={15} />
+          </div>
+        </Link>
+      )}
 
       {/* Signature element: the connection console — the technical heart of the
           page, presented as a chamfered instrument panel. One box, with a tab per
@@ -673,6 +704,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             onLoadModels={() => loadModels('base')}
             onTest={() => test('base')}
             testing={!!testing.base}
+            advancedMode={advancedMode}
             hideFooter
             generationExtra={
               <Field label={t('settings.fields.rapport')} hint={t('settings.fields.rapportHint')}>
@@ -828,6 +860,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
                     onLoadModels={() => loadModels(role)}
                     onTest={() => test(role)}
                     testing={!!testing[role]}
+                    advancedMode={advancedMode}
                     hideFooter
                   />
                 ) : (

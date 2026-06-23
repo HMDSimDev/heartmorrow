@@ -8,6 +8,9 @@ import { idbGet, idbSet, idbDel } from '../lib/idb-kv';
 
 const ACTIVE_WORLD_KEY = 'dsim.activeWorldId';
 const CREATOR_KEY = 'dsim.creatorMode';
+// Advanced mode reveals power-user settings (sampler knobs, the Prompt Editor). It
+// is purely UI gating — client-only, like creator mode — and OFF by default.
+const ADVANCED_KEY = 'dsim.advancedMode';
 // Only the tiny accent values live in localStorage. The wallpaper IMAGE is stored
 // as a Blob in IndexedDB, and `theme.wallpaper` holds a short-lived blob: object
 // URL — NOT the megabyte data URL. Two reasons a data URL fails:
@@ -87,6 +90,10 @@ interface AppData {
   // Mode + theme (client-side)
   creatorMode: boolean;
   setCreatorMode: (on: boolean) => void;
+  /** Advanced mode: reveals power-user settings (sampler knobs + the Prompt Editor).
+   *  Client-only UI gating, persisted to localStorage; the server enforces nothing. */
+  advancedMode: boolean;
+  setAdvancedMode: (on: boolean) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
   /** Set (or clear, with null) the phone wallpaper from an image Blob/File. The
@@ -123,6 +130,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [worldState, setWorldState] = useState<WorldState | null>(null);
   const [dayTick, setDayTick] = useState(0);
   const [creatorMode, setCreatorModeState] = useState<boolean>(() => localStorage.getItem(CREATOR_KEY) !== 'false');
+  const [advancedMode, setAdvancedModeState] = useState<boolean>(() => localStorage.getItem(ADVANCED_KEY) === 'true');
   const [theme, setThemeState] = useState<Theme>(loadThemeMeta);
   const [unreadTexts, setUnreadTexts] = useState(0);
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
@@ -248,6 +256,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const setCreatorMode = useCallback((on: boolean) => {
     localStorage.setItem(CREATOR_KEY, String(on));
     setCreatorModeState(on);
+  }, []);
+
+  const setAdvancedMode = useCallback((on: boolean) => {
+    localStorage.setItem(ADVANCED_KEY, String(on));
+    setAdvancedModeState(on);
   }, []);
 
   const setTheme = useCallback((t: Theme) => {
@@ -421,6 +434,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       sleep,
       creatorMode,
       setCreatorMode,
+      advancedMode,
+      setAdvancedMode,
       theme,
       setTheme,
       setWallpaper,
@@ -431,7 +446,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       refreshActiveDate,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

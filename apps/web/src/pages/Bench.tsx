@@ -714,6 +714,9 @@ export function Bench() {
   const [results, setResults] = useState<Record<string, BenchCaseResult>>({});
   const [running, setRunning] = useState(false);
   const [savedNote, setSavedNote] = useState<string>();
+  /** Ephemeral Prompt-Editor overrides handed off from /prompts to preview here. Read
+   *  once from sessionStorage; applied to every case run until the player dismisses it. */
+  const [previewOverrides, setPreviewOverrides] = useState<Record<string, string> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   /** Id shared by every case in the current run, so Cancel can abort the in-flight
    *  case server-side via /bench/cancel (not just the local fetch). */
@@ -726,6 +729,20 @@ export function Bench() {
     const { baselines: list } = await api.benchBaselines();
     setBaselines(Object.fromEntries(list.map((b) => [b.caseId, b])));
   };
+
+  // One-shot handoff from the Prompt Editor's "Preview in Bench": consume the
+  // sessionStorage entry so a later refresh doesn't silently keep previewing.
+  useEffect(() => {
+    const raw = sessionStorage.getItem('dsim.promptPreview'); // PromptEditor.PROMPT_PREVIEW_KEY
+    if (!raw) return;
+    sessionStorage.removeItem('dsim.promptPreview');
+    try {
+      const map = JSON.parse(raw) as Record<string, string>;
+      if (map && typeof map === 'object' && Object.keys(map).length > 0) setPreviewOverrides(map);
+    } catch {
+      /* ignore a malformed handoff */
+    }
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -814,7 +831,10 @@ export function Bench() {
       }
       setStatus((s) => ({ ...s, [id]: 'running' }));
       try {
-        const r = await api.benchRunCase({ caseId: id, llmPlayer, dialogueTurns, runId }, ac.signal);
+        const r = await api.benchRunCase(
+          { caseId: id, llmPlayer, dialogueTurns, runId, promptOverrides: previewOverrides ?? {} },
+          ac.signal,
+        );
         setResults((prev) => ({ ...prev, [id]: r }));
         setStatus((s) => ({ ...s, [id]: r.ok ? 'done' : 'error' }));
       } catch (e) {
@@ -886,6 +906,14 @@ export function Bench() {
 
       {error && <Banner kind="error">{error}</Banner>}
       {savedNote && <Banner kind="ok">{savedNote}</Banner>}
+      {previewOverrides && (
+        <Banner kind="info">
+          {t('bench.previewing', { count: Object.keys(previewOverrides).length })}{' '}
+          <button className="btn sm" onClick={() => setPreviewOverrides(null)} style={{ marginLeft: 8 }}>
+            {t('bench.previewClear')}
+          </button>
+        </Banner>
+      )}
 
       <div className="bench-tabs">
         <button className={`btn sm ${view === 'run' ? 'primary' : ''}`} onClick={() => setView('run')}>

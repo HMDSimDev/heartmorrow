@@ -35,6 +35,7 @@ import { newId } from '../../lib/ids';
 import { notFound, badRequest } from '../../lib/errors';
 import { getBenchCase, type BenchCaseDef, type DialogueSpec } from './cases';
 import { benchBaselinesStore } from './store';
+import { applyPreviewOverrides } from '../../prompt/registry';
 
 const RUN_BASE_TS = 1_700_000_000_000;
 
@@ -370,18 +371,26 @@ function failedResult(def: BenchCaseDef, message: string): BenchCaseResult {
  *  (`runId` from the request is route-only — used to register cancellation — so the
  *  runner needs just the execution fields.) */
 export async function runBenchCase(
-  req: Pick<BenchRunCaseRequest, 'caseId' | 'llmPlayer' | 'dialogueTurns'>,
+  req: Pick<BenchRunCaseRequest, 'caseId' | 'llmPlayer' | 'dialogueTurns'> & {
+    promptOverrides?: BenchRunCaseRequest['promptOverrides'];
+  },
   signal?: AbortSignal,
 ): Promise<BenchCaseResult> {
   const def = getBenchCase(req.caseId);
   if (!def) throw notFound(`Unknown bench case: ${req.caseId}`);
   const settings = getLlmSettings();
+  // Apply any ephemeral Prompt-Editor preview overrides for THIS run only, then
+  // restore the cache no matter how the case ends (success, failure, or abort).
+  const preview = req.promptOverrides && Object.keys(req.promptOverrides).length > 0 ? req.promptOverrides : null;
+  const restore = preview ? applyPreviewOverrides(preview) : null;
   try {
     if (def.dialogue) return await runDialogue(def, settings, req.dialogueTurns, req.llmPlayer, signal);
     if (def.structured) return await runStructured(def, settings, signal);
     throw badRequest(`Bench case ${req.caseId} has no runnable spec.`);
   } catch (err) {
     return failedResult(def, (err as Error).message || 'Case failed.');
+  } finally {
+    if (restore) restore();
   }
 }
 

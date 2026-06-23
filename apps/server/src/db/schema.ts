@@ -538,6 +538,16 @@ CREATE TABLE IF NOT EXISTS bench_baselines (
   note       TEXT NOT NULL DEFAULT '',
   updated_at INTEGER NOT NULL
 );
+
+-- Prompt Editor: installation-LOCAL overrides for the system prompts / guardrails,
+-- keyed by the registry prompt id. Global (never per-world / per-character) and
+-- deliberately NOT exported with worlds/characters, so a custom prompt set stays on
+-- this machine. A missing row means "use the shipped default".
+CREATE TABLE IF NOT EXISTS prompt_overrides (
+  prompt_id     TEXT PRIMARY KEY,
+  override_text TEXT NOT NULL,
+  updated_at    INTEGER NOT NULL
+);
 `;
 
 /**

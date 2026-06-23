@@ -8,6 +8,8 @@ import { config, ensureDirectories } from './config';
 import { AppError } from './lib/errors';
 import { healthRoutes } from './routes/health';
 import { settingsRoutes } from './routes/settings';
+import { promptRoutes } from './routes/prompts';
+import { hydratePromptOverrides } from './services/prompt-override-service';
 import { worldRoutes } from './routes/worlds';
 import { characterRoutes } from './routes/characters';
 import { assetRoutes } from './routes/assets';
@@ -33,6 +35,10 @@ export interface BuildAppOptions {
 
 export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyInstance> {
   ensureDirectories();
+
+  // Load any installation-local prompt overrides into the registry cache so the
+  // very first prompt the game builds already reflects the player's customizations.
+  hydratePromptOverrides();
 
   const app = Fastify({
     logger: options.logger ?? true,
@@ -96,6 +102,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     async (api) => {
       await healthRoutes(api);
       await settingsRoutes(api);
+      await promptRoutes(api);
       await worldRoutes(api);
       await characterRoutes(api);
       await assetRoutes(api);

@@ -26,4 +26,5 @@ export * from './schemas/entities';
 export * from './schemas/api';
 export * from './schemas/pack';
 export * from './schemas/bench';
+export * from './schemas/prompts';
 export * from './crisis';

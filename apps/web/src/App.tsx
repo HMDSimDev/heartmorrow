@@ -18,6 +18,7 @@ import { Minigames } from './pages/Minigames';
 import { Phone } from './pages/Phone';
 import { Settings } from './pages/Settings';
 import { Bench } from './pages/Bench';
+import { PromptEditor } from './pages/PromptEditor';
 import { Debug } from './pages/Debug';
 
 // `shortKey` is the label used by the cramped bottom nav (phones); the roomy
@@ -47,6 +48,7 @@ function routeKey(path: string): string {
   if (path.startsWith('/minigames')) return 'games';
   if (path.startsWith('/settings')) return 'settings';
   if (path.startsWith('/bench')) return 'settings';
+  if (path.startsWith('/prompts')) return 'settings';
   if (path.startsWith('/world')) return 'world';
   if (path.startsWith('/debug')) return 'debug';
   return 'home';
@@ -142,6 +144,7 @@ export default function App() {
           <Route path="/minigames" element={<Minigames />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/bench" element={<Bench />} />
+          <Route path="/prompts" element={<PromptEditor />} />
           <Route path="/debug" element={<CreatorRoute><Debug /></CreatorRoute>} />
           <Route path="*" element={<Dashboard />} />
         </Routes>

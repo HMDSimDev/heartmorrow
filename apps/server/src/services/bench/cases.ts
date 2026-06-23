@@ -98,7 +98,7 @@ import {
   buildTextReplyMessages,
   estimatePromptChars,
 } from '../../prompt/prompt-builder';
-import { PROFILE_GEN_GUARDRAILS } from '../../prompt/guardrails';
+import { resolvePrompt } from '../../prompt/registry';
 import type { ChatMessage } from '../../llm/types';
 import {
   benchMara,
@@ -382,7 +382,7 @@ function buildProfileGenMessages(): ChatMessage[] {
     appearance: 'Weather-lined face, salt-and-pepper beard, paint under his nails.',
   });
   return [
-    { role: 'system', content: PROFILE_GEN_GUARDRAILS },
+    { role: 'system', content: resolvePrompt('PROFILE_GEN_GUARDRAILS') },
     {
       role: 'user',
       content:

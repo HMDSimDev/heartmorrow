@@ -61,7 +61,7 @@ import {
   buildImageDescriptionMessages,
   buildCharacterFromSourcesMessages,
 } from '../prompt/prompt-builder';
-import { PROFILE_GEN_GUARDRAILS } from '../prompt/guardrails';
+import { resolvePrompt } from '../prompt/registry';
 import type { ChatMessage } from '../llm/types';
 
 export function listCharacters(worldId?: string): Character[] {
@@ -550,7 +550,7 @@ export async function generateCharacterProfile(
   const data = GenerateProfileInputSchema.parse(input);
   const settings = getLlmSettings();
   const messages: ChatMessage[] = [
-    { role: 'system', content: PROFILE_GEN_GUARDRAILS },
+    { role: 'system', content: resolvePrompt('PROFILE_GEN_GUARDRAILS') },
     {
       role: 'user',
       content:

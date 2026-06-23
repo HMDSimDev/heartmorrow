@@ -669,7 +669,9 @@
     "doneOf": "{done}/{total} done",
     "runSaved": "Run saved — find it under History.",
     "nCases": "{count, plural, one {# case} other {# cases}}",
-    "toggleGroup": "Toggle group"
+    "toggleGroup": "Toggle group",
+    "previewing": "{count, plural, one {Previewing # custom prompt} other {Previewing # custom prompts}} — the runs below use your unsaved edits.",
+    "previewClear": "Clear preview"
   },
   "debug": {
     "console": "Creator console",
@@ -1167,6 +1169,52 @@
       "cancel": "Cancel",
       "enabling": "Enabling…",
       "enable": "Enable tragic outcomes"
+    },
+    "advanced": {
+      "kicker": "Advanced",
+      "head": "Advanced mode",
+      "lede": "Reveal power-user controls — the extra sampling knobs on each model connection and the Prompt Editor for customizing the prompts the game sends to the model. Off by default; everything works without it.",
+      "on": "On",
+      "off": "Off"
+    },
+    "prompts": {
+      "kicker": "Prompts",
+      "head": "Prompt Editor",
+      "blurb": "Edit any system prompt or guardrail the game sends to the model. Overrides are saved on this device only — never bundled into the worlds or characters you share.",
+      "open": "Open",
+      "page": {
+        "kicker": "Advanced",
+        "title": "Prompt Editor",
+        "blurb": "Customize any prompt the game sends to the model. Changes are saved on this device only and apply immediately — they are never part of the worlds or characters you export."
+      },
+      "enableAdvanced": "The Prompt Editor lives under Advanced mode. Turn on Advanced mode in Settings to reach it from there — any overrides you save here take effect either way.",
+      "categories": {
+        "roleplay": "Date & roleplay",
+        "judge": "Judges & scoring",
+        "phone": "Phone & texts",
+        "social": "Social feed",
+        "memory": "Memory & recaps",
+        "creator": "Creator tools",
+        "safety": "Safety rails"
+      },
+      "editedBadge": "Customized",
+      "custom": "Customized",
+      "default": "Default",
+      "safetyWarn": "This is a safety rail. Editing it can weaken the game's content limits and its defenses against prompt injection. Change it only if you understand the risk.",
+      "requiredTokens": "Keep these placeholders:",
+      "charCount": "{count, plural, one {# character} other {# characters}}",
+      "missingTokens": "Add these placeholders back before saving: {tokens}",
+      "save": "Save override",
+      "saving": "Saving…",
+      "saved": "Saved. The game will use this prompt from now on.",
+      "previewInBench": "Preview in Bench",
+      "reset": "Reset to default",
+      "resetDone": "Reset to the shipped default.",
+      "showDefault": "Show shipped default",
+      "hideDefault": "Hide shipped default",
+      "defaultPanelLabel": "Shipped default (read-only)",
+      "selectHint": "Select a prompt to edit.",
+      "backToSettings": "Back to Settings"
     }
   }
 }

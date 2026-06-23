@@ -60,6 +60,7 @@ import type {
   BenchRunCaseRequest,
   BenchRunRequest,
   BenchSettingsSnapshot,
+  PromptCatalogEntry,
   MemoryCreate,
   Message,
   Moment,
@@ -376,6 +377,16 @@ export const api = {
   /** List the samplers advertised by an SD endpoint (for the sampler picker). */
   listImageSamplers: (baseUrl: string) =>
     post<{ ok: boolean; samplers: string[]; error?: string }>('/settings/image/samplers', { baseUrl }),
+
+  // Prompt Editor — installation-local overrides for every system prompt / guardrail
+  listPrompts: () => get<{ entries: PromptCatalogEntry[] }>('/settings/prompts'),
+  savePromptOverride: (id: string, text: string) =>
+    request<PromptCatalogEntry>(`/settings/prompts/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ text }),
+    }),
+  resetPromptOverride: (id: string) =>
+    del<PromptCatalogEntry>(`/settings/prompts/${encodeURIComponent(id)}`),
 
   // Heartmorrow Bench — model evaluation harness
   benchCatalog: () => get<BenchCatalog>('/bench/catalog'),
