@@ -7,7 +7,7 @@ import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, setRelationshipFlag, stampLastSeen } from './stat-service';
 import { ensureWorldState, getWorldState } from './world-clock-service';
 import { updateLlmSettings } from './settings-service';
-import { attemptWalkout, createSession, maybeRollJealousy } from './conversation-service';
+import { addPlayerMessage, attemptWalkout, createSession, endSession, maybeRollJealousy } from './conversation-service';
 import { listMemories } from './memory-service';
 
 /** Bump a relationship into the intimacy-permissible band (warmth >= 65, low tension). */
@@ -32,7 +32,7 @@ beforeEach(() => resetDb());
 afterEach(() => setAdapterOverride(null));
 
 describe('walkout', () => {
-  it('ends the date and penalizes when the model confirms (egregious message)', async () => {
+  it('voices the farewell and penalizes when the model confirms (egregious message)', async () => {
     const { character } = seedWorldAndCharacter();
     const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
     const before = getRelationship(character.id).affection;
@@ -92,19 +92,32 @@ describe('walkout', () => {
     expect(adapter.calls).toBe(1); // HOSTILE is never gated by NSFW/closeness
   });
 
-  it('a walkout spends the daily action and stamps last-seen, like any real date', async () => {
+  it('a walkout, once finalized, spends the daily action and stamps last-seen like any real date', async () => {
     const { world, character } = seedWorldAndCharacter();
     const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
     const before = getWorldState(world.id); // createSession ensured the clock; stamina full
+    // attemptWalkout voices the farewell; the CLIENT then runs the normal end-and-
+    // evaluate flow (here: endSession), which is what spends the cost — so script
+    // both the walkout decision and the session-evaluation responses.
     setAdapterOverride(
-      new ScriptedAdapter([JSON.stringify({ walkout: true, reason: 'insulted', farewellLine: "We're done." })]),
+      new ScriptedAdapter([
+        JSON.stringify({ walkout: true, reason: 'insulted', farewellLine: "We're done." }),
+        JSON.stringify({ mood: 'upset', expression: 'neutral', relationshipDeltas: {}, memoryCandidates: [], summaryLine: 'It ended badly.' }),
+      ]),
     );
+    // The route persists the player's turn before screening for a walkout; do the
+    // same so the finalizing eval counts this as a real (if blown-up) date.
+    addPlayerMessage(session.id, "you're pathetic and stupid");
     await attemptWalkout(session.id, "you're pathetic and stupid");
+    expect(getWorldState(world.id).stamina).toBe(before.stamina); // not spent yet — date still open
+    await endSession(session.id);
 
     const after = getWorldState(world.id);
     expect(after.stamina).toBe(before.stamina - 1); // a blown-up date is not free
     expect(after.actionsToday).toBe(before.actionsToday + 1);
     expect(getRelationship(character.id).flags[LAST_SEEN_FLAG]).toBe(after.day);
+    // The grievance survives its own eval — a walkout isn't "aired out" by that date.
+    expect(getRelationship(character.id).flags['state:offended']).toBe(true);
   });
 
   it('records a durable memory + tags it as conflict so it surfaces next time', async () => {

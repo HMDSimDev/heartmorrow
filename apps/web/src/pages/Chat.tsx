@@ -510,10 +510,14 @@ export function Chat() {
           },
           onNotice: (msg) => setNotice(msg),
           onWalkout: (m, reason) => {
+            // The character stormed out. Show the walkout moment, then run the normal
+            // end-and-evaluate flow so the blown-up date is scored in full (stamina,
+            // deltas, memories, milestones) — same as a deliberately-ended date.
             settled = true;
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
             setWalkout(reason || t('chat.walkoutDefault'));
+            void endDate();
           },
           onBreakupIntent: (m, reaction) => {
             settled = true;
@@ -528,11 +532,15 @@ export function Chat() {
             if (delta) setRapportPulse((p) => ({ delta, key: (p?.key ?? 0) + 1 }));
           },
           onLeft: (m) => {
+            // The character lost interest and called it a night. Show the soft-exit
+            // moment, then run the normal end-and-evaluate flow so the flat date is
+            // scored in full (stamina, deltas, memories) like any ended date.
             settled = true;
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
             setLeftEarly(true);
             setVibe(null);
+            void endDate();
           },
           onFarewell: (m, expr) => {
             // The player ended the date by chatting (a natural goodbye). Show the
@@ -1135,27 +1143,11 @@ export function Chat() {
         </div>
       );
     }
-    if (evalResult?.breakup) {
-      return (
-        <div className="date-moment date-moment-breakup">
-          <div className="date-moment-seal" aria-hidden="true">💔</div>
-          <div className="date-moment-kicker">{t('chat.breakupKicker')}</div>
-          <div className="date-moment-title">{t('chat.breakupTitle', { name: character.name })}</div>
-          <p className="date-moment-body">{evalResult.breakup.line}</p>
-          <p className="date-moment-note">{t('chat.breakupNote')}</p>
-        </div>
-      );
-    }
-    if (brokeUp) {
-      return (
-        <div className="date-moment date-moment-breakup">
-          <div className="date-moment-seal" aria-hidden="true">💔</div>
-          <div className="date-moment-kicker">{t('chat.youEndedKicker')}</div>
-          <div className="date-moment-title">{t('chat.youEndedTitle', { name: character.name })}</div>
-          <p className="date-moment-body">{t('chat.youEndedBody')}</p>
-        </div>
-      );
-    }
+    // A walkout / lost-interest exit is the proximate thing that just happened on
+    // screen, so it stays the PRIMARY moment even when the full evaluation it now
+    // runs also ends the relationship — the breakup is surfaced as a consequence
+    // note below (see the secondary outcomes). Checked above evalResult.breakup so a
+    // walkout-induced breakup doesn't get re-skinned as an ordinary breakup card.
     if (walkout) {
       return (
         <div className="date-moment date-moment-walkout">
@@ -1175,6 +1167,27 @@ export function Chat() {
           <div className="date-moment-title">{t('chat.leftEarlyTitle', { name: character.name })}</div>
           <p className="date-moment-body">{t('chat.leftEarlyBody')}</p>
           <p className="date-moment-note">{t('chat.leftEarlyNote')}</p>
+        </div>
+      );
+    }
+    if (evalResult?.breakup) {
+      return (
+        <div className="date-moment date-moment-breakup">
+          <div className="date-moment-seal" aria-hidden="true">💔</div>
+          <div className="date-moment-kicker">{t('chat.breakupKicker')}</div>
+          <div className="date-moment-title">{t('chat.breakupTitle', { name: character.name })}</div>
+          <p className="date-moment-body">{evalResult.breakup.line}</p>
+          <p className="date-moment-note">{t('chat.breakupNote')}</p>
+        </div>
+      );
+    }
+    if (brokeUp) {
+      return (
+        <div className="date-moment date-moment-breakup">
+          <div className="date-moment-seal" aria-hidden="true">💔</div>
+          <div className="date-moment-kicker">{t('chat.youEndedKicker')}</div>
+          <div className="date-moment-title">{t('chat.youEndedTitle', { name: character.name })}</div>
+          <p className="date-moment-body">{t('chat.youEndedBody')}</p>
         </div>
       );
     }
@@ -1392,6 +1405,12 @@ export function Chat() {
 
           {/* Secondary outcomes — quiet notes below the primary moment */}
           {milestoneTookPrimary && evalBanner}
+          {(walkout || leftEarly) && evalResult?.breakup && (
+            <Banner kind="error">
+              <Icon name="breakup" size={14} /> <strong>{t('chat.breakupTitle', { name: character.name })}</strong>{' '}
+              {evalResult.breakup.line}
+            </Banner>
+          )}
           {evalResult?.reconciled && (
             <Banner kind="ok">
               <Icon name="date" size={14} /> <strong>{t('chat.backTogether', { name: character.name })}</strong> {t('chat.backTogetherNote')}

@@ -67,7 +67,7 @@ export type Chronicle = z.infer<typeof ChronicleSchema>;
 export const WalkoutReactionSchema = z.object({
   walkout: z.boolean(),
   reason: z.string().max(120).default(''),
-  farewellLine: z.string().min(1).max(240),
+  farewellLine: z.string().min(1).max(700),
   /** First-person memory the character will carry of what drove the walkout —
    *  written only when walkout=true (server falls back to `reason` if omitted). */
   memory: z.string().max(400).default(''),

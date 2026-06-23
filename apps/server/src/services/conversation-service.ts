@@ -564,9 +564,13 @@ export interface WalkoutOutcome {
 }
 
 /**
- * If the player's latest message is egregious, ask the model (structured)
- * whether the character ends the date and walks out. Returns the farewell
- * message + ends the session, or null. Rare by design; fails safe (no walkout).
+ * If the player's latest message is egregious, ask the model (structured) whether
+ * the character ends the date and walks out. Applies the walkout's special penalty,
+ * grievance, and memory, then voices the farewell — but does NOT end the session
+ * itself: the CLIENT runs the normal end-and-evaluate flow next, so a blown-up date
+ * is scored in full (stamina, evaluator deltas/memories, milestones, strain), exactly
+ * like a date the player ended deliberately. Returns the farewell message + reason,
+ * or null. Rare by design; fails safe (no walkout).
  */
 export async function attemptWalkout(
   sessionId: string,
@@ -594,49 +598,35 @@ export async function attemptWalkout(
   );
   if (!result.ok || !result.data.walkout) return null;
 
-  // Atomically claim the session before applying the penalty/spend: the LLM await
-  // above is a yield point, so a concurrent walkout / lost-interest leave / manual
-  // end could otherwise ALSO penalize + spend for this one blow-up. If another path
-  // already ended it, bail without double-applying.
-  if (!sessionsRepo.claimEnd(sessionId)) return null;
-
+  // Apply the walkout's SPECIAL consequences — the things the normal date evaluator
+  // can't infer: the penalty for egregious behavior, the carried-forward grievance
+  // (state:offended), the same-day cooldown, the despair hit, and a durable conflict
+  // memory. We deliberately DO NOT end the session here: like a date the player ends
+  // with a natural goodbye (see attemptPlayerFarewell), the CLIENT then runs the
+  // normal end-and-evaluate flow, so the blown-up date is still scored IN FULL —
+  // stamina spent, evaluator deltas/memories, milestones, strain. endSession is told
+  // (via the farewell's metadata) not to "air out" the offense it was the eval for.
   applyRelationshipChange(character.id, { ...WALKOUT_PENALTY }, { source: 'walkout', detail: { reason: result.data.reason } });
   setRelationshipFlag(character.id, 'state:offended', true, { source: 'walkout' });
+  const walkoutDay = character.worldId ? ensureWorldState(character.worldId).day : 0;
   if (character.worldId) {
-    const wday = ensureWorldState(character.worldId).day;
-    setRelationshipFlag(character.id, 'walkout:lastDay', wday, { source: 'walkout' });
+    setRelationshipFlag(character.id, 'walkout:lastDay', walkoutDay, { source: 'walkout' });
     // (Opt-in) cruelty severe enough to drive a deeply-attached partner out feeds
     // the despair spiral — no-op unless enabled AND they were close to you.
     try {
-      adjustDespair(character.id, DESPAIR.hostility, 'hostility', wday);
+      adjustDespair(character.id, DESPAIR.hostility, 'hostility', walkoutDay);
     } catch {
       /* best-effort */
     }
   }
-  // A real date occurred (the player earned a walkout over real turns): spend the
-  // daily action + stamp last-seen, exactly like a normally-ended date. Best-effort
-  // so it never blocks the farewell (e.g. if stamina is already 0).
-  if (character.worldId) {
-    try {
-      const wday2 = ensureWorldState(character.worldId).day;
-      stampLastDate(character.id, wday2);
-      if (session.mode === 'date' || session.mode === 'event') spendStamina(character.worldId);
-    } catch {
-      /* best-effort: a date that blew up still ends */
-    }
-  }
   const message = addCharacterMessage(sessionId, result.data.farewellLine.trim(), { walkout: true });
-  // (session already marked ended by claimEnd above)
-  const walkoutDay = character.worldId ? ensureWorldState(character.worldId).day : 0;
   const walkoutEvent = recordEvent('walkout', {
     characterId: character.id,
     reason: result.data.reason,
     ...(character.worldId ? { day: walkoutDay } : {}),
   });
-  // The character now REMEMBERS the blow-up. A walkout used to leave ONLY the
-  // transient state:offended flag (cleared at the next date), so they'd act as if
-  // nothing happened. Write a durable memory of what the player did + a chronicle
-  // line, with safe fallbacks when the model omits the new fields.
+  // A durable, first-person grievance memory so they carry the blow-up forward (the
+  // full evaluator may write its own too; this guarantees a conflict-tagged record).
   const walkoutPlayerName = getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name;
   const walkoutMemory =
     result.data.memory.trim() ||
@@ -649,20 +639,8 @@ export async function attemptWalkout(
       [{ text: walkoutMemory.slice(0, 400), importance: 5, tags: ['conflict'] }],
       walkoutEvent.id,
     );
-    const walkoutSummary =
-      result.data.summaryLine.trim() || `${walkoutPlayerName} crossed a line and ${character.name} walked out of the date.`;
-    appendSessionToChronicle(character.id, walkoutSummary, session.mode, walkoutDay);
   } catch {
     /* best-effort: remembering the blow-up must never block the farewell */
-  }
-  // Storming out of a date can strain a committed relationship onto the rocks
-  // (or break it) — the walkout spiked tension above.
-  if (character.worldId) {
-    try {
-      evaluateRelationshipStrain(character.id, { day: ensureWorldState(character.worldId).day, trigger: 'date', mode: session.mode });
-    } catch {
-      /* strain is best-effort */
-    }
   }
   return { message, reason: result.data.reason };
 }
@@ -766,10 +744,12 @@ export interface LeaveOutcome {
 
 /**
  * If this date's rapport has cratered (the character has quietly lost interest),
- * they end the date themselves — a soft, non-hostile early exit (distinct from a
- * walkout, which is for egregious behavior). Runs BEFORE the reply on the
- * player's next message, so a "losing interest" turn warns first, then they
- * leave. Applies a real cost. Returns the farewell + ends the session, or null.
+ * they call it a night themselves — a soft, non-hostile early exit (distinct from a
+ * walkout, which is for egregious behavior). Runs BEFORE the reply on the player's
+ * next message, so a "losing interest" turn warns first, then they leave. Applies the
+ * leave penalty + a memory, then (like a natural farewell) leaves the session OPEN so
+ * the CLIENT runs the normal end-and-evaluate flow — the flat date is scored in full
+ * (stamina, deltas, memories, milestones, strain). Returns the farewell, or null.
  * Fails safe (no early exit on error).
  */
 export async function maybeLeaveForLostInterest(sessionId: string, signal?: AbortSignal): Promise<LeaveOutcome | null> {
@@ -788,43 +768,27 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
       role: 'system',
       content:
         `OOC stage direction: this date isn't working for you — you've quietly lost interest and want to wrap it up now. ` +
-        `Give ONE short, in-character line making a polite excuse to end the evening and leave (an early night, somewhere to be). ` +
+        `Give a brief, in-character send-off — a few sentences (roughly two or three), not a single clipped line — making a polite excuse to end the evening and leave (an early night, somewhere to be). ` +
         `Not cruel, just done — no questions, and no plans to meet again.`,
     });
     const adapter = getAdapter(settings);
-    const res = await adapter.chat({ messages, temperature: settings.temperature, maxTokens: 200 }, signal);
+    const res = await adapter.chat({ messages, temperature: settings.temperature, maxTokens: 300 }, signal);
     line = stripThink(res.content).trim();
   } catch {
     line = '';
   }
   if (!line) line = `Hey — it's been a long week and I'm pretty wiped. I think I'm gonna call it a night. Take care, okay?`;
 
-  // Atomically claim the session before applying the leave penalty/spend (the line
-  // generation above is an LLM await — the yield point). A concurrent leave / walkout
-  // / manual end that already ended it loses this claim and bails, so the penalty +
-  // stamina spend land exactly once.
-  if (!sessionsRepo.claimEnd(sessionId)) return null;
-
+  // Apply the soft-leave's penalty + a memory of the fizzle, then voice the goodbye —
+  // but DON'T end the session: like a natural farewell, the CLIENT runs the normal
+  // end-and-evaluate flow next, so the flat date is scored in full (stamina, evaluator
+  // deltas/memories, the cratered-rapport consequence, milestones, strain). Rapport is
+  // left intact on purpose so endSession's low-rapport effect still lands.
   applyRelationshipChange(character.id, { ...RAPPORT_LEAVE_PENALTY }, { source: 'rapport', detail: { reason: 'lost_interest' } });
-  // A real date occurred (rapport cratered over real turns): spend the daily action
-  // + stamp last-seen like any ended date — this is the "real cost" the docstring
-  // promises. Best-effort so it never blocks the farewell.
-  if (character.worldId) {
-    try {
-      stampLastDate(character.id, ensureWorldState(character.worldId).day);
-      if (session.mode === 'date' || session.mode === 'event') spendStamina(character.worldId);
-    } catch {
-      /* best-effort: the date still ends */
-    }
-  }
   const message = addCharacterMessage(sessionId, line, { left: true });
-  // (session already marked ended by claimEnd above)
-  clearRapport(sessionId);
   const leftEvent = recordEvent('date_left', { characterId: character.id, reason: 'lost_interest' });
-  // A soft early-exit used to leave no trace either — so remember the fizzled date,
-  // and fold it into the chronicle, so a run of flat dates actually registers.
+  // Remember the fizzle so a run of flat dates registers (the evaluator may add its own).
   const leftPlayerName = getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name;
-  const leftDay = character.worldId ? ensureWorldState(character.worldId).day : 0;
   try {
     addMemoriesFromEvaluation(
       character.id,
@@ -837,17 +801,8 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
       ],
       leftEvent.id,
     );
-    appendSessionToChronicle(character.id, `The date with ${leftPlayerName} fizzled and ${character.name} left early.`, session.mode, leftDay);
   } catch {
     /* best-effort */
-  }
-  // Losing interest and ending the date early can strain a committed relationship.
-  if (character.worldId) {
-    try {
-      evaluateRelationshipStrain(character.id, { day: ensureWorldState(character.worldId).day, trigger: 'date', mode: session.mode });
-    } catch {
-      /* strain is best-effort */
-    }
   }
   return { message, reason: 'lost_interest' };
 }
@@ -1259,6 +1214,12 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
   const incomingFlags = getRelationship(session.characterId).flags;
   const incomingJealous = incomingFlags['state:jealous'] === true;
   const incomingOffended = incomingFlags['state:offended'] === true;
+  // A date that ENDED in a walkout (the character stormed out this very session)
+  // shouldn't have that fresh offense "aired out" by the same eval — they carry it
+  // INTO the next date. Detect it from the walkout farewell's metadata so the
+  // grievance attemptWalkout just set survives, and so a cruel night doesn't also
+  // heal the despair spiral like a normal evening together would.
+  const endedInWalkout = messages.some((m) => m.role === 'character' && m.metadata?.['walkout'] === true);
 
   // A monogamous character may "find out" about other people you've seen lately.
   const jealousy = maybeRollJealousy(getCharacter(session.characterId));
@@ -1314,11 +1275,11 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
   // Resolve the emotional state carried INTO this date — they've now had the
   // chance to air it. Keep jealousy that was freshly discovered this turn so it
   // colors the NEXT date instead.
-  if (incomingOffended) setRelationshipFlag(session.characterId, 'state:offended', false, { source: 'state_resolved' });
+  if (incomingOffended && !endedInWalkout) setRelationshipFlag(session.characterId, 'state:offended', false, { source: 'state_resolved' });
   if (incomingJealous && !jealousy?.triggered) {
     setRelationshipFlag(session.characterId, 'state:jealous', false, { source: 'state_resolved' });
   }
-  const stateResolved = incomingOffended || (incomingJealous && !jealousy?.triggered);
+  const stateResolved = (incomingOffended && !endedInWalkout) || (incomingJealous && !jealousy?.triggered);
 
   // The day's weather + the venue (indoor/outdoor) nudge the date. Server-owned,
   // clamped — and applied BEFORE milestone detection so it can tip a crossing.
@@ -1383,8 +1344,10 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
   clearRapport(session.id);
 
   // (Opt-in) showing up for a real, non-cruel evening helps pull a struggling
-  // partner back from the despair spiral — the off-ramp. (No-op unless enabled.)
-  if (actor.worldId && (session.mode === 'date' || session.mode === 'event')) {
+  // partner back from the despair spiral — the off-ramp. A date that ended in a
+  // walkout is the opposite of that, so it never heals (the walkout already applied
+  // its own hostility hit). (No-op unless enabled.)
+  if (actor.worldId && (session.mode === 'date' || session.mode === 'event') && !endedInWalkout) {
     try {
       adjustDespair(session.characterId, -DESPAIR.dateHeal, 'time_together', chronDay);
     } catch {

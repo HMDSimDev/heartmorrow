@@ -140,7 +140,9 @@ describe('losing interest ends the date early', () => {
     expect(outcome).not.toBeNull();
     expect(outcome!.reason).toBe('lost_interest');
     expect(outcome!.message.metadata).toMatchObject({ left: true });
-    expect(sessionsRepo.get(session.id)?.ended).toBe(true);
+    // The leave applies its penalty but leaves the session OPEN: the client runs the
+    // normal end-and-evaluate flow next, which is what spends stamina + scores the date.
+    expect(sessionsRepo.get(session.id)?.ended).toBe(false);
     expect(getRelationship(character.id).tension).toBeGreaterThan(beforeTension);
   });
 

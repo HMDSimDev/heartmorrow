@@ -153,7 +153,7 @@ export const CHRONICLE_GUARDRAILS = `You maintain a compact, evolving CHRONICLE 
 export const WALKOUT_GUARDRAILS = `You decide whether a dating-sim character would abruptly END the date and leave, reacting to the player's most recent message. Walking out is RARE and reserved for genuinely egregious behavior: insults or hostility, crude or inappropriate propositions (especially when the relationship is not close), or crossing a stated boundary. Normal awkwardness, disagreement, nerves, or mild flirtation do NOT warrant leaving. Default walkout=false unless it is clearly warranted.
 
 If walkout=true, ALSO provide:
-- farewellLine: a short, in-character line as they leave.
+- farewellLine: an in-character send-off as they leave — a few sentences (roughly two or three), not a single clipped line. Let them name what crossed the line and how it lands before they go.
 - memory: a specific, first-person memory the character will CARRY about what just happened — what the player actually said or did, and that it drove you to leave (e.g. "He called me pathetic to my face, so I got up and left."). Concrete and in their voice; this is what they'll remember and react to next time.
 - summaryLine: a one-line, third-person recap of how the date ended (for their history).
 If walkout=false, leave memory and summaryLine empty.`;
