@@ -17,6 +17,7 @@ import {
   humanizeStoryFlag,
   isBrokenUp,
   isInternalFlagKey,
+  reciprocalLinkKind,
   resolveLlmRole,
   warmthBand,
   warmthOf,
@@ -336,7 +337,10 @@ export function composeConstellation(worldId?: string): ConstellationView {
 function setReciprocalLink(source: Character, targetId: string, kind: CharacterLinkKind): void {
   const target = charactersRepo.get(targetId);
   if (!target || target.worldId !== source.worldId) return;
-  const links = [...target.links.filter((l) => l.targetId !== source.id), { targetId: source.id, kind }];
+  // The back-link carries the INVERSE kind for asymmetric bonds (mentor ↔ mentee),
+  // so the two sides don't both end up calling each other "mentor".
+  const backKind = reciprocalLinkKind(kind);
+  const links = [...target.links.filter((l) => l.targetId !== source.id), { targetId: source.id, kind: backKind }];
   charactersRepo.update(CharacterSchema.parse({ ...target, links, updatedAt: Date.now() }));
 }
 
@@ -349,7 +353,8 @@ function removeReciprocalLink(source: Character, targetId: string, kind: Charact
   const target = charactersRepo.get(targetId);
   if (!target || target.worldId !== source.worldId) return;
   const existing = target.links.find((l) => l.targetId === source.id);
-  if (!existing || existing.kind !== kind) return;
+  // Only drop the mirror if it still matches what we'd have written (the inverse kind).
+  if (!existing || existing.kind !== reciprocalLinkKind(kind)) return;
   const links = target.links.filter((l) => l.targetId !== source.id);
   charactersRepo.update(CharacterSchema.parse({ ...target, links, updatedAt: Date.now() }));
 }

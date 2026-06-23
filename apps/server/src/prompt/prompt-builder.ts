@@ -170,6 +170,7 @@ const LINK_RELATION_PHRASE: Record<string, string> = {
   classmate: 'a classmate of yours',
   neighbor: 'a neighbor of yours',
   mentor: 'someone who mentors you',
+  mentee: 'someone you mentor',
   acquaintance: 'someone you know a little around town',
 };
 
@@ -1810,6 +1811,8 @@ function npcLinkToneSteer(kind: CharacterLinkKind, posterName: string): string {
       return `${posterName} is your neighbor — neighborly and pleasant, light and low-key.`;
     case 'mentor':
       return `${posterName} mentors you — respectful and appreciative, a touch of looking up to them.`;
+    case 'mentee':
+      return `You mentor ${posterName} — warm and encouraging, a touch of pride in how they're growing.`;
     default:
       return `You only know ${posterName} a little — keep it light and friendly.`;
   }

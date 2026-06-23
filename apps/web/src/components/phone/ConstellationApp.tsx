@@ -42,6 +42,7 @@ const KIND_ICON: Record<CharacterLinkKind, IconName> = {
   classmate: 'book',
   neighbor: 'location',
   mentor: 'star',
+  mentee: 'star',
   acquaintance: 'acquaintance',
 };
 
@@ -54,6 +55,7 @@ const KIND_PULL: Record<CharacterLinkKind, number> = {
   friend: 0.7,
   roommate: 0.7,
   mentor: 0.6,
+  mentee: 0.6,
   ex: 0.5,
   classmate: 0.5,
   coworker: 0.5,

@@ -544,6 +544,7 @@ function relationLabel(a: Character, b: Character, promoted: boolean, sharePlace
     case 'neighbor':
       return 'neighbors';
     case 'mentor':
+    case 'mentee':
       return 'a mentor and their mentee';
     case 'crush':
       // One-sided by nature — don't out the crush as a mutual scene fact.

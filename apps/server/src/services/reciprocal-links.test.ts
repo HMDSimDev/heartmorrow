@@ -82,6 +82,29 @@ describe('reciprocal connections', () => {
     expect(backLink(a.id, b.id)).toBe('family');
   });
 
+  it('mirrors mentor as mentee on the other side (not mentor↔mentor)', () => {
+    const world = createWorld({ name: 'W' });
+    const a = person(world.id, 'A');
+    const b = person(world.id, 'B');
+
+    updateCharacter(a.id, { links: [{ targetId: b.id, kind: 'mentor' }] });
+    expect(backLink(b.id, a.id)).toBe('mentee');
+    // And the inverse: authoring a mentee mirrors back as mentor.
+    updateCharacter(a.id, { links: [{ targetId: b.id, kind: 'mentee' }] });
+    expect(backLink(b.id, a.id)).toBe('mentor');
+  });
+
+  it('removes the mentee mirror when the mentor link is removed', () => {
+    const world = createWorld({ name: 'W' });
+    const a = person(world.id, 'A');
+    const b = person(world.id, 'B');
+
+    updateCharacter(a.id, { links: [{ targetId: b.id, kind: 'mentor' }] });
+    expect(backLink(b.id, a.id)).toBe('mentee');
+    updateCharacter(a.id, { links: [] });
+    expect(backLink(b.id, a.id)).toBeNull();
+  });
+
   it('never mirrors across worlds', () => {
     const w1 = createWorld({ name: 'W1' });
     const w2 = createWorld({ name: 'W2' });

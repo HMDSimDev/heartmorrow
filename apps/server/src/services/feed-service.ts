@@ -304,6 +304,8 @@ function milestoneSituation(linkKind: string, subjectName: string, playerName: s
       return `${subjectName}, your ${label}, is getting close with ${playerName}. You've had a front-row seat, so you're warm and a little teasing about it.`;
     case 'mentor':
       return `${subjectName} — your ${label} — is getting close with ${playerName}. You're quietly glad for them.`;
+    case 'mentee':
+      return `${subjectName}, your ${label}, is getting close with ${playerName}. You're warm and a little proud, happy to see them happy.`;
     case 'coworker':
     case 'classmate':
     case 'neighbor':

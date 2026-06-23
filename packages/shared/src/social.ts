@@ -37,9 +37,27 @@ export const CharacterLinkKindSchema = z.enum([
   'classmate',
   'neighbor',
   'mentor',
+  'mentee',
   'acquaintance',
 ]);
 export type CharacterLinkKind = z.infer<typeof CharacterLinkKindSchema>;
+
+/**
+ * The kind the OTHER side of a connection should carry. Most bonds are symmetric
+ * (friend↔friend, family↔family), so the reciprocal is the same kind — but the
+ * asymmetric ones get an inverse: a `mentor` is matched by a `mentee` on the other
+ * side (and vice versa), so the relationship reads correctly from both people's
+ * point of view rather than both calling each other "mentor".
+ */
+export const RECIPROCAL_LINK_KIND: Partial<Record<CharacterLinkKind, CharacterLinkKind>> = {
+  mentor: 'mentee',
+  mentee: 'mentor',
+};
+
+/** The link kind the target should hold back toward the source (same kind unless asymmetric). */
+export function reciprocalLinkKind(kind: CharacterLinkKind): CharacterLinkKind {
+  return RECIPROCAL_LINK_KIND[kind] ?? kind;
+}
 
 export const CHARACTER_LINK_LABELS: Record<CharacterLinkKind, string> = {
   friend: 'Friend',
@@ -53,6 +71,7 @@ export const CHARACTER_LINK_LABELS: Record<CharacterLinkKind, string> = {
   classmate: 'Classmate',
   neighbor: 'Neighbor',
   mentor: 'Mentor',
+  mentee: 'Mentee',
   acquaintance: 'Acquaintance',
 };
 
@@ -68,6 +87,7 @@ export const CHARACTER_LINK_ICONS: Record<CharacterLinkKind, string> = {
   classmate: '📚',
   neighbor: '🏡',
   mentor: '🧭',
+  mentee: '🎓',
   acquaintance: '👋',
 };
 
@@ -146,7 +166,7 @@ export function pickConversationTopic(signals: TopicSignals, roll: number): Conv
   if (signals.bothEmployed) weights.push({ topic: 'work', weight: 2 });
   // Coworkers reliably talk shop; mentors and classmates orbit goals and what's next.
   if (signals.relationKind === 'coworker') weights.push({ topic: 'work', weight: 2.5 });
-  if (signals.relationKind === 'mentor' || signals.relationKind === 'classmate') {
+  if (signals.relationKind === 'mentor' || signals.relationKind === 'mentee' || signals.relationKind === 'classmate') {
     weights.push({ topic: 'plans', weight: 2 });
   }
   if (signals.eitherHasGoals) weights.push({ topic: 'plans', weight: 1.5 });
@@ -299,6 +319,7 @@ export const CHARACTER_LINK_ORDER: readonly CharacterLinkKind[] = [
   'friend',
   'roommate',
   'mentor',
+  'mentee',
   'classmate',
   'coworker',
   'rival',
@@ -342,6 +363,7 @@ export const LINK_JEALOUSY_WEIGHT: Record<CharacterLinkKind, number> = {
   coworker: 1,
   neighbor: 1,
   mentor: 1,
+  mentee: 1,
   acquaintance: 1,
 };
 
@@ -359,6 +381,7 @@ export const FEED_NPC_COMMENT_CHANCE: Record<CharacterLinkKind, number> = {
   roommate: 0.5,
   family: 0.45,
   mentor: 0.4,
+  mentee: 0.4,
   classmate: 0.35,
   coworker: 0.3,
   neighbor: 0.2,
@@ -379,6 +402,7 @@ export const FEED_NPC_REACT_CHANCE: Record<CharacterLinkKind, number> = {
   friend: 0.5,
   family: 0.45,
   mentor: 0.42,
+  mentee: 0.42,
   classmate: 0.4,
   coworker: 0.38,
   neighbor: 0.28,
@@ -398,6 +422,7 @@ export const VOUCH_DELTAS: Record<CharacterLinkKind, Partial<Record<Relationship
   partner: { affection: 4, trust: 4 },
   roommate: { affection: 3, comfort: 3 },
   mentor: { affection: 2, trust: 3 },
+  mentee: { affection: 2, trust: 3 },
   classmate: { affection: 2 },
   coworker: { affection: 2 },
   neighbor: { comfort: 1 },
