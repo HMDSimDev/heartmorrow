@@ -126,6 +126,28 @@ export function listAcquaintances(character: Character): Array<{ name: string; k
 }
 
 /**
+ * The NPC(s) this character has actually paired off with via an emergent world-sim
+ * romance (an `npc_edges` row at `romanceState === 'together'`). The world ANNOUNCES
+ * these couples (recap beat + Social app), but the pairing only lives in npc_edges —
+ * the character's own date/text prompt is otherwise blind to it, which is why a
+ * coupled-off character would flatly deny being taken when asked. Feeding this into
+ * the prompts lets them be honest instead. Empty for the unattached / world-less.
+ * (Authored "partner" links are a separate, pre-existing concern and not included.)
+ */
+export function currentNpcPartners(character: Character): Character[] {
+  if (!character.worldId) return [];
+  const partners: Character[] = [];
+  for (const e of npcEdgesRepo.listByWorld(character.worldId)) {
+    if (e.romanceState !== 'together') continue;
+    const otherId = e.aId === character.id ? e.bId : e.bId === character.id ? e.aId : null;
+    if (!otherId) continue;
+    const other = charactersRepo.get(otherId);
+    if (other) partners.push(other);
+  }
+  return partners;
+}
+
+/**
  * The whole world's social web for the phone "Social" view: every character's
  * ties, merging AUTHORED links with the WORLD-SIM's derived `npc_edges`
  * (run-in acquaintances + friendships grown from repeated meetings). The

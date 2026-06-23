@@ -5,6 +5,9 @@ import {
   DATING_STAT_KEYS,
   PROMPT_LIMITS,
   LAST_DATE_FLAG,
+  AFTERGLOW_MOOD_FLAG,
+  AFTERGLOW_DAY_FLAG,
+  DATE_AFTERGLOW_DAYS,
   PHASE_LABELS,
   relationshipStage,
   currentStatus,
@@ -139,6 +142,10 @@ export interface PromptContext {
    *  so they don't know their name or anything about them yet (strangers meeting).
    *  Drives the first-meeting framing + the name/persona suppression in the SCENE. */
   firstMeeting: boolean;
+  /** Names of NPC(s) this character has paired off with via an emergent world-sim
+   *  romance (npc_edges 'together'). Surfaced so a coupled-off character is honest
+   *  about being taken instead of denying it. Optional/empty for the unattached. */
+  npcPartners?: string[];
 }
 
 /** How a character's relationship STYLE should shape their attitude (esp. toward
@@ -421,6 +428,22 @@ export function buildSystemPrompt(ctx: PromptContext, guardrails: string): strin
           `While you and ${ctx.player.name} drifted, you started seeing ${seeingOther} — you're with them now. ` +
           `You're still genuinely fond of ${ctx.player.name} and glad to see them, but you are NOT romantically available: don't flirt back, rekindle, or pretend you're single. ` +
           `If they reach for something romantic, be honest and kind about being taken — maybe a little wistful about the timing, but you're not going to betray ${seeingOther}.`,
+      );
+    }
+    // A world-sim romance may have quietly made this character someone's partner even
+    // though the player never got close enough to be "poached" (no state:seeingOther).
+    // The world already announced the couple, so they must be HONEST about it rather
+    // than denying a relationship that's now true. Poly stays open; monogamous isn't.
+    const npcPartners = ctx.npcPartners ?? [];
+    if (!seeingOther && !brokenUp && npcPartners.length > 0) {
+      const names = joinNames(npcPartners);
+      directiveParts.push(
+        ctx.character.relationshipStyle === 'polyamorous'
+          ? `=== WHERE THINGS STAND NOW ===\n` +
+              `You've started seeing ${names}. You're polyamorous, so this doesn't close anything off — you can still be warm and even interested in ${ctx.player.name} — but be open about it: if they ask whether you're seeing anyone, tell the truth that you're with ${names}. Never deny or hide it.`
+          : `=== WHERE THINGS STAND NOW ===\n` +
+              `You've started seeing ${names} — you're together now. You're still fond of ${ctx.player.name} and glad to see them, but you are NOT romantically available: don't flirt back or pretend you're single. ` +
+              `If they ask whether you're seeing anyone, tell the truth plainly — you're with ${names}. Never deny it.`,
       );
     }
     if (brokenUp) {
@@ -878,6 +901,46 @@ function recentHistoryBlock(
 }
 
 /**
+ * A short-lived "afterglow" nudge so a character's texts honor how their LAST date
+ * left them feeling (the evaluator's mood word) for a day or so, instead of snapping
+ * straight back to breezy texting after a heavy/introspective night. It colors TONE,
+ * not topic — they shouldn't keep re-litigating the date. Empty once the window
+ * (DATE_AFTERGLOW_DAYS) has passed, or when there's no mood/day to read.
+ */
+function dateAfterglowLine(flags: Relationship['flags'], worldDay: number | null, playerName: string): string {
+  const mood = flags[AFTERGLOW_MOOD_FLAG];
+  const day = flags[AFTERGLOW_DAY_FLAG];
+  if (typeof mood !== 'string' || !mood.trim()) return '';
+  if (typeof day !== 'number' || worldDay == null) return '';
+  if (worldDay - day > DATE_AFTERGLOW_DAYS) return ''; // faded — let it go
+  return (
+    `\n\nHOW YOUR LAST TIME TOGETHER LEFT YOU: your most recent date with ${playerName} was ${mood.trim()}. ` +
+    `Let that still color the TONE of this text — match that emotional register rather than defaulting to breezy or jokey. ` +
+    `Don't recap or keep bringing the date up; just let the feeling carry, then ease back to normal as it settles.`
+  );
+}
+
+/** Natural-language join of a few names ("Bea", "Bea and Cy", "Bea, Cy and Dee"). */
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * The "you're partnered with someone now" clause for the phone surfaces, mirroring
+ * the date prompt's WHERE-THINGS-STAND block so a character the world has coupled off
+ * (an emergent npc_edges romance) is honest about it over text instead of denying it.
+ * Poly stays open; monogamous is not romantically available. Empty when unattached.
+ */
+function npcPartnerClause(c: Character, partnerNames: string[], playerName: string): string {
+  if (partnerNames.length === 0) return '';
+  const names = joinNames(partnerNames);
+  return c.relationshipStyle === 'polyamorous'
+    ? ` You're seeing ${names} now; you're polyamorous, so be open and honest about it if ${playerName} asks — never deny or hide that you're with ${names}.`
+    : ` You're seeing ${names} now — you're together, so you're not romantically available to ${playerName}: stay warm but don't flirt, and if they ask whether you're seeing someone, tell the truth that you're with ${names}. Never deny it.`;
+}
+
+/**
  * The not-romantically-into-you guard for the phone surfaces, gated EXACTLY like
  * the date prompt's soft-rejection branch (a fully-specified incompatible pair)
  * so the date and the phone agree. Empty string otherwise.
@@ -904,6 +967,9 @@ export function buildTextReplyMessages(args: {
   memories?: CharacterMemory[];
   /** This character's social circle, so they recognize people the player mentions. */
   acquaintances?: Array<{ name: string; kind: string }>;
+  /** NPC(s) this character has paired off with (npc_edges 'together') — so they're
+   *  honest about being taken over text instead of denying it. */
+  npcPartnerNames?: string[];
   /** When the player attached a photo, a `data:` URL of it (vision model reads it). */
   imageDataUrl?: string | null;
 }): ChatMessage[] {
@@ -917,6 +983,7 @@ export function buildTextReplyMessages(args: {
     chronicle = null,
     memories = [],
     acquaintances = [],
+    npcPartnerNames = [],
     imageDataUrl,
   } = args;
   const stage = relationshipStage(relationship);
@@ -934,6 +1001,7 @@ export function buildTextReplyMessages(args: {
       : '';
   const memoryBlock = memories.length ? `\n\nTHINGS YOU REMEMBER about ${playerName}:\n${bullet(memories.map((m) => m.text))}` : '';
   const historyBlock = recentHistoryBlock(chronicle);
+  const afterglowBlock = dateAfterglowLine(relationship.flags, worldDay, playerName);
   const knownBlock = acquaintances.length
     ? `\nPeople you know: ${acquaintances.map((a) => `${a.name} (${LINK_RELATION_PHRASE[a.kind] ?? a.kind})`).join(', ')}. If ${playerName} mentions them, you know who they are.`
     : '';
@@ -945,17 +1013,18 @@ export function buildTextReplyMessages(args: {
     `${c.boundaries.length ? ` Boundaries (respect them): ${c.boundaries.join(', ')}.` : ''}`;
   // Current emotional state + the not-attracted guard, mirroring the date prompt.
   const feelingLine = relationshipStateNote(relationship.flags, playerName, 'text');
+  const partnerClause = npcPartnerClause(c, npcPartnerNames, playerName);
   const attraction = attractionGuardClause(c, playerGender, playerName);
   const photoLine = imageDataUrl
     ? `${playerName} just sent you a PHOTO (shown below). Look closely and take in the specific details — who or what is in it, the setting, expressions, colors, little things in the background — then react naturally, like a real person reacting to a pic a date texted you. Mention the specific things you actually notice (the more precise, the more it feels like you really looked), not a generic "nice pic." `
     : '';
-  const userText = `Text conversation so far:\n${convo || '(no messages yet)'}${staleness}${memoryBlock}${historyBlock}\n\n${photoLine}Text ${playerName} back as ${c.name}.`;
+  const userText = `Text conversation so far:\n${convo || '(no messages yet)'}${staleness}${memoryBlock}${historyBlock}${afterglowBlock}\n\n${photoLine}Text ${playerName} back as ${c.name}.`;
   return [
     {
       role: 'system',
       content:
         `${SMS_GUARDRAILS}\n\nYou are ${characterBrief(c)}\n` +
-        `Relationship stage with ${playerName}: ${stage.label}. ${stage.guidance}${statusLine}${traits}${feelingLine}${attraction}${knownBlock}`,
+        `Relationship stage with ${playerName}: ${stage.label}. ${stage.guidance}${statusLine}${traits}${feelingLine}${partnerClause}${attraction}${knownBlock}`,
     },
     {
       role: 'user',
@@ -1050,6 +1119,11 @@ export function buildDailyTextPlanMessages(args: {
   recentMilestone?: string | null;
   /** A few top memories so the text can reference shared history. */
   memories?: CharacterMemory[];
+  /** Current in-world day, so a recent date's mood can briefly color today's text. */
+  worldDay?: number | null;
+  /** NPC(s) this character has paired off with (npc_edges 'together') — so a coupled-off
+   *  character's proactive texts stay honest/platonic instead of breezily flirty. */
+  npcPartnerNames?: string[];
 }): ChatMessage[] {
   const {
     character: c,
@@ -1062,6 +1136,8 @@ export function buildDailyTextPlanMessages(args: {
     chronicle = null,
     recentMilestone,
     memories = [],
+    worldDay = null,
+    npcPartnerNames = [],
   } = args;
   const stage = relationshipStage(relationship);
   const gifts = giftable.length ? giftable.map((g) => `${g.id} ("${g.name}")`).join('; ') : 'none available';
@@ -1070,21 +1146,23 @@ export function buildDailyTextPlanMessages(args: {
     : '';
   const memoryBlock = memories.length ? `\nTHINGS YOU REMEMBER about ${playerName}:\n${bullet(memories.map((m) => m.text))}` : '';
   const historyBlock = recentHistoryBlock(chronicle);
+  const afterglowBlock = dateAfterglowLine(relationship.flags, worldDay, playerName);
   const threadBlock = recentTexts.length
     ? `\nRECENT TEXTS (most recent last — don't repeat or contradict these; you may pick up an open thread, but don't re-ask what's already answered):\n${recentTexts
         .map((t) => `${t.sender === 'player' ? playerName : c.name}: ${t.body}`)
         .join('\n')}`
     : '';
   const attraction = attractionGuardClause(c, playerGender, playerName);
+  const partnerClause = npcPartnerClause(c, npcPartnerNames, playerName);
   return [
-    { role: 'system', content: `${DAILY_TEXT_GUARDRAILS}\n\nYou are ${characterBrief(c)}${attraction}` },
+    { role: 'system', content: `${DAILY_TEXT_GUARDRAILS}\n\nYou are ${characterBrief(c)}${partnerClause}${attraction}` },
     {
       role: 'user',
       content:
         `Write today's single text to ${playerName}.\n` +
         `CURRENT RELATIONSHIP STAGE: ${stage.label}. ${stage.guidance}\n` +
         `(${relationshipStatLine(relationship)})\n` +
-        `Days since you last saw ${playerName}: ${daysSinceSeen}.${milestoneLine}${memoryBlock}${historyBlock}${threadBlock}\n` +
+        `Days since you last saw ${playerName}: ${daysSinceSeen}.${milestoneLine}${afterglowBlock}${memoryBlock}${historyBlock}${threadBlock}\n` +
         `Allowed gift item ids (suggest at most one, or null): ${gifts}.\n` +
         `Write ONE short, casual text, matching the relationship stage. (The "phase" field is ignored — the game schedules it.)`,
     },

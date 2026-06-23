@@ -4,12 +4,13 @@ import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers
 import { setAdapterOverride } from '../llm/provider';
 import { messagesRepo, sessionsRepo, textMessagesRepo, worldStatesRepo } from '../db/repositories';
 import { newId } from '../lib/ids';
-import { composeConstellation, createCharacter, getCharacter, getSocialWeb, updateCharacter } from './character-service';
+import { composeConstellation, createCharacter, currentNpcPartners, getCharacter, getSocialWeb, updateCharacter } from './character-service';
 import { npcEdgesRepo } from '../db/repositories';
 import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, applyTempBuff, setRelationshipFlag, stampLastSeen } from './stat-service';
 import { ensureWorldState } from './world-clock-service';
-import { addPlayerMessage, createSession, endSession, maybeRollJealousy, previewCharacterPrompt } from './conversation-service';
+import { addPlayerMessage, createSession, endSession, maybeRollJealousy, previewCharacterPrompt, previewSessionPrompt } from './conversation-service';
+import { buildTextReplyMessages, messageText } from '../prompt/prompt-builder';
 import { listMemories } from './memory-service';
 import { recordEvent } from './event-service';
 import { getOrCreateThread, sendPlayerText } from './text-message-service';
@@ -431,5 +432,91 @@ describe('temporary buffs decay when a session ends', () => {
     expect(res.evaluated).toBe(false); // eval failed → no relationship/memory mutation
     // …but the buff still decayed by one session (README: "decay when a session ends").
     expect(getRelationship(character.id).flags['buff:charm']).toBe(1);
+  });
+});
+
+describe('honest about an emergent NPC partnership (no denying a world-announced couple)', () => {
+  /** Pair two NPCs off the way the world-sim does — an npc_edges row at 'together'. */
+  function coupleUp(worldId: string, aId: string, bId: string): void {
+    npcEdgesRepo.upsert({
+      worldId,
+      aId,
+      bId,
+      warmth: 50,
+      meetCount: 4,
+      lastDay: 1,
+      promoted: true,
+      romanceState: 'together' as RomanceState,
+      romanceSince: 1,
+      soured: false,
+    });
+  }
+
+  it('resolves the partner from npc_edges (only "together", both directions)', () => {
+    const { world, character } = seedWorldAndCharacter();
+    const bea = createCharacter({ worldId: world.id, name: 'Bea', age: 27, datingStats: DEFAULT_DATING_STATS });
+    coupleUp(world.id, bea.id, character.id); // reversed order — upsert canonicalizes
+    expect(currentNpcPartners(character).map((p) => p.name)).toEqual(['Bea']);
+    // A mere crush is NOT a partnership.
+    const { character: single } = seedWorldAndCharacter();
+    expect(currentNpcPartners(single)).toHaveLength(0);
+  });
+
+  it('on a date, a coupled-off (monogamous) character is told to be honest, not deny it', () => {
+    const { world, character } = seedWorldAndCharacter(); // monogamous by default
+    const bea = createCharacter({ worldId: world.id, name: 'Bea', age: 27, datingStats: DEFAULT_DATING_STATS });
+    coupleUp(world.id, character.id, bea.id);
+
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    const sys = previewSessionPrompt(session.id).system;
+    expect(sys).toContain('Bea');
+    expect(sys.toLowerCase()).toContain('never deny');
+  });
+
+  it('texts honestly about the new partner (the reported surface)', () => {
+    const { world, character } = seedWorldAndCharacter();
+    const bea = createCharacter({ worldId: world.id, name: 'Bea', age: 27, datingStats: DEFAULT_DATING_STATS });
+    coupleUp(world.id, character.id, bea.id);
+
+    const msgs = buildTextReplyMessages({
+      character: getCharacter(character.id),
+      relationship: getRelationship(character.id),
+      recentTexts: [],
+      playerName: 'Alex',
+      npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
+    });
+    const sys = messageText(msgs[0]!.content).toLowerCase();
+    expect(sys).toContain('seeing bea');
+    expect(sys).toContain('never deny');
+  });
+
+  it('a polyamorous character stays open but is still honest about the other partner', () => {
+    const { world, character } = seedWorldAndCharacter();
+    updateCharacter(character.id, { relationshipStyle: 'polyamorous' });
+    const bea = createCharacter({ worldId: world.id, name: 'Bea', age: 27, datingStats: DEFAULT_DATING_STATS });
+    coupleUp(world.id, character.id, bea.id);
+
+    const msgs = buildTextReplyMessages({
+      character: getCharacter(character.id), // re-fetch so the poly style is in effect
+      relationship: getRelationship(character.id),
+      recentTexts: [],
+      playerName: 'Alex',
+      npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
+    });
+    const sys = messageText(msgs[0]!.content).toLowerCase();
+    expect(sys).toContain('polyamorous');
+    expect(sys).toContain('bea');
+  });
+
+  it('an unattached character gets no "you\'re taken" clause', () => {
+    const { character } = seedWorldAndCharacter();
+    const msgs = buildTextReplyMessages({
+      character,
+      relationship: getRelationship(character.id),
+      recentTexts: [],
+      playerName: 'Alex',
+      npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
+    });
+    expect(messageText(msgs[0]!.content).toLowerCase()).not.toContain('never deny');
   });
 });

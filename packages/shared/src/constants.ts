@@ -85,6 +85,14 @@ export const LAST_SEEN_FLAG = 'lastSeenDay';
  *  — which resets lastSeen to keep the neglect clock warm — can't suppress the
  *  "it's been a while since we spent time together" beat. */
 export const LAST_DATE_FLAG = 'lastDateDay';
+/** Relationship-flag keys that carry the emotional register of the LAST date — the
+ *  evaluator's mood word plus the world-day it was captured — so a character's texts
+ *  briefly honor how the night left them feeling (a heavy date shouldn't be followed
+ *  by a breezy joke the next morning). The day stamp is self-contained (NOT reused
+ *  from lastSeen/lastDate, which activities also bump) so the afterglow tracks the
+ *  date itself and fades on its own clock. See DATE_AFTERGLOW_DAYS. */
+export const AFTERGLOW_MOOD_FLAG = 'afterglow:mood';
+export const AFTERGLOW_DAY_FLAG = 'afterglow:day';
 
 // --- Phone (Messages / Email) -----------------------------------------------
 
@@ -107,6 +115,10 @@ export const DAILY_TEXT_CHANCE = 0.4;
 export const FORLORN_TEXT_CHANCE = 0.25;
 /** A daily text is scheduled to ONE of these phases — never the afternoon. */
 export const DAILY_TEXT_PHASES = ['morning', 'evening', 'night'] as const;
+/** How many in-world days a date's emotional register keeps coloring the character's
+ *  texts afterward. 1 = the date day and the day after honor it; from day 2 on it has
+ *  faded, so they don't keep harping on the last date many days later. */
+export const DATE_AFTERGLOW_DAYS = 1;
 
 /** Chance that ANY in-world emails arrive on a given day. Most days: none. */
 export const EMAIL_DAY_CHANCE = 0.25;

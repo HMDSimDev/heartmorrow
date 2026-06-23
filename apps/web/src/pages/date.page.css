@@ -541,6 +541,25 @@
   border-radius: 999px;
 }
 
+/* Venue flavor — the third-person scene-setter that opens a repeat date. A few
+   sentences of prose, so it reads as an almanac aside rather than a one-line beat. */
+.date-msg.narrator.venue-flavor {
+  align-self: stretch;
+  max-width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  letter-spacing: normal;
+  line-height: 1.6;
+  color: var(--text-mute);
+  background: linear-gradient(180deg, rgba(230, 177, 94, 0.07), rgba(230, 177, 94, 0.02));
+  border: 1px solid rgba(230, 177, 94, 0.16);
+  border-left: 2px solid var(--brass);
+  border-radius: 10px;
+}
+
 .date-cursor::after {
   content: '▍';
   animation: date-blink 1s steps(2) infinite;

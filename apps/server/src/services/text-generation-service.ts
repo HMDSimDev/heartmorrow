@@ -20,6 +20,7 @@ import { charactersRepo, chroniclesRepo, shopItemsRepo, textMessagesRepo } from 
 import { ensureRelationship, getRelationship } from './relationship-service';
 import { setRelationshipFlag } from './stat-service';
 import { getOrCreateThread, getRecentTexts, hasDated } from './text-message-service';
+import { currentNpcPartners } from './character-service';
 import { getWorldAvailability } from './availability-service';
 import { listMemories } from './memory-service';
 import { getOrCreatePlayer } from './player-service';
@@ -206,6 +207,8 @@ export async function generateDailyTextsForDay(
         chronicle: chronicleForPrompt(character.id),
         recentMilestone,
         memories: topMemoriesFor(character.id),
+        worldDay: day,
+        npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
       }),
       { settings, task: `Write ${character.name}'s text for the day.`, schemaName: 'DailyTextPlan' },
     );

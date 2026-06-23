@@ -23,7 +23,7 @@ import { getDb } from '../db/index';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest } from '../lib/errors';
 import { withKeyedLock } from '../lib/keyed-lock';
-import { getCharacter, listAcquaintances } from './character-service';
+import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { readAssetFile } from './asset-service';
 import { getCharacterAvailability, currentAvailabilityFor, currentAvailabilityMap } from './availability-service';
 import { getRelationship } from './relationship-service';
@@ -397,6 +397,7 @@ async function generateTextReply(
       chronicle,
       memories,
       acquaintances: listAcquaintances(character),
+      npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
       imageDataUrl,
     }),
     { settings: effectiveSettings, task: 'Reply to the player’s text in character (short).', schemaName: 'TextReply' },

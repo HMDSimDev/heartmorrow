@@ -33,6 +33,8 @@ import {
   linkTo,
   LINK_JEALOUSY_WEIGHT,
   CHARACTER_LINK_LABELS,
+  AFTERGLOW_MOOD_FLAG,
+  AFTERGLOW_DAY_FLAG,
   PHASE_LABELS,
   deriveCalendar,
   intimacyAllowed,
@@ -55,7 +57,7 @@ import {
 import { charactersRepo, chroniclesRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
 import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
-import { getCharacter, listAcquaintances } from './character-service';
+import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { getRelationship } from './relationship-service';
 import { getOrCreatePlayer, spendMoney } from './player-service';
 import { selectTopMemories } from './memory-service';
@@ -276,6 +278,21 @@ function addCharacterMessage(sessionId: string, text: string, metadata: Record<s
   return messagesRepo.insert(message);
 }
 
+/** Insert a third-person narration "beat" (scene-setting, gift lines, etc.) — not
+ *  dialogue. Rendered centered/quiet on the client and fed back to the model as
+ *  `Narration: …` so later turns stay aware of it. */
+function addNarratorMessage(sessionId: string, text: string, metadata: Record<string, unknown> = {}): Message {
+  const message = MessageSchema.parse({
+    id: newId('msg'),
+    sessionId,
+    role: 'narrator',
+    text,
+    metadata,
+    createdAt: Date.now(),
+  });
+  return messagesRepo.insert(message);
+}
+
 // --- prompt context ---------------------------------------------------------
 
 /**
@@ -444,6 +461,9 @@ export function buildPromptContextForSession(
     guardedness: character.guardedness,
     turnVerdict: opts?.turnVerdict ?? null,
     firstMeeting: isFirstMeeting(session, relationship),
+    // NPC(s) the world-sim has paired this character off with — so a coupled-off
+    // character is honest about being taken rather than denying it on a date.
+    npcPartners: currentNpcPartners(character).map((p) => p.name),
   };
 }
 
@@ -519,13 +539,20 @@ export function persistStreamedReply(sessionId: string, text: string): Message {
 }
 
 /**
- * On a FIRST date, let the character break the ice. Generates a single in-character
- * opening greeting and persists it as the date's first (character) message, so the
- * player isn't forced to open a date with a total stranger. Returns the message, or
- * null when it doesn't apply (plain chat, ended, already has turns, or not a first
- * meeting) or generation fails. Best-effort: never throws — on any failure the date
- * simply falls back to the player opening. The non-first-meeting cases short-circuit
- * BEFORE any LLM call, so a normal date pays no latency for this.
+ * Set the scene when a date opens, so the player has something to react to.
+ *
+ * - On a FIRST date the character breaks the ice: a single in-character opening
+ *   greeting, persisted as the date's first (character) message, so the player
+ *   isn't forced to open a date with a total stranger.
+ * - On a REPEAT date there's no introduction to make, so instead we lay down a
+ *   short third-person "venue flavor" beat — narration, not dialogue — describing
+ *   where the character is, what they're doing, and the weather/time of day.
+ *
+ * Returns the persisted message, or null when it doesn't apply (plain chat, ended,
+ * or the session already has turns) or generation fails. Best-effort: never throws —
+ * on any failure the date simply falls back to the player opening (and the client's
+ * static opening card). Plain chats and ended/active sessions short-circuit BEFORE
+ * any LLM call.
  */
 export async function openConversation(sessionId: string): Promise<Message | null> {
   let session: ConversationSession;
@@ -537,24 +564,40 @@ export async function openConversation(sessionId: string): Promise<Message | nul
   if (session.ended || session.mode === 'chat') return null;
   if (messagesRepo.countBySession(sessionId) > 0) return null; // someone already spoke
   const character = getCharacter(session.characterId);
-  if (!isFirstMeeting(session, getRelationship(character.id))) return null;
+  const firstMeeting = isFirstMeeting(session, getRelationship(character.id));
 
   const settings = getLlmSettings();
   try {
     const messages = buildDialogueRequest(sessionId);
-    messages.push({
-      role: 'system',
-      content:
-        `OOC stage direction: the date is just beginning and this is the first time the two of you are meeting. ` +
-        `You speak first — open the conversation yourself with a warm, natural greeting in your own voice: ` +
-        `say hello, introduce yourself, and break the ice however suits you. Stay true to how guarded or outgoing you are, ` +
-        `and keep it to just a line or two (an opening, not a monologue). Follow everything above about what you do and don't know about them.`,
-    });
+    if (firstMeeting) {
+      messages.push({
+        role: 'system',
+        content:
+          `OOC stage direction: the date is just beginning and this is the first time the two of you are meeting. ` +
+          `You speak first — open the conversation yourself with a warm, natural greeting in your own voice: ` +
+          `say hello, introduce yourself, and break the ice however suits you. Stay true to how guarded or outgoing you are, ` +
+          `and keep it to just a line or two (an opening, not a monologue). Follow everything above about what you do and don't know about them.`,
+      });
+    } else {
+      // Repeat date: no introduction needed — set the scene instead, in third person.
+      messages.push({
+        role: 'system',
+        content:
+          `OOC stage direction: set the scene for the moment the player arrives at the start of this date. ` +
+          `Write 2-3 sentences of vivid third-person narration: where ${character.name} is and what they're doing at the venue, ` +
+          `the atmosphere of the place, and the weather and time of day (use the scene and world details above). ` +
+          `Describe ${character.name} from the OUTSIDE, by name (e.g. "${character.name} is waiting at a corner table, ..."). ` +
+          `This is stage-setting prose for the player to read — NOT a spoken line: do not write any dialogue, do not speak in ` +
+          `${character.name}'s voice, no greeting, and no quotation marks. Just the scene.`,
+      });
+    }
     const adapter = getAdapter(settings);
     const res = await adapter.chat({ messages, temperature: settings.temperature, maxTokens: settings.maxTokens });
     const text = stripThink(res.content).trim();
     if (!text) return null;
-    const message = addCharacterMessage(sessionId, text, { opener: true });
+    const message = firstMeeting
+      ? addCharacterMessage(sessionId, text, { opener: true })
+      : addNarratorMessage(sessionId, text, { venueFlavor: true });
     touchSession(session);
     return message;
   } catch {
@@ -1423,6 +1466,15 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
     appendSessionToChronicle(session.characterId, evaluation.summaryLine, session.mode, chronDay);
   } catch {
     /* chronicle is best-effort; never block ending a date */
+  }
+
+  // Carry the date's emotional register forward briefly: stamp the evaluator's mood
+  // (plus the day) so the next day-or-so of texts honor how the night left them
+  // feeling instead of snapping straight back to breezy texting. A fresh date
+  // overwrites it; the read side (text prompts) lets it fade after DATE_AFTERGLOW_DAYS.
+  if (session.mode === 'date' || session.mode === 'event') {
+    setRelationshipFlag(session.characterId, AFTERGLOW_MOOD_FLAG, evaluation.mood, { source: 'date' });
+    setRelationshipFlag(session.characterId, AFTERGLOW_DAY_FLAG, chronDay, { source: 'date' });
   }
 
   // Endgame: a committed relationship may go on the rocks / break up after a bad

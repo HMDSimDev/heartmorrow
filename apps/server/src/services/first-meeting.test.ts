@@ -76,13 +76,25 @@ describe('first date: the character takes the first turn', () => {
     expect(messagesRepo.listBySession(session.id)).toHaveLength(1); // still just the player turn
   });
 
-  it('does not open a repeat date, nor a plain chat', async () => {
+  it('opens a repeat date with a third-person venue-flavor beat, not a greeting', async () => {
+    const { character } = seedWorldAndCharacter();
+    priorDate(character.id);
+    setAdapterOverride(
+      new ScriptedAdapter(['The cafe hums with low chatter as Test Character waits at a window table, nursing a coffee.']),
+    );
+
+    const repeat = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    const flavor = await openConversation(repeat.id);
+    expect(flavor).not.toBeNull();
+    expect(flavor!.role).toBe('narrator');
+    expect(flavor!.metadata.venueFlavor).toBe(true);
+    expect(messagesRepo.listBySession(repeat.id)).toHaveLength(1);
+  });
+
+  it('does not set a scene for a plain chat', async () => {
     const { character } = seedWorldAndCharacter();
     priorDate(character.id);
     setAdapterOverride(new ScriptedAdapter(['(should not be used)']));
-
-    const repeat = createSession({ characterId: character.id, mode: 'date', locationId: null });
-    expect(await openConversation(repeat.id)).toBeNull();
 
     const chat = createSession({ characterId: character.id, mode: 'chat', locationId: null });
     expect(await openConversation(chat.id)).toBeNull();

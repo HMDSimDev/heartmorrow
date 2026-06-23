@@ -1396,7 +1396,10 @@ export function Chat() {
               </div>
             )}
             {messages.map((m) => (
-              <div key={m.id} className={`date-msg ${m.role}`}>
+              <div
+                key={m.id}
+                className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
+              >
                 {m.text}
               </div>
             ))}

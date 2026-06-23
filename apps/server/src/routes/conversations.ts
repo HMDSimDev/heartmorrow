@@ -30,9 +30,10 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'Create a conversation session', body: ConversationCreateSchema }) }, async (req, reply) => {
     const input = parseInput(ConversationCreateSchema, req.body);
     const session = createSession(input);
-    // On a first date the character breaks the ice (best-effort; a no-op for plain
-    // chats and repeat dates, so only first meetings pay the model latency). The
-    // opening line is persisted; the client loads it via GET /conversations/:id.
+    // Set the scene as the date opens (best-effort; a no-op for plain chats): on a
+    // first date the character breaks the ice, on a repeat date we lay down a short
+    // third-person "venue flavor" beat. The line is persisted; the client loads it
+    // via GET /conversations/:id.
     await openConversation(session.id);
     reply.code(201);
     return session;
