@@ -158,7 +158,9 @@
     "noteOptional": "(optional — a message for whoever opens it)",
     "notePlaceholder": "e.g. The full Lumen Quarter cast — let me know what you think!",
     "preparing": "Preparing…",
-    "download": "Download {ext}"
+    "download": "Download {ext}",
+    "linksWarn": "{count, plural, one {# connection won't transfer} other {# connections won't transfer}}: {names} {count, plural, one {links} other {link}} to people not included here. Add them to this export to keep those ties — otherwise the connection is dropped on import.",
+    "linksWarnMore": "{names} +{count, plural, one {# more} other {# more}}"
   },
   "profile": {
     "tenseSuffix": " · tense",
@@ -729,6 +731,8 @@
     "newWorld": "New world",
     "saving": "Saving…",
     "saveWorld": "Save world",
+    "export": "Export…",
+    "exportDirtyHint": "Save your changes first — export ships the saved world, so unsaved edits won't be included.",
     "worldSaved": "World saved!",
     "noun": "world",
     "untitledWorld": "Untitled world",

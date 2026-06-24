@@ -324,6 +324,28 @@ export function ShareExportDialog({
           ? '.hmpack'
           : '.hmpack';
 
+  // A character link only survives import if its target is also in the export set
+  // (the importer remaps links within the batch and drops the rest). Warn when a
+  // selected person points at someone who isn't coming along. Scoped to the
+  // character-only flow — when a world travels, its whole cast does too (server
+  // side), so intra-world ties aren't at risk and we lack those ids here anyway.
+  const exportedIds = new Set(characters.map((c) => c.id));
+  const droppedByChar =
+    worlds.length === 0
+      ? characters
+          .map((c) => ({
+            name: c.name,
+            count: c.links.filter((l) => l.targetId && !exportedIds.has(l.targetId)).length,
+          }))
+          .filter((x) => x.count > 0)
+      : [];
+  const droppedTotal = droppedByChar.reduce((n, x) => n + x.count, 0);
+  const droppedNames = (() => {
+    const names = droppedByChar.map((x) => x.name);
+    if (names.length <= 3) return names.join(', ');
+    return t('share.linksWarnMore', { names: names.slice(0, 3).join(', '), count: names.length - 3 });
+  })();
+
   const download = async () => {
     setBusy(true);
     setError(undefined);
@@ -388,6 +410,10 @@ export function ShareExportDialog({
           </div>
         )}
       </div>
+
+      {droppedTotal > 0 && (
+        <Banner kind="info">{t('share.linksWarn', { count: droppedTotal, names: droppedNames })}</Banner>
+      )}
 
       {worlds.length > 0 && (
         <label className="share-toggle">

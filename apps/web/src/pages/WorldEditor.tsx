@@ -19,6 +19,7 @@ import { useDraft } from '../lib/useDraft';
 import { draftKey, listDrafts } from '../lib/drafts';
 import { Icon } from '../components/Icon';
 import { AssetPicker } from '../components/AssetPicker';
+import { ShareExportDialog } from '../components/ShareTools';
 import './creator.page.css';
 
 const SCOPES: WorldNoteScope[] = ['global', 'location', 'faction', 'lore', 'rule', 'character', 'misc'];
@@ -58,6 +59,7 @@ export function WorldEditor() {
   const [genCount, setGenCount] = useState(4);
   const [generating, setGenerating] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [deleteChars, setDeleteChars] = useState(false);
   const [deletingWorld, setDeletingWorld] = useState(false);
   const [creatingWorld, setCreatingWorld] = useState(false);
@@ -255,6 +257,17 @@ export function WorldEditor() {
             {t('pages:worldEditor.newWorld')}
           </button>
           {world && <UnsavedPill dirty={draft.dirty} failed={draft.persistError} />}
+          {world && (
+            <button
+              className="btn ghost"
+              onClick={() => setExportOpen(true)}
+              disabled={saving || draft.dirty}
+              title={draft.dirty ? t('pages:worldEditor.exportDirtyHint') : undefined}
+            >
+              <Icon name="download" size={14} />
+              {t('pages:worldEditor.export')}
+            </button>
+          )}
           {world && (
             <button className="btn primary" onClick={save} disabled={saving}>
               <Icon name="save" size={14} />
@@ -495,6 +508,10 @@ export function WorldEditor() {
           )}
         </div>
       </div>
+
+      {exportOpen && world && (
+        <ShareExportDialog worlds={[world]} characters={[]} onClose={() => setExportOpen(false)} />
+      )}
 
       {/* ConfirmDialog for world deletion */}
       {confirmDelete && world && (
