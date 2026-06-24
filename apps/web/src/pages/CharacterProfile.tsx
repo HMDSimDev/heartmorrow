@@ -37,6 +37,7 @@ import { Icon } from '../components/Icon';
 import { CrisisResources } from '../components/CrisisResources';
 import { DatingBars, RelationshipBars } from '../components/StatBars';
 import { Banner, Empty, Loader, ConfirmDialog } from '../components/ui';
+import { ShareExportDialog } from '../components/ShareTools';
 import './profile.page.css';
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
@@ -66,6 +67,7 @@ export function CharacterProfile() {
   const { creatorMode, dayTick } = useAppData();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const bundle = useAsync(() => api.getCharacterBundle(id), [id]);
@@ -220,6 +222,9 @@ export function CharacterProfile() {
                     </Link>
                     <button className="btn ghost" onClick={() => setConfirmDuplicate(true)} disabled={busy}>
                       <Icon name="duplicate" size={16} /> {t('profile.duplicate')}
+                    </button>
+                    <button className="btn ghost" onClick={() => setExporting(true)} disabled={busy}>
+                      <Icon name="download" size={16} /> {t('profile.export')}
                     </button>
                     <button className="btn danger ghost" onClick={() => setConfirmDelete(true)} disabled={busy}>
                       <Icon name="trash" size={16} /> {t('profile.delete')}
@@ -593,6 +598,10 @@ export function CharacterProfile() {
             </div>
 
             {bundle.error && <Banner kind="error">{bundle.error}</Banner>}
+
+            {exporting && (
+              <ShareExportDialog worlds={[]} characters={[character]} onClose={() => setExporting(false)} />
+            )}
 
             {confirmDelete && (
               <ConfirmDialog
