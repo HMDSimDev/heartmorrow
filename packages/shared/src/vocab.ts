@@ -86,6 +86,8 @@ export const MEMORY_TAGS = [
   'social',
   'minigame',
   'npc_life',
+  // A beat that happened inside a Wayfarer quest scene.
+  'quest',
 ] as const;
 export type MemoryTag = (typeof MEMORY_TAGS)[number];
 export const MemoryTagSchema = z.enum(MEMORY_TAGS);
@@ -107,3 +109,78 @@ export const MemoryTagArraySchema = z
   .array(z.string())
   .default([])
   .transform((arr): MemoryTag[] => arr.filter(isMemoryTag).slice(0, 8));
+
+// --- Quest mode (Wayfarer) --------------------------------------------------
+
+/**
+ * The quest vocabularies. Like the date expressions above, these are CLOSED sets
+ * the LLM picks from — never free-form. They are *classification targets* (the
+ * Interpreter coerces freeform player intent onto them) and *consequence
+ * primitives* (the referee composes outcomes from them). Anything off-list is
+ * coerced to a safe default via `.catch()`, so a hallucinated value can never
+ * reach the deterministic referee or game state. See `docs/quest-mode-plan.md`.
+ */
+
+/** Verbs are a CLASSIFICATION target, not the action space (~a dozen, off-list → wait). */
+export const QUEST_VERBS = [
+  'inspect',
+  'move',
+  'use_item',
+  'persuade',
+  'intimidate',
+  'deceive',
+  'charm',
+  'sneak',
+  'force',
+  'aid',
+  'attack',
+  'wait',
+] as const;
+export type QuestVerb = (typeof QUEST_VERBS)[number];
+export const QuestVerbSchema = z.enum(QUEST_VERBS).catch('wait');
+
+/** How hard the Interpreter judged the attempt to be — gates the proportionality tier. */
+export const DIFFICULTY_BANDS = ['trivial', 'normal', 'hard', 'desperate'] as const;
+export type DifficultyBand = (typeof DIFFICULTY_BANDS)[number];
+export const DifficultyBandSchema = z.enum(DIFFICULTY_BANDS).catch('normal');
+
+/** The four grades a seeded check resolves to — the referee owns this, never the LLM. */
+export const OUTCOME_GRADES = ['success', 'partial', 'fail', 'complication'] as const;
+export type OutcomeGrade = (typeof OUTCOME_GRADES)[number];
+export const OutcomeGradeSchema = z.enum(OUTCOME_GRADES).catch('fail');
+
+/** The closed consequence grammar — every outcome is a COMPOSITION of these primitives. */
+export const EFFECT_OPS = [
+  'setFlag',
+  'clearFlag',
+  'moveEntityToFaction', // the "switch sides" primitive
+  'adjustWarmth', // → stat-service, capped + anti-grind
+  'adjustStat', // player stat OR an entity's hp/disposition, clamped
+  'grantItem',
+  'removeItem',
+  'addMoney', // → addMoney(), capped
+  'moveToNode', // authored routing (gated; desperate tier only)
+  'endScene',
+] as const;
+export type EffectOp = (typeof EFFECT_OPS)[number];
+export const EffectOpSchema = z.enum(EFFECT_OPS).catch('setFlag');
+
+/** A scene entity's allegiance — mutable, the target of `moveEntityToFaction`. */
+export const QUEST_FACTIONS = ['party', 'ally', 'neutral', 'hostile'] as const;
+export type QuestFaction = (typeof QUEST_FACTIONS)[number];
+export const QuestFactionSchema = z.enum(QUEST_FACTIONS).catch('neutral');
+
+/** Lifecycle of a quest run. */
+export const QUEST_STATUSES = ['active', 'resolved', 'abandoned'] as const;
+export type QuestStatus = (typeof QUEST_STATUSES)[number];
+export const QuestStatusSchema = z.enum(QUEST_STATUSES).catch('active');
+
+/** The SHAPES of an authored end condition; each compiles to a state predicate. */
+export const GOAL_KINDS = ['defeat', 'persuade', 'acquire', 'reach', 'survive', 'flag'] as const;
+export type GoalKind = (typeof GOAL_KINDS)[number];
+export const GoalKindSchema = z.enum(GOAL_KINDS).catch('flag');
+
+/** Whether satisfying a goal predicate WINS or LOSES the quest. */
+export const GOAL_OUTCOMES = ['win', 'lose'] as const;
+export type GoalOutcome = (typeof GOAL_OUTCOMES)[number];
+export const GoalOutcomeSchema = z.enum(GOAL_OUTCOMES).catch('win');

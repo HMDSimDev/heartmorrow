@@ -18,6 +18,7 @@ import { shopRoutes } from './routes/shop';
 import { propertyRoutes } from './routes/property';
 import { marketRoutes } from './routes/market';
 import { gamblingRoutes } from './routes/gambling';
+import { questRoutes } from './routes/quests';
 import { minigameRoutes } from './routes/minigames';
 import { playerRoutes } from './routes/player';
 import { dataRoutes } from './routes/data';
@@ -111,6 +112,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await propertyRoutes(api);
       await marketRoutes(api);
       await gamblingRoutes(api);
+      await questRoutes(api);
       await minigameRoutes(api);
       await playerRoutes(api);
       await phoneRoutes(api);

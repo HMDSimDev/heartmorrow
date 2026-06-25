@@ -7,6 +7,7 @@ import {
   CharacterSchema,
   CompanySchema,
   PropertySchema,
+  QuestSchema,
   WorldSchema,
   WorldNoteSchema,
   CharacterPackPayloadSchema,
@@ -15,6 +16,7 @@ import {
   type Character,
   type Company,
   type Property,
+  type Quest,
   type PortableAsset,
   type PackManifest,
   type CharacterPackPayload,
@@ -31,6 +33,7 @@ import {
   worldNotesRepo,
   propertiesRepo,
   companiesRepo,
+  questsRepo,
 } from '../db/repositories';
 import { newId } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
@@ -235,6 +238,10 @@ export function exportWorldPack(
   const companies = companiesRepo
     .listByWorld(worldId)
     .map((c) => (includeCharacters ? c : { ...c, linkedCharacterId: null }));
+  // Authored quests travel too; without the cast a quest can't anchor a character.
+  const quests = questsRepo
+    .listByWorld(worldId)
+    .map((q) => (includeCharacters ? q : { ...q, partnerId: null }));
 
   const ids = collectCharacterAssetIds(characters); // empty when characters excluded
   for (const loc of world.locations) if (loc.imageAssetId) ids.add(loc.imageAssetId);
@@ -248,6 +255,7 @@ export function exportWorldPack(
     characters,
     properties,
     companies,
+    quests,
     assets: portable,
   });
   const manifest = makeManifest('world', {
@@ -499,6 +507,19 @@ function importWorldPayload(
         worldId: newWorldId,
         assetId: mapId(c.assetId, assetIdMap),
         linkedCharacterId: mapId(c.linkedCharacterId, charIdMap),
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+  }
+  for (const q of payload.quests as Quest[]) {
+    questsRepo.insert(
+      QuestSchema.parse({
+        ...q,
+        id: newId('quest'),
+        worldId: newWorldId,
+        // Re-anchor onto the imported cast if it travelled, else drop the anchor.
+        partnerId: mapId(q.partnerId, charIdMap),
         createdAt: now,
         updatedAt: now,
       }),

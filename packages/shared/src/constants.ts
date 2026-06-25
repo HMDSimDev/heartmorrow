@@ -281,3 +281,44 @@ export const AVAILABILITY_REASONS = [
   'is off the grid, dealing with something personal',
   'asked for a quiet day to themselves',
 ] as const;
+
+// --- Quests (Wayfarer adventure mode) ---------------------------------------
+
+/**
+ * Tunables for quest mode (see `quest.ts` + `docs/quest-mode-plan.md`). Two jobs:
+ *  1. bound the STATE (entities per scene, effects per outcome) so a scene stays a
+ *     character sheet, never a transcript; and
+ *  2. bound the ECONOMY/relationship reach of an emergent outcome so a quest can
+ *     never become a money/affection engine — every magnitude here sits UNDER the
+ *     gift/expedition caps and routes through the same capped services.
+ *
+ * The proportionality table (which effect TIERS each difficulty band may unlock)
+ * lives in `quest.ts`; these are the flat magnitude ceilings it clamps against.
+ */
+export const QUEST = {
+  /** A scene introduces at most this many entities (the mutable "nouns"). */
+  MAX_ENTITIES_PER_SCENE: 8,
+  /** A single outcome composition is small — at most this many primitives. */
+  MAX_EFFECTS_PER_OUTCOME: 4,
+  /** Shared per-(world, partner, day) warmth gain cap — mirrors gifts/expeditions. */
+  WARMTH_GAIN_CAP_PER_PARTNER_DAY: 4,
+  /** Total money a single quest run may ever accrue (well under REWARD caps). */
+  MONEY_CAP_PER_QUEST: 120,
+  /** Largest money delta a single effect may add. */
+  MONEY_DELTA_MAX: 60,
+  /** Largest warmth delta a single effect may apply (before the daily cap). */
+  WARMTH_DELTA_MAX: 4,
+  /** Largest disposition delta per outcome, per entity. */
+  DISPOSITION_DELTA_MAX: 20,
+  /** Largest generic stat/hp delta a single effect may apply. */
+  STAT_DELTA_MAX: 25,
+  /** Entity / player hp clamp ceiling. */
+  MAX_HP: 100,
+  // --- Bounding: a quest is ALWAYS finite (plan §5.4) ---
+  /** No authored quest may exceed this turn budget. */
+  MAX_TURNS_CEILING: 20,
+  /** Default authored turn budget when none is set. */
+  DEFAULT_MAX_TURNS: 8,
+  /** Consecutive goal-irrelevant turns before the referee force-resolves the scene. */
+  STALL_LIMIT: 3,
+} as const;

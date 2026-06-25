@@ -8,7 +8,7 @@ import { pseudoize } from './pseudo';
 
 // Namespaces map 1:1 onto app areas. Grow this as you extract more strings
 // (e.g. 'pages', 'phone', 'minigames', 'gambling'); load each lazily where used.
-export const NAMESPACES = ['common', 'settings', 'pages', 'phone'] as const;
+export const NAMESPACES = ['common', 'settings', 'pages', 'phone', 'quests'] as const;
 
 // Vite statically analyzes this glob and emits ONE lazy chunk per locale file,
 // so each language × namespace is code-split and fetched only when first needed.

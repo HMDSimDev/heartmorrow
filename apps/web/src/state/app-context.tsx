@@ -1,7 +1,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
-import type { ActiveDate, Asset, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
+import type { ActiveDate, Asset, PlayerProfile, QuestSceneView, SleepResponse, World, WorldState } from '@dsim/shared';
 import { deriveCalendar } from '@dsim/shared';
 import { api } from '../lib/api';
 import { idbGet, idbSet, idbDel } from '../lib/idb-kv';
@@ -111,6 +111,13 @@ interface AppData {
    *  before it knows whether a date is already underway. */
   activeDateLoaded: boolean;
   refreshActiveDate: () => Promise<void>;
+  /** The active world's in-flight Wayfarer quest (if any). Drives the Wayfarer-tab
+   *  resume + nav badge, and locks day-spending actions (Sleep / Work) while a
+   *  quest is underway — exactly like {@link activeDate}. Null when none is open. */
+  activeQuest: QuestSceneView | null;
+  /** False until the active quest has been fetched once this session. */
+  activeQuestLoaded: boolean;
+  refreshActiveQuest: () => Promise<void>;
   // Total reset
   resetProgress: () => Promise<void>;
 }
@@ -135,6 +142,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [unreadTexts, setUnreadTexts] = useState(0);
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
   const [activeDateLoaded, setActiveDateLoaded] = useState(false);
+  const [activeQuest, setActiveQuest] = useState<QuestSceneView | null>(null);
+  const [activeQuestLoaded, setActiveQuestLoaded] = useState(false);
 
   const reloadPlayer = useCallback(async () => {
     try {
@@ -185,6 +194,25 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       /* leave the last-known value on a transient error */
     } finally {
       setActiveDateLoaded(true);
+    }
+  }, [activeWorldId]);
+  // The active world's in-flight quest — the resume + action-lock source for
+  // Wayfarer. Only worlds with the `quests` feature enabled answer this; a 403 on
+  // a quest-less world simply leaves it null. The Wayfarer page also drives explicit
+  // refreshes as a quest starts, advances, and resolves.
+  const refreshActiveQuest = useCallback(async () => {
+    if (!activeWorldId) {
+      setActiveQuest(null);
+      setActiveQuestLoaded(true);
+      return;
+    }
+    try {
+      setActiveQuest((await api.questLobby(activeWorldId)).active);
+    } catch {
+      // Quest-less worlds (feature off) 403 here — treat as "no quest", don't retain.
+      setActiveQuest(null);
+    } finally {
+      setActiveQuestLoaded(true);
     }
   }, [activeWorldId]);
 
@@ -243,6 +271,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshActiveDate();
   }, [refreshActiveDate]);
+
+  // Same for the in-flight quest: re-derive on world change + first mount.
+  useEffect(() => {
+    void refreshActiveQuest();
+  }, [refreshActiveQuest]);
 
   const sleep = useCallback(async (): Promise<SleepResponse | null> => {
     if (!activeWorldId) return null;
@@ -405,8 +438,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     await api.resetData();
     setDayTick((t) => t + 1); // everything is day-derived after a reset
     setActiveDate(null); // a reset wipes all sessions
-    await Promise.all([reloadPlayer(), refreshWorldState(), refreshActiveDate()]);
-  }, [reloadPlayer, refreshWorldState, refreshActiveDate]);
+    setActiveQuest(null); // ...and all quest runs
+    await Promise.all([reloadPlayer(), refreshWorldState(), refreshActiveDate(), refreshActiveQuest()]);
+  }, [reloadPlayer, refreshWorldState, refreshActiveDate, refreshActiveQuest]);
 
   const assetMap = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
   const assetById = useCallback(
@@ -444,9 +478,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       activeDate,
       activeDateLoaded,
       refreshActiveDate,
+      activeQuest,
+      activeQuestLoaded,
+      refreshActiveQuest,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, activeQuest, activeQuestLoaded, refreshActiveQuest, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

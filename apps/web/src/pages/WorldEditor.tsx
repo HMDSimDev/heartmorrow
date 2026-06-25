@@ -402,6 +402,14 @@ export function WorldEditor() {
                       />
                       {t('pages:worldEditor.featureCasino')}
                     </label>
+                    <label className="creator-flag">
+                      <input
+                        type="checkbox"
+                        checked={world.featureFlags.quests}
+                        onChange={(e) => setFeature('quests', e.target.checked)}
+                      />
+                      {t('pages:worldEditor.featureQuests')}
+                    </label>
                   </div>
                   {world.featureFlags.gambling && (
                     <div className="row" style={{ gap: 12, marginTop: 10, flexWrap: 'wrap' }}>

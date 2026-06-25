@@ -53,6 +53,14 @@ import {
   GenerateProfileInputSchema,
   MAX_EVAL_DELTA,
   RELATIONSHIP_STAT_LABELS,
+  // Wayfarer quests
+  QuestGraphSchema,
+  QuestActionSchema,
+  QuestGenSchema,
+  resolveQuestAction,
+  initialQuestState,
+  boundQuestGraph,
+  isWinReachable,
   BenchCaseMetaSchema,
   type BenchCaseMeta,
   type BenchCaseKind,
@@ -99,6 +107,13 @@ import {
   estimatePromptChars,
 } from '../../prompt/prompt-builder';
 import { resolvePrompt } from '../../prompt/registry';
+import {
+  buildInterpretMessages,
+  buildNarrateMessages,
+  buildQuestGenMessages,
+  QuestInterpretSchema,
+  QuestNarrateSchema,
+} from '../quest-service';
 import type { ChatMessage } from '../../llm/types';
 import {
   benchMara,
@@ -436,7 +451,83 @@ export const BENCH_GROUPS = [
   'Extraction',
   'Creator generation',
   'Social feed',
+  'Wayfarer quests',
 ] as const;
+
+// --- Wayfarer quest fixtures (a harbor standoff scene the model reasons over) ---
+
+const benchQuestGraph = QuestGraphSchema.parse({
+  entryNodeId: 'gate',
+  maxTurns: 8,
+  timeoutOutcome: 'resolved',
+  nodes: [
+    {
+      id: 'gate',
+      kind: 'standoff',
+      setup:
+        'A night watchman bars the warehouse door, lantern raised against the fog. Word on the docks is his captain has been skimming the crews’ wages.',
+      entities: [{ id: 'watch', name: 'Bram the Watchman', faction: 'hostile', disposition: -10, hp: 30 }],
+      affordances: [
+        {
+          verb: 'persuade',
+          stat: 'charm',
+          difficulty: 'hard',
+          hint: 'Tell Bram his captain has been pocketing the crews’ wages.',
+          effects: {
+            success: [{ op: 'moveEntityToFaction', entityId: 'watch', faction: 'ally' }, { op: 'setFlag', flag: 'watch.won' }],
+            partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'watch', delta: 6 }],
+            fail: [],
+            complication: [{ op: 'adjustStat', key: 'disposition', entityId: 'watch', delta: -5 }],
+          },
+        },
+        {
+          verb: 'intimidate',
+          stat: 'grit',
+          difficulty: 'hard',
+          hint: 'Loom out of the fog and make him stand down.',
+          effects: { success: [{ op: 'adjustStat', key: 'disposition', entityId: 'watch', delta: -8 }], partial: [], fail: [], complication: [] },
+        },
+        {
+          verb: 'inspect',
+          stat: 'wits',
+          difficulty: 'trivial',
+          hint: 'Search the manifest crates for the skimming ledger.',
+          effects: { success: [{ op: 'setFlag', flag: 'found.ledger' }], partial: [], fail: [], complication: [] },
+        },
+        {
+          verb: 'attack',
+          stat: 'grit',
+          difficulty: 'desperate',
+          hint: 'Draw your blade and rush him.',
+          effects: { success: [{ op: 'adjustStat', key: 'hp', entityId: 'watch', delta: -20 }], partial: [], fail: [], complication: [{ op: 'adjustStat', key: 'hp', entityId: 'watch', delta: 0 }] },
+        },
+      ],
+      edges: [],
+      isTerminal: false,
+    },
+  ],
+  goals: [{ id: 'win', kind: 'persuade', outcome: 'win', label: 'Win the watchman over', predicate: { kind: 'entityFaction', entityId: 'watch', faction: 'ally' } }],
+});
+const benchQuestNode = benchQuestGraph.nodes[0]!;
+const benchQuestState = initialQuestState(benchQuestGraph, { charm: 60, grit: 55, wits: 60 });
+
+// A pre-resolved success outcome (the guard flips) for the narrate case.
+const benchQuestAction = QuestActionSchema.parse({ verb: 'persuade', stat: 'charm', difficulty: 'hard', proposedEffects: [] });
+const benchQuestResolved = resolveQuestAction(benchQuestState, benchQuestGraph, benchQuestAction, 0.1);
+
+// The verbs offered as the interpret baseline (the scene's affordances + close cousins).
+const QUEST_VERB_OPTIONS = [
+  { value: 'persuade', label: 'persuade' },
+  { value: 'intimidate', label: 'intimidate' },
+  { value: 'deceive', label: 'deceive' },
+  { value: 'inspect', label: 'inspect' },
+  { value: 'attack', label: 'attack' },
+  { value: 'sneak', label: 'sneak' },
+];
+
+const QUEST_SCENE_LINES: BenchTranscriptLine[] = [
+  { speaker: 'narrator', name: '', text: benchQuestNode.setup },
+];
 
 // Each script has at least the max slider's worth of turns (12) so a scripted run
 // is never silently truncated below the requested dialogueTurns.
@@ -1345,6 +1436,119 @@ export const BENCH_CASES: BenchCaseDef[] = [
     }),
     // The schema defaults `tone` to '' — an empty tone label is a real miss, so fail it.
     validate: (data) => (nonBlank((data as { tone?: unknown }).tone) ? null : 'No tone label — the comment’s "tone" field came back empty.'),
+  },
+
+  // === Wayfarer quests ===
+  {
+    id: 'quest_interpret_persuade',
+    label: 'Quest interpret — persuade',
+    description: 'The Interpreter reads a clearly-persuasive freeform action (telling the guard his captain robbed him) and classifies the verb. The referee owns the dice; this only tests intent reading.',
+    kind: 'judge',
+    group: 'Wayfarer quests',
+    baselineSpec: { kind: 'choice', options: QUEST_VERB_OPTIONS },
+    baselinePrompt: 'Which verb best fits “I tell the watchman his captain has been skimming the wages — stand with me, not a thief.”?',
+    defaultBaseline: { choice: 'persuade' },
+    setup: {
+      characterName: '',
+      characterBrief: '',
+      relationshipLine: '',
+      note: 'Player action: “I tell the watchman his captain has been skimming the wages — he’s better off standing with me than a thief.”',
+      transcript: QUEST_SCENE_LINES,
+    },
+    structured: () => ({
+      messages: buildInterpretMessages(benchQuestNode, benchQuestState, 'I tell the watchman his captain has been skimming the wages — he’s better off standing with me than with a thief.'),
+      schema: QuestInterpretSchema,
+      schemaName: 'QuestInterpret',
+      task: 'Classify the player’s freeform quest action into a verb + difficulty.',
+    }),
+    score: (human, llm) => scoreChoice(human, (llm as { verb?: string })?.verb, 'Verb'),
+  },
+  {
+    id: 'quest_interpret_attack',
+    label: 'Quest interpret — attack',
+    description: 'The same Interpreter on an unambiguously violent action — drawing a blade and lunging. Should classify as attack, not persuade.',
+    kind: 'judge',
+    group: 'Wayfarer quests',
+    baselineSpec: { kind: 'choice', options: QUEST_VERB_OPTIONS },
+    baselinePrompt: 'Which verb best fits “I draw my blade and lunge at him before he can raise the alarm.”?',
+    defaultBaseline: { choice: 'attack' },
+    setup: {
+      characterName: '',
+      characterBrief: '',
+      relationshipLine: '',
+      note: 'Player action: “I draw my blade and lunge at him before he can raise the alarm.”',
+      transcript: QUEST_SCENE_LINES,
+    },
+    structured: () => ({
+      messages: buildInterpretMessages(benchQuestNode, benchQuestState, 'I draw my blade and lunge at him before he can raise the alarm.'),
+      schema: QuestInterpretSchema,
+      schemaName: 'QuestInterpret',
+      task: 'Classify the player’s freeform quest action into a verb + difficulty.',
+    }),
+    score: (human, llm) => scoreChoice(human, (llm as { verb?: string })?.verb, 'Verb'),
+  },
+  {
+    id: 'quest_generate',
+    label: 'Quest generation',
+    description: 'Draft a whole single-scene Wayfarer quest (scene, entities, affordances with per-grade effect menus, and a win goal) from a one-line idea. "Pass" = the server can actually run what the model produced.',
+    kind: 'generation',
+    group: 'Wayfarer quests',
+    setup: {
+      characterName: '',
+      characterBrief: '',
+      relationshipLine: '',
+      note: 'Idea: a tense midnight standoff at the harbor — win over a suspicious night watchman before the smugglers arrive.',
+      transcript: [],
+    },
+    structured: () => ({
+      messages: buildQuestGenMessages({
+        world: benchWorld,
+        prompt: 'A tense midnight standoff at the harbor warehouse: the player must win over a suspicious night watchman before the smugglers arrive.',
+        partnerName: null,
+      }),
+      schema: QuestGenSchema,
+      schemaName: 'QuestGen',
+      task: 'Generate a single-scene Wayfarer quest.',
+      maxTokens: 2400,
+    }),
+    // Beyond schema validity: the bounded graph must be RUNNABLE — at least one
+    // affordance, a success the player can land, and a reachable win goal.
+    validate: (data) => {
+      try {
+        const g = boundQuestGraph((data as { graph?: unknown }).graph);
+        if (!g.nodes.some((n) => n.affordances.length > 0)) return 'No affordances — there’s nothing the player can try.';
+        if (!g.nodes.some((n) => n.affordances.some((a) => a.effects.success.length > 0))) return 'No success effects — nothing the player can actually achieve.';
+        if (!isWinReachable(g)) return 'No reachable win — the win goal is wired to something no effect can satisfy.';
+        return null;
+      } catch {
+        return 'Produced a structurally invalid quest graph.';
+      }
+    },
+  },
+  {
+    id: 'quest_narrate',
+    label: 'Quest narration',
+    description: 'Narrate an already-decided outcome (the watchman is won over) in vivid second person — without inventing results the seeded referee didn’t decide.',
+    kind: 'generation',
+    group: 'Wayfarer quests',
+    setup: {
+      characterName: '',
+      characterBrief: '',
+      relationshipLine: '',
+      note: 'Outcome (authoritative): the player persuaded the watchman; he comes over to their side.',
+      transcript: QUEST_SCENE_LINES,
+    },
+    structured: () => ({
+      messages: buildNarrateMessages(benchQuestNode, benchQuestAction, benchQuestResolved.outcome, benchQuestResolved.newState),
+      schema: QuestNarrateSchema,
+      schemaName: 'QuestNarrate',
+      task: 'Narrate the already-decided quest outcome in second person.',
+      maxTokens: 400,
+    }),
+    validate: (data) => {
+      const prose = (data as { prose?: unknown }).prose;
+      return nonBlank(prose) && String(prose).length >= 20 ? null : 'Empty or trivially short narration.';
+    },
   },
 ];
 

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ParseKeys } from 'i18next';
+import type { FeatureFlags } from '@dsim/shared';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppData } from './state/app-context';
@@ -16,6 +17,7 @@ import { Shop } from './pages/Shop';
 import { Inventory } from './pages/Inventory';
 import { Minigames } from './pages/Minigames';
 import { Phone } from './pages/Phone';
+import { Wayfarer } from './pages/Wayfarer';
 import { Settings } from './pages/Settings';
 import { Help } from './pages/Help';
 import { Bench } from './pages/Bench';
@@ -29,11 +31,14 @@ type CommonKey = ParseKeys<'common'>;
 // `hideOnBottomNav` keeps an item out of the cramped mobile bottom bar (which must
 // stay fully on-screen, no scroll) while still showing it in the roomy sidebar.
 // Help lives there: desktop gets a permanent tab; mobile reaches it via Settings.
-const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonKey; end?: boolean; creatorOnly?: boolean; hideOnBottomNav?: boolean }[] = [
+// `featureGate` hides a tab unless the active world enables that feature flag —
+// the same server-enforced gate the phone tiles use (a deep-link still 403s).
+const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonKey; end?: boolean; creatorOnly?: boolean; hideOnBottomNav?: boolean; featureGate?: keyof FeatureFlags }[] = [
   { to: '/', icon: 'home', labelKey: 'nav.home', end: true },
   { to: '/characters', icon: 'people', labelKey: 'nav.people' },
   { to: '/world', icon: 'chronicle', labelKey: 'nav.world', creatorOnly: true },
   { to: '/chat', icon: 'date', labelKey: 'nav.date' },
+  { to: '/quests', icon: 'quest', labelKey: 'nav.wayfarer', featureGate: 'quests' },
   { to: '/phone', icon: 'phone', labelKey: 'nav.phone' },
   { to: '/settings', icon: 'settings', labelKey: 'nav.settings' },
   { to: '/help', icon: 'info', labelKey: 'nav.help', hideOnBottomNav: true },
@@ -47,6 +52,7 @@ function routeKey(path: string): string {
   if (path === '/characters') return 'people';
   if (path.startsWith('/characters')) return 'profile'; // profile, new, edit
   if (path.startsWith('/chat')) return 'date';
+  if (path.startsWith('/quests')) return 'quests';
   if (path.startsWith('/phone')) return 'phone';
   if (path.startsWith('/shop')) return 'shop';
   if (path.startsWith('/inventory')) return 'bag';
@@ -68,7 +74,7 @@ function CreatorRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   const { t } = useTranslation();
-  const { creatorMode, unreadTexts, activeWorldId, activeDate } = useAppData();
+  const { creatorMode, unreadTexts, activeWorldId, activeWorld, activeDate, activeQuest } = useAppData();
   const location = useLocation();
 
   // The world selector + onboarding are a full-screen experience OUTSIDE the
@@ -90,7 +96,11 @@ export default function App() {
     return <Navigate to="/worlds" replace />;
   }
 
-  const nav = NAV.filter((n) => creatorMode || !n.creatorOnly);
+  const nav = NAV.filter(
+    (n) =>
+      (creatorMode || !n.creatorOnly) &&
+      (!n.featureGate || !!activeWorld?.featureFlags?.[n.featureGate]),
+  );
   const badgeFor = (to: string) => {
     if (to === '/phone' && unreadTexts > 0)
       return <span className="nav-badge">{unreadTexts > 9 ? '9+' : unreadTexts}</span>;
@@ -102,6 +112,15 @@ export default function App() {
           className="nav-badge nav-badge-live"
           title={t('hud.onDateWith', { name: activeDate.characterName })}
           aria-label={t('hud.dateInProgress', { name: activeDate.characterName })}
+        />
+      );
+    // A live quest is underway — same pulsing dot on the Wayfarer tab.
+    if (to === '/quests' && activeQuest && activeQuest.status === 'active')
+      return (
+        <span
+          className="nav-badge nav-badge-live"
+          title={t('hud.inQuest', { name: activeQuest.name })}
+          aria-label={t('hud.inQuest', { name: activeQuest.name })}
         />
       );
     return null;
@@ -144,6 +163,7 @@ export default function App() {
           <Route path="/characters/:id/edit" element={<CreatorRoute><CharacterEditor /></CreatorRoute>} />
           <Route path="/world" element={<CreatorRoute><WorldEditor /></CreatorRoute>} />
           <Route path="/chat" element={<Chat />} />
+          <Route path="/quests" element={<Wayfarer />} />
           <Route path="/phone" element={<Phone />} />
           <Route path="/shop" element={<Shop />} />
           <Route path="/inventory" element={<Inventory />} />

@@ -36,6 +36,12 @@ import type {
   TextMessage,
   TogetherResult,
   ActiveDate,
+  QuestSummaryView,
+  QuestSceneView,
+  Quest,
+  QuestCreate,
+  QuestUpdate,
+  QuestGraph,
   ConversationCreate,
   ConversationSession,
   DtrResponse,
@@ -579,6 +585,23 @@ export const api = {
   startVideoPoker: (worldId: string, bet: number) => post<VideoPokerResponse>('/gambling/videopoker/start', { worldId, bet }),
   videoPokerDraw: (worldId: string, roundId: string, holds: boolean[]) =>
     post<VideoPokerResponse>('/gambling/videopoker/draw', { worldId, roundId, holds }),
+
+  // Wayfarer quests (per-world; gated by world.featureFlags.quests)
+  questLobby: (worldId: string) =>
+    get<{ quests: QuestSummaryView[]; active: QuestSceneView | null }>(`/quests${worldQuery(worldId)}`),
+  startQuest: (worldId: string, questId: string) => post<QuestSceneView>('/quests/start', { worldId, questId }),
+  questTurn: (worldId: string, text: string) => post<QuestSceneView>('/quests/turn', { worldId, text }),
+  abandonQuest: (worldId: string) => post<{ ok: true }>('/quests/abandon', { worldId }),
+  // quest authoring (creator; full graphs)
+  authoredQuests: (worldId: string) => get<{ quests: Quest[] }>(`/quests/authoring${worldQuery(worldId)}`),
+  createQuest: (input: QuestCreate) => post<Quest>('/quests/authoring', input),
+  updateQuest: (id: string, patchInput: QuestUpdate) => patch<Quest>(`/quests/authoring/${id}`, patchInput),
+  deleteQuest: (id: string) => del<{ ok: true }>(`/quests/authoring/${id}`),
+  generateQuest: (worldId: string, prompt: string, partnerId: string | null) =>
+    post<StructuredResult<{ name: string; blurb: string; partnerId: string | null; minWarmthBand: number; graph: QuestGraph }>>(
+      '/quests/generate',
+      { worldId, prompt, partnerId },
+    ),
 
   // minigames
   listMemorials: (worldId?: string) => get<string[]>(`/characters/memorials${worldQuery(worldId)}`),

@@ -42,8 +42,12 @@ import {
   StockPriceSchema,
   MarketNewsSchema,
   GamblingRoundSchema,
+  QuestSchema,
+  ActiveQuestSchema,
+  QuestTurnSchema,
 } from './entities';
 import { DayRecapSchema, ITEM_GEN, LOCATION_GEN, PROPERTY_GEN, STOCK_GEN, WORLD_GEN } from './llm';
+import { QuestGraphSchema } from '../quest';
 import { ItemCategorySchema, ItemRaritySchema } from './items';
 import { CharacterLinkKindSchema, RelationshipStatusSchema } from '../social';
 import { PropertyCategorySchema, StockSectorSchema } from '../wealth';
@@ -1149,6 +1153,55 @@ export const CreateFeedPostResponseSchema = z.object({
 });
 export type CreateFeedPostResponse = z.infer<typeof CreateFeedPostResponseSchema>;
 
+// --- Quests (Wayfarer) ------------------------------------------------------
+
+export const QuestStartSchema = z.object({
+  worldId: z.string().min(1),
+  questId: z.string().min(1),
+});
+export type QuestStart = z.input<typeof QuestStartSchema>;
+
+export const QuestTurnInputSchema = z.object({
+  worldId: z.string().min(1),
+  /** The player's freeform attempt — what they want to try this turn. */
+  text: z.string().min(1).max(1000),
+});
+export type QuestTurnInput = z.input<typeof QuestTurnInputSchema>;
+
+export const QuestAbandonSchema = z.object({
+  worldId: z.string().min(1),
+});
+export type QuestAbandon = z.input<typeof QuestAbandonSchema>;
+
+// Authoring (creator) — create/update a quest. The graph is schema-validated here
+// and re-sanitised by boundQuestGraph server-side before it ever reaches the referee.
+export const QuestCreateSchema = z.object({
+  worldId: z.string().min(1),
+  name: z.string().min(1).max(120),
+  blurb: z.string().max(400).default(''),
+  partnerId: z.string().nullable().default(null),
+  minWarmthBand: z.number().int().min(0).max(5).default(0),
+  graph: QuestGraphSchema,
+});
+export type QuestCreate = z.input<typeof QuestCreateSchema>;
+
+export const QuestUpdateSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  blurb: z.string().max(400).optional(),
+  partnerId: z.string().nullable().optional(),
+  minWarmthBand: z.number().int().min(0).max(5).optional(),
+  graph: QuestGraphSchema.optional(),
+});
+export type QuestUpdate = z.input<typeof QuestUpdateSchema>;
+
+/** Body of `POST /quests/generate` — the creator's idea for the ✨ quest drafter. */
+export const GenerateQuestInputSchema = z.object({
+  worldId: z.string().min(1),
+  prompt: z.string().min(1).max(600),
+  partnerId: z.string().nullable().default(null),
+});
+export type GenerateQuestInput = z.input<typeof GenerateQuestInputSchema>;
+
 // --- Export / import --------------------------------------------------------
 
 export const ExportBundleSchema = z.object({
@@ -1197,6 +1250,11 @@ export const ExportBundleSchema = z.object({
   marketNews: z.array(MarketNewsSchema).default([]),
   // Gambling: pure playthrough state (settled-bet log + any active hand).
   gamblingRounds: z.array(GamblingRoundSchema).default([]),
+  // Quests (Wayfarer): authored `quests` ship with 'authoring'; the run state
+  // (active_quests + the quest_turns transcript) is zeroed for that kind.
+  quests: z.array(QuestSchema).default([]),
+  activeQuests: z.array(ActiveQuestSchema).default([]),
+  questTurns: z.array(QuestTurnSchema).default([]),
 });
 export type ExportBundle = z.infer<typeof ExportBundleSchema>;
 

@@ -509,6 +509,56 @@ CREATE TABLE IF NOT EXISTS gambling_rounds (
 CREATE INDEX IF NOT EXISTS idx_gambling_rounds_day ON gambling_rounds(world_id, player_id, day);
 CREATE INDEX IF NOT EXISTS idx_gambling_rounds_active ON gambling_rounds(world_id, player_id, status);
 
+-- Quests (Wayfarer): authored quest DEFINITIONS — CONTENT, like properties/companies.
+-- The whole node graph lives in the graph JSON column (validated on read/import).
+CREATE TABLE IF NOT EXISTS quests (
+  id              TEXT PRIMARY KEY,
+  world_id        TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  blurb           TEXT NOT NULL DEFAULT '',
+  partner_id      TEXT,
+  min_warmth_band INTEGER NOT NULL DEFAULT 0,
+  graph           TEXT NOT NULL DEFAULT '{}',
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_quests_world ON quests(world_id);
+
+-- A player's in-flight quest run (playthrough state). The materialised current
+-- vector lives in the state column; UNIQUE (world, player) enforces exactly one
+-- run at a time, like an active date. A resolved run stays here so the resolution
+-- screen survives a refresh; it's cleared when the player leaves it or starts another.
+CREATE TABLE IF NOT EXISTS active_quests (
+  id         TEXT PRIMARY KEY,
+  world_id   TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+  player_id  TEXT NOT NULL,
+  quest_id   TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'active',
+  state      TEXT NOT NULL DEFAULT '{}',
+  seed       TEXT NOT NULL DEFAULT '',
+  turn       INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_active_quest_one ON active_quests(world_id, player_id);
+
+-- The transcript / replay log: one row per resolved player action. The logged
+-- action is the replay source (the LLM is never re-invoked); roll is the seeded
+-- roll the referee used; outcome carries the result + narrated prose.
+CREATE TABLE IF NOT EXISTS quest_turns (
+  id          TEXT PRIMARY KEY,
+  world_id    TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+  player_id   TEXT NOT NULL,
+  quest_id    TEXT NOT NULL,
+  turn        INTEGER NOT NULL,
+  player_text TEXT NOT NULL DEFAULT '',
+  action      TEXT NOT NULL DEFAULT '{}',
+  roll        REAL NOT NULL DEFAULT 0,
+  outcome     TEXT NOT NULL DEFAULT '{}',
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_quest_turns ON quest_turns(world_id, player_id, quest_id, turn);
+
 -- Live-date rapport (0..100), persisted per session so a date RESUMED after a
 -- server restart keeps its real vibe instead of snapping back to neutral. The
 -- rapport-service keeps an in-memory write-through cache for hot live turns; this

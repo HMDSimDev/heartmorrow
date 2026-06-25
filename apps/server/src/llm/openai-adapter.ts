@@ -1,5 +1,5 @@
 import type { LlmModelInfo } from '@dsim/shared';
-import type { ChatAdapter, ChatRequest, ChatResult, GenerationStats } from './types';
+import type { ChatAdapter, ChatMessage, ChatRequest, ChatResult, GenerationStats } from './types';
 
 /**
  * Adapter for any OpenAI-API-compatible endpoint (LM Studio, Ollama,
@@ -34,6 +34,50 @@ export function joinUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
 }
 
+/** Common non-ASCII typographic characters → ASCII look-alikes. Applied before
+ * the catch-all strip so the readable punctuation in our prompts survives. */
+const TYPOGRAPHIC_TO_ASCII: ReadonlyArray<readonly [RegExp, string]> = [
+  [/[‘’‚‛′‵]/g, "'"], // curly single quotes / primes → '
+  [/[“”„‟″‶]/g, '"'], // curly double quotes → "
+  [/[‐‑‒–—―−]/g, '-'], // hyphens / en–em dashes / minus → -
+  [/[•‣⁃∙◦·]/g, '*'], // bullets / middle dot → *
+  [/…/g, '...'], // ellipsis → ...
+  [/[       ]/g, ' '], // nbsp / thin / figure spaces → space
+  [/[​‌‍⁠﻿]/g, ''], // zero-width chars / BOM → removed
+];
+
+/**
+ * Fold a string to pure ASCII. Maps typographic punctuation to look-alikes,
+ * NFKD-decomposes accented letters and strips the combining marks (é → e), then
+ * drops anything still non-ASCII.
+ *
+ * Why this exists: the Unsloth/llama-server serving stack in front of the model
+ * decodes our request JSON and RE-ENCODES it before its engine parses it, and that
+ * layer mis-handles multi-byte UTF-8 — it 500s with `parse_error.101 ill-formed
+ * UTF-8 byte` on the first non-ASCII character (e.g. the em-dashes/bullets in our
+ * system guardrails). Escaping to `\uXXXX` on the wire doesn't survive that re-encode
+ * (it decodes back to the raw character), so we remove the non-ASCII CHARACTERS
+ * themselves. Lossy for non-Latin scripts/emoji, but it's the only thing that gets a
+ * prompt through a server that can't handle UTF-8.
+ */
+export function foldToAscii(s: string): string {
+  let out = s.normalize('NFKD');
+  for (const [re, rep] of TYPOGRAPHIC_TO_ASCII) out = out.replace(re, rep);
+  // Strip combining marks left by NFKD and any remaining non-ASCII code points.
+  return out.replace(/[\s\S]/g, (c) => (c.charCodeAt(0) > 0x7f ? '' : c));
+}
+
+/** Apply `foldToAscii` to the text of a chat message, leaving image parts intact. */
+function foldMessageToAscii(m: ChatMessage): ChatMessage {
+  if (typeof m.content === 'string') return { ...m, content: foldToAscii(m.content) };
+  return {
+    ...m,
+    content: m.content.map((part) =>
+      part.type === 'text' ? { ...part, text: foldToAscii(part.text) } : part,
+    ),
+  };
+}
+
 /** Map an LM-Studio-style `stats` block (also emitted by some other servers)
  * to our camelCased GenerationStats. Returns undefined when nothing is present. */
 export function parseGenerationStats(stats: unknown): GenerationStats | undefined {
@@ -56,7 +100,7 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
   constructor(protected readonly cfg: OpenAiAdapterConfig) {}
 
   protected headers(): Record<string, string> {
-    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const h: Record<string, string> = { 'Content-Type': 'application/json; charset=utf-8' };
     if (this.cfg.apiKey) h.Authorization = `Bearer ${this.cfg.apiKey}`;
     return h;
   }
@@ -64,7 +108,11 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
   private body(req: ChatRequest, stream: boolean): string {
     const payload: Record<string, unknown> = {
       model: this.cfg.model,
-      messages: req.messages,
+      // Fold prompt text to pure ASCII: some serving stacks (Unsloth / llama-server
+      // gateway) mis-handle multi-byte UTF-8 in the request and reject the whole
+      // call. Stripping the non-ASCII characters is the only thing that survives a
+      // server that re-encodes the body before parsing it.
+      messages: req.messages.map(foldMessageToAscii),
       temperature: req.temperature ?? 0.8,
       max_tokens: req.maxTokens ?? 1024,
       stream,

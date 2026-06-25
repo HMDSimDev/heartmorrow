@@ -4,6 +4,7 @@ import {
   CharacterSchema,
   CompanySchema,
   PropertySchema,
+  QuestSchema,
   WorldSchema,
   WorldNoteSchema,
 } from './entities';
@@ -90,6 +91,8 @@ export const WorldPackPayloadSchema = z.object({
   characters: z.array(CharacterSchema).default([]),
   properties: z.array(PropertySchema).default([]),
   companies: z.array(CompanySchema).default([]),
+  /** Authored Wayfarer quests (definitions only — no run state). */
+  quests: z.array(QuestSchema).default([]),
   assets: z.array(PortableAssetSchema).default([]),
 });
 export type WorldPackPayload = z.infer<typeof WorldPackPayloadSchema>;

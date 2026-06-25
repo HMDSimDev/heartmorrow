@@ -1,0 +1,50 @@
+{
+  "title": "Wayfarer",
+  "tagline": "Open roads, and the small adventures that find you.",
+  "loading": "Looking down the road…",
+  "lobby": {
+    "available": "Adventures",
+    "empty": "No adventures await in this world yet.",
+    "start": "Begin",
+    "locked": "Locked",
+    "partnerWith": "With {name}",
+    "blurbFallback": "An adventure waits."
+  },
+  "resume": {
+    "banner": "You're in the middle of “{name}.”",
+    "continue": "Continue"
+  },
+  "scene": {
+    "tryHint": "What you might try",
+    "placeholder": "What do you do?",
+    "send": "Attempt",
+    "thinking": "The scene responds…",
+    "turn": "Turn {turn} of {max}",
+    "objective": "Goal: {label}",
+    "leave": "Leave quest",
+    "you": "You"
+  },
+  "grade": {
+    "success": "Success",
+    "partial": "Partial",
+    "fail": "Fail",
+    "complication": "Complication"
+  },
+  "faction": {
+    "party": "With you",
+    "ally": "Ally",
+    "neutral": "Neutral",
+    "hostile": "Hostile"
+  },
+  "resolution": {
+    "win": "Quest complete",
+    "lose": "The quest ends",
+    "money": "Earned ◈ {amount}",
+    "warmth": "Closer by {amount}",
+    "ackWin": "Wrap up",
+    "ackLose": "Move on"
+  },
+  "errors": {
+    "generic": "Something went sideways. Try again."
+  }
+}

@@ -65,6 +65,7 @@ import {
   TrendingUp,
   Landmark,
   Dice5,
+  Compass,
   type LucideProps,
 } from 'lucide-react';
 
@@ -104,6 +105,7 @@ const ICONS = {
   people: Users,
   date: Heart,
   phone: Smartphone,
+  quest: Compass,
   games: Gamepad2,
   bag: Backpack,
   shop: Store,

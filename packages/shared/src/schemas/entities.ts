@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, GAMBLING } from '../constants';
 import { CasinoGameSchema } from '../gambling';
+import { QuestGraphSchema, QuestStateSchema, QuestActionSchema } from '../quest';
+import { QuestStatusSchema } from '../vocab';
 import { DatingStatsSchema, RelationshipStatsSchema, RelationshipStatKeySchema } from '../stats';
 import { PhaseSchema } from '../time';
 import { RelationshipStyleSchema, CharacterLinkSchema, EmploymentSchema, GenderSchema, SexualitySchema, RomanceStateSchema } from '../social';
@@ -61,6 +63,9 @@ export const FeatureFlagsSchema = z.object({
   /** The casino: wager money on slots/blackjack/roulette/video poker, behind a
    *  flat per-bet cap and a per-day wager cap so it never becomes a money engine. */
   gambling: z.boolean().default(false),
+  /** Wayfarer quests: live, freeform-input adventure scenes resolved by a seeded,
+   *  code-owned referee. Adds the "Wayfarer" tab so the player can go on Adventures. */
+  quests: z.boolean().default(false),
 });
 export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 
@@ -544,6 +549,70 @@ export const GamblingRoundSchema = z.object({
   updatedAt: ts,
 });
 export type GamblingRound = z.infer<typeof GamblingRoundSchema>;
+
+// --- Quests (Wayfarer) ------------------------------------------------------
+
+/**
+ * An AUTHORED quest the creator places in a world (like a Property or Company):
+ * a named adventure with an authored node `graph` (scenes, entities, affordance
+ * menus, goals). Ships in clone/export/.hmpack as CONTENT; never zeroed. The whole
+ * `graph` is untrusted authored data — display-or-referee-only, never a prompt
+ * instruction (see `docs/quest-mode-plan.md` §R-LLM).
+ */
+export const QuestSchema = z.object({
+  id,
+  worldId: id,
+  name: z.string().min(1),
+  blurb: z.string().default(''),
+  /** Optional romance anchor: a dated character this quest is about. */
+  partnerId: id.nullable().default(null),
+  /** 0..5 warmth-band gate when partner-anchored (0 = no gate). */
+  minWarmthBand: z.number().int().min(0).max(5).default(0),
+  graph: QuestGraphSchema,
+  createdAt: ts,
+  updatedAt: ts,
+});
+export type Quest = z.infer<typeof QuestSchema>;
+
+/**
+ * A player's in-flight quest run — PLAYTHROUGH state, per-world, keyed
+ * `player:${worldId}`. UNIQUE (world, player): exactly one quest at a time, like
+ * an active date. `state` is the materialised current vector (durable truth);
+ * `seed` + `turn` derive every per-turn roll for replay determinism.
+ */
+export const ActiveQuestSchema = z.object({
+  id,
+  worldId: id,
+  playerId: id,
+  questId: id,
+  status: QuestStatusSchema.default('active'),
+  state: QuestStateSchema,
+  seed: z.string().default(''),
+  turn: z.number().int().min(0).default(0),
+  createdAt: ts,
+  updatedAt: ts,
+});
+export type ActiveQuest = z.infer<typeof ActiveQuestSchema>;
+
+/**
+ * One resolved player action — the TRANSCRIPT / replay log. The `action` is the
+ * logged Interpreter output (replay reuses it; the LLM is never re-invoked);
+ * `roll` is the seeded roll the referee used; `outcome` is its result.
+ */
+export const QuestTurnSchema = z.object({
+  id,
+  worldId: id,
+  playerId: id,
+  questId: id,
+  turn: z.number().int().min(0),
+  playerText: z.string().default(''),
+  action: QuestActionSchema,
+  roll: z.number().default(0),
+  /** Referee result + the narrated prose, for replay/audit + the scene log. */
+  outcome: MetadataSchema.default({}),
+  createdAt: ts,
+});
+export type QuestTurn = z.infer<typeof QuestTurnSchema>;
 
 // --- Events -----------------------------------------------------------------
 

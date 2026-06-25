@@ -125,6 +125,7 @@
     "people": "People",
     "world": "World",
     "date": "Date",
+    "wayfarer": "Wayfarer",
     "phone": "Phone",
     "settings": "Settings",
     "help": "Help",
@@ -355,7 +356,10 @@
     "onDateWith": "On a date with {name}",
     "dateInProgress": "Date in progress with {name}",
     "endDayDateBlock": "You're on a date with {name} — finish it on the Date tab before ending the day.",
-    "onDateNote": "On a date — finish it to end the day."
+    "onDateNote": "On a date — finish it to end the day.",
+    "inQuest": "On a quest: {name}",
+    "endDayQuestBlock": "You're mid-quest ({name}) — finish it on the Wayfarer tab before ending the day.",
+    "inQuestNote": "On a quest — finish it to end the day."
   },
   "recap": {
     "newDay": "A new day dawns",

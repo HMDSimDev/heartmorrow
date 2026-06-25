@@ -13,7 +13,9 @@ import { createCharacter, updateCharacter } from './services/character-service';
 import { createShopItem } from './services/shop-service';
 import { createProperty } from './services/property-service';
 import { createCompany } from './services/market-service';
+import { createQuest } from './services/quest-service';
 import { getOrCreatePlayer } from './services/player-service';
+import { QuestGraphSchema } from '@dsim/shared';
 import { newId, playerIdForWorld } from './lib/ids';
 
 function seed(): void {
@@ -41,8 +43,8 @@ function seed(): void {
     rules: 'No magic or sci-fi; this is grounded contemporary fiction.',
     lore: 'The Quarter was an old textile district reclaimed by artists a generation ago.',
     locations: [cafe, glasshouse, boardwalk, vinyl, aurora],
-    // The mock world ships with the wealth + casino systems ON to showcase them.
-    featureFlags: { property: true, stockMarket: true, gambling: true },
+    // The mock world ships with the wealth + casino + quest systems ON to showcase them.
+    featureFlags: { property: true, stockMarket: true, gambling: true, quests: true },
   });
 
   // This world's self-contained player save (money + persona live per-world).
@@ -331,8 +333,157 @@ function seed(): void {
     createCompany({ worldId: world.id, ...c, assetId: null });
   }
 
+  // --- Wayfarer quests: live, freeform adventure scenes (low-stakes, in-tone) ---
+  // 1) An open, non-anchored scene anyone can take — the festival deadline.
+  createQuest({
+    worldId: world.id,
+    name: 'The Lantern Run',
+    blurb: 'The festival lanterns are tangled on the bank and dusk is falling. Get them up in time.',
+    graph: QuestGraphSchema.parse({
+      entryNodeId: 'boardwalk',
+      maxTurns: 8,
+      timeoutOutcome: 'resolved',
+      nodes: [
+        {
+          id: 'boardwalk',
+          kind: 'festival',
+          setup:
+            'Dusk on the Riverside Boardwalk. The lantern crew is short-handed and the floating racks are still snarled on the bank — if the lanterns don’t go up before full dark, the whole festival fizzles. Pip the barista is fraying at the edges.',
+          entities: [{ id: 'pip', name: 'Pip', faction: 'neutral', disposition: 10 }],
+          affordances: [
+            {
+              verb: 'aid',
+              stat: 'empathy',
+              difficulty: 'normal',
+              hint: 'Wade in and untangle the racks yourself.',
+              effects: {
+                success: [
+                  { op: 'setFlag', flag: 'lanterns.launched' },
+                  { op: 'adjustStat', key: 'disposition', entityId: 'pip', delta: 6 },
+                  { op: 'addMoney', amount: 25 },
+                ],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'pip', delta: 4 }],
+                fail: [],
+                complication: [{ op: 'adjustStat', key: 'disposition', entityId: 'pip', delta: -3 }],
+              },
+            },
+            {
+              verb: 'persuade',
+              stat: 'charm',
+              difficulty: 'normal',
+              hint: 'Rally the boardwalk crowd to pitch in.',
+              effects: {
+                success: [
+                  { op: 'setFlag', flag: 'crowd.rallied' },
+                  { op: 'adjustStat', key: 'disposition', entityId: 'pip', delta: 5 },
+                ],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'pip', delta: 3 }],
+                fail: [],
+                complication: [],
+              },
+            },
+            {
+              verb: 'inspect',
+              stat: 'wits',
+              difficulty: 'trivial',
+              hint: 'Find where the lines are snagged.',
+              effects: { success: [{ op: 'setFlag', flag: 'found.knots' }], partial: [], fail: [], complication: [] },
+            },
+          ],
+          edges: [],
+          isTerminal: false,
+        },
+      ],
+      goals: [
+        {
+          id: 'win',
+          kind: 'reach',
+          outcome: 'win',
+          label: 'Get the lanterns up in time',
+          predicate: { kind: 'flag', flag: 'lanterns.launched' },
+        },
+      ],
+    }),
+  });
+
+  // 2) A partner-anchored romance quest (gated on a little warmth with Dorian).
+  createQuest({
+    worldId: world.id,
+    name: 'One Song, After Hours',
+    blurb: 'Long after the last set, Dorian lingers at the piano with music he wrote and won’t play. Coax it out of him.',
+    partnerId: dorian.id,
+    minWarmthBand: 1,
+    graph: QuestGraphSchema.parse({
+      entryNodeId: 'vinyl',
+      maxTurns: 8,
+      timeoutOutcome: 'resolved',
+      nodes: [
+        {
+          id: 'vinyl',
+          kind: 'after-hours',
+          setup:
+            'Vinyl & Vine, long after the last set. Dorian lingers at the piano, a folded sheet of his own music in his pocket he keeps not playing. The room is empty but for the two of you.',
+          entities: [{ id: 'dorian', name: 'Dorian', faction: 'neutral', disposition: 20 }],
+          affordances: [
+            {
+              verb: 'persuade',
+              stat: 'charm',
+              difficulty: 'hard',
+              hint: 'Tell him the room is empty — it’s just for you.',
+              effects: {
+                success: [
+                  { op: 'setFlag', flag: 'song.played' },
+                  { op: 'adjustWarmth', characterId: dorian.id, delta: 3 },
+                  { op: 'adjustStat', key: 'disposition', entityId: 'dorian', delta: 8 },
+                ],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'dorian', delta: 5 }],
+                fail: [],
+                complication: [{ op: 'adjustStat', key: 'disposition', entityId: 'dorian', delta: -4 }],
+              },
+            },
+            {
+              verb: 'aid',
+              stat: 'empathy',
+              difficulty: 'normal',
+              hint: 'Say nothing. Sit close and wait him out.',
+              effects: {
+                success: [{ op: 'adjustStat', key: 'disposition', entityId: 'dorian', delta: 6 }],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'dorian', delta: 3 }],
+                fail: [],
+                complication: [],
+              },
+            },
+            {
+              verb: 'charm',
+              stat: 'charm',
+              difficulty: 'normal',
+              hint: 'Tease him until he caves.',
+              effects: {
+                success: [{ op: 'adjustStat', key: 'disposition', entityId: 'dorian', delta: 5 }],
+                partial: [],
+                fail: [],
+                complication: [{ op: 'adjustStat', key: 'disposition', entityId: 'dorian', delta: -3 }],
+              },
+            },
+          ],
+          edges: [],
+          isTerminal: false,
+        },
+      ],
+      goals: [
+        {
+          id: 'win',
+          kind: 'flag',
+          outcome: 'win',
+          label: 'Get Dorian to play his song',
+          predicate: { kind: 'flag', flag: 'song.played' },
+        },
+      ],
+    }),
+  });
+
   // eslint-disable-next-line no-console
-  console.log('Seed complete: 1 world, 3 notes, 3 characters, 5 shop items, 4 properties, 5 companies.');
+  console.log('Seed complete: 1 world, 3 notes, 3 characters, 5 shop items, 4 properties, 5 companies, 2 quests.');
 }
 
 seed();

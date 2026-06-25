@@ -34,6 +34,12 @@ import {
   StockPriceSchema,
   MarketNewsSchema,
   GamblingRoundSchema,
+  QuestSchema,
+  ActiveQuestSchema,
+  QuestTurnSchema,
+  type Quest,
+  type ActiveQuest,
+  type QuestTurn,
   type Asset,
   type Character,
   type WorldState,
@@ -2045,6 +2051,145 @@ export const gamblingRoundsRepo = {
   },
   delete(id: string): void {
     getDb().run('DELETE FROM gambling_rounds WHERE id = ?', id);
+  },
+};
+
+// --- Quests (Wayfarer) ------------------------------------------------------
+
+function rowToQuest(r: Row): Quest {
+  return QuestSchema.parse({
+    id: r.id,
+    worldId: r.world_id,
+    name: r.name,
+    blurb: r.blurb,
+    partnerId: nStr(r.partner_id),
+    minWarmthBand: Number(r.min_warmth_band ?? 0),
+    graph: fromJson(r.graph, {}),
+    createdAt: Number(r.created_at),
+    updatedAt: Number(r.updated_at),
+  });
+}
+
+export const questsRepo = {
+  get(id: string): Quest | undefined {
+    const r = getDb().get<Row>('SELECT * FROM quests WHERE id = ?', id);
+    return r ? rowToQuest(r) : undefined;
+  },
+  listByWorld(worldId: string): Quest[] {
+    return getDb()
+      .all<Row>('SELECT * FROM quests WHERE world_id = ? ORDER BY created_at ASC', worldId)
+      .map(rowToQuest);
+  },
+  /** All quests (every world) — used for faithful export. */
+  list(): Quest[] {
+    return getDb().all<Row>('SELECT * FROM quests ORDER BY created_at ASC').map(rowToQuest);
+  },
+  insert(q: Quest): Quest {
+    getDb().run(
+      `INSERT INTO quests (id,world_id,name,blurb,partner_id,min_warmth_band,graph,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      q.id, q.worldId, q.name, q.blurb, q.partnerId, q.minWarmthBand, j(q.graph), q.createdAt, q.updatedAt,
+    );
+    return q;
+  },
+  update(q: Quest): Quest {
+    getDb().run(
+      `UPDATE quests SET name=?,blurb=?,partner_id=?,min_warmth_band=?,graph=?,updated_at=? WHERE id=?`,
+      q.name, q.blurb, q.partnerId, q.minWarmthBand, j(q.graph), q.updatedAt, q.id,
+    );
+    return q;
+  },
+  delete(id: string): void {
+    getDb().run('DELETE FROM quests WHERE id = ?', id);
+  },
+};
+
+function rowToActiveQuest(r: Row): ActiveQuest {
+  return ActiveQuestSchema.parse({
+    id: r.id,
+    worldId: r.world_id,
+    playerId: r.player_id,
+    questId: r.quest_id,
+    status: r.status,
+    state: fromJson(r.state, {}),
+    seed: r.seed,
+    turn: Number(r.turn ?? 0),
+    createdAt: Number(r.created_at),
+    updatedAt: Number(r.updated_at),
+  });
+}
+
+export const activeQuestsRepo = {
+  /** The player's single active/resolved run for this world (UNIQUE per world+player). */
+  getActive(worldId: string, playerId: string): ActiveQuest | undefined {
+    const r = getDb().get<Row>(
+      'SELECT * FROM active_quests WHERE world_id = ? AND player_id = ? LIMIT 1',
+      worldId,
+      playerId,
+    );
+    return r ? rowToActiveQuest(r) : undefined;
+  },
+  /** All runs (every world) — used for faithful export. */
+  list(): ActiveQuest[] {
+    return getDb().all<Row>('SELECT * FROM active_quests ORDER BY created_at ASC').map(rowToActiveQuest);
+  },
+  upsert(a: ActiveQuest): ActiveQuest {
+    getDb().run(
+      `INSERT INTO active_quests (id,world_id,player_id,quest_id,status,state,seed,turn,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(id) DO UPDATE SET
+         status = excluded.status, state = excluded.state, turn = excluded.turn, updated_at = excluded.updated_at`,
+      a.id, a.worldId, a.playerId, a.questId, a.status, j(a.state), a.seed, a.turn, a.createdAt, a.updatedAt,
+    );
+    return a;
+  },
+  delete(worldId: string, playerId: string): void {
+    getDb().run('DELETE FROM active_quests WHERE world_id = ? AND player_id = ?', worldId, playerId);
+  },
+};
+
+function rowToQuestTurn(r: Row): QuestTurn {
+  return QuestTurnSchema.parse({
+    id: r.id,
+    worldId: r.world_id,
+    playerId: r.player_id,
+    questId: r.quest_id,
+    turn: Number(r.turn),
+    playerText: r.player_text,
+    action: fromJson(r.action, {}),
+    roll: Number(r.roll ?? 0),
+    outcome: fromJson(r.outcome, {}),
+    createdAt: Number(r.created_at),
+  });
+}
+
+export const questTurnsRepo = {
+  listByRun(worldId: string, playerId: string, questId: string): QuestTurn[] {
+    return getDb()
+      .all<Row>(
+        'SELECT * FROM quest_turns WHERE world_id = ? AND player_id = ? AND quest_id = ? ORDER BY turn ASC',
+        worldId,
+        playerId,
+        questId,
+      )
+      .map(rowToQuestTurn);
+  },
+  /** All turns (every world) — used for faithful export. */
+  list(): QuestTurn[] {
+    return getDb().all<Row>('SELECT * FROM quest_turns ORDER BY created_at ASC').map(rowToQuestTurn);
+  },
+  insert(t: QuestTurn): QuestTurn {
+    getDb().run(
+      `INSERT INTO quest_turns (id,world_id,player_id,quest_id,turn,player_text,action,roll,outcome,created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      t.id, t.worldId, t.playerId, t.questId, t.turn, t.playerText, j(t.action), t.roll, j(t.outcome), t.createdAt,
+    );
+    return t;
+  },
+  /** Clear a player's whole quest transcript (on starting a fresh run / abandoning) —
+   *  the log is per-active-run, so a replay must not inherit a prior run's turns. */
+  deleteForPlayer(worldId: string, playerId: string): void {
+    getDb().run('DELETE FROM quest_turns WHERE world_id = ? AND player_id = ?', worldId, playerId);
   },
 };
 

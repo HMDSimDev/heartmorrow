@@ -14,6 +14,7 @@ export * from './social';
 export * from './intent';
 export * from './wealth';
 export * from './gambling';
+export * from './quest';
 export * from './activities';
 export * from './career';
 export * from './together';

@@ -15,6 +15,7 @@ const TOPICS: { id: string; icon: IconName }[] = [
   { id: 'relationships', icon: 'commit' },
   { id: 'phone', icon: 'phone' },
   { id: 'life-money', icon: 'coin' },
+  { id: 'wayfarer', icon: 'quest' },
   { id: 'building', icon: 'edit' },
   { id: 'tips', icon: 'sparkle' },
 ];

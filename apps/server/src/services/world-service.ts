@@ -15,6 +15,7 @@ import { notFound } from '../lib/errors';
 import { cloneCharactersToWorld } from './character-service';
 import { clonePropertiesToWorld } from './property-service';
 import { cloneCompaniesToWorld } from './market-service';
+import { cloneQuestsToWorld } from './quest-service';
 
 export function listWorlds(): World[] {
   return worldsRepo.list();
@@ -70,6 +71,8 @@ export function cloneWorld(sourceId: string, name: string): World {
     // Authored wealth content (property + company DEFINITIONS) travels with the world.
     clonePropertiesToWorld(sourceId, created.id);
     cloneCompaniesToWorld(sourceId, created.id);
+    // Authored Wayfarer quests travel too (partner anchor dropped — cast is re-minted).
+    cloneQuestsToWorld(sourceId, created.id);
     return created;
   });
 }

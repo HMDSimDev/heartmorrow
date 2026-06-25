@@ -41,6 +41,9 @@ import {
   stockPricesRepo,
   marketNewsRepo,
   gamblingRoundsRepo,
+  questsRepo,
+  activeQuestsRepo,
+  questTurnsRepo,
 } from '../db/repositories';
 import { recordEvent } from './event-service';
 import { ensureDayRecords } from './day-record-service';
@@ -109,6 +112,11 @@ export function exportAll(opts: { kind?: 'authoring' | 'savegame' } = {}): Expor
     marketNews: authoring ? [] : marketNewsRepo.list(),
     // Gambling: pure playthrough state (settled-bet log + any active hand).
     gamblingRounds: authoring ? [] : gamblingRoundsRepo.list(),
+    // Quests: authored definitions always ship; the run state (active + transcript)
+    // is zeroed for an 'authoring' export, like property/market playthrough rows.
+    quests: questsRepo.list(),
+    activeQuests: authoring ? [] : activeQuestsRepo.list(),
+    questTurns: authoring ? [] : questTurnsRepo.list(),
   });
 }
 
@@ -147,6 +155,11 @@ const CLEAR_ORDER = [
   'properties',
   // Gambling: pure playthrough rows (reference only worlds), wiped before worlds.
   'gambling_rounds',
+  // Quests: the run state + transcript (playthrough) before the authored `quests`
+  // (content), and all of them before worlds.
+  'quest_turns',
+  'active_quests',
+  'quests',
   'characters',
   'world_notes',
   'worlds',
@@ -250,6 +263,18 @@ export function importAll(bundle: ExportBundle): { imported: true } {
       if (importWorldIds.has(g.worldId)) gamblingRoundsRepo.upsert(g);
       else prunedDerived += 1;
     });
+    // Quests: authored definitions after worlds, then the run state (orphans pruned).
+    data.quests.forEach((q) => {
+      if (importWorldIds.has(q.worldId)) questsRepo.insert(q);
+    });
+    data.activeQuests.forEach((a) => {
+      if (importWorldIds.has(a.worldId)) activeQuestsRepo.upsert(a);
+      else prunedDerived += 1;
+    });
+    data.questTurns.forEach((tn) => {
+      if (importWorldIds.has(tn.worldId)) questTurnsRepo.insert(tn);
+      else prunedDerived += 1;
+    });
     data.players.forEach((p) => {
       // Players use INSERT (table was cleared above). Go through the repo so the column
       // list stays in one place — a hand-written INSERT here previously dropped `career`.
@@ -300,6 +325,10 @@ const PROGRESS_TABLES = [
   'market_news',
   // Gambling: bet log + any active hand are playthrough state, wiped on reset.
   'gambling_rounds',
+  // Quests: a run + its transcript are playthrough state; the authored `quests`
+  // definitions are content and survive a reset.
+  'quest_turns',
+  'active_quests',
   'game_events',
 ];
 

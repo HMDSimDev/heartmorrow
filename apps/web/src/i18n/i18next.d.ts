@@ -7,6 +7,7 @@ import type common from './locales/en/common.json';
 import type settings from './locales/en/settings.json';
 import type pages from './locales/en/pages.json';
 import type phone from './locales/en/phone.json';
+import type quests from './locales/en/quests.json';
 
 declare module 'i18next' {
   interface CustomTypeOptions {
@@ -16,6 +17,7 @@ declare module 'i18next' {
       settings: typeof settings;
       pages: typeof pages;
       phone: typeof phone;
+      quests: typeof quests;
     };
   }
 }

@@ -755,6 +755,7 @@
     "featureProperty": "Property — rent or buy places, collect rent, date there for a buff",
     "featureStock": "Stock market — invest in fictional in-world companies",
     "featureCasino": "Casino — wager money on slots, blackjack, roulette & video poker",
+    "featureQuests": "Wayfarer — live, freeform adventure scenes resolved by a fair, seeded referee",
     "maxBet": "Max bet (◈)",
     "maxBetHint": "Flat per-bet cap · up to {max}",
     "dailyCap": "Daily wager cap (◈)",
@@ -1569,6 +1570,32 @@
               "The stock market lets you buy and sell shares in the world's fictional companies. Prices drift from day to day and can react to big relationship moments in your world, so a portfolio is a gamble, not a guarantee. Some companies pay a small dividend each day on shares you've held at least a full day -- the one bit of money that arrives without you working for it.",
               "Property lets you lease a place -- paying rent on a set schedule, whether daily, weekly, or monthly -- or buy one outright. Owning or leasing a place lets you take dates there, and a date at a place you own gives a warmer boost than one you've only rented for the night. Watch your rent: miss a payment and you'll get a landlord warning and three days' grace before you're evicted. Selling a place you own simply refunds what you paid for it.",
               "The casino, where enabled, offers slots, blackjack, roulette, and video poker. The house always has an edge, so treat it as risk and flavor, never an income plan. Each bet has a minimum (5) and a cap, and there's a limit on how much you can wager in a single day, so a bad streak can't wipe you out in one sitting."
+            ]
+          }
+        ]
+      },
+      "wayfarer": {
+        "label": "Wayfarer quests",
+        "title": "Wayfarer: open roads",
+        "overview": "When a world enables it, a Wayfarer tab appears — a place to go on small, live adventures. You type what you want to try in plain language, and the game works out what actually happens. It's a dating sim first: quests are a way to share a scene with someone, win them over, or just get into a bit of trouble.",
+        "sections": [
+          {
+            "heading": "How a scene works",
+            "body": [
+              "Pick an adventure from the lobby and you drop into a scene. Type anything you like — persuade, charm, sneak, search, fight, wait. There's no fixed menu of buttons; the little \"what you might try\" hints just point at what the scene is set up for. You can always do something they don't suggest.",
+              "Behind the scenes, the game reads your attempt, rolls a fair, seeded check (your approach and how bold it is shape the odds), and then narrates the result. The dice decide — never the storyteller — so the outcome is always honest. A bold framing can win a bigger result, but bold framings are harder to pull off."
+            ],
+            "bullets": [
+              "Success, partial, fail, or complication — each turn lands somewhere on that scale.",
+              "Outcomes can shift how characters feel about you, flip an ally, hand you a little money, or move the scene along.",
+              "Asking for the moon on a trivial whim won't work — big wins are tied to real risk."
+            ]
+          },
+          {
+            "heading": "Endings",
+            "body": [
+              "Every quest has a clear goal and a turn budget, so a scene always wraps up — when you reach the goal, when the moment passes, or when you choose to leave. A quest is a single sitting: while you're in one, you can't end the day until you finish or walk away.",
+              "Some adventures are tied to a particular person and only open once you've grown a little closer to them. Those can deepen a bond through the very same warmth your dates and gifts use — with the same daily limits, so a quest can never become a shortcut to someone's heart."
             ]
           }
         ]

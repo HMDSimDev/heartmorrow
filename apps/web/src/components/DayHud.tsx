@@ -12,8 +12,10 @@ import { Modal } from './ui';
 /** Compact day / time-of-day / stamina indicator + Sleep control for the active world. */
 export function DayHud() {
   const { t } = useTranslation();
-  const { worlds, activeWorldId, activeWorld, worldState, setActiveWorld, sleep, player, dayTick, activeDate } =
+  const { worlds, activeWorldId, activeWorld, worldState, setActiveWorld, sleep, player, dayTick, activeDate, activeQuest } =
     useAppData();
+  // A quest is a single sitting — mid-quest it locks the day-end, like an open date.
+  const questActive = activeQuest?.status === 'active';
   const [recap, setRecap] = useState<SleepResponse | null>(null);
   const [sleeping, setSleeping] = useState(false);
   const [error, setError] = useState<string>();
@@ -112,11 +114,13 @@ export function DayHud() {
         <button
           className="btn sm primary hud-end"
           onClick={doSleep}
-          disabled={sleeping || !!activeDate}
+          disabled={sleeping || !!activeDate || questActive}
           title={
             activeDate
               ? t('hud.endDayDateBlock', { name: activeDate.characterName })
-              : undefined
+              : questActive
+                ? t('hud.endDayQuestBlock', { name: activeQuest!.name })
+                : undefined
           }
         >
           {sleeping ? '…' : worldState.stamina <= 0 ? t('hud.sleep') : t('hud.endDay')}
@@ -124,6 +128,7 @@ export function DayHud() {
       </div>
 
       {activeDate && <small className="hud-note">{t('hud.onDateNote')}</small>}
+      {!activeDate && questActive && <small className="hud-note">{t('hud.inQuestNote')}</small>}
       {error && <small className="hud-err">{error}</small>}
       {recap && <RecapModal res={recap} onClose={() => setRecap(null)} />}
     </div>

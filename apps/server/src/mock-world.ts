@@ -28,6 +28,7 @@ import {
   GameEventSchema,
   InventoryItemSchema,
   MarketNewsSchema,
+  QuestGraphSchema,
   MessageSchema,
   MessageThreadSchema,
   MinigameResultSchema,
@@ -82,6 +83,7 @@ import { createCharacter, updateCharacter } from './services/character-service';
 import { createShopItem } from './services/shop-service';
 import { createProperty } from './services/property-service';
 import { createCompany } from './services/market-service';
+import { createQuest } from './services/quest-service';
 import { deleteAsset } from './services/asset-service';
 import { getOrCreatePlayer, updatePlayer } from './services/player-service';
 import { PlayerProfileSchema } from '@dsim/shared';
@@ -335,6 +337,9 @@ function purgeExisting(): void {
     db.run('DELETE FROM feed_posts WHERE world_id = ?', world.id);
     db.run('DELETE FROM feed_seen WHERE world_id = ?', world.id);
     db.run('DELETE FROM gambling_rounds WHERE world_id = ?', world.id);
+    db.run('DELETE FROM quest_turns WHERE world_id = ?', world.id);
+    db.run('DELETE FROM active_quests WHERE world_id = ?', world.id);
+    db.run('DELETE FROM quests WHERE world_id = ?', world.id);
     db.run('DELETE FROM day_records WHERE world_id = ?', world.id);
     db.run('DELETE FROM market_news WHERE world_id = ?', world.id);
     db.run('DELETE FROM stock_holdings WHERE world_id = ?', world.id);
@@ -387,7 +392,7 @@ function mock(): void {
     lore: 'Asterfall Bay was a working harbor that became a university town; the lighthouse went dark the same year the train station became an arcade. The Star Festival has marked the end of summer for as long as anyone remembers.',
     locations: [cafe, aquarium, lighthouse, arcade, conservatory, boardwalk],
     // Showcase the optional mechanics (property / stock market / casino) in the demo world.
-    featureFlags: { property: true, stockMarket: true, gambling: true },
+    featureFlags: { property: true, stockMarket: true, gambling: true, quests: true },
   });
 
   // --- Player (this world's self-contained save) ----------------------------
@@ -943,6 +948,150 @@ function mock(): void {
   news(CURRENT_DAY, arcd.id, 'ARCD', 'Arcade pinball league sells out opening night', 'Starling Arcade Co. rallies on a packed relaunch; the restored station hall is suddenly the place to be.', 'up');
   news(23, drft.id, 'DRFT', 'Driftwood Roasters expands harbor delivery', 'The roastery’s new boardwalk round nudges shares up on quiet but steady volume.', 'up');
   news(23, ryfo.id, 'RYFO', 'Reyes Film cuts run of its cult expired stock', 'A scarcity scare turns to a sell-off as photographers worry the famous gold-grain emulsion is ending.', 'down');
+
+  // --- Wayfarer quests: live freeform adventure scenes ----------------------
+  createQuest({
+    worldId: world.id,
+    name: 'Lights Out on the Boardwalk',
+    blurb: 'A breaker tripped mid-festival and the arcade’s gone dark. Get the lights back before the crowd drifts off.',
+    graph: QuestGraphSchema.parse({
+      entryNodeId: 'arcade',
+      maxTurns: 8,
+      timeoutOutcome: 'resolved',
+      nodes: [
+        {
+          id: 'arcade',
+          kind: 'festival',
+          setup:
+            'The restored Starling Arcade has gone dark mid-festival — a tripped breaker somewhere behind the pinball wall. The caretaker, Fynn, is flustered, the crowd is restless, and the box of spare fuses is just out of reach behind a jammed panel.',
+          entities: [{ id: 'fynn', name: 'Fynn', faction: 'neutral', disposition: 5 }],
+          affordances: [
+            {
+              verb: 'aid',
+              stat: 'grit',
+              difficulty: 'normal',
+              hint: 'Pry the panel and reset the breaker yourself.',
+              effects: {
+                success: [
+                  { op: 'setFlag', flag: 'arcade.lit' },
+                  { op: 'adjustStat', key: 'disposition', entityId: 'fynn', delta: 6 },
+                  { op: 'addMoney', amount: 30 },
+                ],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'fynn', delta: 4 }],
+                fail: [],
+                complication: [{ op: 'adjustStat', key: 'disposition', entityId: 'fynn', delta: -3 }],
+              },
+            },
+            {
+              verb: 'persuade',
+              stat: 'charm',
+              difficulty: 'normal',
+              hint: 'Talk Fynn through where the spare fuses are.',
+              effects: {
+                success: [{ op: 'setFlag', flag: 'fynn.helping' }, { op: 'adjustStat', key: 'disposition', entityId: 'fynn', delta: 5 }],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'fynn', delta: 3 }],
+                fail: [],
+                complication: [],
+              },
+            },
+            {
+              verb: 'inspect',
+              stat: 'wits',
+              difficulty: 'trivial',
+              hint: 'Trace which line is dead.',
+              effects: { success: [{ op: 'setFlag', flag: 'found.breaker' }], partial: [], fail: [], complication: [] },
+            },
+          ],
+          edges: [],
+          isTerminal: false,
+        },
+      ],
+      goals: [
+        {
+          id: 'win',
+          kind: 'reach',
+          outcome: 'win',
+          label: 'Get the arcade lit again',
+          predicate: { kind: 'flag', flag: 'arcade.lit' },
+        },
+      ],
+    }),
+  });
+
+  createQuest({
+    worldId: world.id,
+    name: 'One More Game',
+    blurb: 'Minh An keeps saying they should head home, and keeps not leaving. Get them to admit they want to stay.',
+    partnerId: minhAn.id,
+    minWarmthBand: 1,
+    graph: QuestGraphSchema.parse({
+      entryNodeId: 'closing',
+      maxTurns: 8,
+      timeoutOutcome: 'resolved',
+      nodes: [
+        {
+          id: 'closing',
+          kind: 'after-hours',
+          setup:
+            'Closing time at the arcade. Minh An lingers by the high-score cabinet, coat half-on, insisting they really should go — and not going. The machines hum down one by one.',
+          entities: [{ id: 'minhan', name: 'Minh An', faction: 'neutral', disposition: 25 }],
+          affordances: [
+            {
+              verb: 'persuade',
+              stat: 'charm',
+              difficulty: 'hard',
+              hint: 'Call their bluff — one more game, just you two.',
+              effects: {
+                success: [
+                  { op: 'setFlag', flag: 'they.stayed' },
+                  { op: 'adjustWarmth', characterId: minhAn.id, delta: 3 },
+                  { op: 'adjustStat', key: 'disposition', entityId: 'minhan', delta: 8 },
+                ],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'minhan', delta: 5 }],
+                fail: [],
+                complication: [{ op: 'adjustStat', key: 'disposition', entityId: 'minhan', delta: -4 }],
+              },
+            },
+            {
+              verb: 'charm',
+              stat: 'charm',
+              difficulty: 'normal',
+              hint: 'Tease them about the high score they’ll never beat.',
+              effects: {
+                success: [{ op: 'adjustStat', key: 'disposition', entityId: 'minhan', delta: 5 }],
+                partial: [],
+                fail: [],
+                complication: [{ op: 'adjustStat', key: 'disposition', entityId: 'minhan', delta: -3 }],
+              },
+            },
+            {
+              verb: 'aid',
+              stat: 'empathy',
+              difficulty: 'normal',
+              hint: 'Just rack up the next game and wait.',
+              effects: {
+                success: [{ op: 'adjustStat', key: 'disposition', entityId: 'minhan', delta: 6 }],
+                partial: [{ op: 'adjustStat', key: 'disposition', entityId: 'minhan', delta: 3 }],
+                fail: [],
+                complication: [],
+              },
+            },
+          ],
+          edges: [],
+          isTerminal: false,
+        },
+      ],
+      goals: [
+        {
+          id: 'win',
+          kind: 'flag',
+          outcome: 'win',
+          label: 'Get Minh An to stay',
+          predicate: { kind: 'flag', flag: 'they.stayed' },
+        },
+      ],
+    }),
+  });
 
   // --- Casino: a small, believable gambling history --------------------------
   const round = (game: 'slots' | 'blackjack' | 'roulette' | 'videoPoker', bet: number, payout: number, outcome: string, day: number, state: Record<string, unknown>): void => {
