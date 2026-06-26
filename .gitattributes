@@ -1,0 +1,5 @@
+# Always use LF for shell scripts so they run on macOS/Linux
+*.sh text eol=lf
+
+# Windows batch files stay CRLF
+*.bat text eol=crlf
