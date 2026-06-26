@@ -237,6 +237,40 @@ describe('caps', () => {
     expect(outcome.appliedEffects[0]).toMatchObject({ op: 'addMoney', amount: 10 });
     expect(newState.stats['_moneyAccrued']).toBe(120);
   });
+
+  it('caps CUMULATIVE addMoney within one outcome to the per-quest room', () => {
+    const graph = guardGraph({
+      goals: [],
+      nodes: [
+        {
+          id: 'gate',
+          kind: 'scene',
+          setup: '',
+          entities: [],
+          edges: [],
+          isTerminal: false,
+          affordances: [
+            {
+              verb: 'aid',
+              stat: 'wits',
+              difficulty: 'hard',
+              hint: '',
+              // two payouts in one success menu — must not collectively exceed the cap
+              effects: { success: [{ op: 'addMoney', amount: 60 }, { op: 'addMoney', amount: 60 }], partial: [], fail: [], complication: [] },
+            },
+          ],
+        },
+      ],
+    });
+    const state = initialQuestState(graph, { wits: 99 });
+    state.stats['_moneyAccrued'] = 70; // only 50 of the 120 cap remains
+    const action = QuestActionSchema.parse({ verb: 'aid', stat: 'wits', difficulty: 'hard', proposedEffects: [] });
+    const { outcome, newState } = resolveQuestAction(state, graph, action, 0.01);
+    expect(outcome.grade).toBe('success');
+    const paid = outcome.appliedEffects.filter((e) => e.op === 'addMoney').reduce((s, e) => s + (e.amount ?? 0), 0);
+    expect(paid).toBe(50); // not 100
+    expect(newState.stats['_moneyAccrued']).toBe(120); // capped, not 170
+  });
 });
 
 describe('termination is code-owned (plan §5.4)', () => {
@@ -248,7 +282,7 @@ describe('termination is code-owned (plan §5.4)', () => {
     expect(outcome.endGoal?.outcome).toBe('lose');
   });
 
-  it('force-resolves after STALL_LIMIT goal-irrelevant turns', () => {
+  it('force-resolves after STALL_LIMIT repeated no-progress attempts of the same verb', () => {
     const graph = guardGraph({
       maxTurns: 20,
       goals: [],
@@ -260,12 +294,13 @@ describe('termination is code-owned (plan §5.4)', () => {
           entities: [],
           edges: [],
           isTerminal: false,
-          affordances: [{ verb: 'wait', stat: 'grit', difficulty: 'normal', hint: '', effects: {} }],
+          // A committal verb whose menus are all empty → no progress, ever.
+          affordances: [{ verb: 'force', stat: 'grit', difficulty: 'normal', hint: '', effects: {} }],
         },
       ],
     });
     let state = initialQuestState(graph, {});
-    const action = QuestActionSchema.parse({ verb: 'wait', stat: 'grit', difficulty: 'normal', proposedEffects: [] });
+    const action = QuestActionSchema.parse({ verb: 'force', stat: 'grit', difficulty: 'normal', proposedEffects: [] });
     let ended = false;
     for (let i = 0; i < QUEST.STALL_LIMIT; i += 1) {
       const r = resolveQuestAction(state, graph, action, 0.99);
@@ -274,6 +309,61 @@ describe('termination is code-owned (plan §5.4)', () => {
     }
     expect(ended).toBe(true);
     expect(state.turn).toBe(QUEST.STALL_LIMIT);
+  });
+
+  it('does NOT force-resolve on repeated inspect turns (exploration is free)', () => {
+    const graph = guardGraph({
+      maxTurns: 20,
+      goals: [],
+      nodes: [
+        {
+          id: 'gate',
+          kind: 'scene',
+          setup: '',
+          entities: [],
+          edges: [],
+          isTerminal: false,
+          affordances: [{ verb: 'inspect', stat: 'wits', difficulty: 'normal', hint: '', effects: {} }],
+        },
+      ],
+    });
+    let state = initialQuestState(graph, {});
+    const action = QuestActionSchema.parse({ verb: 'inspect', stat: 'wits', difficulty: 'normal', proposedEffects: [] });
+    for (let i = 0; i < QUEST.STALL_LIMIT + 2; i += 1) {
+      const r = resolveQuestAction(state, graph, action, 0.99);
+      state = r.newState;
+      expect(r.outcome.ended).toBe(false); // looking around never loses the quest
+    }
+  });
+
+  it('does NOT force-resolve on VARIED no-progress verbs (only repeats count)', () => {
+    const graph = guardGraph({
+      maxTurns: 20,
+      goals: [],
+      nodes: [
+        {
+          id: 'gate',
+          kind: 'scene',
+          setup: '',
+          entities: [],
+          edges: [],
+          isTerminal: false,
+          affordances: [
+            { verb: 'persuade', stat: 'charm', difficulty: 'normal', hint: '', effects: {} },
+            { verb: 'intimidate', stat: 'grit', difficulty: 'normal', hint: '', effects: {} },
+            { verb: 'force', stat: 'grit', difficulty: 'normal', hint: '', effects: {} },
+          ],
+        },
+      ],
+    });
+    let state = initialQuestState(graph, {});
+    let ended = false;
+    for (const v of ['persuade', 'intimidate', 'force'] as const) {
+      const r = resolveQuestAction(state, graph, QuestActionSchema.parse({ verb: v, difficulty: 'normal', proposedEffects: [] }), 0.99);
+      state = r.newState;
+      ended = ended || r.outcome.ended;
+    }
+    expect(ended).toBe(false); // three DIFFERENT no-progress verbs never reach the limit
   });
 
   it('does not end a normal under-budget success with no goal', () => {
@@ -305,6 +395,72 @@ describe('termination is code-owned (plan §5.4)', () => {
     expect(outcome.grade).toBe('success');
     expect(outcome.ended).toBe(false);
     expect(newState.entities[0]!.disposition).toBe(5);
+  });
+});
+
+describe('neutral degrade (off-menu / non-diegetic input)', () => {
+  it('resolves a noop sentinel to a do-nothing beat — no roll, no effects, no turn', () => {
+    const graph = guardGraph();
+    const state = initialQuestState(graph, { charm: 90 });
+    const action = QuestActionSchema.parse({ verb: 'noop', difficulty: 'trivial', proposedEffects: [] });
+    const { newState, outcome } = resolveQuestAction(state, graph, action, 0.01);
+    expect(outcome.neutral).toBe(true);
+    expect(outcome.voiced).toBeFalsy(); // inert — a fixed safe line, never voiced
+    expect(outcome.appliedEffects).toHaveLength(0);
+    expect(outcome.ended).toBe(false);
+    expect(newState.turn).toBe(state.turn); // turn not consumed
+    expect(newState.entities[0]!.faction).toBe('hostile'); // nothing changed
+  });
+
+  it('neutral-degrades a talk the scene offers no affordance for, voiced so a character replies', () => {
+    const graph = guardGraph(); // affordances: persuade, charm — no talk
+    const state = initialQuestState(graph, { charm: 90 });
+    const action = QuestActionSchema.parse({ verb: 'talk', difficulty: 'normal', proposedEffects: [] });
+    const { newState, outcome } = resolveQuestAction(state, graph, action, 0.01);
+    expect(outcome.neutral).toBe(true);
+    expect(outcome.voiced).toBe(true); // a character should still reply (fiction valve)
+    expect(newState.entities[0]!.faction).toBe('hostile'); // no deceive/persuade applied
+    expect(newState.turn).toBe(0);
+  });
+
+  it('does NOT snap an off-menu verb onto the first affordance — it comes to nothing, never wins', () => {
+    // guardGraph's first affordance is a `persuade` whose SUCCESS flips the guard + fires
+    // the win goal. An off-menu `use_item` must NOT borrow that and win.
+    const graph = guardGraph();
+    const state = initialQuestState(graph, { charm: 99 });
+    const action = QuestActionSchema.parse({ verb: 'use_item', difficulty: 'trivial', proposedEffects: [] });
+    const { newState, outcome } = resolveQuestAction(state, graph, action, 0.01); // a roll that WOULD succeed
+    expect(outcome.neutral).toBe(true);
+    expect(outcome.voiced).toBe(true); // narrator describes it falling flat
+    expect(outcome.appliedEffects).toHaveLength(0);
+    expect(outcome.ended).toBe(false); // the quest did NOT resolve
+    expect(newState.entities[0]!.faction).toBe('hostile'); // the guard was not flipped
+    expect(newState.turn).toBe(0); // no turn consumed
+  });
+
+  it('resolves a talk normally when the node DOES offer a talk affordance', () => {
+    const graph = guardGraph({
+      goals: [],
+      nodes: [
+        {
+          id: 'gate',
+          kind: 'scene',
+          setup: '',
+          entities: [{ id: 'guard', name: 'G', faction: 'hostile', disposition: 0 }],
+          edges: [],
+          isTerminal: false,
+          affordances: [
+            { verb: 'talk', stat: 'wits', difficulty: 'normal', hint: '', effects: { success: [{ op: 'setFlag', flag: 'asked' }], partial: [], fail: [], complication: [] } },
+          ],
+        },
+      ],
+    });
+    const state = initialQuestState(graph, { wits: 99 });
+    const action = QuestActionSchema.parse({ verb: 'talk', difficulty: 'normal', proposedEffects: [] });
+    const { newState, outcome } = resolveQuestAction(state, graph, action, 0.01);
+    expect(outcome.neutral).toBeFalsy();
+    expect(newState.flags).toContain('asked');
+    expect(newState.turn).toBe(1);
   });
 });
 

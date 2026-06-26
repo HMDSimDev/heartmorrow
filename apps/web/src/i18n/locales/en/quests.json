@@ -7,6 +7,8 @@
     "empty": "No adventures await in this world yet.",
     "start": "Begin",
     "locked": "Locked",
+    "romance": "Romance",
+    "adventure": "Adventure",
     "partnerWith": "With {name}",
     "blurbFallback": "An adventure waits."
   },
@@ -22,6 +24,12 @@
     "turn": "Turn {turn} of {max}",
     "objective": "Goal: {label}",
     "leave": "Leave quest",
+    "leaveConfirm": {
+      "title": "Abandon this quest?",
+      "body": "Your progress in “{name}” will be lost — this can't be undone.",
+      "confirm": "Abandon",
+      "cancel": "Keep playing"
+    },
     "you": "You"
   },
   "grade": {
@@ -41,6 +49,9 @@
     "lose": "The quest ends",
     "money": "Earned ◈ {amount}",
     "warmth": "Closer by {amount}",
+    "warmthNamed": "Closer to {name} by {amount}",
+    "strained": "Strained by {amount}",
+    "strainedNamed": "Strained with {name} by {amount}",
     "ackWin": "Wrap up",
     "ackLose": "Move on"
   },

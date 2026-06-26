@@ -2167,7 +2167,9 @@ export const questTurnsRepo = {
   listByRun(worldId: string, playerId: string, questId: string): QuestTurn[] {
     return getDb()
       .all<Row>(
-        'SELECT * FROM quest_turns WHERE world_id = ? AND player_id = ? AND quest_id = ? ORDER BY turn ASC',
+        // created_at breaks ties: a neutral beat (no turn consumed) can share a turn
+        // number with the real action that follows it; keep them in chronological order.
+        'SELECT * FROM quest_turns WHERE world_id = ? AND player_id = ? AND quest_id = ? ORDER BY turn ASC, created_at ASC',
         worldId,
         playerId,
         questId,

@@ -5,6 +5,7 @@ import { useAppData } from '../state/app-context';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { Icon } from '../components/Icon';
+import { ConfirmDialog } from '../components/ui';
 import { QuestAuthor } from '../components/wayfarer/QuestEditor';
 import './wayfarer.page.css';
 
@@ -29,6 +30,9 @@ export function Wayfarer() {
   const [loaded, setLoaded] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  // The player's just-submitted line, echoed optimistically while the turn resolves
+  // (so you see what you said immediately, not only after the server round-trip).
+  const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -76,14 +80,17 @@ export function Wayfarer() {
     setBusy(true);
     setError(null);
     setInput('');
+    setPending(text); // echo it in the reel right away
     try {
       const next = await api.questTurn(activeWorldId, text);
-      setScene(next);
+      setScene(next); // the server log now holds the real beat
+      setPending(null);
       void refreshActiveQuest();
       // A quest can pay out money / nudge warmth — refresh the wallet.
       void reloadPlayer();
     } catch (e) {
       setError(errorMessage(e));
+      setPending(null);
       setInput(text); // give the player their words back to retry
     } finally {
       setBusy(false);
@@ -99,6 +106,7 @@ export function Wayfarer() {
       /* ignore — fall through to a reload */
     } finally {
       setScene(null);
+      setPending(null);
       setBusy(false);
       void refreshActiveQuest();
       void load();
@@ -145,9 +153,6 @@ export function Wayfarer() {
       </div>
     );
   }
-  if (scene && scene.status !== 'active') {
-    return <Resolution scene={scene} onDone={leave} busy={busy} t={t} />;
-  }
   if (scene) {
     return (
       <Scene
@@ -157,6 +162,7 @@ export function Wayfarer() {
         onAttempt={attempt}
         onLeave={leave}
         busy={busy}
+        pending={pending}
         error={error}
         t={t}
       />
@@ -172,10 +178,13 @@ type TFn = (key: string, opts?: Record<string, unknown>) => string;
 function WayfarerHeader({ t }: { t: TFn }) {
   return (
     <header className="wf-head">
-      <h1>
-        <Icon name="quest" size={22} /> {t('quests:title')}
-      </h1>
-      <p className="wf-tagline">{t('quests:tagline')}</p>
+      <span className="wf-head-mark" aria-hidden>
+        <Icon name="quest" size={24} />
+      </span>
+      <div className="wf-head-titles">
+        <h1>{t('quests:title')}</h1>
+        <p className="wf-tagline">{t('quests:tagline')}</p>
+      </div>
     </header>
   );
 }
@@ -203,34 +212,57 @@ function Lobby({
       {modeToggle}
       {error && <div className="wf-error" role="alert">{error}</div>}
       {quests.length === 0 ? (
-        <div className="card wf-empty">{t('quests:lobby.empty')}</div>
-      ) : (
-        <div className="wf-grid">
-          {quests.map((q) => (
-            <article key={q.id} className={`card wf-card${q.eligible ? '' : ' wf-card-locked'}`}>
-              <div className="wf-card-body">
-                <h2>{q.name}</h2>
-                {q.partnerName && (
-                  <span className="badge accent wf-partner">
-                    <Icon name="affection" size={12} /> {t('quests:lobby.partnerWith', { name: q.partnerName })}
-                  </span>
-                )}
-                <p className="wf-blurb">{q.blurb || t('quests:lobby.blurbFallback')}</p>
-              </div>
-              <div className="wf-card-foot">
-                {q.eligible ? (
-                  <button className="btn primary sm" disabled={busy} onClick={() => onBegin(q.id)}>
-                    <Icon name="play" size={14} /> {t('quests:lobby.start')}
-                  </button>
-                ) : (
-                  <span className="wf-lock" title={q.lockReason ?? ''}>
-                    <Icon name="warn" size={13} /> {q.lockReason ?? t('quests:lobby.locked')}
-                  </span>
-                )}
-              </div>
-            </article>
-          ))}
+        <div className="card wf-empty">
+          <span className="wf-empty-mark" aria-hidden><Icon name="quest" size={30} /></span>
+          <p>{t('quests:lobby.empty')}</p>
         </div>
+      ) : (
+        <>
+          <div className="wf-lobby-head">
+            <span className="kicker">{t('quests:lobby.available')}</span>
+            <span className="wf-lobby-count">{quests.length}</span>
+            <span className="wf-lobby-rule" aria-hidden />
+          </div>
+          <div className="wf-grid">
+            {quests.map((q) => {
+              const romance = !!q.partnerId;
+              return (
+                <article
+                  key={q.id}
+                  className={`card wf-card${q.eligible ? '' : ' wf-card-locked'}${romance ? ' wf-card-romance' : ''}`}
+                >
+                  <span className="wf-card-seal" aria-hidden>
+                    <Icon name={romance ? 'affection' : 'quest'} size={96} />
+                  </span>
+                  <div className="wf-card-body">
+                    <span className="wf-card-kicker">
+                      <Icon name={romance ? 'affection' : 'quest'} size={11} />
+                      {romance ? t('quests:lobby.romance') : t('quests:lobby.adventure')}
+                    </span>
+                    <h2>{q.name}</h2>
+                    {q.partnerName && (
+                      <span className="badge accent wf-partner">
+                        <Icon name="affection" size={12} /> {t('quests:lobby.partnerWith', { name: q.partnerName })}
+                      </span>
+                    )}
+                    <p className="wf-blurb">{q.blurb || t('quests:lobby.blurbFallback')}</p>
+                  </div>
+                  <div className="wf-card-foot">
+                    {q.eligible ? (
+                      <button className="btn primary sm" disabled={busy} onClick={() => onBegin(q.id)}>
+                        <Icon name="play" size={14} /> {t('quests:lobby.start')}
+                      </button>
+                    ) : (
+                      <span className="wf-lock" title={q.lockReason ?? ''}>
+                        <Icon name="warn" size={13} /> {q.lockReason ?? t('quests:lobby.locked')}
+                      </span>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -238,11 +270,11 @@ function Lobby({
 
 // --- Scene (the live loop) --------------------------------------------------
 
-const FACTION_TONE: Record<QuestFaction, string> = {
-  party: 'good',
-  ally: 'good',
-  neutral: '',
-  hostile: 'danger',
+const FACTION_CLASS: Record<QuestFaction, string> = {
+  party: 'wf-fac-party',
+  ally: 'wf-fac-ally',
+  neutral: 'wf-fac-neutral',
+  hostile: 'wf-fac-hostile',
 };
 
 function Scene({
@@ -252,6 +284,7 @@ function Scene({
   onAttempt,
   onLeave,
   busy,
+  pending,
   error,
   t,
 }: {
@@ -261,119 +294,203 @@ function Scene({
   onAttempt: () => void;
   onLeave: () => void;
   busy: boolean;
+  pending: string | null;
   error: string | null;
   t: TFn;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const resolved = scene.status !== 'active';
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [scene.log.length, busy]);
+  }, [scene.log.length, pending, resolved]);
+  // Refocus the composer after a turn resolves (disabling it on busy blurs it).
+  useEffect(() => {
+    if (!busy && !resolved) inputRef.current?.focus();
+  }, [busy, resolved]);
 
   const objective = useMemo(() => scene.objectives[0] ?? '', [scene.objectives]);
+  const turnPct = Math.min(100, Math.round((scene.turn / Math.max(1, scene.maxTurns)) * 100));
+  const turnsLeft = scene.maxTurns - scene.turn;
 
   return (
     <div className="wf wf-scene">
       <header className="wf-scene-head">
         <div className="wf-scene-title">
-          <Icon name="quest" size={16} /> <strong>{scene.name}</strong>
+          <span className="wf-scene-mark" aria-hidden><Icon name="quest" size={16} /></span>
+          <strong>{scene.name}</strong>
         </div>
-        <div className="wf-scene-meta">
-          {objective && <span className="wf-objective">{t('quests:scene.objective', { label: objective })}</span>}
-          <span className="badge wf-turn">{t('quests:scene.turn', { turn: scene.turn, max: scene.maxTurns })}</span>
-          <button className="btn ghost sm" onClick={onLeave} disabled={busy}>
+        {!resolved && (
+          <button className="btn ghost sm wf-scene-leave" onClick={() => setConfirmLeave(true)} disabled={busy}>
             <Icon name="leave" size={14} /> {t('quests:scene.leave')}
           </button>
-        </div>
+        )}
       </header>
+
+      <div className="wf-scene-bar">
+        {objective && (
+          <div className="wf-objective" title={objective}>
+            <Icon name="end" size={13} />
+            <span>{t('quests:scene.objective', { label: objective })}</span>
+          </div>
+        )}
+        <div className={`wf-turnmeter${!resolved && turnsLeft <= 2 ? ' low' : ''}`}>
+          <span className="wf-turnmeter-label">{t('quests:scene.turn', { turn: scene.turn, max: scene.maxTurns })}</span>
+          <span className="wf-turnmeter-track" aria-hidden>
+            <span className="wf-turnmeter-fill" style={{ width: `${turnPct}%` }} />
+          </span>
+        </div>
+      </div>
+
+      {confirmLeave && (
+        <ConfirmDialog
+          title={t('quests:scene.leaveConfirm.title')}
+          body={t('quests:scene.leaveConfirm.body', { name: scene.name })}
+          danger
+          busy={busy}
+          confirmLabel={t('quests:scene.leaveConfirm.confirm')}
+          cancelLabel={t('quests:scene.leaveConfirm.cancel')}
+          onConfirm={() => {
+            setConfirmLeave(false);
+            onLeave();
+          }}
+          onCancel={() => setConfirmLeave(false)}
+        />
+      )}
 
       {scene.entities.length > 0 && (
         <div className="wf-entities">
           {scene.entities.map((e) => (
-            <span key={e.id} className={`badge ${FACTION_TONE[e.faction]} wf-entity`} title={t(`quests:faction.${e.faction}`)}>
-              {e.name || e.id}
-              {e.hp != null && <em className="wf-hp">{e.hp}</em>}
+            <span key={e.id} className={`wf-entity ${FACTION_CLASS[e.faction]}`} title={t(`quests:faction.${e.faction}`)}>
+              <span className="wf-entity-dot" aria-hidden />
+              <span className="wf-entity-name">{e.name || e.id}</span>
+              {e.hp != null && (
+                <span className="wf-entity-hp" title={`${e.hp} HP`}>
+                  <span className="wf-entity-hpbar" aria-hidden>
+                    <span style={{ width: `${Math.max(0, Math.min(100, e.hp))}%` }} />
+                  </span>
+                  <em>{e.hp}</em>
+                </span>
+              )}
             </span>
           ))}
         </div>
       )}
 
       <div className="wf-reel">
-        <div className="wf-setup">{scene.setup}</div>
-        {scene.log.map((entry) => (
-          <div key={entry.turn} className="wf-beat">
+        {scene.setup && <div className="wf-setup">{scene.setup}</div>}
+        {scene.log.map((entry, i) => (
+          <div key={i} className="wf-beat">
             <div className="wf-msg you">{entry.playerText}</div>
-            <div className="wf-msg narrator">
+            <div className={`wf-msg narrator${entry.neutral && !entry.voiced ? ' wf-neutral' : ''}`}>
               {entry.narration}
-              <span className={`wf-grade wf-grade-${entry.grade}`}>{gradeLabel(entry.grade, t)}</span>
+              {!entry.neutral && (
+                <span className={`wf-grade wf-grade-${entry.grade}`}>{gradeLabel(entry.grade, t)}</span>
+              )}
             </div>
           </div>
         ))}
-        {busy && (
-          <div className="wf-msg narrator wf-thinking">
-            <span className="wf-typing"><span /><span /><span /></span> {t('quests:scene.thinking')}
+        {pending !== null && (
+          <div className="wf-beat">
+            <div className="wf-msg you">{pending}</div>
+            <div className="wf-msg narrator wf-thinking">
+              <span className="wf-typing"><span /><span /><span /></span> {t('quests:scene.thinking')}
+            </div>
           </div>
+        )}
+        {resolved && scene.resolution && (
+          <ResolutionCard res={scene.resolution} onDone={onLeave} busy={busy} t={t} />
         )}
         <div ref={endRef} />
       </div>
 
-      <div className="wf-foot">
-        {error && <div className="wf-error" role="alert">{error}</div>}
-        {scene.hints.length > 0 && (
-          <div className="wf-hints">
-            <span className="wf-hints-label">{t('quests:scene.tryHint')}</span>
-            {scene.hints.map((h, i) => (
-              <button key={i} type="button" className="wf-hint" onClick={() => setInput(h)} disabled={busy}>
-                {h}
-              </button>
-            ))}
+      {!resolved && (
+        <div className="wf-foot">
+          {error && <div className="wf-error" role="alert">{error}</div>}
+          {scene.hints.length > 0 && (
+            <div className="wf-hints">
+              <span className="wf-hints-label">{t('quests:scene.tryHint')}</span>
+              {scene.hints.map((h, i) => (
+                <button key={i} type="button" className="wf-hint" onClick={() => setInput(h)} disabled={busy}>
+                  {h}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="wf-composer">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  onAttempt();
+                }
+              }}
+              placeholder={t('quests:scene.placeholder')}
+              rows={2}
+              disabled={busy}
+            />
+            <button className="btn primary" onClick={onAttempt} disabled={busy || !input.trim()}>
+              <Icon name="send" size={16} /> {t('quests:scene.send')}
+            </button>
           </div>
-        )}
-        <div className="wf-composer">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                onAttempt();
-              }
-            }}
-            placeholder={t('quests:scene.placeholder')}
-            rows={2}
-            disabled={busy}
-          />
-          <button className="btn primary" onClick={onAttempt} disabled={busy || !input.trim()}>
-            <Icon name="send" size={16} /> {t('quests:scene.send')}
-          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
-// --- Resolution -------------------------------------------------------------
+// --- Resolution (an inline card at the foot of the chat, after the final beat) ------
 
-function Resolution({ scene, onDone, busy, t }: { scene: QuestSceneView; onDone: () => void; busy: boolean; t: TFn }) {
-  const res = scene.resolution;
-  const win = res?.outcome === 'win';
+function ResolutionCard({
+  res,
+  onDone,
+  busy,
+  t,
+}: {
+  res: NonNullable<QuestSceneView['resolution']>;
+  onDone: () => void;
+  busy: boolean;
+  t: TFn;
+}) {
+  const win = res.outcome === 'win';
+  const warmth = res.warmthChange ?? 0;
+  const warmthBadge = warmth !== 0 ? warmthLabel(warmth, res.partnerName ?? null, t) : null;
   return (
-    <div className="wf wf-resolve">
-      <div className={`card wf-resolve-card ${win ? 'win' : 'lose'}`}>
-        <div className="wf-resolve-glyph">
-          <Icon name={win ? 'trophy' : 'moon'} size={34} />
-        </div>
-        <h1>{win ? t('quests:resolution.win') : t('quests:resolution.lose')}</h1>
-        <p className="wf-resolve-label">{res?.label}</p>
-        <div className="wf-resolve-stats">
-          {!!res?.moneyEarned && <span className="badge warn">{t('quests:resolution.money', { amount: res.moneyEarned })}</span>}
-          {!!res?.warmthChange && <span className="badge accent">{t('quests:resolution.warmth', { amount: res.warmthChange })}</span>}
-        </div>
-        <button className="btn primary lg" onClick={onDone} disabled={busy}>
-          {win ? t('quests:resolution.ackWin') : t('quests:resolution.ackLose')}
-        </button>
+    <div className={`wf-resolve-inline ${win ? 'win' : 'lose'}`}>
+      <div className="wf-resolve-medal" aria-hidden>
+        <Icon name={win ? 'trophy' : 'moon'} size={28} />
       </div>
+      <h2>{win ? t('quests:resolution.win') : t('quests:resolution.lose')}</h2>
+      <p className="wf-resolve-label">{res.label}</p>
+      {(!!res.moneyEarned || warmthBadge) && (
+        <div className="wf-resolve-stats">
+          {!!res.moneyEarned && <span className="badge warn">{t('quests:resolution.money', { amount: res.moneyEarned })}</span>}
+          {warmthBadge && <span className={`badge ${warmth > 0 ? 'accent' : 'danger'}`}>{warmthBadge}</span>}
+        </div>
+      )}
+      <button className="btn primary" onClick={onDone} disabled={busy}>
+        {win ? t('quests:resolution.ackWin') : t('quests:resolution.ackLose')}
+      </button>
     </div>
   );
+}
+
+/** Warmth badge copy: signed + attributed to the partner when the quest is anchored. */
+function warmthLabel(change: number, partnerName: string | null, t: TFn): string {
+  const amount = Math.abs(change);
+  const closer = change > 0;
+  const key = closer
+    ? partnerName
+      ? 'quests:resolution.warmthNamed'
+      : 'quests:resolution.warmth'
+    : partnerName
+      ? 'quests:resolution.strainedNamed'
+      : 'quests:resolution.strained';
+  return t(key, { amount, name: partnerName ?? '' });
 }
 
 function gradeLabel(grade: OutcomeGrade, t: TFn): string {

@@ -31,3 +31,13 @@ export function getRelationship(
 ): Relationship {
   return ensureRelationship(characterId, playerId);
 }
+
+/** Read the relationship only if it already exists — WITHOUT creating one. Use this
+ *  on read-only surfaces (e.g. the quest lobby) so listing never persists a row for a
+ *  character the player has never actually met. A missing row means "no rapport yet". */
+export function getRelationshipIfExists(
+  characterId: string,
+  playerId: string = DEFAULT_PLAYER_ID,
+): Relationship | undefined {
+  return relationshipsRepo.getByCharacter(characterId, playerId);
+}

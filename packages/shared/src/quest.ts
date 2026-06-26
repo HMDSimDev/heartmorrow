@@ -8,6 +8,7 @@ import {
   QuestFactionSchema,
   QuestStatusSchema,
   QuestVerbSchema,
+  QUEST_VERBS,
   type DifficultyBand,
   type OutcomeGrade,
   type QuestFaction,
@@ -214,6 +215,13 @@ export interface QuestOutcome {
   expression: string;
   /** True once the referee ended the scene (goal fired / turn cap / stall). */
   ended: boolean;
+  /** A do-nothing beat (off-menu / non-diegetic input): no roll, no effects, no
+   *  turn consumed. The client hides the grade chip. */
+  neutral?: boolean;
+  /** A neutral beat the NARRATOR still voices in-fiction (a `talk` reply, or a
+   *  description of an off-menu attempt coming to nothing) — rendered like a normal
+   *  beat, not muted. Only an inert `noop` (false) uses the fixed safe line. */
+  voiced?: boolean;
   endStatus?: QuestStatus;
   /** Which authored goal fired (if any), for the resolution screen. */
   endGoal?: { outcome: 'win' | 'lose'; label: string };
@@ -233,6 +241,12 @@ const TIERS_BY_BAND: Record<DifficultyBand, ReadonlySet<EffectTier>> = {
   hard: new Set<EffectTier>(['cosmetic', 'material', 'heavy']),
   desperate: new Set<EffectTier>(['cosmetic', 'material', 'heavy', 'spine']),
 };
+
+/** Which effect tiers a difficulty band unlocks (authoring/UI helper — same table the
+ *  referee clamps against, so the editor can warn when an effect won't fire). */
+export function tierUnlockedBy(band: DifficultyBand): ReadonlySet<EffectTier> {
+  return TIERS_BY_BAND[band];
+}
 
 /** Classify an effect into its proportionality tier by op + magnitude. */
 export function effectTier(e: Effect): EffectTier {
@@ -314,9 +328,25 @@ export function resolveQuestAction(
   const node = graph.nodes.find((n) => n.id === state.nodeId) ?? graph.nodes[0]!;
   const next = cloneState(state);
 
-  // 1. VALIDATE — find the affordance for the proposed verb (else degrade to wait/no-op).
-  const affordance =
-    node.affordances.find((a) => a.verb === action.verb) ?? node.affordances[0] ?? null;
+  // 1. VALIDATE — find the affordance for the proposed verb.
+  const matched = node.affordances.find((a) => a.verb === action.verb) ?? null;
+
+  // 1a. NEUTRAL DEGRADE (the plan's "fiction valve") — ANY verb the scene offers no
+  // affordance for resolves to a do-nothing beat: no roll, no effects, no turn consumed,
+  // no stall. This is what stops an OFF-MENU verb from being reskinned as the node's
+  // FIRST affordance and accidentally winning (the "use a rock" / off-menu "deceive"
+  // that fired the Force/Aid success). The only verbs that mutate state are the ones the
+  // author actually offered here. A `noop` (self-harm / meta / nonsense) is INERT — a
+  // fixed safe line, never sent to the model; every OTHER unmatched verb is VOICED — the
+  // narrator describes the reply (`talk`) or why the attempt came to nothing.
+  if (action.verb === 'noop' || !matched) {
+    return {
+      newState: next, // turn unchanged — nothing mechanical happened
+      outcome: { grade: 'fail', appliedEffects: [], rejected: [], expression: 'thoughtful', ended: false, neutral: true, voiced: action.verb !== 'noop' },
+    };
+  }
+
+  const affordance = matched; // a real, offered approach — resolve the check below
 
   // 2. CHECK — the seeded roll decides the grade. The LLM never touches this.
   const stat = affordance?.stat ?? action.stat;
@@ -334,6 +364,10 @@ export function resolveQuestAction(
   const allowedTiers = TIERS_BY_BAND[band];
   const rejected: Effect[] = [];
   const applied: Effect[] = [];
+  // Track money accrued WITHIN this outcome too: `_moneyAccrued` is only bumped in the
+  // apply step (below), so without this a second addMoney in the same composition would
+  // see the same headroom and the per-quest cap could be overshot in one turn.
+  let accrued = next.stats['_moneyAccrued'] ?? 0;
   for (const raw of chosen) {
     if (applied.length >= QUEST.MAX_EFFECTS_PER_OUTCOME) {
       rejected.push(raw);
@@ -343,10 +377,14 @@ export function resolveQuestAction(
       rejected.push(raw);
       continue;
     }
-    const moneyRoom = Math.max(0, QUEST.MONEY_CAP_PER_QUEST - (next.stats['_moneyAccrued'] ?? 0));
+    const moneyRoom = Math.max(0, QUEST.MONEY_CAP_PER_QUEST - accrued);
     const clamped = clampEffect(raw, moneyRoom);
-    if (clamped) applied.push(clamped);
-    else rejected.push(raw);
+    if (clamped) {
+      applied.push(clamped);
+      if (clamped.op === 'addMoney') accrued += clamped.amount ?? 0;
+    } else {
+      rejected.push(raw);
+    }
   }
 
   // 5. APPLY — mutate the cloned state through the closed grammar.
@@ -400,10 +438,21 @@ export function resolveQuestAction(
     finish(outcome, graph.timeoutOutcome, { outcome: 'lose', label: 'The moment passes.' });
     return { newState: next, outcome };
   }
-  // 6c. Stall detection — too many goal-irrelevant turns in a row → force-resolve.
-  const stall = goalRelevant ? 0 : (next.stats['_stall'] ?? 0) + 1;
-  next.stats['_stall'] = stall;
-  if (stall >= QUEST.STALL_LIMIT) {
+  // 6c. Stall detection — only REPEATED no-progress attempts of the SAME committal verb
+  // count (the spec's "count only repeated no-progress verbs", §5.4.4 / §R-bounding #3),
+  // so legitimately gathering info or trying VARIED approaches never trips an early loss.
+  // Exploration verbs (inspect/wait) never count; the neutral beat returned earlier. The
+  // maxTurns backstop (6b) still guarantees termination regardless.
+  const exploratory = action.verb === 'inspect' || action.verb === 'wait';
+  if (goalRelevant || exploratory) {
+    next.stats['_stall'] = 0;
+  } else {
+    const verbIdx = QUEST_VERBS.indexOf(action.verb);
+    const sameAsLast = (next.stats['_stallVerb'] ?? -1) === verbIdx;
+    next.stats['_stall'] = sameAsLast ? (next.stats['_stall'] ?? 0) + 1 : 1;
+    next.stats['_stallVerb'] = verbIdx;
+  }
+  if ((next.stats['_stall'] ?? 0) >= QUEST.STALL_LIMIT) {
     finish(outcome, graph.timeoutOutcome, { outcome: 'lose', label: 'The trail goes cold.' });
     return { newState: next, outcome };
   }
@@ -869,6 +918,11 @@ export interface QuestLogEntry {
   playerText: string;
   narration: string;
   grade: OutcomeGrade;
+  /** A do-nothing beat (off-menu / non-diegetic input) — the client hides the chip. */
+  neutral?: boolean;
+  /** A narrator-voiced neutral beat (a reply or a useless-attempt description; rendered
+   *  normally, unlike an inert noop which is muted). */
+  voiced?: boolean;
 }
 
 /** An entity portrait in the live scene. */
@@ -901,7 +955,10 @@ export interface QuestSceneView {
     outcome: 'win' | 'lose';
     label: string;
     moneyEarned: number;
+    /** Signed: positive = grew closer, negative = strained. */
     warmthChange: number;
+    /** The romance anchor warmth routed to (so the screen can name them). */
+    partnerName: string | null;
   } | null;
 }
 

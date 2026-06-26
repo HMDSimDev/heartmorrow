@@ -121,11 +121,23 @@ export const MemoryTagArraySchema = z
  * reach the deterministic referee or game state. See `docs/quest-mode-plan.md`.
  */
 
-/** Verbs are a CLASSIFICATION target, not the action space (~a dozen, off-list → wait). */
+/**
+ * Verbs are a CLASSIFICATION target, not the action space (~a dozen, off-list → noop).
+ *
+ * `talk` is the neutral conversational verb — asking, greeting, querying — distinct
+ * from the *leverage* verbs (`persuade`/`deceive`/`charm`/`intimidate`), so an
+ * information request is never mistaken for a bluff. `noop` is a NON-diegetic
+ * sentinel (not a real in-world action): the interpreter routes self-directed,
+ * meta/OOC, impossible, or nonsensical input to it, and the referee resolves it as
+ * a do-nothing beat — kept away from the dice AND the narrator. It is the `.catch()`
+ * target so any off-list hallucination also degrades to a safe no-op rather than a
+ * real verb. (Authoring surfaces hide `noop`; it is a classification result only.)
+ */
 export const QUEST_VERBS = [
   'inspect',
   'move',
   'use_item',
+  'talk',
   'persuade',
   'intimidate',
   'deceive',
@@ -135,9 +147,10 @@ export const QUEST_VERBS = [
   'aid',
   'attack',
   'wait',
+  'noop',
 ] as const;
 export type QuestVerb = (typeof QUEST_VERBS)[number];
-export const QuestVerbSchema = z.enum(QUEST_VERBS).catch('wait');
+export const QuestVerbSchema = z.enum(QUEST_VERBS).catch('noop');
 
 /** How hard the Interpreter judged the attempt to be — gates the proportionality tier. */
 export const DIFFICULTY_BANDS = ['trivial', 'normal', 'hard', 'desperate'] as const;
