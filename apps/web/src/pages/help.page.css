@@ -135,6 +135,66 @@
 .help-section p strong { color: var(--text); font-weight: 600; }
 .help-bullets li b { color: var(--text); font-weight: 600; } /* lead-in term */
 
+/* Closing support card — a doorway to the Discord + the exact build stamp. */
+.help-support {
+  margin-top: 18px;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, #5865f2 12%, var(--panel)),
+    var(--panel));
+  border: 1px solid color-mix(in oklab, #5865f2 26%, var(--border-soft));
+  border-radius: var(--radius);
+  padding: 20px 22px;
+}
+.help-support .kicker { margin-bottom: 4px; }
+.help-support h3 {
+  font-family: var(--font-display);
+  font-size: 1.14rem;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+.help-support p {
+  margin: 0 0 14px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  max-width: 64ch;
+}
+.help-support-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.help-discord-btn,
+.help-github-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
+}
+.help-discord-btn:active,
+.help-github-btn:active { transform: translateY(1px); }
+.help-discord-btn { background: #5865f2; color: #fff; }
+.help-discord-btn:hover { background: #4954df; color: #fff; }
+.help-github-btn {
+  background: color-mix(in oklab, var(--text) 8%, transparent);
+  border: 1px solid color-mix(in oklab, var(--text) 22%, transparent);
+  color: var(--text);
+}
+.help-github-btn:hover {
+  background: color-mix(in oklab, var(--text) 14%, transparent);
+  border-color: color-mix(in oklab, var(--text) 34%, transparent);
+  color: var(--text);
+}
+.help-version {
+  margin-top: 12px;
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Narrow: the rail collapses to a wrapping chip row above the content
    (no horizontal scroll — nav must always stay fully on-screen). */
 @media (max-width: 860px) {

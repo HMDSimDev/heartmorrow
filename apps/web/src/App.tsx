@@ -21,6 +21,7 @@ import { Help } from './pages/Help';
 import { Bench } from './pages/Bench';
 import { PromptEditor } from './pages/PromptEditor';
 import { Debug } from './pages/Debug';
+import { APP_VERSION, DISCORD_URL, GITHUB_URL, GIT_COMMIT } from './version';
 
 // `shortKey` is the label used by the cramped bottom nav (phones); the roomy
 // sidebar always shows the full `labelKey`. Only set it where the full label is
@@ -125,6 +126,42 @@ export default function App() {
               </NavLink>
             ))}
           </nav>
+
+          {/* Pinned to the bottom of the column: a way out to support/updates,
+              plus the exact build so bug reports can name a version. On phones the
+              sidebar is hidden, so the same link lives in Help → Support instead. */}
+          <div className="sidebar-foot">
+            <a
+              className="support-link discord-link"
+              href={DISCORD_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <span className="ico"><Icon name="discord" size={18} /></span>
+              <span className="support-link-text">
+                {t('support.discord')}
+                <small>{t('support.discordHint')}</small>
+              </span>
+            </a>
+            <a
+              className="support-link github-link"
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <span className="ico"><Icon name="github" size={18} /></span>
+              <span className="support-link-text">
+                {t('support.github')}
+                <small>{t('support.githubHint')}</small>
+              </span>
+            </a>
+            <div
+              className="app-version"
+              title={t('support.versionTitle', { version: APP_VERSION, commit: GIT_COMMIT })}
+            >
+              Heartmorrow {APP_VERSION} <span className="commit">({GIT_COMMIT})</span>
+            </div>
+          </div>
         </div>
       </aside>
 

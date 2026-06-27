@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Icon, type IconName } from '../components/Icon';
+import { APP_VERSION, DISCORD_URL, GITHUB_URL, GIT_COMMIT } from '../version';
 import './help.page.css';
 
 type HelpSection = { heading: string; body: string[]; bullets?: string[] };
@@ -102,6 +103,35 @@ export function Help() {
               ))}
             </>
           )}
+
+          {/* Support/community CTA. The sidebar carries this on desktop, but the
+              sidebar is hidden on phones — Help is how mobile players reach it. */}
+          <section className="help-support">
+            <div className="kicker">{t('help.support.kicker')}</div>
+            <h3>{t('help.support.title')}</h3>
+            <p>{t('help.support.blurb')}</p>
+            <div className="help-support-actions">
+              <a
+                className="help-discord-btn"
+                href={DISCORD_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <Icon name="discord" size={18} />
+                {t('help.support.cta')}
+              </a>
+              <a
+                className="help-github-btn"
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                <Icon name="github" size={18} />
+                {t('help.support.ctaGithub')}
+              </a>
+            </div>
+            <div className="help-version">Heartmorrow {APP_VERSION} ({GIT_COMMIT})</div>
+          </section>
         </div>
       </div>
     </div>

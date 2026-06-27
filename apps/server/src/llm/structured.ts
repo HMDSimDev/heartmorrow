@@ -181,6 +181,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
   // Adaptive structured-output mode: start from the configured mode and
   // downgrade if the server rejects the response_format.
   const modeChain = buildModeChain(settings.structuredMode);
+  const requestedMode = modeChain[0]!;
   let modeIdx = 0;
   let formatFallbacks = 0;
   const maxFormatFallbacks = modeChain.length - 1;
@@ -195,7 +196,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
     // Stop before each call if the caller aborted (e.g. the bench user hit Cancel) —
     // works even for adapters that don't propagate the signal to their transport.
     if (options.signal?.aborted) {
-      return { ok: false, error: 'Aborted.', attempts: attempt, lastRaw };
+      return { ok: false, error: 'Aborted.', attempts: attempt, lastRaw, requestedMode, finalMode: modeChain[modeIdx]! };
     }
     const mode = modeChain[modeIdx]!;
     const responseFormat = buildResponseFormat(mode, schemaName, jsonSchema);
@@ -250,7 +251,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
       // If the caller aborted (e.g. the bench user hit Cancel / disconnected),
       // stop immediately rather than spending the remaining retry budget.
       if (options.signal?.aborted || (err as Error).name === 'AbortError') {
-        return { ok: false, error: `Aborted: ${message}`, attempts: attempt + 1, lastRaw };
+        return { ok: false, error: `Aborted: ${message}`, attempts: attempt + 1, lastRaw, requestedMode, finalMode: modeChain[modeIdx]! };
       }
       lastError = `Transport error: ${message}`;
       // A transport failure produced no model reply — clear any stale reply from an
@@ -286,7 +287,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
 
     const validation = schema.safeParse(parsed);
     if (validation.success) {
-      return { ok: true, data: validation.data, attempts: attempt + 1 };
+      return { ok: true, data: validation.data, attempts: attempt + 1, requestedMode, finalMode: modeChain[modeIdx]! };
     }
     lastError = formatZodError(validation.error);
     options.log?.(`[structured:${schemaName}] attempt ${attempt + 1}/${totalAttempts} validation failed:\n${lastError}`);
@@ -298,5 +299,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
     error: `Structured output failed after ${totalAttempts} attempt(s). Last error:\n${lastError}`,
     attempts: totalAttempts,
     lastRaw,
+    requestedMode,
+    finalMode: modeChain[modeIdx]!,
   };
 }

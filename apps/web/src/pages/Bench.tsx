@@ -386,6 +386,11 @@ function CaseCard({
             {result && result.comparison?.closeness != null && (
               <span className="badge" style={{ color: result.comparison.pass === false ? 'var(--ember)' : closenessColor(result.comparison.closeness) }}>{pct(result.comparison.closeness)}</span>
             )}
+            {result?.structuredMode && result.structuredMode.final !== result.structuredMode.requested && (
+              <span className="badge warn mono" title={t('bench.fallbackBadgeTitle')}>
+                {result.structuredMode.requested} → {result.structuredMode.final}
+              </span>
+            )}
           </span>
           <Icon name={open ? 'chevronDown' : 'chevronRight'} size={16} />
         </button>
@@ -489,6 +494,14 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
   const judged = results.filter((r) => r.comparison?.closeness != null);
   const avgCloseness = judged.length ? judged.reduce((n, r) => n + (r.comparison!.closeness ?? 0), 0) / judged.length : null;
   const estimated = results.some((r) => r.tokensEstimated);
+  // Cases whose structured-output mode downgraded from the one requested. A fallback
+  // is NOT a failure — it shows the endpoint couldn't serve the requested mode.
+  const fellBack = results.filter((r) => r.structuredMode && r.structuredMode.final !== r.structuredMode.requested);
+  const fallbackByMode = fellBack.reduce<Record<string, number>>((acc, r) => {
+    const f = r.structuredMode!.final;
+    acc[f] = (acc[f] ?? 0) + 1;
+    return acc;
+  }, {});
 
   if (!results.length) return null;
   return (
@@ -513,6 +526,13 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
         {avgCloseness != null && (
           <div className="bench-stat framed bench-stat-ring">
             <RingGauge value={avgCloseness} label={t('bench.judgeAgreement')} sub={t('bench.nJudged', { count: judged.length })} />
+          </div>
+        )}
+        {fellBack.length > 0 && (
+          <div className="bench-stat framed" title={t('bench.fellBackTitle')}>
+            <div className="bench-stat-num mono" style={{ color: 'var(--brass)' }}>{fellBack.length}</div>
+            <div className="bench-stat-lbl">{t('bench.fellBack')}</div>
+            <div className="bench-stat-sub mono">{Object.entries(fallbackByMode).map(([m, n]) => `${n} → ${m}`).join(' · ')}</div>
           </div>
         )}
       </div>
@@ -617,6 +637,9 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
                       <span className="bench-runrow-label">{r.label || t('bench.untitledRun')}</span>
                       <span className="badge mono">{r.model}</span>
                       {r.failures.length > 0 && <span className="badge danger">{t('bench.nFailed', { count: r.failures.length })}</span>}
+                      {r.aggregate.structuredFallbacks > 0 && (
+                        <span className="badge warn" title={t('bench.fellBackTitle')}>{t('bench.nFellBack', { count: r.aggregate.structuredFallbacks })}</span>
+                      )}
                     </div>
                     <div className="bench-runrow-meta mono">
                       {new Date(r.createdAt).toLocaleString(i18n.language)} · {t('bench.passedOf', { passed: r.aggregate.passed, cases: r.aggregate.cases })} ·{' '}
@@ -845,7 +868,7 @@ export function Bench() {
           const m = catalog.cases.find((c) => c.id === id);
           setResults((prev) => ({
             ...prev,
-            [id]: { caseId: id, label: m?.label ?? id, group: m?.group ?? '', kind: m?.kind ?? 'generation', ok: false, error: errorMessage(e), calls: [], promptTokens: null, completionTokens: null, totalLatencyMs: 0, attempts: 0, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [], repetitionMax: null, repetitionAvg: null, comparison: null },
+            [id]: { caseId: id, label: m?.label ?? id, group: m?.group ?? '', kind: m?.kind ?? 'generation', ok: false, error: errorMessage(e), calls: [], promptTokens: null, completionTokens: null, totalLatencyMs: 0, attempts: 0, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [], repetitionMax: null, repetitionAvg: null, comparison: null, structuredMode: null },
           }));
         }
       }
@@ -938,6 +961,8 @@ export function Bench() {
                 <span className="kicker">{t('bench.select')}</span>
                 <button className="btn sm" onClick={() => setSel(catalog.cases.map((c) => c.id))} disabled={running}>{t('bench.selAll')}</button>
                 <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => c.kind === 'judge').map((c) => c.id))} disabled={running}>{t('bench.selJudges')}</button>
+                <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => c.tags.includes('generator')).map((c) => c.id))} disabled={running}>{t('bench.selGenerators')}</button>
+                <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => c.tags.includes('prose')).map((c) => c.id))} disabled={running}>{t('bench.selProse')}</button>
                 <button className="btn sm" onClick={() => setSel(catalog.cases.filter((c) => QUICK_IDS.includes(c.id)).map((c) => c.id))} disabled={running}>{t('bench.selQuick')}</button>
                 <button className="btn sm" onClick={() => setSel([])} disabled={running}>{t('bench.selNone')}</button>
               </div>

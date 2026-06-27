@@ -49,6 +49,8 @@ describe('callStructuredLlm', () => {
     if (res.ok) {
       expect(res.data).toEqual({ mood: 'happy', score: 5 });
       expect(res.attempts).toBe(2);
+      // A content retry is NOT a format fallback — the mode never downgraded.
+      expect(res.requestedMode).toBe(res.finalMode);
     }
     expect(adapter.calls).toBe(2);
   });
@@ -90,7 +92,12 @@ describe('callStructuredLlm', () => {
     // It tried json_object (rejected), then downgraded to json_schema (accepted)
     // WITHOUT consuming a content retry.
     expect(adapter.formatsSeen).toEqual(['json_object', 'json_schema']);
-    if (res.ok) expect(res.attempts).toBe(1);
+    if (res.ok) {
+      expect(res.attempts).toBe(1);
+      // The fallback is reported: requested json_object, ended on json_schema.
+      expect(res.requestedMode).toBe('json_object');
+      expect(res.finalMode).toBe('json_schema');
+    }
   });
 
   it('never performs regex/partial-JSON salvage (prose with embedded JSON still fails)', async () => {

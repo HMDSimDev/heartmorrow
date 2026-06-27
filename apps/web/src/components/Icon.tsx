@@ -93,6 +93,46 @@ function Constellation({ size = 18, strokeWidth = 1.75, className, ...rest }: Lu
   );
 }
 
+/** Discord's brand mark. A filled glyph (ignores `strokeWidth`) that tints via
+ *  `currentColor` so it sits naturally next to the lucide line-art. */
+function DiscordGlyph({ size = 18, className, ...rest }: LucideProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+      className={className}
+      {...rest}
+    >
+      <path d="M19.27 5.33A16.6 16.6 0 0 0 15.16 4l-.21.43a14.7 14.7 0 0 1 3.74 1.18 13.1 13.1 0 0 0-11.4 0 14.7 14.7 0 0 1 3.74-1.18L10.84 4a16.6 16.6 0 0 0-4.11 1.33A18.9 18.9 0 0 0 3 17.36 16.7 16.7 0 0 0 8.07 20l.62-.86a10.8 10.8 0 0 1-2.43-1.17l.47-.37a11.5 11.5 0 0 0 10.54 0l.47.37c-.76.45-1.57.84-2.43 1.17l.62.86A16.7 16.7 0 0 0 21 17.36a18.9 18.9 0 0 0-1.73-12.03ZM9.34 14.85c-.81 0-1.48-.74-1.48-1.66s.65-1.66 1.48-1.66 1.49.75 1.48 1.66c0 .92-.66 1.66-1.48 1.66Zm5.32 0c-.81 0-1.48-.74-1.48-1.66s.65-1.66 1.48-1.66 1.49.75 1.48 1.66c0 .92-.65 1.66-1.48 1.66Z" />
+    </svg>
+  );
+}
+
+/** GitHub's brand mark — a filled glyph (ignores `strokeWidth`) tinting via
+ *  `currentColor`, matching DiscordGlyph's treatment. */
+function GithubGlyph({ size = 18, className, ...rest }: LucideProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="none"
+      className={className}
+      {...rest}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2C6.48 2 2 6.58 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49l-.01-1.72c-2.78.62-3.37-1.37-3.37-1.37-.46-1.18-1.11-1.5-1.11-1.5-.91-.63.07-.62.07-.62 1 .07 1.53 1.06 1.53 1.06.89 1.57 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.55-1.14-4.55-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05a9.3 9.3 0 0 1 2.5-.34c.85 0 1.71.12 2.5.34 1.91-1.33 2.75-1.05 2.75-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.79-4.57 5.05.36.32.68.94.68 1.9l-.01 2.82c0 .27.18.59.69.49A10.04 10.04 0 0 0 22 12.25C22 6.58 17.52 2 12 2Z"
+      />
+    </svg>
+  );
+}
+
 /* One semantic icon vocabulary for the whole app. Call sites say what a glyph
    MEANS (<Icon name="date" />), so the lamplit line-art can be retuned in one
    place. Icons inherit `currentColor`, so they tint with the Nocturne tokens
@@ -189,6 +229,10 @@ const ICONS = {
   reactWow: PartyPopper,
   reactSad: Frown,
   reactAngry: Angry,
+
+  // brands (filled glyph; ignores strokeWidth, tints via currentColor)
+  discord: DiscordGlyph,
+  github: GithubGlyph,
 } satisfies Record<string, React.ComponentType<LucideProps>>;
 
 export type IconName = keyof typeof ICONS;

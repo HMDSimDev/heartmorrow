@@ -56,6 +56,7 @@ import {
   BenchCaseMetaSchema,
   type BenchCaseMeta,
   type BenchCaseKind,
+  type BenchCaseTag,
   type BenchBaselineSpec,
   type BenchBaselineValue,
   type BenchCaseSetupInput,
@@ -164,6 +165,9 @@ export interface BenchCaseDef {
   description: string;
   kind: BenchCaseKind;
   group: string;
+  /** Cross-cutting run-preset tags ("Generators" / "Prose"); omit for cases (e.g.
+   *  judges, dialogue, extraction) that belong to neither bucket. */
+  tags?: BenchCaseTag[];
   baselineSpec?: BenchBaselineSpec;
   baselinePrompt?: string;
   /** Built-in default baseline (judge cases) so runs are scored without user input. */
@@ -948,6 +952,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   // === Texting & phone ===
   {
     id: 'gen_daily_text',
+    tags: ['prose'],
     label: 'Daily check-in text',
     description: 'Mara’s one unprompted daily text. Should fit her voice and the relationship stage; may suggest a gift.',
     kind: 'generation',
@@ -972,6 +977,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_email_batch',
+    tags: ['prose'],
     label: 'In-world emails',
     description: 'A batch of ambient in-world emails (services, strangers — never love interests) for the player’s inbox.',
     kind: 'generation',
@@ -988,6 +994,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   // === World & continuity ===
   {
     id: 'gen_day_recap',
+    tags: ['prose'],
     label: 'End-of-day recap',
     description: 'Narrate a day’s real events into a short recap. Must stay grounded in the facts it’s given.',
     kind: 'generation',
@@ -1006,6 +1013,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_world_sim',
+    tags: ['prose'],
     label: 'World-sim color pass',
     description: 'Reword the day’s pre-decided town happenings, keyed by ref — never inventing people or events.',
     kind: 'generation',
@@ -1025,6 +1033,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_summary',
+    tags: ['prose'],
     label: 'Conversation summary',
     description: 'Compress a date transcript into a compact rolling summary that bounds prompt growth.',
     kind: 'generation',
@@ -1039,6 +1048,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_chronicle',
+    tags: ['prose'],
     label: 'Chronicle fold',
     description: 'Fold new date highlights into the cross-date chronicle — the long narrative memory of the relationship.',
     kind: 'generation',
@@ -1062,6 +1072,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_epilogue',
+    tags: ['prose'],
     label: 'Happy-ending epilogue',
     description: 'Synthesize a forward-looking happy-ending epilogue from the relationship’s history.',
     kind: 'generation',
@@ -1119,6 +1130,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   // === Creator generation ===
   {
     id: 'gen_world',
+    tags: ['generator'],
     label: 'World generation',
     description: 'Design a whole, fleshed-out world (setting + locations + notes) from a one-line seed. The heaviest generation.',
     kind: 'generation',
@@ -1134,6 +1146,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_location',
+    tags: ['generator'],
     label: 'Location generation',
     description: 'Invent distinct new venues that fit the world (no duplicates of existing ones).',
     kind: 'generation',
@@ -1154,6 +1167,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_shop',
+    tags: ['generator'],
     label: 'Shop-item generation',
     description: 'Generate a batch of in-world giftable items that fit the setting; the server clamps their effects.',
     kind: 'generation',
@@ -1169,6 +1183,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_property',
+    tags: ['generator'],
     label: 'Property generation',
     description: 'Generate ownable/leasable properties with coherent economics (the server enforces a payback floor).',
     kind: 'generation',
@@ -1184,6 +1199,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_company',
+    tags: ['generator'],
     label: 'Company / stock generation',
     description: 'Generate fictional companies for the stock market that fit the world’s economy.',
     kind: 'generation',
@@ -1199,6 +1215,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_market_news',
+    tags: ['prose'],
     label: 'Market news color',
     description: 'Narrate the day’s biggest stock movers, keyed by ticker ref — never inventing companies or prices.',
     kind: 'generation',
@@ -1214,6 +1231,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_quiz',
+    tags: ['generator'],
     label: 'Lore-quiz generation',
     description: 'Generate multiple-choice quiz questions grounded only in the world + the date (the Lore Quiz minigame).',
     kind: 'generation',
@@ -1229,6 +1247,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_writer',
+    tags: ['prose'],
     label: 'Newspaper dispatch',
     description: 'Write a short in-world newspaper dispatch to transcribe (the Copy Desk job). Plain prose, grounded in lore.',
     kind: 'generation',
@@ -1244,6 +1263,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_profile',
+    tags: ['generator'],
     label: 'Character profile generation',
     description: 'Flesh out a character’s narrative profile fields (appearance, love language, quirks…) from a short brief.',
     kind: 'generation',
@@ -1259,6 +1279,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_character',
+    tags: ['generator'],
     label: 'Character generation (from text)',
     description: 'Build a WHOLE character draft from pasted/uploaded reference text (a SillyTavern-style card), fitted to the world — how well the model turns messy source material into a complete, coherent character.',
     kind: 'generation',
@@ -1284,6 +1305,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_room',
+    tags: ['prose'],
     label: 'Private-room description',
     description: 'Describe a character’s home as a cozy, characterful date venue, grounded in who they are.',
     kind: 'generation',
@@ -1301,6 +1323,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   // === Social feed ===
   {
     id: 'gen_feed_post',
+    tags: ['prose'],
     label: 'Faces post',
     description: 'An NPC writes an ambient social-feed post in their own voice, driven by their posting style.',
     kind: 'generation',
@@ -1322,6 +1345,7 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
   {
     id: 'gen_feed_comment',
+    tags: ['prose'],
     label: 'Faces comment',
     description: 'An NPC comments on the player’s post, colored by their relationship and shared memories.',
     kind: 'generation',
@@ -1364,6 +1388,7 @@ function buildMeta(def: BenchCaseDef): BenchCaseMeta {
     description: def.description,
     kind: def.kind,
     group: def.group,
+    tags: def.tags ?? [],
     baselineSpec: def.baselineSpec ?? null,
     baselinePrompt: def.baselinePrompt ?? '',
     defaultBaseline: def.defaultBaseline ?? null,

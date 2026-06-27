@@ -362,6 +362,51 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
   .sidebar a.active .ico { opacity: 1; }
   .sidebar .money-pill { margin-top: auto; align-self: stretch; justify-content: center; }
   .app-main { padding: 34px 38px 56px; }
+
+  /* Pinned footer: a lit doorway out to the Discord + the build stamp. */
+  .sidebar-foot {
+    margin-top: auto;
+    flex-shrink: 0;
+    padding-top: 12px;
+    display: flex; flex-direction: column; gap: 8px;
+    border-top: 1px solid var(--border-soft);
+  }
+  .sidebar-foot .support-link {
+    display: flex; align-items: center; gap: 11px;
+    padding: 9px 11px; border-radius: var(--radius-sm);
+    color: var(--text-dim); font-weight: 600;
+    border: 1px solid transparent;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .sidebar-foot .support-link .ico {
+    width: 22px; text-align: center; opacity: 0.9; flex-shrink: 0;
+  }
+  .sidebar-foot .support-link:hover { color: var(--text); }
+  .sidebar-foot .support-link:hover .ico { opacity: 1; }
+  /* Per-brand accent: Discord blurple, GitHub a warm parchment-neutral. */
+  .sidebar-foot .discord-link .ico { color: #8b9bff; }
+  .sidebar-foot .discord-link:hover {
+    background: color-mix(in oklab, #5865f2 16%, transparent);
+    border-color: color-mix(in oklab, #5865f2 34%, transparent);
+  }
+  .sidebar-foot .github-link .ico { color: var(--text); opacity: 0.78; }
+  .sidebar-foot .github-link:hover {
+    background: color-mix(in oklab, var(--text) 10%, transparent);
+    border-color: color-mix(in oklab, var(--text) 22%, transparent);
+  }
+  .sidebar-foot .support-link-text {
+    display: flex; flex-direction: column; line-height: 1.2; min-width: 0;
+    font-size: 0.9rem;
+  }
+  .sidebar-foot .support-link-text small {
+    font-weight: 500; font-size: 0.72rem; color: var(--text-dim); opacity: 0.78;
+  }
+  .app-version {
+    padding: 0 4px;
+    font-size: 0.72rem; color: var(--text-dim); opacity: 0.6;
+    letter-spacing: 0.01em;
+  }
+  .app-version .commit { font-variant-numeric: tabular-nums; opacity: 0.85; }
 }
 
 /* Right after the sidebar appears (860–1023px) the content column is at its

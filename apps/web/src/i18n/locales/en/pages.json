@@ -621,6 +621,10 @@
     "avgTokSec": "avg tok/sec",
     "judgeAgreement": "judge agreement",
     "nJudged": "{count} judged",
+    "fellBack": "fell back",
+    "fellBackTitle": "How many cases couldn't use the requested structured-output mode and fell back to a looser one (json_schema → json_object → prompt_only). This is a capability signal, not a failure — the cases still ran.",
+    "fallbackBadgeTitle": "This case fell back from the requested structured-output mode to a looser one because your endpoint rejected the requested format. Not a failure — the output was still produced and validated.",
+    "nFellBack": "{count} fell back",
     "perCase": "Per case",
     "chTokens": "Tokens (in / out)",
     "chLatency": "Latency",
@@ -660,6 +664,8 @@
     "select": "Select",
     "selAll": "All",
     "selJudges": "Judges",
+    "selGenerators": "Generators",
+    "selProse": "Prose",
     "selQuick": "Quick",
     "selNone": "None",
     "dialogueTurns": "Dialogue turns: {n}",
@@ -1238,6 +1244,13 @@
       "topics": "Topics"
     },
     "topicOf": "Topic {n} of {total}",
+    "support": {
+      "kicker": "Community",
+      "title": "Support & updates",
+      "blurb": "Questions, bug reports, ideas, or just want to follow along? Join the Discord for support, announcements, and the community — or browse the source, releases, and open issues on GitHub.",
+      "cta": "Join the Discord",
+      "ctaGithub": "View on GitHub"
+    },
     "cats": {
       "getting-started": {
         "label": "Getting started",

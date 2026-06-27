@@ -18,6 +18,20 @@ describe('bench catalog', () => {
     expect(ids.size).toBe(cat.cases.length);
   });
 
+  it('the Generators/Prose run-preset tags are sane', () => {
+    const cat = buildBenchCatalog('test-model');
+    const generators = cat.cases.filter((c) => c.tags.includes('generator'));
+    const prose = cat.cases.filter((c) => c.tags.includes('prose'));
+    // both presets actually select something
+    expect(generators.length).toBeGreaterThan(0);
+    expect(prose.length).toBeGreaterThan(0);
+    // tags only ride on generation cases, and the two buckets never overlap
+    for (const c of cat.cases) {
+      if (c.tags.length) expect(c.kind, `${c.id} kind`).toBe('generation');
+      expect(c.tags.includes('generator') && c.tags.includes('prose'), `${c.id} dual-tagged`).toBe(false);
+    }
+  });
+
   it('every judge case has a baseline spec + scorer + built-in default; every case is runnable', () => {
     for (const def of BENCH_CASES) {
       if (def.kind === 'judge') {
@@ -294,7 +308,7 @@ describe('bench persistence + aggregate', () => {
     const base = {
       label: '', group: '', kind: 'judge' as const, calls: [], promptTokens: 10, completionTokens: 5,
       totalLatencyMs: 100, attempts: 1, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [],
-      repetitionMax: null, repetitionAvg: null,
+      repetitionMax: null, repetitionAvg: null, structuredMode: null,
     };
     const agg = computeAggregate([
       { ...base, caseId: 'a', ok: true, error: '', comparison: { human: { engagement: 2 }, llm: { engagement: 2 }, closeness: 1, agree: null, pass: true, rows: [] } },
@@ -306,5 +320,30 @@ describe('bench persistence + aggregate', () => {
     expect(agg.failed).toBe(1);
     expect(agg.judgeCases).toBe(2);
     expect(agg.avgCloseness).toBeCloseTo(0.75, 5);
+  });
+
+  it('computeAggregate counts structured-output fallbacks by final mode (a fallback is not a failure)', () => {
+    const base = {
+      label: '', group: '', kind: 'generation' as const, calls: [], promptTokens: 10, completionTokens: 5,
+      totalLatencyMs: 100, attempts: 1, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [],
+      repetitionMax: null, repetitionAvg: null, comparison: null,
+    };
+    const agg = computeAggregate([
+      // ran at the requested mode — no fallback
+      { ...base, caseId: 'a', ok: true, error: '', structuredMode: { requested: 'json_schema', final: 'json_schema' } },
+      // fell back one step, still passed
+      { ...base, caseId: 'b', ok: true, error: '', structuredMode: { requested: 'json_schema', final: 'json_object' } },
+      // fell back two steps, still passed
+      { ...base, caseId: 'c', ok: true, error: '', structuredMode: { requested: 'json_schema', final: 'prompt_only' } },
+      // another to prompt_only
+      { ...base, caseId: 'd', ok: true, error: '', structuredMode: { requested: 'json_schema', final: 'prompt_only' } },
+      // free-text dialogue — no structured call at all
+      { ...base, caseId: 'e', ok: true, error: '', kind: 'dialogue' as const, structuredMode: null },
+    ]);
+    expect(agg.structuredFallbacks).toBe(3); // b, c, d
+    expect(agg.fallbackByMode).toEqual({ json_object: 1, prompt_only: 2 });
+    // fallbacks never inflate the failure count
+    expect(agg.failed).toBe(0);
+    expect(agg.passed).toBe(5);
   });
 });

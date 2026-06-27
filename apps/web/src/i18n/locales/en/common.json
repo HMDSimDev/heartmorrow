@@ -132,6 +132,13 @@
     "worldsShort": "Worlds",
     "debug": "Debug"
   },
+  "support": {
+    "discord": "Join the Discord",
+    "discordHint": "Support, updates & community",
+    "github": "Source on GitHub",
+    "githubHint": "Code, releases & issues",
+    "versionTitle": "Heartmorrow {{version}} · build {{commit}}"
+  },
   "phase": {
     "morning": "Morning",
     "afternoon": "Afternoon",

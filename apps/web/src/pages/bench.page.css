@@ -541,6 +541,12 @@
 .bench-stat-ring {
   padding: 10px;
 }
+.bench-stat-sub {
+  font-size: 0.62rem;
+  line-height: 1.3;
+  color: var(--text-mute);
+  word-break: break-word;
+}
 
 .bench-charts {
   display: grid;

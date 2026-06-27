@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { StructuredOutputMode } from './settings';
 import { WorldNoteScopeSchema } from './entities';
 import { MAX_EVAL_DELTA, EMAILS_MAX_PER_DAY, MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, WEALTH } from '../constants';
 import { PhaseSchema } from '../time';
@@ -712,7 +713,17 @@ export type CharacterTemplateDraft = Omit<CharacterTemplateGeneration, 'datingSt
   datingStats: z.infer<typeof DatingStatsSchema>;
 };
 
-/** Discriminated result type returned by the structured LLM caller. */
+/**
+ * Discriminated result type returned by the structured LLM caller.
+ *
+ * `requestedMode` is the structured-output mode the call STARTED at (the configured
+ * mode for the role); `finalMode` is the mode it actually produced output with after
+ * any response-format downgrades (json_schema → json_object → prompt_only). When
+ * `finalMode !== requestedMode` the endpoint couldn't serve the requested mode and the
+ * caller fell back — NOT an error, just a capability signal the bench surfaces. Both
+ * are optional because the service wrappers that re-shape this result don't propagate
+ * them; `callStructuredLlm` itself always sets them.
+ */
 export type StructuredResult<T> =
-  | { ok: true; data: T; attempts: number }
-  | { ok: false; error: string; attempts: number; lastRaw?: string };
+  | { ok: true; data: T; attempts: number; requestedMode?: StructuredOutputMode; finalMode?: StructuredOutputMode }
+  | { ok: false; error: string; attempts: number; lastRaw?: string; requestedMode?: StructuredOutputMode; finalMode?: StructuredOutputMode };

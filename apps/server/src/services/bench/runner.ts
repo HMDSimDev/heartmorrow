@@ -24,6 +24,7 @@ import {
   type BenchSettingsSnapshot,
   type Message,
   type LlmSettings,
+  type StructuredOutputMode,
 } from '@dsim/shared';
 import type { TokenUsage } from '../../llm/types';
 import type { ChatMessage } from '../../llm/types';
@@ -177,6 +178,8 @@ async function runStructured(def: BenchCaseDef, settings: LlmSettings, signal?: 
     onAttempt: (info) => calls.push(buildMetric(`call ${info.call}`, info.latencyMs, info.usage, info.promptChars, info.completionChars, info.ok)),
   });
   const r = rollup(calls);
+  const structuredMode =
+    res.requestedMode && res.finalMode ? { requested: res.requestedMode, final: res.finalMode } : null;
 
   let comparison: BenchComparison | null = null;
   let judgeFailReason = '';
@@ -220,6 +223,7 @@ async function runStructured(def: BenchCaseDef, settings: LlmSettings, signal?: 
     repetitionMax: null,
     repetitionAvg: null,
     comparison,
+    structuredMode,
   });
 }
 
@@ -242,6 +246,12 @@ async function runDialogue(
   const reps: number[] = [];
   let failed = false;
   let firstError = '';
+  /** Structured-output mode tracking for the texting case (one structured call per
+   *  turn). `reqMode` is the requested mode; `degradedFinal` captures the mode a turn
+   *  fell back to (if any) — every turn re-discovers the same fallback deterministically,
+   *  so a single fell-back turn is enough to mark the whole case as having fallen back. */
+  let reqMode: StructuredOutputMode | null = null;
+  let degradedFinal: StructuredOutputMode | null = null;
 
   for (let i = 0; i < dialogueTurns; i++) {
     if (signal?.aborted) break; // honor cancellation between turns
@@ -283,6 +293,8 @@ async function runDialogue(
       });
       replyOk = res.ok;
       replyText = res.ok ? cleanLine(d.extractReply(res.data)) : '(structured reply failed)';
+      if (res.requestedMode) reqMode ??= res.requestedMode;
+      if (res.finalMode && res.requestedMode && res.finalMode !== res.requestedMode) degradedFinal = res.finalMode;
       if (!res.ok && !failed) { failed = true; firstError = res.error; }
       calls.push(...sub);
       turnMetric = combineCalls(`reply ${i + 1}`, sub);
@@ -353,6 +365,7 @@ async function runDialogue(
     repetitionMax,
     repetitionAvg,
     comparison: null,
+    structuredMode: reqMode ? { requested: reqMode, final: degradedFinal ?? reqMode } : null,
   });
 }
 
@@ -399,6 +412,8 @@ export async function runBenchCase(
 export function computeAggregate(results: BenchCaseResult[]): BenchAggregate {
   let passed = 0, failed = 0, totalPrompt = 0, totalCompletion = 0, totalLatency = 0, estimated = false;
   let judgeCases = 0, closenessSum = 0;
+  let structuredFallbacks = 0;
+  const fallbackByMode: Record<string, number> = {};
   for (const res of results) {
     if (res.ok) passed += 1; else failed += 1;
     totalPrompt += res.promptTokens ?? 0;
@@ -408,6 +423,11 @@ export function computeAggregate(results: BenchCaseResult[]): BenchAggregate {
     if (res.comparison && res.comparison.closeness != null) {
       judgeCases += 1;
       closenessSum += res.comparison.closeness;
+    }
+    // A fallback (final !== requested mode) is tracked, never failed.
+    if (res.structuredMode && res.structuredMode.final !== res.structuredMode.requested) {
+      structuredFallbacks += 1;
+      fallbackByMode[res.structuredMode.final] = (fallbackByMode[res.structuredMode.final] ?? 0) + 1;
     }
   }
   const avgTps = totalLatency > 0 && totalCompletion > 0 ? totalCompletion / (totalLatency / 1000) : null;
@@ -422,6 +442,8 @@ export function computeAggregate(results: BenchCaseResult[]): BenchAggregate {
     judgeCases,
     avgCloseness: judgeCases ? closenessSum / judgeCases : null,
     tokensEstimated: estimated,
+    structuredFallbacks,
+    fallbackByMode,
   };
 }
 
