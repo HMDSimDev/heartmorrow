@@ -5,6 +5,7 @@ import { parseInput } from '../lib/validate';
 import { getLlmSettings, getRedactedLlmSettings, updateLlmSettings } from '../services/settings-service';
 import { runHealthCheck } from '../llm/health';
 import { getAdapter } from '../llm/provider';
+import { describeLlmError } from '../llm/errors';
 import { estimatePrompts } from '../services/prompt-estimator-service';
 import { docSchema } from '../lib/openapi-schema';
 
@@ -41,11 +42,12 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   // as the test route) so the UI can list against the values currently typed into
   // the form WITHOUT having to save them first. POST (not GET) so a body is allowed.
   app.post('/settings/models', { schema: docSchema({ tags: ['settings'], summary: 'List models from the endpoint', body: LlmSettingsUpdateSchema }) }, async (req) => {
+    const dry = dryRunSettings(req.body);
     try {
-      const models = await getAdapter(dryRunSettings(req.body)).listModels(AbortSignal.timeout(10_000));
+      const models = await getAdapter(dry).listModels(AbortSignal.timeout(10_000));
       return { ok: true, models };
     } catch (err) {
-      return { ok: false, models: [], error: (err as Error).message };
+      return { ok: false, models: [], error: describeLlmError(err, dry.baseUrl) };
     }
   });
 
@@ -96,7 +98,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
       try {
         return { ok: true, samplers: await fetchSamplers(imageRoot(baseUrl)) };
       } catch (err) {
-        return { ok: false, samplers: [], error: (err as Error).message };
+        return { ok: false, samplers: [], error: (err as Error).message || 'Could not reach the endpoint.' };
       }
     },
   );

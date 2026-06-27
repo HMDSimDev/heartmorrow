@@ -12,8 +12,8 @@ export class AppError extends Error {
 
 export const badRequest = (message: string, details?: unknown) =>
   new AppError(400, message, details);
-export const forbidden = (message = 'This feature is not enabled.') => new AppError(403, message);
-export const notFound = (message = 'Not found') => new AppError(404, message);
+export const forbidden = (message = 'This feature isn’t enabled for this world.') => new AppError(403, message);
+export const notFound = (message = 'We couldn’t find what you were looking for.') => new AppError(404, message);
 export const conflict = (message: string, details?: unknown) =>
   new AppError(409, message, details);
 export const serverError = (message: string, details?: unknown) =>

@@ -1,4 +1,5 @@
 import type { LlmModelInfo } from '@dsim/shared';
+import { llmFetch } from './errors';
 import type { ChatAdapter, ChatRequest, ChatResult, GenerationStats } from './types';
 
 /**
@@ -88,12 +89,11 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
   }
 
   async chat(req: ChatRequest, signal?: AbortSignal): Promise<ChatResult> {
-    const res = await fetch(joinUrl(this.cfg.baseUrl, 'chat/completions'), {
-      method: 'POST',
-      headers: this.headers(),
-      body: this.body(req, false),
-      signal,
-    });
+    const res = await llmFetch(
+      joinUrl(this.cfg.baseUrl, 'chat/completions'),
+      { method: 'POST', headers: this.headers(), body: this.body(req, false), signal },
+      this.cfg.baseUrl,
+    );
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       throw new Error(`LLM endpoint returned ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
@@ -133,12 +133,11 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
     onDelta: (text: string) => void,
     signal?: AbortSignal,
   ): Promise<ChatResult> {
-    const res = await fetch(joinUrl(this.cfg.baseUrl, 'chat/completions'), {
-      method: 'POST',
-      headers: this.headers(),
-      body: this.body(req, true),
-      signal,
-    });
+    const res = await llmFetch(
+      joinUrl(this.cfg.baseUrl, 'chat/completions'),
+      { method: 'POST', headers: this.headers(), body: this.body(req, true), signal },
+      this.cfg.baseUrl,
+    );
     if (!res.ok || !res.body) {
       const text = res.body ? await res.text().catch(() => '') : '';
       throw new Error(`LLM endpoint returned ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
@@ -205,11 +204,11 @@ export class OpenAiCompatibleAdapter implements ChatAdapter {
   }
 
   async listModels(signal?: AbortSignal): Promise<LlmModelInfo[]> {
-    const res = await fetch(joinUrl(this.cfg.baseUrl, 'models'), {
-      method: 'GET',
-      headers: this.headers(),
-      signal,
-    });
+    const res = await llmFetch(
+      joinUrl(this.cfg.baseUrl, 'models'),
+      { method: 'GET', headers: this.headers(), signal },
+      this.cfg.baseUrl,
+    );
     if (!res.ok) {
       throw new Error(`Model listing returned ${res.status} ${res.statusText}`);
     }

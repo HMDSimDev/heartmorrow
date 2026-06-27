@@ -328,7 +328,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
 
   return {
     ok: false,
-    error: `Structured output failed after ${totalAttempts} attempt(s). Last error:\n${lastError}`,
+    error: `The model couldn’t produce a valid response after ${totalAttempts} attempt(s).\n${lastError}`,
     attempts: totalAttempts,
     lastRaw,
     requestedMode,

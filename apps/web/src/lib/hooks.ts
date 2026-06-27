@@ -30,7 +30,7 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): Asy
     setError(undefined);
     loaderRef.current()
       .then((d) => current() && setData(d))
-      .catch((e) => current() && setError(e instanceof ApiError ? e.message : String(e)))
+      .catch((e) => current() && setError(errorMessage(e)))
       .finally(() => current() && setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
@@ -46,8 +46,34 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[] = []): Asy
   return { data, error, loading, reload, setData };
 }
 
+/** Zod's `flatten()` shape, as the server sends it in `ApiError.details` for a
+ *  validation failure ({ error: 'Validation failed.', details: {…} }). */
+interface ZodFlattened {
+  formErrors: string[];
+  fieldErrors: Record<string, string[]>;
+}
+
+function asZodFlattened(d: unknown): ZodFlattened | null {
+  if (!d || typeof d !== 'object') return null;
+  const f = d as Partial<ZodFlattened>;
+  return Array.isArray(f.formErrors) && f.fieldErrors && typeof f.fieldErrors === 'object'
+    ? (f as ZodFlattened)
+    : null;
+}
+
 export function errorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.message;
+  if (err instanceof ApiError) {
+    // Surface which field(s) failed validation instead of a bare "Validation failed."
+    const flat = asZodFlattened(err.details);
+    if (flat) {
+      const parts = [...flat.formErrors];
+      for (const [field, msgs] of Object.entries(flat.fieldErrors)) {
+        if (Array.isArray(msgs) && msgs.length) parts.push(`${field} — ${msgs.join(', ')}`);
+      }
+      if (parts.length) return `${err.message} ${parts.join('; ')}`;
+    }
+    return err.message;
+  }
   if (err instanceof Error) return err.message;
   return String(err);
 }

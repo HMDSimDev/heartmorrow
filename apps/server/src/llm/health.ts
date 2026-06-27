@@ -1,5 +1,6 @@
 import type { LlmSettings, LlmHealthResult } from '@dsim/shared';
 import { getAdapter } from './provider';
+import { describeLlmError } from './errors';
 
 /**
  * Health check / test-prompt used by the Settings page. Tries to list models
@@ -45,7 +46,7 @@ export async function runHealthCheck(settings: LlmSettings): Promise<LlmHealthRe
   } catch (err) {
     return {
       ok: false,
-      message: `Could not reach the LLM endpoint: ${(err as Error).message}`,
+      message: describeLlmError(err, settings.baseUrl),
       models,
     };
   }

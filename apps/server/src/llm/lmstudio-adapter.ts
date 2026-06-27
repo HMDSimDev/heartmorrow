@@ -1,4 +1,5 @@
 import type { LlmModelInfo } from '@dsim/shared';
+import { llmFetch } from './errors';
 import { OpenAiCompatibleAdapter, joinUrl } from './openai-adapter';
 
 /**
@@ -19,11 +20,11 @@ export class LmStudioAdapter extends OpenAiCompatibleAdapter {
   override readonly name = 'lmstudio';
 
   override async listModels(signal?: AbortSignal): Promise<LlmModelInfo[]> {
-    const res = await fetch(joinUrl(this.cfg.baseUrl, 'models'), {
-      method: 'GET',
-      headers: this.headers(),
-      signal,
-    });
+    const res = await llmFetch(
+      joinUrl(this.cfg.baseUrl, 'models'),
+      { method: 'GET', headers: this.headers(), signal },
+      this.cfg.baseUrl,
+    );
     if (!res.ok) {
       throw new Error(`Model listing returned ${res.status} ${res.statusText}`);
     }

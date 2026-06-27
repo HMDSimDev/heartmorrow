@@ -65,7 +65,7 @@ describe('callStructuredLlm', () => {
     expect(res.ok).toBe(false);
     if (!res.ok) {
       expect(res.attempts).toBe(3); // 1 initial + 2 retries
-      expect(res.error).toContain('failed after 3');
+      expect(res.error).toContain('after 3 attempt');
     }
     expect(adapter.calls).toBe(3);
   });

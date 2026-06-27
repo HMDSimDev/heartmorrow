@@ -195,7 +195,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       }
     } catch (err) {
       // Don't surface an error that was caused by the client disconnecting.
-      if (!ac.signal.aborted) send('error', { message: (err as Error).message });
+      if (!ac.signal.aborted) send('error', { message: (err as Error).message || 'The reply failed unexpectedly — tap retry.' });
     } finally {
       finished = true;
       raw.off('close', onClose);
@@ -278,7 +278,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
         }
       });
     } catch (err) {
-      if (!ac.signal.aborted) send('error', { message: (err as Error).message });
+      if (!ac.signal.aborted) send('error', { message: (err as Error).message || 'The reply failed unexpectedly — tap retry.' });
     } finally {
       finish();
     }
