@@ -190,6 +190,13 @@ function nonBlank(v: unknown): boolean {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
+/** True when a value is a present, non-empty array — used to FAIL a generation whose
+ *  schema `.default([])`s a list the task actually required content in (so a lazy model
+ *  that omits the field still parses, but doesn't pass the bench). */
+function nonEmptyArr(v: unknown): boolean {
+  return Array.isArray(v) && v.length > 0;
+}
+
 // --- display helpers --------------------------------------------------------
 
 const MARA_BRIEF = `${benchMara.name}, ${benchMara.age} — ${benchMara.shortDescription}`;
@@ -989,6 +996,9 @@ export const BENCH_CASES: BenchCaseDef[] = [
       schemaName: 'EmailBatch',
       task: 'Write 1–2 in-world emails.',
     }),
+    // The task asks for 1–2 emails; `emails` `.default([])`s, so producing none still
+    // parses. An empty batch means it did nothing it was asked to — fail it.
+    validate: (data) => (nonEmptyArr((data as { emails?: unknown }).emails) ? null : 'No emails — the model was asked for 1–2 and produced none.'),
   },
 
   // === World & continuity ===
@@ -1030,6 +1040,9 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Reword each happening, keyed by ref.',
       maxTokens: 1200,
     }),
+    // Given 3 refs to reword; `lines` `.default([])`s, so a model that rewrote nothing
+    // still parses. An empty pass means it did the job for none of them — fail it.
+    validate: (data) => (nonEmptyArr((data as { lines?: unknown }).lines) ? null : 'No lines — the model rewrote none of the happenings it was handed.'),
   },
   {
     id: 'gen_summary',
@@ -1111,6 +1124,10 @@ export const BENCH_CASES: BenchCaseDef[] = [
       schemaName: 'ExFactExtraction',
       task: 'Extract a concrete ex-fact with a verbatim quote.',
     }),
+    // The prompt allows "no facts" only when none are stated — but THIS fixture states
+    // clear ex-facts (a clock-restoring ex who kept odd 4am hours). An empty extraction
+    // means the model missed obvious, quotable material — fail it.
+    validate: (data) => (nonEmptyArr((data as { facts?: unknown }).facts) ? null : 'No facts — the fixture states clear ex-facts (a clock-restoring ex, odd hours) the model failed to extract.'),
   },
   {
     id: 'gen_player_fact',
@@ -1125,6 +1142,10 @@ export const BENCH_CASES: BenchCaseDef[] = [
       schemaName: 'PlayerFactExtraction',
       task: 'Extract concrete player self-facts with verbatim quotes.',
     }),
+    // This fixture states clear self-facts (freelance illustrator, grew up inland, wants
+    // to illustrate a book of sea myths). An empty extraction misses obvious, quotable
+    // material — fail it.
+    validate: (data) => (nonEmptyArr((data as { facts?: unknown }).facts) ? null : 'No facts — the fixture states clear self-facts (freelance illustrator, grew up inland) the model failed to extract.'),
   },
 
   // === Creator generation ===
@@ -1143,6 +1164,16 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Generate a complete world.',
       maxTokens: 3500,
     }),
+    // The guardrails require LORE and GLOBAL NOTES on every world (RULES may legitimately
+    // be empty for an ordinary modern setting, so it's NOT gated). Both default to '' in
+    // the schema, so a model that skips them still parses — fail those: a "fleshed-out
+    // world" with no backstory or narrator briefing isn't complete.
+    validate: (data) => {
+      const d = (data ?? {}) as { lore?: unknown; globalNotes?: unknown };
+      if (!nonBlank(d.lore)) return 'Empty lore — a fleshed-out world needs its backstory; LORE came back blank.';
+      if (!nonBlank(d.globalNotes)) return 'Empty global notes — the always-on narrator briefing came back blank.';
+      return null;
+    },
   },
   {
     id: 'gen_location',
@@ -1228,6 +1259,9 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Narrate the day’s movers.',
       maxTokens: 1000,
     }),
+    // Given 2 movers to narrate; `items` `.default([])`s, so narrating nothing still
+    // parses. An empty result is a failure — there was clear material to color.
+    validate: (data) => (nonEmptyArr((data as { items?: unknown }).items) ? null : 'No items — the model narrated none of the movers it was handed.'),
   },
   {
     id: 'gen_quiz',
@@ -1276,6 +1310,22 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Flesh out a character profile.',
       maxTokens: 3000,
     }),
+    // The guardrails ask the model to fill EVERY profile field; the schema `.default`s
+    // each to empty, so a model that skips one (e.g. an empty `physicalDesires` for a
+    // stoic character) still parses. The whole point of the profile filler is a COMPLETE
+    // profile — so any requested field coming back empty fails the case.
+    validate: (data) => {
+      const d = (data ?? {}) as Record<string, unknown>;
+      const strFields = ['appearance', 'textingStyle', 'onlinePersona', 'loveLanguage'] as const;
+      for (const f of strFields) {
+        if (!nonBlank(d[f])) return `Empty ${f} — the profile filler left a field the guardrails require blank.`;
+      }
+      const listFields = ['physicalNeeds', 'physicalDesires', 'physicalDislikes', 'insecurities', 'quirks'] as const;
+      for (const f of listFields) {
+        if (!nonEmptyArr(d[f])) return `Empty ${f} — the profile filler returned no items for a field the guardrails require.`;
+      }
+      return null;
+    },
   },
   {
     id: 'gen_character',

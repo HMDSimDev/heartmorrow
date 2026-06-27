@@ -270,6 +270,68 @@ describe('bench runner', () => {
     expect(res.error.toLowerCase()).toContain('tone');
   });
 
+  it('FAILS profile generation when a required field (physicalDesires) comes back empty', async () => {
+    // The exact shape the user flagged: every field filled EXCEPT physicalDesires: [].
+    setAdapterOverride(
+      new ScriptedAdapter([
+        JSON.stringify({
+          appearance: 'Weather-lined and solid, with a salt-and-pepper beard and paint-stained hands.',
+          textingStyle: 'Minimalist and abrupt; short full sentences, precise punctuation, no emojis.',
+          onlinePersona: 'Posts quiet weather observations and dry, world-weary one-liners.',
+          loveLanguage: 'Quality Time',
+          physicalNeeds: ['the smell of salt and brine', 'a strong cup of black coffee'],
+          physicalDesires: [],
+          physicalDislikes: ['overly bright lights', 'crowded noisy spaces'],
+          insecurities: ['that his silence reads as coldness'],
+          quirks: ['traces the grain of wooden surfaces'],
+        }),
+      ]),
+    );
+    const res = await runBenchCase({ caseId: 'gen_profile', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(false);
+    expect(res.error.toLowerCase()).toContain('physicaldesires');
+  });
+
+  it('PASSES profile generation when every requested field is populated', async () => {
+    setAdapterOverride(
+      new ScriptedAdapter([
+        JSON.stringify({
+          appearance: 'Weather-lined and solid, with a salt-and-pepper beard and paint-stained hands.',
+          textingStyle: 'Minimalist and abrupt; short full sentences, precise punctuation, no emojis.',
+          onlinePersona: 'Posts quiet weather observations and dry, world-weary one-liners.',
+          loveLanguage: 'Quality Time',
+          physicalNeeds: ['the smell of salt and brine'],
+          physicalDesires: ['a steady, weathered hand to hold'],
+          physicalDislikes: ['overly bright lights'],
+          insecurities: ['that his silence reads as coldness'],
+          quirks: ['traces the grain of wooden surfaces'],
+        }),
+      ]),
+    );
+    const res = await runBenchCase({ caseId: 'gen_profile', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(true);
+  });
+
+  it('FAILS list-output generations that return an empty list they were handed material for', async () => {
+    // market-news color: 2 movers handed in, but it narrated none.
+    setAdapterOverride(new ScriptedAdapter(['{"items":[]}']));
+    const news = await runBenchCase({ caseId: 'gen_market_news', llmPlayer: false, dialogueTurns: 4 });
+    expect(news.ok).toBe(false);
+    expect(news.error.toLowerCase()).toContain('items');
+
+    // ex-fact extraction: the fixture states clear ex-facts, yet it extracted none.
+    setAdapterOverride(new ScriptedAdapter(['{"exName":null,"facts":[]}']));
+    const facts = await runBenchCase({ caseId: 'gen_ex_fact', llmPlayer: false, dialogueTurns: 4 });
+    expect(facts.ok).toBe(false);
+    expect(facts.error.toLowerCase()).toContain('facts');
+
+    // in-world emails: asked for 1–2, produced none.
+    setAdapterOverride(new ScriptedAdapter(['{"emails":[]}']));
+    const mail = await runBenchCase({ caseId: 'gen_email_batch', llmPlayer: false, dialogueTurns: 4 });
+    expect(mail.ok).toBe(false);
+    expect(mail.error.toLowerCase()).toContain('email');
+  });
+
   it('PASSES from-text character generation when a fleshed-out draft comes back', async () => {
     setAdapterOverride(
       new ScriptedAdapter([
