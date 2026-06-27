@@ -1,9 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resetDb, ScriptedAdapter } from '../../test/helpers';
 import { setAdapterOverride } from '../../llm/provider';
+import type { ChatAdapter, ChatRequest, ChatResult, GenerationStats, LlmModelInfo, TokenUsage } from '../../llm/types';
 import { buildBenchCatalog, getBenchCase, BENCH_CASES, BENCH_GROUPS } from './cases';
 import { runBenchCase, computeAggregate, buildRunSummary } from './runner';
 import { benchRunsStore, benchBaselinesStore } from './store';
+
+/** Adapter that returns a fixed payload PLUS an endpoint usage block and/or
+ *  generation stats — to exercise the bench's endpoint-measured tok/sec path. */
+class StatsAdapter implements ChatAdapter {
+  readonly name = 'stats';
+  calls = 0;
+  constructor(
+    private readonly payload: string,
+    private readonly extra: { usage?: TokenUsage; stats?: GenerationStats } = {},
+  ) {}
+  async chat(): Promise<ChatResult> {
+    this.calls += 1;
+    return { content: this.payload, usage: this.extra.usage, stats: this.extra.stats };
+  }
+  async streamChat(_req: ChatRequest, onDelta: (t: string) => void): Promise<ChatResult> {
+    const r = await this.chat();
+    onDelta(r.content);
+    return r;
+  }
+  async listModels(): Promise<LlmModelInfo[]> {
+    return [];
+  }
+}
 
 describe('bench catalog', () => {
   it('exposes every case across the declared groups', () => {
@@ -129,6 +153,36 @@ describe('bench runner', () => {
     expect(res.comparison?.human).toEqual({ engagement: 1 }); // the USER baseline, not the +2 default
     expect(res.comparison?.closeness).toBeCloseTo(1 - 1 / 6, 5); // |1 - 2| / 6
     expect(res.comparison?.pass).toBe(true); // off by 1 → within tolerance
+  });
+
+  it('reports endpoint-MEASURED decode speed when the endpoint provides generation stats', async () => {
+    setAdapterOverride(
+      new StatsAdapter('{"engagement":2,"expression":"happy","note":"x"}', {
+        usage: { promptTokens: 800, completionTokens: 30 },
+        // The endpoint says it decoded in 0.5s (excludes the big prompt's prefill).
+        stats: { tokensPerSecond: 60, generationTimeSec: 0.5 },
+      }),
+    );
+    const res = await runBenchCase({ caseId: 'judge_turn_good', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(true);
+    expect(res.speedMeasured).toBe(true);
+    // 30 tokens over the reported 0.5s of DECODE time = 60 tok/s — NOT tokens/round-trip.
+    expect(res.genTimeMs).toBeCloseTo(500, 5);
+    expect(res.tokensPerSec).toBeCloseTo(60, 5);
+  });
+
+  it('falls back to end-to-end latency for tok/sec when the endpoint reports no generation stats', async () => {
+    setAdapterOverride(
+      new StatsAdapter('{"engagement":2,"expression":"happy","note":"x"}', {
+        usage: { promptTokens: 800, completionTokens: 30 },
+      }),
+    );
+    const res = await runBenchCase({ caseId: 'judge_turn_good', llmPlayer: false, dialogueTurns: 4 });
+    expect(res.ok).toBe(true);
+    // No stats → the speed is an end-to-end estimate, flagged so the UI can mark it.
+    expect(res.speedMeasured).toBe(false);
+    // Decode time falls back to the round-trip latency (never the 0.5s a stats block would give).
+    expect(res.genTimeMs).toBe(res.totalLatencyMs);
   });
 
   it('scores against the built-in default baseline when the user has not saved one', async () => {
@@ -307,7 +361,7 @@ describe('bench persistence + aggregate', () => {
   it('computeAggregate averages judge closeness only over scored cases', () => {
     const base = {
       label: '', group: '', kind: 'judge' as const, calls: [], promptTokens: 10, completionTokens: 5,
-      totalLatencyMs: 100, attempts: 1, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [],
+      totalLatencyMs: 100, attempts: 1, tokensPerSec: null, tokensEstimated: false, genTimeMs: 0, speedMeasured: false, output: '', transcript: [],
       repetitionMax: null, repetitionAvg: null, structuredMode: null,
     };
     const agg = computeAggregate([
@@ -325,7 +379,7 @@ describe('bench persistence + aggregate', () => {
   it('computeAggregate counts structured-output fallbacks by final mode (a fallback is not a failure)', () => {
     const base = {
       label: '', group: '', kind: 'generation' as const, calls: [], promptTokens: 10, completionTokens: 5,
-      totalLatencyMs: 100, attempts: 1, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [],
+      totalLatencyMs: 100, attempts: 1, tokensPerSec: null, tokensEstimated: false, genTimeMs: 0, speedMeasured: false, output: '', transcript: [],
       repetitionMax: null, repetitionAvg: null, comparison: null,
     };
     const agg = computeAggregate([
@@ -345,5 +399,39 @@ describe('bench persistence + aggregate', () => {
     // fallbacks never inflate the failure count
     expect(agg.failed).toBe(0);
     expect(agg.passed).toBe(5);
+  });
+
+  it('computeAggregate bases avg tok/sec on decode time, not round-trip latency', () => {
+    const base = {
+      label: '', group: '', kind: 'generation' as const, calls: [], promptTokens: 200,
+      attempts: 1, tokensPerSec: 100, tokensEstimated: false, output: '', transcript: [],
+      repetitionMax: null, repetitionAvg: null, comparison: null, structuredMode: null,
+    };
+    // Two endpoint-measured cases. Round-trip latency is huge (prefill-heavy) but the
+    // decode time is small — the aggregate rate must follow decode time, so latency
+    // must NOT leak into avgTokensPerSec.
+    const agg = computeAggregate([
+      { ...base, caseId: 'a', ok: true, error: '', completionTokens: 100, totalLatencyMs: 9000, genTimeMs: 1000, speedMeasured: true },
+      { ...base, caseId: 'b', ok: true, error: '', completionTokens: 50, totalLatencyMs: 4000, genTimeMs: 500, speedMeasured: true },
+    ]);
+    // 150 tokens over 1.5s of DECODE = 100 tok/s — not 150 / 13s of round-trip.
+    expect(agg.avgTokensPerSec).toBeCloseTo(100, 5);
+    expect(agg.speedEstimated).toBe(false);
+  });
+
+  it('computeAggregate flags speed as estimated when a token-bearing case fell back to latency', () => {
+    const base = {
+      label: '', group: '', kind: 'generation' as const, calls: [], promptTokens: 10,
+      attempts: 1, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [],
+      repetitionMax: null, repetitionAvg: null, comparison: null, structuredMode: null,
+    };
+    const agg = computeAggregate([
+      { ...base, caseId: 'a', ok: true, error: '', completionTokens: 40, totalLatencyMs: 800, genTimeMs: 800, tokensPerSec: 50, speedMeasured: false },
+      // an all-failed case (no tokens) must NOT trip the estimate flag on its own
+      { ...base, caseId: 'b', ok: false, error: 'boom', completionTokens: 0, totalLatencyMs: 500, genTimeMs: 0, speedMeasured: false },
+    ]);
+    expect(agg.speedEstimated).toBe(true);
+    // rate from the one token-bearing case's decode time: 40 / 0.8s = 50
+    expect(agg.avgTokensPerSec).toBeCloseTo(50, 5);
   });
 });

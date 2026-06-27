@@ -3,7 +3,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 import { resolveLlmRole, type LlmRole, type LlmSettings, type StructuredResult } from '@dsim/shared';
 import { parseJsonStrict, JsonParseError } from '../lib/json';
 import { getAdapter } from './provider';
-import type { ChatAdapter, ChatMessage, ResponseFormat, TokenUsage } from './types';
+import type { ChatAdapter, ChatMessage, GenerationStats, ResponseFormat, TokenUsage } from './types';
 
 /**
  * Central structured-output caller. This is the ONLY way game-state-affecting
@@ -65,6 +65,10 @@ export interface StructuredCallOptions {
     call: number;
     latencyMs: number;
     usage?: TokenUsage;
+    /** Endpoint-reported generation stats (real decode tok/sec + generation time),
+     *  when the server provides them (e.g. LM Studio's native API). The bench uses
+     *  these for accurate tok/sec instead of the end-to-end-latency estimate. */
+    stats?: GenerationStats;
     /** Transport-level success (the call returned content, before parse/validation). */
     ok: boolean;
     promptChars: number;
@@ -234,6 +238,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
         call: callIndex,
         latencyMs: Date.now() - callStarted,
         usage: result.usage,
+        stats: result.stats,
         ok: true,
         promptChars: messagesChars(attemptMessages),
         completionChars: content.length,

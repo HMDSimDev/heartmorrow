@@ -453,7 +453,11 @@ function CaseCard({
                 <Metric label={t('bench.mPrompt')} value={num(result.promptTokens)} unit={t('bench.tokUnit')} />
                 <Metric label={t('bench.mReply')} value={num(result.completionTokens)} unit={t('bench.tokUnit')} />
                 <Metric label={t('bench.mLatency')} value={fmtMs(result.totalLatencyMs)} />
-                <Metric label={t('bench.mSpeed')} value={fmtTps(result.tokensPerSec)} />
+                <Metric
+                  label={t('bench.mSpeed')}
+                  value={`${!result.speedMeasured && result.tokensPerSec != null ? '≈' : ''}${fmtTps(result.tokensPerSec)}`}
+                  title={result.tokensPerSec == null ? undefined : result.speedMeasured ? t('bench.speedMeasuredTitle') : t('bench.speedEstimatedTitle')}
+                />
                 <Metric label={t('bench.mCalls')} value={String(result.attempts)} />
                 {result.kind === 'dialogue' && result.repetitionMax != null && (
                   <Metric label={t('bench.mMaxRepeat')} value={pct(result.repetitionMax)} color={repetitionColor(result.repetitionMax)} />
@@ -470,9 +474,9 @@ function CaseCard({
   );
 }
 
-function Metric({ label, value, unit, color }: { label: string; value: string; unit?: string; color?: string }) {
+function Metric({ label, value, unit, color, title }: { label: string; value: string; unit?: string; color?: string; title?: string }) {
   return (
-    <div className="bench-metric">
+    <div className="bench-metric" title={title}>
       <div className="bench-metric-val mono" style={color ? { color } : undefined}>
         {value}
         {unit && <span className="bench-metric-unit"> {unit}</span>}
@@ -494,6 +498,9 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
   const judged = results.filter((r) => r.comparison?.closeness != null);
   const avgCloseness = judged.length ? judged.reduce((n, r) => n + (r.comparison!.closeness ?? 0), 0) / judged.length : null;
   const estimated = results.some((r) => r.tokensEstimated);
+  // tok/sec is endpoint-measured only when every token-bearing case reported generation
+  // stats; otherwise the run's speed numbers are end-to-end-latency estimates.
+  const speedEstimated = results.some((r) => (r.completionTokens ?? 0) > 0 && !r.speedMeasured);
   // Cases whose structured-output mode downgraded from the one requested. A fallback
   // is NOT a failure — it shows the endpoint couldn't serve the requested mode.
   const fellBack = results.filter((r) => r.structuredMode && r.structuredMode.final !== r.structuredMode.requested);
@@ -519,8 +526,8 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
           <div className="bench-stat-num mono">{fmtMs(totalLatency)}</div>
           <div className="bench-stat-lbl">{t('bench.totalTime')}</div>
         </div>
-        <div className="bench-stat framed">
-          <div className="bench-stat-num mono">{avgTps != null ? avgTps.toFixed(1) : '—'}</div>
+        <div className="bench-stat framed" title={t('bench.avgTokSecTitle')}>
+          <div className="bench-stat-num mono">{avgTps != null ? `${speedEstimated ? '≈' : ''}${avgTps.toFixed(1)}` : '—'}</div>
           <div className="bench-stat-lbl">{t('bench.avgTokSec')}</div>
         </div>
         {avgCloseness != null && (
@@ -548,8 +555,8 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
           <Bars items={results.map((r) => ({ key: r.caseId, label: r.label, value: r.totalLatencyMs, display: fmtMs(r.totalLatencyMs), color: 'var(--brass)' }))} />
         </div>
         <div className="card bench-chart">
-          <div className="section-head"><div className="titles"><div className="kicker">{t('bench.perCase')}</div><h3>{t('bench.chSpeed')}</h3></div><div className="trail" /></div>
-          <Bars items={results.filter((r) => r.tokensPerSec != null).map((r) => ({ key: r.caseId, label: r.label, value: r.tokensPerSec ?? 0, display: fmtTps(r.tokensPerSec), color: 'var(--moon)' }))} />
+          <div className="section-head" title={t('bench.avgTokSecTitle')}><div className="titles"><div className="kicker">{t('bench.perCase')}</div><h3>{t('bench.chSpeed')}</h3></div><div className="trail" /></div>
+          <Bars items={results.filter((r) => r.tokensPerSec != null).map((r) => ({ key: r.caseId, label: r.label, value: r.tokensPerSec ?? 0, display: `${!r.speedMeasured ? '≈' : ''}${fmtTps(r.tokensPerSec)}`, color: 'var(--moon)' }))} />
         </div>
         {judged.length > 0 && (
           <div className="card bench-chart">
@@ -559,6 +566,7 @@ function Dashboard({ results }: { results: BenchCaseResult[] }) {
         )}
       </div>
       {estimated && <p className="muted bench-foot">{t('bench.estFoot')}</p>}
+      {speedEstimated && <p className="muted bench-foot">{t('bench.speedFoot')}</p>}
     </div>
   );
 }
@@ -644,7 +652,7 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
                     <div className="bench-runrow-meta mono">
                       {new Date(r.createdAt).toLocaleString(i18n.language)} · {t('bench.passedOf', { passed: r.aggregate.passed, cases: r.aggregate.cases })} ·{' '}
                       {num(r.aggregate.totalPromptTokens + r.aggregate.totalCompletionTokens)} {t('bench.tokUnit')} ·{' '}
-                      {r.aggregate.avgTokensPerSec != null ? `${r.aggregate.avgTokensPerSec.toFixed(1)} tok/s` : '—'}
+                      {r.aggregate.avgTokensPerSec != null ? `${r.aggregate.speedEstimated ? '≈' : ''}${r.aggregate.avgTokensPerSec.toFixed(1)} tok/s` : '—'}
                       {r.aggregate.avgCloseness != null ? t('bench.judgePct', { pct: pct(r.aggregate.avgCloseness) }) : ''}
                     </div>
                   </button>
@@ -689,7 +697,7 @@ function CompareStrip({ a, b }: { a: BenchRunSummary; b: BenchRunSummary }) {
     { label: t('bench.csPassed'), a: `${a.aggregate.passed}/${a.aggregate.cases}`, b: `${b.aggregate.passed}/${b.aggregate.cases}` },
     { label: t('bench.csTotalTokens'), a: num(a.aggregate.totalPromptTokens + a.aggregate.totalCompletionTokens), b: num(b.aggregate.totalPromptTokens + b.aggregate.totalCompletionTokens) },
     { label: t('bench.csTotalTime'), a: fmtMs(a.aggregate.totalLatencyMs), b: fmtMs(b.aggregate.totalLatencyMs) },
-    { label: t('bench.csAvgTokS'), a: a.aggregate.avgTokensPerSec != null ? a.aggregate.avgTokensPerSec.toFixed(1) : '—', b: b.aggregate.avgTokensPerSec != null ? b.aggregate.avgTokensPerSec.toFixed(1) : '—' },
+    { label: t('bench.csAvgTokS'), a: a.aggregate.avgTokensPerSec != null ? `${a.aggregate.speedEstimated ? '≈' : ''}${a.aggregate.avgTokensPerSec.toFixed(1)}` : '—', b: b.aggregate.avgTokensPerSec != null ? `${b.aggregate.speedEstimated ? '≈' : ''}${b.aggregate.avgTokensPerSec.toFixed(1)}` : '—' },
     { label: t('bench.csJudge'), a: pct(a.aggregate.avgCloseness), b: pct(b.aggregate.avgCloseness) },
   ];
   return (
@@ -868,7 +876,7 @@ export function Bench() {
           const m = catalog.cases.find((c) => c.id === id);
           setResults((prev) => ({
             ...prev,
-            [id]: { caseId: id, label: m?.label ?? id, group: m?.group ?? '', kind: m?.kind ?? 'generation', ok: false, error: errorMessage(e), calls: [], promptTokens: null, completionTokens: null, totalLatencyMs: 0, attempts: 0, tokensPerSec: null, tokensEstimated: false, output: '', transcript: [], repetitionMax: null, repetitionAvg: null, comparison: null, structuredMode: null },
+            [id]: { caseId: id, label: m?.label ?? id, group: m?.group ?? '', kind: m?.kind ?? 'generation', ok: false, error: errorMessage(e), calls: [], promptTokens: null, completionTokens: null, totalLatencyMs: 0, attempts: 0, tokensPerSec: null, tokensEstimated: false, genTimeMs: 0, speedMeasured: false, output: '', transcript: [], repetitionMax: null, repetitionAvg: null, comparison: null, structuredMode: null },
           }));
         }
       }

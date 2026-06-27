@@ -179,6 +179,15 @@ export const BenchCallMetricSchema = z.object({
   attempts: z.number().int().default(1),
   ok: z.boolean(),
   tokensPerSec: z.number().nullable().default(null),
+  /** The time (ms) `tokensPerSec` is computed over: the endpoint's reported
+   *  GENERATION time when it provides per-response stats (decode only — excludes
+   *  prompt prefill + transport), otherwise the full round-trip `latencyMs` as a
+   *  fallback. 0 for calls that produced no tokens. Rollups sum this so a combined
+   *  rate stays correct. */
+  genTimeMs: z.number().default(0),
+  /** True when `genTimeMs`/`tokensPerSec` came from endpoint-reported generation
+   *  stats (a real decode rate) rather than the end-to-end latency fallback. */
+  speedMeasured: z.boolean().default(false),
 });
 export type BenchCallMetric = z.infer<typeof BenchCallMetricSchema>;
 
@@ -248,6 +257,16 @@ export const BenchCaseResultSchema = z.object({
   attempts: z.number().int().default(0),
   tokensPerSec: z.number().nullable().default(null),
   tokensEstimated: z.boolean().default(false),
+  /** Total decode time (ms) `tokensPerSec` is computed over — Σ of the case's
+   *  token-bearing calls' `genTimeMs` (endpoint-measured generation time when
+   *  available, else round-trip latency). Lets the run aggregate compose a correct
+   *  token-weighted rate across cases. */
+  genTimeMs: z.number().default(0),
+  /** True when this case's `tokensPerSec` is an endpoint-measured decode rate
+   *  (every token-bearing call reported generation stats); false when it fell back
+   *  to end-to-end latency (which includes prompt processing + transport, so it
+   *  under-reports true generation speed). */
+  speedMeasured: z.boolean().default(false),
   /** Pretty-printed structured output (judge/generation). */
   output: z.string().default(''),
   /** Generated dialogue (dialogue cases). */
@@ -277,6 +296,11 @@ export const BenchAggregateSchema = z.object({
   avgCloseness: z.number().nullable().default(null),
   /** True when any case fell back to chars/4 token estimates. */
   tokensEstimated: z.boolean().default(false),
+  /** True when any token-bearing case's tok/sec is an end-to-end-latency estimate
+   *  rather than an endpoint-measured decode rate — so the UI can flag the speed
+   *  numbers. Endpoints like LM Studio's native API report real per-response stats;
+   *  configuring the best available API in Settings makes these numbers accurate. */
+  speedEstimated: z.boolean().default(false),
   /** How many cases had to fall back from their requested structured-output mode
    *  (json_schema → json_object/prompt_only). A fallback is NOT a failure — it means
    *  the endpoint couldn't serve the requested mode, so the case still ran but at a
