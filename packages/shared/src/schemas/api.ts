@@ -1194,10 +1194,12 @@ export const QuestUpdateSchema = z.object({
 });
 export type QuestUpdate = z.input<typeof QuestUpdateSchema>;
 
-/** Body of `POST /quests/generate` — the creator's idea for the ✨ quest drafter. */
+/** Body of `POST /quests/generate` — the creator's idea for the ✨ quest drafter. The idea
+ *  can be a long, detailed brief (a full scene/premise), so the cap is generous — it's
+ *  interpolated into the prompt as untrusted DATA, never instructions. */
 export const GenerateQuestInputSchema = z.object({
   worldId: z.string().min(1),
-  prompt: z.string().min(1).max(600),
+  prompt: z.string().min(1).max(8000),
   partnerId: z.string().nullable().default(null),
 });
 export type GenerateQuestInput = z.input<typeof GenerateQuestInputSchema>;

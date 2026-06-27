@@ -11,8 +11,7 @@ import {
   QUEST,
   effectTier,
   tierUnlockedBy,
-  hasWinGoal,
-  isWinReachable,
+  lintQuestGraph,
   type Quest,
   type QuestGraph,
   type QuestNode,
@@ -172,6 +171,9 @@ interface Draft {
   partnerId: string | null;
   minWarmthBand: number;
   graph: QuestGraph;
+  /** One-time notes from the generator (incl. fiction-coherence judge findings that the
+   *  live linter can't see). Shown as an info banner on a freshly-drafted quest only. */
+  genNotes?: string[];
 }
 
 function blankGraph(): QuestGraph {
@@ -347,7 +349,7 @@ function GenerateModal({
     try {
       const res = await api.generateQuest(worldId, prompt.trim(), partnerId || null);
       if (res.ok) {
-        onDrafted({ id: null, name: res.data.name, blurb: res.data.blurb, partnerId: res.data.partnerId, minWarmthBand: res.data.minWarmthBand, graph: res.data.graph });
+        onDrafted({ id: null, name: res.data.name, blurb: res.data.blurb, partnerId: res.data.partnerId, minWarmthBand: res.data.minWarmthBand, graph: res.data.graph, genNotes: res.data.warnings });
       } else {
         setError(res.error || 'The model couldn’t draft a usable quest. Try a clearer idea, or a more capable model.');
       }
@@ -363,10 +365,10 @@ function GenerateModal({
       <div className="kicker">Generate a quest</div>
       <h2 style={{ marginTop: 0 }}>Describe the adventure</h2>
       {error && <Banner kind="error">{error}</Banner>}
-      <Field label="Your idea" hint="A scene, a goal, a problem to talk/fight/sneak your way through.">
+      <Field label="Your idea" hint="A scene, a goal, a problem to talk/fight/sneak your way through. Go into as much detail as you like.">
         <textarea
           value={prompt}
-          rows={3}
+          rows={8}
           autoFocus
           placeholder="e.g. A midnight standoff at the harbor warehouse — win over the suspicious night watchman before the smugglers arrive."
           onChange={(e) => setPrompt(e.target.value)}
@@ -398,6 +400,7 @@ export function QuestEditor({ worldId, draft: initial, onClose, onSaved }: { wor
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmBack, setConfirmBack] = useState(false);
+  const [notesDismissed, setNotesDismissed] = useState(false);
   // The scene focused in the graph below; the detail form edits this one. Tracked by
   // index (not id) so renaming a scene's id doesn't drop the selection.
   const [selectedIdx, setSelectedIdx] = useState(() => {
@@ -502,6 +505,28 @@ export function QuestEditor({ worldId, draft: initial, onClose, onSaved }: { wor
       </div>
 
       {error && <Banner kind="error">{error}</Banner>}
+
+      {(() => {
+        // Show only the generation notes the LIVE linter doesn't already report (so the
+        // deterministic ones surface in the problems list below — and drop off once fixed —
+        // while the coherence-judge notes, which can't be rechecked, persist here).
+        const live = new Set(problems.map((p) => p.text));
+        const banner = (draft.genNotes ?? []).filter((n) => !live.has(n));
+        if (banner.length === 0 || notesDismissed) return null;
+        return (
+          <Banner kind="info">
+            <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <strong>Generated draft — a few things worth a look before saving:</strong>
+              <button className="btn ghost sm" onClick={() => setNotesDismissed(true)}>Dismiss</button>
+            </div>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {banner.map((n, i) => (
+                <li key={i}>{n}</li>
+              ))}
+            </ul>
+          </Banner>
+        );
+      })()}
 
       <details className="wf-ed-help">
         <summary>How authoring works</summary>
@@ -1115,30 +1140,17 @@ interface Problem {
   blocking: boolean;
 }
 
-/** Pre-save validation surfaced inline. The server's safeGraph + boundQuestGraph still
- *  own the real boundary; this just turns the eventual 400 into live guidance. */
+/** Pre-save validation surfaced inline. Delegates the graph coherence checks to the
+ *  SHARED {@link lintQuestGraph} (the same one the generator's repair loop uses), so the
+ *  editor, the generation pipeline, and the referee's notion of "winnable" never drift.
+ *  The server's safeGraph + boundQuestGraph still own the real boundary; this turns the
+ *  eventual problem into live guidance. Only the quest NAME (not part of the graph) is
+ *  checked here. */
 function validateDraft(draft: Draft): Problem[] {
-  const g = draft.graph;
   const problems: Problem[] = [];
   if (!draft.name.trim()) problems.push({ text: 'Give the adventure a name.', blocking: true });
-  if (!hasWinGoal(g)) problems.push({ text: 'Add at least one goal with outcome “Win”.', blocking: true });
-  else if (!isWinReachable(g)) problems.push({ text: 'No win goal looks reachable yet — make sure an effect sets, grants, or moves whatever a win goal checks.', blocking: false });
-  const entry = g.nodes.find((n) => n.id === g.entryNodeId) ?? g.nodes[0];
-  if (entry && entry.affordances.length === 0) problems.push({ text: `The entry scene “${entry.id}” needs at least one approach.`, blocking: true });
-  const set = new Set(flagsSetIn(g));
-  const missing = new Set<string>();
-  const checkPred = (p: StatePredicate) => {
-    if (p.kind === 'flag' && p.flag && !p.negate && !set.has(p.flag)) missing.add(p.flag);
-  };
-  g.goals.forEach((go) => checkPred(go.predicate));
-  g.nodes.forEach((n) => n.edges.forEach((e) => checkPred(e.when)));
-  missing.forEach((f) => problems.push({ text: `Nothing sets the flag “${f}” that a goal or route checks.`, blocking: false }));
-  for (const n of g.nodes)
-    for (const a of n.affordances)
-      for (const grade of GRADES)
-        for (const e of a.effects[grade])
-          if (!effectIncomplete(e) && !tierUnlockedBy(a.difficulty).has(effectTier(e)))
-            problems.push({ text: `“${EFFECT_OP_LABEL[e.op] ?? e.op}” on “${VERB_LABEL[a.verb] ?? a.verb}” won’t fire — it needs a harder approach (${TIER_LABEL[effectTier(e)]} tier).`, blocking: false });
+  for (const p of lintQuestGraph(draft.graph, { partnerId: draft.partnerId }))
+    problems.push({ text: p.message, blocking: p.severity === 'blocking' });
   return problems;
 }
 

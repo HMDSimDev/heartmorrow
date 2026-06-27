@@ -598,7 +598,7 @@ export const api = {
   updateQuest: (id: string, patchInput: QuestUpdate) => patch<Quest>(`/quests/authoring/${id}`, patchInput),
   deleteQuest: (id: string) => del<{ ok: true }>(`/quests/authoring/${id}`),
   generateQuest: (worldId: string, prompt: string, partnerId: string | null) =>
-    post<StructuredResult<{ name: string; blurb: string; partnerId: string | null; minWarmthBand: number; graph: QuestGraph }>>(
+    post<StructuredResult<{ name: string; blurb: string; partnerId: string | null; minWarmthBand: number; graph: QuestGraph; warnings?: string[] }>>(
       '/quests/generate',
       { worldId, prompt, partnerId },
     ),

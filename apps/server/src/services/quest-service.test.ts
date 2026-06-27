@@ -1,14 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   QuestGraphSchema,
   QuestGenSchema,
   hasWinGoal,
   isWinReachable,
+  isWinReachableTiered,
   resolveQuestAction,
   initialQuestState,
   type QuestState,
 } from '@dsim/shared';
-import { resetDb, seedWorldAndCharacter } from '../test/helpers';
+import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
+import { setAdapterOverride } from '../llm/provider';
 import { ensureWorldState } from '../services/world-clock-service';
 import { activeQuestsRepo, questTurnsRepo } from '../db/repositories';
 import { playerIdForWorld } from '../lib/ids';
@@ -222,6 +224,71 @@ describe('LLM quest generation (boundGeneratedQuest)', () => {
     const res = await generateQuest(world.id, 'A heist at the clocktower.', null);
     expect(res.ok).toBe(false);
   });
+
+  it('auto-raises a tier-gated faction-flip win so the draft is actually winnable', () => {
+    // The model put the win-deciding faction flip (a `heavy` effect) on a `normal`
+    // approach, where the referee would silently drop it. boundGeneratedQuest must fix it.
+    const draft = boundGeneratedQuest(
+      QuestGenSchema.parse({
+        name: 'Gate',
+        blurb: '',
+        graph: {
+          entryNodeId: 'gate',
+          maxTurns: 8,
+          nodes: [
+            {
+              id: 'gate',
+              setup: 'A watchman bars the gate.',
+              entities: [{ id: 'watch', name: 'Watchman', faction: 'neutral', disposition: 0 }],
+              affordances: [{ verb: 'persuade', stat: 'charm', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'moveEntityToFaction', entityId: 'watch', faction: 'ally' }] } }],
+            },
+          ],
+          goals: [{ id: 'w', kind: 'persuade', outcome: 'win', label: 'Win', predicate: { kind: 'entityFaction', entityId: 'watch', faction: 'ally' } }],
+        },
+      }),
+      null,
+    );
+    expect(isWinReachableTiered(draft.graph)).toBe(true);
+    const persuade = draft.graph.nodes[0]!.affordances.find((a) => a.verb === 'persuade')!;
+    expect(persuade.difficulty).toBe('hard'); // raised from 'normal' so the flip fires
+  });
+
+  it('drops an auto-true lose goal so the quest is not lost on turn 1', () => {
+    const draft = boundGeneratedQuest(
+      QuestGenSchema.parse({
+        name: 'X',
+        blurb: '',
+        graph: {
+          entryNodeId: 'a',
+          nodes: [{ id: 'a', setup: 's', affordances: [{ verb: 'inspect', stat: 'intellect', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'won' }] } }] }],
+          goals: [
+            { id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } },
+            { id: 'l', kind: 'flag', outcome: 'lose', label: 'L', predicate: { kind: 'always' } },
+          ],
+        },
+      }),
+      null,
+    );
+    expect(draft.graph.goals.some((x) => x.outcome === 'lose')).toBe(false);
+    expect(isWinReachableTiered(draft.graph)).toBe(true);
+  });
+
+  it('retargets adjustWarmth to the anchored partner', () => {
+    const draft = boundGeneratedQuest(
+      QuestGenSchema.parse({
+        name: 'X',
+        blurb: '',
+        graph: {
+          entryNodeId: 'a',
+          nodes: [{ id: 'a', setup: 's', entities: [{ id: 'm', name: 'M', faction: 'ally' }], affordances: [{ verb: 'charm', stat: 'charm', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'won' }, { op: 'adjustWarmth', characterId: 'scene-entity', delta: 2 }] } }] }],
+          goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } }],
+        },
+      }),
+      'char:9',
+    );
+    const warmth = draft.graph.nodes[0]!.affordances[0]!.effects.success.find((e) => e.op === 'adjustWarmth');
+    expect(warmth?.characterId).toBe('char:9');
+  });
 });
 
 describe('replaying a quest starts it clean', () => {
@@ -274,6 +341,52 @@ describe('off-axis input degrades safely (offline templated interpreter)', () =>
     // …and it's an actual reply, not the inert "nothing answers that" line
     expect(beat.narration).not.toMatch(/nothing answers that/i);
     expect(beat.narration).toMatch(/Watchman|hears you out|few words/i);
+  });
+
+  it('a GRADED talk affordance still voices a reply, not a generic action-outcome line', async () => {
+    updateLlmSettings({ baseUrl: 'http://127.0.0.1:1/v1' }); // offline → templated reply
+    const { world } = seedWorldAndCharacter();
+    ensureWorldState(world.id);
+    // A quest whose `talk` approach actually rolls (a real success effect), so the beat is a
+    // graded outcome — the path that used to fall into the generic narrator ("It lands.").
+    const quest = createQuest({
+      worldId: world.id,
+      name: 'The Crate',
+      graph: QuestGraphSchema.parse({
+        entryNodeId: 'room',
+        maxTurns: 3,
+        timeoutOutcome: 'resolved',
+        nodes: [
+          {
+            id: 'room',
+            kind: 'scene',
+            setup: 'A watchman stands beside a sealed crate.',
+            entities: [{ id: 'watch', name: 'Watchman', faction: 'neutral', disposition: 0 }],
+            affordances: [
+              {
+                verb: 'talk',
+                stat: 'charm',
+                difficulty: 'normal',
+                hint: 'Ask him about the crate.',
+                effects: { success: [{ op: 'setFlag', flag: 'asked' }, { op: 'adjustStat', entityId: 'watch', key: 'disposition', delta: 8 }], partial: [{ op: 'adjustStat', entityId: 'watch', key: 'disposition', delta: 3 }], fail: [], complication: [] },
+              },
+            ],
+            edges: [],
+            isTerminal: false,
+          },
+        ],
+        goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'Ask him', predicate: { kind: 'flag', flag: 'asked' } }],
+      }),
+    });
+    await startQuest(world.id, quest.id);
+
+    const scene = await takeQuestTurn(world.id, 'I ask the watchman about the crate.');
+    const beat = scene.log[scene.log.length - 1]!;
+    expect(beat.neutral).toBeFalsy(); // it's a real graded outcome (the check rolled)
+    // The reply is framed as conversation (mentions the speaker), NOT the generic
+    // action-outcome leads ("It lands." / "It half-works." / …).
+    expect(beat.narration).not.toMatch(/^It (lands|half-works|falls flat|goes wrong)\b/);
+    expect(beat.narration).toMatch(/Watchman/);
   });
 });
 
@@ -446,5 +559,114 @@ describe('start → resume → turn loop → resolve', () => {
     // …until the player leaves it.
     abandonQuest(world.id);
     expect(getActiveQuest(world.id)).toBeNull();
+  });
+});
+
+describe('generateQuest — the generate → lint → repair loop', () => {
+  afterEach(() => setAdapterOverride(null));
+
+  const JUDGE_CLEAN = JSON.stringify({ issues: [] });
+
+  // A broken first draft: the win checks entity 'c', but the entry scene only has p & q,
+  // so it's blocking (and auto-fix can't remap — there's more than one entry entity).
+  const BROKEN = JSON.stringify({
+    name: 'Broken',
+    blurb: 'b',
+    graph: {
+      entryNodeId: 'gate',
+      maxTurns: 8,
+      timeoutOutcome: 'resolved',
+      nodes: [
+        {
+          id: 'gate',
+          kind: 'scene',
+          setup: 'A gate.',
+          entities: [
+            { id: 'p', name: 'P', faction: 'neutral', disposition: 0 },
+            { id: 'q', name: 'Q', faction: 'neutral', disposition: 0 },
+          ],
+          affordances: [{ verb: 'persuade', stat: 'charm', difficulty: 'hard', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'progress' }, { op: 'moveEntityToFaction', entityId: 'p', faction: 'ally' }], partial: [], fail: [], complication: [] } }],
+          edges: [],
+          isTerminal: false,
+        },
+      ],
+      goals: [{ id: 'win', kind: 'persuade', outcome: 'win', label: 'W', predicate: { kind: 'entityFaction', entityId: 'c', faction: 'ally' } }],
+    },
+  });
+  // The repaired draft: the win now targets the real entity 'p'.
+  const FIXED = BROKEN.replace('"entityId":"c"', '"entityId":"p"');
+
+  it('fires a repair round when the first draft has a blocking defect, then succeeds', async () => {
+    const { world } = seedWorldAndCharacter();
+    const adapter = new ScriptedAdapter([BROKEN, FIXED, JUDGE_CLEAN]);
+    setAdapterOverride(adapter);
+
+    const res = await generateQuest(world.id, 'Win past the gate.', null);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    // gen (broken) + one repair (fixed) + the coherence judge = 3 model calls.
+    expect(adapter.calls).toBe(3);
+    expect(isWinReachableTiered(res.data.graph)).toBe(true);
+    const win = res.data.graph.goals.find((g) => g.outcome === 'win' && g.predicate.kind === 'entityFaction')!;
+    expect(win.predicate.entityId).toBe('p');
+  });
+
+  it('skips repair entirely when the first draft is already clean', async () => {
+    const { world } = seedWorldAndCharacter();
+    const CLEAN = JSON.stringify({
+      name: 'Clean',
+      blurb: 'b',
+      graph: {
+        entryNodeId: 'gate',
+        maxTurns: 8,
+        timeoutOutcome: 'resolved',
+        nodes: [
+          {
+            id: 'gate',
+            kind: 'scene',
+            setup: 'A gate.',
+            entities: [{ id: 'watch', name: 'Watchman', faction: 'neutral', disposition: 0 }],
+            affordances: [{ verb: 'persuade', stat: 'charm', difficulty: 'hard', hint: 'h', effects: { success: [{ op: 'moveEntityToFaction', entityId: 'watch', faction: 'ally' }], partial: [], fail: [], complication: [] } }],
+            edges: [],
+            isTerminal: false,
+          },
+        ],
+        goals: [{ id: 'win', kind: 'persuade', outcome: 'win', label: 'W', predicate: { kind: 'entityFaction', entityId: 'watch', faction: 'ally' } }],
+      },
+    });
+    const adapter = new ScriptedAdapter([CLEAN, JUDGE_CLEAN]);
+    setAdapterOverride(adapter);
+
+    const res = await generateQuest(world.id, 'Win past the gate.', null);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    // gen (clean) + the coherence judge = 2 calls; NO repair round.
+    expect(adapter.calls).toBe(2);
+    expect(isWinReachableTiered(res.data.graph)).toBe(true);
+  });
+
+  it('succeeds on a draft that OMITS entryNodeId (the omitted-field failure) instead of returning unusable', async () => {
+    const { world } = seedWorldAndCharacter();
+    // No graph.entryNodeId — the exact shape that used to throw in boundQuestGraph → ok:false.
+    const NO_ENTRY = JSON.stringify({
+      name: 'A Studio Hand',
+      blurb: 'Help Mira move the crate.',
+      graph: {
+        maxTurns: 6,
+        timeoutOutcome: 'resolved',
+        nodes: [
+          { id: 'delivery', kind: 'scene', setup: 'A studio.', entities: [], affordances: [{ verb: 'aid', stat: 'grit', difficulty: 'normal', hint: 'Carry it.', effects: { success: [{ op: 'setFlag', flag: 'crate_moved' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false },
+        ],
+        goals: [{ id: 'win', kind: 'flag', outcome: 'win', label: 'Move the crate', predicate: { kind: 'flag', flag: 'crate_moved' } }],
+      },
+    });
+    const adapter = new ScriptedAdapter([NO_ENTRY, JUDGE_CLEAN]);
+    setAdapterOverride(adapter);
+
+    const res = await generateQuest(world.id, 'Help Mira move the crate.', null);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.graph.entryNodeId).toBe('delivery'); // repaired, not rejected
+    expect(isWinReachableTiered(res.data.graph)).toBe(true);
   });
 });

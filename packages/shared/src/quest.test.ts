@@ -502,6 +502,30 @@ describe('boundQuestGraph (authoring sanitiser)', () => {
     expect(eff.find((e) => e.op === 'adjustWarmth')!.delta).toBe(QUEST.WARMTH_DELTA_MAX);
   });
 
+  it('repairs a MISSING/empty entryNodeId instead of throwing (the omitted-field generation failure)', () => {
+    // A model that omits graph.entryNodeId leaves the lenient default "", which the strict
+    // schema's z.string().min(1) used to reject — throwing before the post-parse repair ran.
+    const bounded = boundQuestGraph({
+      // no entryNodeId
+      maxTurns: 6,
+      nodes: [
+        { id: 'delivery', setup: 's', affordances: [{ verb: 'aid', stat: 'grit', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'done' }] } }] },
+        { id: 'finish', setup: 's2', affordances: [], isTerminal: true },
+      ],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'done' } }],
+    });
+    expect(bounded.entryNodeId).toBe('delivery'); // repaired to the first node, no throw
+  });
+
+  it('drops an edge whose `to` is empty instead of throwing', () => {
+    const bounded = boundQuestGraph({
+      entryNodeId: 'a',
+      nodes: [{ id: 'a', setup: '', affordances: [{ verb: 'wait', stat: 'grit', difficulty: 'normal', hint: '', effects: { success: [{ op: 'setFlag', flag: 'x' }] } }], edges: [{ when: { kind: 'always' }, to: '' }] }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'w', predicate: { kind: 'flag', flag: 'x' } }],
+    });
+    expect(bounded.nodes[0]!.edges).toHaveLength(0);
+  });
+
   it('is idempotent on an already-bounded graph', () => {
     const once = boundQuestGraph(guardGraph());
     const twice = boundQuestGraph(once);
