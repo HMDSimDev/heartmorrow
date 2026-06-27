@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { StructuredOutputMode } from './settings';
 import { WorldNoteScopeSchema } from './entities';
-import { MAX_EVAL_DELTA, EMAILS_MAX_PER_DAY, MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, WEALTH } from '../constants';
+import { MAX_EVAL_DELTA, EMAILS_MAX_PER_DAY, MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, WEALTH, GEN_TEXT } from '../constants';
 import { PhaseSchema } from '../time';
 import { ItemCategorySchema, ItemRaritySchema } from './items';
 import { RelationshipStatKeySchema, DatingStatKeySchema, DatingStatsSchema } from '../stats';
@@ -33,7 +33,7 @@ export const RelationshipDeltaSchema = z
 export type RelationshipDelta = z.infer<typeof RelationshipDeltaSchema>;
 
 export const MemoryCandidateSchema = z.object({
-  text: z.string().min(1).max(600),
+  text: z.string().min(1).max(GEN_TEXT.line),
   importance: z.number().int().min(1).max(5),
   /** Canonical tags only — off-list values are dropped (never stored). */
   tags: MemoryTagArraySchema,
@@ -45,7 +45,7 @@ export type MemoryCandidate = z.infer<typeof MemoryCandidateSchema>;
  * relationship deltas, mood/expression, and memory writes.
  */
 export const SessionEvaluationSchema = z.object({
-  mood: z.string().min(1).max(40),
+  mood: z.string().min(1).max(GEN_TEXT.label),
   /** Canonical expression the UI maps to a portrait asset; off-list → neutral. */
   expression: ExpressionSchema.catch(DEFAULT_EXPRESSION),
   relationshipDeltas: RelationshipDeltaSchema,
@@ -53,27 +53,27 @@ export const SessionEvaluationSchema = z.object({
   /** A short recap of what happened (a sentence or two), used as a session
    *  highlight. Kept in sync with ChronicleLine.line (entities.ts) and the slice
    *  in chronicle-service; the Calendar clamps it visually with a "show more". */
-  summaryLine: z.string().min(1).max(600),
+  summaryLine: z.string().min(1).max(GEN_TEXT.line),
 });
 export type SessionEvaluation = z.infer<typeof SessionEvaluationSchema>;
 
 /** Folded narrative of the player's history with a character (no stat fields). */
 export const ChronicleSchema = z.object({
-  chronicle: z.string().min(1).max(5000),
-  highlights: z.array(z.string().min(1).max(160)).max(6).default([]),
+  chronicle: z.string().min(1).max(GEN_TEXT.blurb),
+  highlights: z.array(z.string().min(1).max(GEN_TEXT.line)).max(6).default([]),
 });
 export type Chronicle = z.infer<typeof ChronicleSchema>;
 
 /** Mid-date decision: should the character end the date over the player's behavior? */
 export const WalkoutReactionSchema = z.object({
   walkout: z.boolean(),
-  reason: z.string().max(120).default(''),
-  farewellLine: z.string().min(1).max(700),
+  reason: z.string().max(GEN_TEXT.label).default(''),
+  farewellLine: z.string().min(1).max(GEN_TEXT.line),
   /** First-person memory the character will carry of what drove the walkout —
    *  written only when walkout=true (server falls back to `reason` if omitted). */
-  memory: z.string().max(400).default(''),
+  memory: z.string().max(GEN_TEXT.line).default(''),
   /** One-line recap of how the date ended, folded into the cross-date chronicle. */
-  summaryLine: z.string().max(240).default(''),
+  summaryLine: z.string().max(GEN_TEXT.line).default(''),
 });
 export type WalkoutReaction = z.infer<typeof WalkoutReactionSchema>;
 
@@ -85,8 +85,8 @@ export type WalkoutReaction = z.infer<typeof WalkoutReactionSchema>;
  */
 export const DtrReactionSchema = z.object({
   decision: z.enum(['accept', 'deflect', 'backfire']),
-  line: z.string().min(1).max(400),
-  reason: z.string().max(160).default(''),
+  line: z.string().min(1).max(GEN_TEXT.line),
+  reason: z.string().max(GEN_TEXT.label).default(''),
 });
 export type DtrReaction = z.infer<typeof DtrReactionSchema>;
 
@@ -101,7 +101,7 @@ export const GiftReactionSchema = z.object({
   /** Canonical expression for the portrait; off-list → neutral. */
   expression: ExpressionSchema.catch(DEFAULT_EXPRESSION),
   /** The character's in-character reaction (one short line). */
-  line: z.string().min(1).max(280),
+  line: z.string().min(1).max(GEN_TEXT.line),
   /** Proposed stat changes — server clamps + caps these to a gift-sized nudge. */
   relationshipDeltas: RelationshipDeltaSchema,
   /** A keepsake (or sting) the character carries from the gift, or null. */
@@ -121,7 +121,7 @@ export const PlayerBreakupReactionSchema = z.object({
   genuine: z.boolean(),
   /** How the character takes it (only meaningful when genuine). */
   reaction: z.enum(['accept', 'hurt', 'plead']).default('hurt'),
-  line: z.string().min(1).max(400),
+  line: z.string().min(1).max(GEN_TEXT.line),
 });
 export type PlayerBreakupReaction = z.infer<typeof PlayerBreakupReactionSchema>;
 
@@ -140,23 +140,23 @@ export const PlayerFarewellReactionSchema = z.object({
   /** Canonical expression for the live portrait; off-list → neutral. */
   expression: ExpressionSchema.catch(DEFAULT_EXPRESSION),
   /** The character's short, in-character goodbye line. */
-  farewellLine: z.string().min(1).max(280),
+  farewellLine: z.string().min(1).max(GEN_TEXT.line),
 });
 export type PlayerFarewellReaction = z.infer<typeof PlayerFarewellReactionSchema>;
 
 /** Compact rolling summary of a session, used to bound prompt growth. */
 export const SessionSummarySchema = z.object({
-  summary: z.string().min(1).max(1200),
-  keyPoints: z.array(z.string().min(1).max(200)).max(8).default([]),
+  summary: z.string().min(1).max(GEN_TEXT.blurb),
+  keyPoints: z.array(z.string().min(1).max(GEN_TEXT.line)).max(8).default([]),
 });
 export type SessionSummary = z.infer<typeof SessionSummarySchema>;
 
 /** A single generated quiz question, including the correct answer (server-only). */
 export const GeneratedQuizQuestionSchema = z.object({
-  prompt: z.string().min(1).max(300),
-  choices: z.array(z.string().min(1).max(160)).min(3).max(4),
+  prompt: z.string().min(1).max(GEN_TEXT.line),
+  choices: z.array(z.string().min(1).max(GEN_TEXT.line)).min(3).max(4),
   correctIndex: z.number().int().min(0),
-  explanation: z.string().max(300).default(''),
+  explanation: z.string().max(GEN_TEXT.line).default(''),
 });
 export type GeneratedQuizQuestion = z.infer<typeof GeneratedQuizQuestionSchema>;
 
@@ -169,8 +169,8 @@ export type QuizGeneration = z.infer<typeof QuizGenerationSchema>;
  *  in-world newspaper dispatch the player transcribes. Length is bounded so a typing
  *  shift stays brief and the LLM call stays cheap; the body is prose only (no stats). */
 export const WriterCommissionGenSchema = z.object({
-  headline: z.string().min(1).max(120),
-  body: z.string().min(60).max(600),
+  headline: z.string().min(1).max(GEN_TEXT.label),
+  body: z.string().min(60).max(GEN_TEXT.blurb),
 });
 export type WriterCommissionGen = z.infer<typeof WriterCommissionGenSchema>;
 
@@ -184,6 +184,8 @@ export type WriterCommissionGen = z.infer<typeof WriterCommissionGenSchema>;
  */
 export const ITEM_GEN = {
   MAX_ITEMS: 12,
+  MAX_NAME: GEN_TEXT.label,
+  MAX_DESCRIPTION: GEN_TEXT.line,
   MIN_PRICE: 0,
   MAX_PRICE: 5_000,
   /** Stat-effect magnitude cap; mirrors MAX_EVAL_DELTA so items feel proportional to a session. */
@@ -220,8 +222,8 @@ export type GeneratedItemEffect = z.infer<typeof GeneratedItemEffectSchema>;
 
 /** One generated item draft (no id/timestamps/asset/stock — those are server-owned at save). */
 export const GeneratedShopItemSchema = z.object({
-  name: z.string().min(1).max(60),
-  description: z.string().min(1).max(240),
+  name: z.string().min(1).max(ITEM_GEN.MAX_NAME),
+  description: z.string().min(1).max(ITEM_GEN.MAX_DESCRIPTION),
   category: ItemCategorySchema,
   rarity: ItemRaritySchema,
   price: z.number().int().min(ITEM_GEN.MIN_PRICE).max(ITEM_GEN.MAX_PRICE),
@@ -241,10 +243,10 @@ export type ShopItemGeneration = z.infer<typeof ShopItemGenerationSchema>;
  */
 export const LOCATION_GEN = {
   MAX_LOCATIONS: 8,
-  MAX_NAME: 60,
-  MAX_DESCRIPTION: 280,
+  MAX_NAME: GEN_TEXT.label,
+  MAX_DESCRIPTION: GEN_TEXT.line,
   MAX_TAGS: 6,
-  MAX_TAG_LEN: 24,
+  MAX_TAG_LEN: GEN_TEXT.label,
 } as const;
 
 /** One generated location draft (no id — the server assigns it at bound time). */
@@ -270,18 +272,18 @@ export type LocationGeneration = z.infer<typeof LocationGenerationSchema>;
  * generator intentionally does NOT produce characters — only the setting + venues.
  */
 export const WORLD_GEN = {
-  MAX_NAME: 80,
-  MAX_SUMMARY: 280,
-  MAX_TONE: 120,
-  MAX_LORE: 2000,
-  MAX_RULES: 1200,
-  MAX_GLOBAL_NOTES: 1500,
+  MAX_NAME: GEN_TEXT.label,
+  MAX_SUMMARY: GEN_TEXT.blurb,
+  MAX_TONE: GEN_TEXT.line,
+  MAX_LORE: GEN_TEXT.prose,
+  MAX_RULES: GEN_TEXT.prose,
+  MAX_GLOBAL_NOTES: GEN_TEXT.prose,
   MIN_LOCATIONS: 3,
   MAX_LOCATIONS: 8,
   MIN_NOTES: 3,
   MAX_NOTES: 6,
-  MAX_NOTE_TITLE: 70,
-  MAX_NOTE_BODY: 600,
+  MAX_NOTE_TITLE: GEN_TEXT.label,
+  MAX_NOTE_BODY: GEN_TEXT.blurb,
   MAX_NOTE_TAGS: 6,
 } as const;
 
@@ -326,8 +328,8 @@ export type WorldGeneration = z.infer<typeof WorldGenerationSchema>;
  */
 export const PROPERTY_GEN = {
   MAX_PROPERTIES: 8,
-  MAX_NAME: 60,
-  MAX_DESCRIPTION: 280,
+  MAX_NAME: GEN_TEXT.label,
+  MAX_DESCRIPTION: GEN_TEXT.line,
   MIN_PRICE: 0,
   /** Ceiling on a property's purchase price. */
   MAX_PRICE: 100_000,
@@ -337,7 +339,7 @@ export const PROPERTY_GEN = {
    *  venue nudges in venues.ts). */
   MAX_BUFF: 5,
   MAX_TAGS: 6,
-  MAX_TAG_LEN: 24,
+  MAX_TAG_LEN: GEN_TEXT.label,
   /** Anti-cheap-buy: owning must be worth at least this many days of rent (so buying
    *  is a real investment over leasing, never trivially cheaper). */
   MIN_PAYBACK_DAYS: 90,
@@ -373,8 +375,8 @@ export type PropertyGeneration = z.infer<typeof PropertyGenerationSchema>;
  */
 export const STOCK_GEN = {
   MAX_COMPANIES: 8,
-  MAX_NAME: 60,
-  MAX_DESCRIPTION: 280,
+  MAX_NAME: GEN_TEXT.label,
+  MAX_DESCRIPTION: GEN_TEXT.line,
   MAX_TICKER_LEN: 5,
   MIN_PRICE: 1,
   /** Ceiling on a company's base/anchor share price. */
@@ -412,8 +414,8 @@ export type CompanyGeneration = z.infer<typeof CompanyGenerationSchema>;
  */
 export const MarketNewsLineSchema = z.object({
   ref: z.string().min(1).max(8),
-  headline: z.string().min(1).max(120),
-  body: z.string().min(1).max(280),
+  headline: z.string().min(1).max(GEN_TEXT.label),
+  body: z.string().min(1).max(GEN_TEXT.line),
 });
 export const MarketNewsGenSchema = z.object({
   items: z.array(MarketNewsLineSchema).max(STOCK_GEN.MAX_COMPANIES).default([]),
@@ -422,9 +424,9 @@ export type MarketNewsGen = z.infer<typeof MarketNewsGenSchema>;
 
 /** End-of-day recap, narrated from the day's actual events (no stat fields). */
 export const DayRecapSchema = z.object({
-  headline: z.string().min(1).max(120),
-  narrative: z.string().min(1).max(1800),
-  highlights: z.array(z.string().min(1).max(200)).max(8).default([]),
+  headline: z.string().min(1).max(GEN_TEXT.label),
+  narrative: z.string().min(1).max(GEN_TEXT.blurb),
+  highlights: z.array(z.string().min(1).max(GEN_TEXT.line)).max(8).default([]),
 });
 export type DayRecap = z.infer<typeof DayRecapSchema>;
 
@@ -437,11 +439,11 @@ export type DayRecap = z.infer<typeof DayRecapSchema>;
  */
 export const WorldSimColorLineSchema = z.object({
   ref: z.string().min(1).max(40),
-  summary: z.string().min(1).max(200),
+  summary: z.string().min(1).max(GEN_TEXT.line),
   /** For meeting refs only: one short clause of what they actually talked about,
    *  grounded in the topic + personalities the server provided. Becomes both parties'
    *  memory of the encounter. Optional — a missing gist just leaves the templated memory. */
-  gist: z.string().max(200).optional(),
+  gist: z.string().max(GEN_TEXT.line).optional(),
 });
 export const WorldSimColorSchema = z.object({
   lines: z.array(WorldSimColorLineSchema).max(16).default([]),
@@ -457,13 +459,13 @@ export type WorldSimColor = z.infer<typeof WorldSimColorSchema>;
  */
 export const ExFactSchema = z.object({
   category: z.enum(['habit', 'hobby', 'job', 'appearance']),
-  value: z.string().min(1).max(80),
+  value: z.string().min(1).max(GEN_TEXT.label),
   sensitivity: z.enum(['neutral', 'touchy']).default('neutral'),
-  sourceQuote: z.string().min(1).max(160),
+  sourceQuote: z.string().min(1).max(GEN_TEXT.line),
 });
 export const ExFactExtractionSchema = z.object({
   /** The name the character used for their ex, if any (server resolves it; null = unnamed). */
-  exName: z.string().max(60).nullable().default(null),
+  exName: z.string().max(GEN_TEXT.label).nullable().default(null),
   facts: z.array(ExFactSchema).max(4).default([]),
 });
 export type ExFactExtraction = z.infer<typeof ExFactExtractionSchema>;
@@ -480,8 +482,8 @@ export const PlayerFactSchema = z.object({
   category: z.enum(['job', 'hobby', 'interest', 'background', 'plan']),
   /** A SHORT, neutral noun/verb phrase about the player (e.g. "is a chef", "runs
    *  marathons", "grew up by the coast", "wants to open a bookshop"). No sentences. */
-  value: z.string().min(1).max(80),
-  sourceQuote: z.string().min(1).max(160),
+  value: z.string().min(1).max(GEN_TEXT.label),
+  sourceQuote: z.string().min(1).max(GEN_TEXT.line),
 });
 export const PlayerFactExtractionSchema = z.object({
   facts: z.array(PlayerFactSchema).max(4).default([]),
@@ -499,7 +501,7 @@ export const DailyTextPlanSchema = z.object({
   texts: z
     .array(
       z.object({
-        body: z.string().min(1).max(280),
+        body: z.string().min(1).max(GEN_TEXT.line),
         // Required by the schema but server-owned: generateDailyTextsForDay always
         // overwrites it with a server-chosen phase, so default it (the model needn't
         // emit it, and a stray value can't fail the parse). The prompt notes it's ignored.
@@ -514,7 +516,7 @@ export type DailyTextPlan = z.infer<typeof DailyTextPlanSchema>;
 
 /** A character's short reply to the player's text. */
 export const TextReplySchema = z.object({
-  body: z.string().min(1).max(280),
+  body: z.string().min(1).max(GEN_TEXT.line),
   tone: z.enum(['warm', 'playful', 'flirty', 'neutral', 'distant', 'annoyed']).default('neutral'),
 });
 export type TextReply = z.infer<typeof TextReplySchema>;
@@ -524,10 +526,10 @@ export const EmailBatchSchema = z.object({
   emails: z
     .array(
       z.object({
-        senderName: z.string().min(1).max(80),
-        senderHandle: z.string().min(1).max(120),
-        subject: z.string().min(1).max(140),
-        body: z.string().min(1).max(1200),
+        senderName: z.string().min(1).max(GEN_TEXT.label),
+        senderHandle: z.string().min(1).max(GEN_TEXT.label),
+        subject: z.string().min(1).max(GEN_TEXT.label),
+        body: z.string().min(1).max(GEN_TEXT.blurb),
       }),
     )
     .max(EMAILS_MAX_PER_DAY)
@@ -537,7 +539,7 @@ export type EmailBatch = z.infer<typeof EmailBatchSchema>;
 
 /** One piece of gossip a character texts the player about someone in their social web. */
 export const GossipTextSchema = z.object({
-  body: z.string().min(1).max(280),
+  body: z.string().min(1).max(GEN_TEXT.line),
 });
 export type GossipText = z.infer<typeof GossipTextSchema>;
 
@@ -547,7 +549,7 @@ export type GossipText = z.infer<typeof GossipTextSchema>;
  * beat fires (and all stat consequences); the model only writes the body.
  */
 export const RelationshipBeatTextSchema = z.object({
-  body: z.string().min(1).max(600),
+  body: z.string().min(1).max(GEN_TEXT.line),
 });
 export type RelationshipBeatText = z.infer<typeof RelationshipBeatTextSchema>;
 
@@ -558,13 +560,13 @@ export type RelationshipBeatText = z.infer<typeof RelationshipBeatTextSchema>;
  * NOTICE is never LLM-authored — only these earlier, off-ramp messages are.
  */
 export const CrisisTextSchema = z.object({
-  body: z.string().min(1).max(360),
+  body: z.string().min(1).max(GEN_TEXT.line),
 });
 export type CrisisText = z.infer<typeof CrisisTextSchema>;
 
 /** LLM-authored description of a character's private room (their personal date venue). */
 export const RoomDescriptionSchema = z.object({
-  description: z.string().min(1).max(900),
+  description: z.string().min(1).max(GEN_TEXT.blurb),
 });
 export type RoomDescription = z.infer<typeof RoomDescriptionSchema>;
 
@@ -574,8 +576,8 @@ export type RoomDescription = z.infer<typeof RoomDescriptionSchema>;
  * soft win, never a game-over.
  */
 export const EpilogueSchema = z.object({
-  title: z.string().min(1).max(80),
-  epilogue: z.string().min(1).max(2000),
+  title: z.string().min(1).max(GEN_TEXT.label),
+  epilogue: z.string().min(1).max(GEN_TEXT.prose),
 });
 export type Epilogue = z.infer<typeof EpilogueSchema>;
 
@@ -591,7 +593,7 @@ export const TurnReactionSchema = z.object({
   expression: ExpressionSchema.catch(DEFAULT_EXPRESSION),
   /** Internal reason (not shown to the player). Roomy cap: models routinely write
    * a 1–2 sentence rationale, and a tighter limit rejected otherwise-valid verdicts. */
-  note: z.string().max(600).default(''),
+  note: z.string().max(GEN_TEXT.line).default(''),
 });
 export type TurnReaction = z.infer<typeof TurnReactionSchema>;
 
@@ -609,7 +611,7 @@ export const TextJudgeSchema = z.object({
   hostile: z.boolean().default(false),
   /** Internal reason (not shown to the player). Roomy cap: models routinely write
    * a 1–2 sentence rationale, and a tighter limit rejected otherwise-valid verdicts. */
-  note: z.string().max(600).default(''),
+  note: z.string().max(GEN_TEXT.line).default(''),
 });
 export type TextJudge = z.infer<typeof TextJudgeSchema>;
 
@@ -617,7 +619,7 @@ export type TextJudge = z.infer<typeof TextJudgeSchema>;
 
 /** An NPC's social-feed post. The model writes only the text + a mood word. */
 export const NpcFeedPostSchema = z.object({
-  body: z.string().min(1).max(300),
+  body: z.string().min(1).max(GEN_TEXT.line),
   /** One-word mood/tone label (e.g. "wistful", "giddy", "wry"). */
   mood: z.string().max(40).default(''),
 });
@@ -625,7 +627,7 @@ export type NpcFeedPost = z.infer<typeof NpcFeedPostSchema>;
 
 /** An NPC's comment on a feed post. Text + a short tone label. */
 export const FeedCommentDraftSchema = z.object({
-  body: z.string().min(1).max(200),
+  body: z.string().min(1).max(GEN_TEXT.line),
   tone: z.string().max(40).default(''),
 });
 export type FeedCommentDraft = z.infer<typeof FeedCommentDraftSchema>;
@@ -636,15 +638,15 @@ export type FeedCommentDraft = z.infer<typeof FeedCommentDraftSchema>;
  * creator review/edit before saving. No stat fields — purely descriptive.
  */
 export const ProfileGenerationSchema = z.object({
-  appearance: z.string().max(600).default(''),
-  textingStyle: z.string().max(240).default(''),
-  onlinePersona: z.string().max(240).default(''),
-  loveLanguage: z.string().max(120).default(''),
-  physicalNeeds: z.array(z.string().min(1).max(80)).max(8).default([]),
-  physicalDesires: z.array(z.string().min(1).max(80)).max(8).default([]),
-  physicalDislikes: z.array(z.string().min(1).max(80)).max(8).default([]),
-  insecurities: z.array(z.string().min(1).max(80)).max(8).default([]),
-  quirks: z.array(z.string().min(1).max(80)).max(8).default([]),
+  appearance: z.string().max(GEN_TEXT.prose).default(''),
+  textingStyle: z.string().max(GEN_TEXT.prose).default(''),
+  onlinePersona: z.string().max(GEN_TEXT.prose).default(''),
+  loveLanguage: z.string().max(GEN_TEXT.line).default(''),
+  physicalNeeds: z.array(z.string().min(1).max(GEN_TEXT.label)).max(8).default([]),
+  physicalDesires: z.array(z.string().min(1).max(GEN_TEXT.label)).max(8).default([]),
+  physicalDislikes: z.array(z.string().min(1).max(GEN_TEXT.label)).max(8).default([]),
+  insecurities: z.array(z.string().min(1).max(GEN_TEXT.label)).max(8).default([]),
+  quirks: z.array(z.string().min(1).max(GEN_TEXT.label)).max(8).default([]),
 });
 export type ProfileGeneration = z.infer<typeof ProfileGenerationSchema>;
 

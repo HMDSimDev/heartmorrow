@@ -2,6 +2,7 @@ import {
   CharacterEndingSchema,
   EpilogueSchema,
   DEFAULT_PLAYER_ID,
+  GEN_TEXT,
   endingEligible,
   type CharacterEnding,
   type ConversationMode,
@@ -64,7 +65,7 @@ function salvageEpilogue(raw: string | undefined): Epilogue | null {
   if (!parsed || typeof parsed !== 'object') return null;
   const obj = parsed as Record<string, unknown>;
   if (typeof obj.title !== 'string' || typeof obj.epilogue !== 'string') return null;
-  const candidate = { title: softTrim(obj.title, 80), epilogue: softTrim(obj.epilogue, 2000) };
+  const candidate = { title: softTrim(obj.title, GEN_TEXT.label), epilogue: softTrim(obj.epilogue, GEN_TEXT.prose) };
   const check = EpilogueSchema.safeParse(candidate);
   return check.success ? check.data : null;
 }

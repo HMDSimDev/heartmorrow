@@ -9,6 +9,7 @@ import {
   PlayerBreakupReactionSchema,
   PlayerFarewellReactionSchema,
   PROMPT_LIMITS,
+  GEN_TEXT,
   DEFAULT_PLAYER_ID,
   LAST_SEEN_FLAG,
   KNOWLEDGE_GOSSIP_MIN_FIDELITY,
@@ -711,7 +712,7 @@ export async function attemptWalkout(
   try {
     addMemoriesFromEvaluation(
       character.id,
-      [{ text: walkoutMemory.slice(0, 400), importance: 5, tags: ['conflict'] }],
+      [{ text: walkoutMemory.slice(0, GEN_TEXT.line), importance: 5, tags: ['conflict'] }],
       walkoutEvent.id,
     );
   } catch {

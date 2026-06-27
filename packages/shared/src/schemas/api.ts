@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { GEN_TEXT } from '../constants';
 import { DatingStatsSchema, DEFAULT_DATING_STATS } from '../stats';
 import { IntentSchema } from '../intent';
 import { RelationshipDeltaSchema } from './llm';
@@ -96,7 +97,7 @@ export type WorldUpdate = z.input<typeof WorldUpdateSchema>;
 
 /** Clone an existing world (definition + notes + cast) into a fresh save. */
 export const CloneWorldSchema = z.object({
-  name: z.string().min(1).max(120),
+  name: z.string().min(1).max(GEN_TEXT.label),
 });
 export type CloneWorld = z.input<typeof CloneWorldSchema>;
 
@@ -285,18 +286,18 @@ export type ShopItemUpdate = z.input<typeof ShopItemUpdateSchema>;
  */
 export const GenerateShopItemsInputSchema = z.object({
   count: z.number().int().min(1).max(ITEM_GEN.MAX_ITEMS).default(4),
-  theme: z.string().max(400).default(''),
+  theme: z.string().max(GEN_TEXT.line).default(''),
   rarityHint: ItemRaritySchema.optional(),
   categoryHint: ItemCategorySchema.optional(),
   minPrice: z.number().int().min(ITEM_GEN.MIN_PRICE).max(ITEM_GEN.MAX_PRICE).optional(),
   maxPrice: z.number().int().min(ITEM_GEN.MIN_PRICE).max(ITEM_GEN.MAX_PRICE).optional(),
   world: z
     .object({
-      name: z.string().max(120).default(''),
-      summary: z.string().max(1_000).default(''),
-      tone: z.string().max(400).default(''),
-      lore: z.string().max(2_000).default(''),
-      rules: z.string().max(2_000).default(''),
+      name: z.string().max(GEN_TEXT.label).default(''),
+      summary: z.string().max(GEN_TEXT.blurb).default(''),
+      tone: z.string().max(GEN_TEXT.line).default(''),
+      lore: z.string().max(GEN_TEXT.prose).default(''),
+      rules: z.string().max(GEN_TEXT.prose).default(''),
     })
     .default({}),
 });
@@ -312,7 +313,7 @@ export type GenerateShopItemsParsed = z.output<typeof GenerateShopItemsInputSche
  */
 export const GenerateLocationsInputSchema = z.object({
   count: z.number().int().min(1).max(LOCATION_GEN.MAX_LOCATIONS).default(4),
-  prompt: z.string().max(600).default(''),
+  prompt: z.string().max(GEN_TEXT.prose).default(''),
 });
 export type GenerateLocationsInput = z.input<typeof GenerateLocationsInputSchema>;
 /** Parsed form (defaults applied) used by the server prompt builder + bounding. */
@@ -326,9 +327,9 @@ export type GenerateLocationsParsed = z.output<typeof GenerateLocationsInputSche
  */
 export const GenerateWorldInputSchema = z.object({
   name: z.string().max(WORLD_GEN.MAX_NAME).default(''),
-  summary: z.string().max(600).default(''),
-  tone: z.string().max(300).default(''),
-  prompt: z.string().max(1000).default(''),
+  summary: z.string().max(GEN_TEXT.blurb).default(''),
+  tone: z.string().max(GEN_TEXT.line).default(''),
+  prompt: z.string().max(GEN_TEXT.prose).default(''),
   locationCount: z
     .number()
     .int()
@@ -409,7 +410,7 @@ export type PropertyUpdate = z.input<typeof PropertyUpdateSchema>;
 /** Input for the LLM property generator (creator tool). `world` is reference DATA. */
 export const GeneratePropertiesInputSchema = z.object({
   count: z.number().int().min(1).max(PROPERTY_GEN.MAX_PROPERTIES).default(4),
-  theme: z.string().max(400).default(''),
+  theme: z.string().max(GEN_TEXT.line).default(''),
   categoryHint: PropertyCategorySchema.optional(),
   world: WorldRefSchema,
 });
@@ -472,7 +473,7 @@ export type CompanyUpdate = z.input<typeof CompanyUpdateSchema>;
 /** Input for the LLM company generator (creator tool). `world` is reference DATA. */
 export const GenerateCompaniesInputSchema = z.object({
   count: z.number().int().min(1).max(STOCK_GEN.MAX_COMPANIES).default(4),
-  theme: z.string().max(400).default(''),
+  theme: z.string().max(GEN_TEXT.line).default(''),
   sectorHint: StockSectorSchema.optional(),
   world: WorldRefSchema,
 });
@@ -1084,7 +1085,7 @@ export type PhoneInbox = z.infer<typeof PhoneInboxSchema>;
 // --- Faces (social feed) ----------------------------------------------------
 
 export const CreateFeedPostSchema = z.object({
-  body: z.string().min(1).max(500),
+  body: z.string().min(1).max(GEN_TEXT.line),
   worldId: z.string().min(1),
 });
 export type CreateFeedPost = z.input<typeof CreateFeedPostSchema>;
@@ -1095,7 +1096,7 @@ export const FeedReactSchema = z.object({
 export type FeedReact = z.input<typeof FeedReactSchema>;
 
 export const FeedCommentInputSchema = z.object({
-  body: z.string().min(1).max(400),
+  body: z.string().min(1).max(GEN_TEXT.line),
 });
 export type FeedCommentInput = z.input<typeof FeedCommentInputSchema>;
 

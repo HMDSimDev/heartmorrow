@@ -90,6 +90,30 @@ function formatZodError(err: z.ZodError): string {
     .join('\n');
 }
 
+/**
+ * Deep-clone a JSON-schema tree with every `maxLength` constraint removed.
+ *
+ * In `json_schema` mode the schema becomes a GRAMMAR that constrains decoding, and a
+ * `maxLength` there is a HARD cap: the server stops the string at exactly N characters
+ * and closes the quote — truncating fields mid-word ("…video streams or v"). We strip
+ * it so the model writes the field out in full. The Zod schema's `.max()` is untouched
+ * and still VALIDATES the result, so a genuinely runaway/looping output that overruns
+ * the (generous) limit is rejected and retried rather than silently truncated. The
+ * cap is kept in the PROMPT copy of the schema as a soft size hint (see `schemaText`).
+ */
+function stripMaxLength(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(stripMaxLength);
+  if (node && typeof node === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      if (k === 'maxLength') continue;
+      out[k] = stripMaxLength(v);
+    }
+    return out;
+  }
+  return node;
+}
+
 function buildResponseFormat(
   mode: LlmSettings['structuredMode'],
   schemaName: string,
@@ -181,6 +205,9 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
 
   const jsonSchema = zodToJsonSchema(schema, { name: schemaName, $refStrategy: 'none' });
   const schemaText = JSON.stringify(jsonSchema, null, 2);
+  // The GRAMMAR (json_schema mode) drops `maxLength` so strings are never hard-cut
+  // mid-word; validation against the Zod `.max()` still rejects a true runaway.
+  const grammarJsonSchema = stripMaxLength(jsonSchema);
 
   // Adaptive structured-output mode: start from the configured mode and
   // downgrade if the server rejects the response_format.
@@ -203,7 +230,7 @@ export async function callStructuredLlm<S extends z.ZodTypeAny>(
       return { ok: false, error: 'Aborted.', attempts: attempt, lastRaw, requestedMode, finalMode: modeChain[modeIdx]! };
     }
     const mode = modeChain[modeIdx]!;
-    const responseFormat = buildResponseFormat(mode, schemaName, jsonSchema);
+    const responseFormat = buildResponseFormat(mode, schemaName, grammarJsonSchema);
     const temperature = Math.max(0, baseTemp - attempt * 0.2);
 
     // Built per attempt because the mode can downgrade across retries (and the

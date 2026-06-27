@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, GAMBLING } from '../constants';
+import { MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, GAMBLING, GEN_TEXT } from '../constants';
 import { CasinoGameSchema } from '../gambling';
 import { DatingStatsSchema, RelationshipStatsSchema, RelationshipStatKeySchema } from '../stats';
 import { PhaseSchema } from '../time';
@@ -728,7 +728,7 @@ export const ChronicleLineSchema = z.object({
   mode: ConversationModeSchema,
   // Holds the evaluator's summaryLine verbatim — keep in sync with
   // SessionEvaluationSchema.summaryLine (llm.ts) and the slice in chronicle-service.
-  line: z.string().max(600),
+  line: z.string().max(GEN_TEXT.line),
 });
 export type ChronicleLine = z.infer<typeof ChronicleLineSchema>;
 
@@ -766,7 +766,7 @@ export type CharacterEnding = z.infer<typeof CharacterEndingSchema>;
  *  (the player-facing beats) and the world-sim ("around town"). */
 export const DayRecordBeatSchema = z.object({
   icon: z.string().max(8).default('•'),
-  text: z.string().min(1).max(280),
+  text: z.string().min(1).max(GEN_TEXT.line),
   tone: z.enum(['good', 'bad', 'neutral']).default('neutral'),
 });
 export type DayRecordBeat = z.infer<typeof DayRecordBeatSchema>;
@@ -784,7 +784,7 @@ export const DayRecordSchema = z.object({
   day: z.number().int().positive(),
   headline: z.string().default(''),
   narrative: z.string().default(''),
-  highlights: z.array(z.string().max(280)).default([]),
+  highlights: z.array(z.string().max(GEN_TEXT.line)).default([]),
   beats: z.array(DayRecordBeatSchema).default([]),
   /** Passive daily income credited as this day began. */
   income: z.number().int().nonnegative().default(0),

@@ -21,6 +21,7 @@ import {
   resolveLlmRole,
   warmthBand,
   warmthOf,
+  GEN_TEXT,
   type Character,
   type CharacterBundle,
   type CharacterCreate,
@@ -594,7 +595,7 @@ function boundText(s: string, max: number): string {
 }
 
 /** Clamp a list of short phrases: trim, drop empties, cap item length (word-boundary) + count. */
-function boundList(items: string[], maxItems = 10, maxLen = 80): string[] {
+function boundList(items: string[], maxItems = 10, maxLen: number = GEN_TEXT.label): string[] {
   return items
     .map((s) => trimToWord(s, maxLen))
     .filter((s) => s.length > 0)
@@ -613,24 +614,24 @@ function boundGeneratedTemplate(g: CharacterTemplateGeneration): CharacterTempla
     Object.fromEntries(DATING_STAT_KEYS.map((k) => [k, clampStat(g.datingStats[k])])),
   );
   return {
-    name: boundText(g.name, 80),
+    name: boundText(g.name, GEN_TEXT.label),
     age: Math.max(MIN_CHARACTER_AGE, Math.round(g.age)),
-    pronouns: boundText(g.pronouns, 40) || 'they/them',
+    pronouns: boundText(g.pronouns, GEN_TEXT.label) || 'they/them',
     gender: g.gender,
     sexuality: g.sexuality,
-    shortDescription: boundText(g.shortDescription, 600),
-    personality: boundText(g.personality, 1500),
-    speechStyle: boundText(g.speechStyle, 600),
-    relationshipPreferences: boundText(g.relationshipPreferences, 600),
+    shortDescription: boundText(g.shortDescription, GEN_TEXT.line),
+    personality: boundText(g.personality, GEN_TEXT.prose),
+    speechStyle: boundText(g.speechStyle, GEN_TEXT.prose),
+    relationshipPreferences: boundText(g.relationshipPreferences, GEN_TEXT.prose),
     relationshipStyle: g.relationshipStyle,
     likes: boundList(g.likes),
     dislikes: boundList(g.dislikes),
     goals: boundList(g.goals),
     boundaries: boundList(g.boundaries),
-    appearance: boundText(g.appearance, 600),
-    textingStyle: boundText(g.textingStyle, 240),
-    onlinePersona: boundText(g.onlinePersona, 240),
-    loveLanguage: boundText(g.loveLanguage, 120),
+    appearance: boundText(g.appearance, GEN_TEXT.prose),
+    textingStyle: boundText(g.textingStyle, GEN_TEXT.prose),
+    onlinePersona: boundText(g.onlinePersona, GEN_TEXT.prose),
+    loveLanguage: boundText(g.loveLanguage, GEN_TEXT.line),
     physicalNeeds: boundList(g.physicalNeeds, 8),
     physicalDesires: boundList(g.physicalDesires, 8),
     physicalDislikes: boundList(g.physicalDislikes, 8),

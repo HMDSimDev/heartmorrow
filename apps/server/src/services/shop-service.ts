@@ -318,8 +318,8 @@ export function boundGeneratedItem(g: GeneratedShopItem, input: GenerateShopItem
   if (netMoney > 0) price = Math.max(price, netMoney + 1);
 
   return {
-    name: g.name.slice(0, 60),
-    description: g.description.slice(0, 240),
+    name: g.name.slice(0, ITEM_GEN.MAX_NAME),
+    description: g.description.slice(0, ITEM_GEN.MAX_DESCRIPTION),
     category,
     rarity,
     price,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import type { FeedPostView, ReactionKind } from '@dsim/shared';
+import { GEN_TEXT, type FeedPostView, type ReactionKind } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
@@ -117,7 +117,7 @@ export function FacesApp() {
               value={draft}
               placeholder={t('faces.composePlaceholder')}
               rows={2}
-              maxLength={500}
+              maxLength={GEN_TEXT.line}
               onChange={(e) => setDraft(e.target.value)}
               disabled={posting}
             />
@@ -305,7 +305,7 @@ function CommentList({
             className="fcs-comment-input"
             value={text}
             placeholder={t('faces.addComment')}
-            maxLength={400}
+            maxLength={GEN_TEXT.line}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {

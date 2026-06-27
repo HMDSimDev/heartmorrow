@@ -12,6 +12,35 @@ export const DEFAULT_PLAYER_ID = 'player-default';
  *  you EARN (work shifts, minigames, wealth-system yield), never handed out. */
 export const DEFAULT_STARTING_MONEY = 0;
 
+/**
+ * Generous, centralized character-length tiers for free-text fields — both the ones
+ * the LLM GENERATES (profiles, world lore, descriptions, prose) and the ones a USER
+ * TYPES as generation input (world info, prompts, themes).
+ *
+ * These caps are NOT meant to shape output length (the prompts do that) — they exist
+ * only to bound a runaway/looping model so a degenerate repeat is REJECTED by
+ * validation rather than accepted. They are set far above any natural output, so real
+ * content is never clipped. (The structured caller strips `maxLength` from the GRAMMAR
+ * — see `structured.ts` — so the model is never hard-truncated mid-word; an over-long
+ * loop instead fails the Zod `.max()` here and is retried, never stored.)
+ *
+ * Tune the whole app's field sizes here.
+ */
+export const GEN_TEXT = {
+  /** Names, titles, tags, single labels, short one-phrase list items. */
+  label: 200,
+  /** One/two-line outputs: spoken & texted lines, social posts/comments, headlines,
+   *  short descriptions, quiz/news bodies, facts. */
+  line: 2_000,
+  /** Short paragraphs: longer descriptions, recap narrative, email bodies, room
+   *  descriptions, rolling summaries, short-bios. */
+  blurb: 8_000,
+  /** Rich, multi-paragraph fields: personality, appearance, speech/texting style,
+   *  online persona, world summary/lore/rules/notes, epilogues, and the prompts /
+   *  world-context a creator types to drive generation. */
+  prose: 24_000,
+} as const;
+
 /** Prompt-builder budget approximations (rough char-based, not real tokens). */
 export const PROMPT_LIMITS = {
   /** Max recent messages included verbatim in a prompt. */
@@ -23,9 +52,10 @@ export const PROMPT_LIMITS = {
   /** Trigger a rolling summary once a session exceeds this many messages. */
   summarizeEveryMessages: 24,
   /** Soft char cap for the cross-date chronicle injected into prompts. Kept at
-   * or above the chronicle's hard ceiling so a complete narrative is never
-   * re-truncated mid-sentence when fed back into a prompt. */
-  chronicleChars: 5000,
+   * or above the chronicle's hard ceiling (ChronicleSchema.chronicle = GEN_TEXT.blurb)
+   * so a complete narrative is never re-truncated mid-sentence when fed back into a
+   * prompt. */
+  chronicleChars: GEN_TEXT.blurb,
 } as const;
 
 /** Fold the chronicle (compress recent date-lines into the narrative) every N dates. */
@@ -96,10 +126,10 @@ export const AFTERGLOW_DAY_FLAG = 'afterglow:day';
 
 // --- Phone (Messages / Email) -----------------------------------------------
 
-/** Max length of a player-sent text. */
-export const TEXT_MAX_LEN = 1000;
-/** Max length of a character's text bubble. */
-export const TEXT_BUBBLE_MAX = 280;
+/** Max length of a player-sent text. Roomy — only a runaway guard, not a target. */
+export const TEXT_MAX_LEN = GEN_TEXT.line;
+/** Max length of a character's text bubble. Roomy — only a runaway guard, not a target. */
+export const TEXT_BUBBLE_MAX = GEN_TEXT.line;
 /** Max daily texts a single character may send. */
 export const DAILY_TEXTS_MAX = 3;
 /** Days unseen before a character's daily text turns "forlorn" (missing you). */

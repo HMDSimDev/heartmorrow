@@ -112,4 +112,54 @@ describe('callStructuredLlm', () => {
     // Strict JSON.parse fails on prose-wrapped JSON; we do NOT extract it.
     expect(res.ok).toBe(false);
   });
+
+  it('strips maxLength from the json_schema GRAMMAR so strings are never hard-cut mid-word', async () => {
+    // Records the response_format it was handed, then returns a valid short answer.
+    let seenFormat: unknown;
+    const adapter: ChatAdapter = {
+      name: 'capture',
+      async chat(req) {
+        seenFormat = req.responseFormat;
+        return { content: JSON.stringify({ bio: 'short' }) };
+      },
+      async streamChat(req, onDelta) {
+        const r = await this.chat(req);
+        onDelta(r.content);
+        return r;
+      },
+      async listModels() {
+        return [];
+      },
+    };
+    const BioSchema = z.object({ bio: z.string().max(2000) });
+    const res = await callStructuredLlm(BioSchema, [{ role: 'user', content: 't' }], {
+      settings: testSettings({ structuredMode: 'json_schema', maxRetries: 0 }),
+      task: 'unit test',
+      adapter,
+    });
+    expect(res.ok).toBe(true);
+    // The grammar handed to the endpoint must carry NO maxLength anywhere.
+    const hasMaxLength = (node: unknown): boolean => {
+      if (Array.isArray(node)) return node.some(hasMaxLength);
+      if (node && typeof node === 'object') {
+        return Object.entries(node as Record<string, unknown>).some(([k, v]) => k === 'maxLength' || hasMaxLength(v));
+      }
+      return false;
+    };
+    expect(seenFormat).toMatchObject({ type: 'json_schema' });
+    expect(hasMaxLength(seenFormat)).toBe(false);
+  });
+
+  it('still REJECTS an over-long (looping) string via Zod .max — a runaway is never accepted', async () => {
+    const BioSchema = z.object({ bio: z.string().max(10) });
+    // The model "loops" and overruns the 10-char cap; with the grammar no longer
+    // hard-capping, validation must catch it and fail (rather than silently truncate).
+    const adapter = new ScriptedAdapter([JSON.stringify({ bio: 'x'.repeat(500) })]);
+    const res = await callStructuredLlm(BioSchema, [{ role: 'user', content: 't' }], {
+      settings: testSettings({ structuredMode: 'json_schema', maxRetries: 0 }),
+      task: 'unit test',
+      adapter,
+    });
+    expect(res.ok).toBe(false);
+  });
 });

@@ -3,6 +3,7 @@ import {
   ChronicleSchema,
   CHRONICLE_FOLD_EVERY,
   DEFAULT_PLAYER_ID,
+  GEN_TEXT,
   type CharacterChronicle,
   type ConversationMode,
 } from '@dsim/shared';
@@ -55,8 +56,8 @@ export function appendChronicleLine(
 ): void {
   if (!line || !line.trim()) return;
   const chron = getChronicle(characterId, playerId);
-  // 600 mirrors ChronicleLineSchema.line / SessionEvaluationSchema.summaryLine.
-  const recentLines = [...chron.recentLines, { day, mode, line: line.slice(0, 600) }];
+  // Mirrors ChronicleLineSchema.line / SessionEvaluationSchema.summaryLine.
+  const recentLines = [...chron.recentLines, { day, mode, line: line.slice(0, GEN_TEXT.line) }];
   chroniclesRepo.update(
     CharacterChronicleSchema.parse({
       ...chron,

@@ -2,6 +2,7 @@ import {
   DayRecordSchema,
   WorldCalendarSchema,
   SEASON_LENGTH,
+  GEN_TEXT,
   type CalendarEntry,
   type DayRecap,
   type DayRecord,
@@ -36,7 +37,7 @@ function buildBeats(events: GameEvent[], worldSim: WorldSimResult | null): DayRe
   const townBeats: DayRecordBeat[] = [];
   for (const wb of worldSim?.beats ?? []) {
     if (wb.summary && wb.summary.trim()) {
-      townBeats.push({ icon: '🏘️', text: wb.summary.trim().slice(0, 280), tone: 'neutral' });
+      townBeats.push({ icon: '🏘️', text: wb.summary.trim().slice(0, GEN_TEXT.line), tone: 'neutral' });
     }
   }
   const playerBeats: DayRecordBeat[] = [];
