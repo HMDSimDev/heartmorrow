@@ -435,7 +435,7 @@ export function buildQuestGenMessages(input: { world: World; prompt: string; par
     : 'This quest is not anchored to a romance.';
   const system =
     `You design a single-scene "Wayfarer" quest for a dating-sim adventure mode. Output ONE JSON object matching the schema. ` +
-    `A scene is a node with: a vivid "setup", 1–3 "entities" (the mutable people/things; each has id, name, faction ∈ {party,ally,neutral,hostile}, disposition −100..100), and 2–4 "affordances". ` +
+    `A scene is a node with: a vivid "setup", 1–3 "entities" (the mutable people/things; each has id, name, a short "description" for the narrator (a persona like "young barista, neurotic and high-strung", or an object's nature like "a battered strongbox, rusted shut"), faction ∈ {party,ally,neutral,hostile}, disposition −100..100), and 2–4 "affordances". ` +
     `Each affordance is one approach the player can try: a "verb" ∈ {${QUEST_VERBS.filter((v) => v !== 'noop').join(', ')}}, the "stat" it tests, a "difficulty" ∈ {${DIFFICULTY_BANDS.join(', ')}}, a one-line "hint", and an "effects" menu with arrays for success/partial/fail/complication. ` +
     `Each effect is {op, …operands}. Use the EXACT operand name for each op — do NOT put everything in "itemId":\n` +
     `  setFlag/clearFlag → {"op":"setFlag","flag":"door_open"}\n` +
@@ -685,9 +685,7 @@ export function buildInterpretMessages(node: QuestNode, state: QuestState, text:
   const affordances = node.affordances
     .map((a) => `- ${a.verb} (tests ${a.stat}, ~${a.difficulty})${a.hint ? `: ${a.hint}` : ''}`)
     .join('\n');
-  const entities =
-    state.entities.map((e) => `- ${e.id}: ${e.name} (${e.faction}, feels ${e.disposition >= 0 ? '+' : ''}${e.disposition})`).join('\n') ||
-    '(none)';
+  const entities = entityRoster(state, { feelings: true });
   const system =
     `You are the INTERPRETER for a quest scene in a dating-sim adventure. The player ` +
     `types a freeform action; your ONLY job is to CLASSIFY it into one verb + a ` +
@@ -860,6 +858,21 @@ async function narrateOutcome(
   return templatedNarration(action, outcome, before, after);
 }
 
+/** A roster line per scene entity for narrator/interpreter prompts. Includes the
+ *  authored persona (description) so the model portrays characters, not just names them. */
+function entityRoster(state: QuestState, opts: { feelings?: boolean } = {}): string {
+  return (
+    state.entities
+      .map((e) => {
+        const who = e.name || e.id;
+        const desc = e.description?.trim() ? ` — ${e.description.trim()}` : '';
+        const feel = opts.feelings ? `, feels ${e.disposition >= 0 ? '+' : ''}${e.disposition}` : '';
+        return `- ${e.id}: ${who}${desc} (${e.faction}${feel})`;
+      })
+      .join('\n') || '(none)'
+  );
+}
+
 export function buildNarrateMessages(node: QuestNode, action: QuestAction, outcome: QuestOutcome, after: QuestState): ChatMessage[] {
   const effects = outcome.appliedEffects.map((e) => describeEffect(e, after)).filter(Boolean).join('; ') || 'nothing changes';
   const system =
@@ -869,6 +882,7 @@ export function buildNarrateMessages(node: QuestNode, action: QuestAction, outco
     `states. Keep it scene-neutral (no time of day). Stay in the fiction.`;
   const user =
     `=== SCENE ===\n${node.setup}\n\n` +
+    `=== CHARACTERS ===\n${entityRoster(after)}\n\n` +
     `=== WHAT THE PLAYER TRIED ===\nverb: ${action.verb}\n\n` +
     `=== OUTCOME (authoritative) ===\ngrade: ${outcome.grade}\nchanges: ${effects}\n` +
     (outcome.endGoal ? `ending: ${outcome.endGoal.outcome} — ${outcome.endGoal.label}\n` : '') +
@@ -885,7 +899,7 @@ export function buildNarrateMessages(node: QuestNode, action: QuestAction, outco
 function buildConverseMessages(node: QuestNode, action: QuestAction, playerText: string, state: QuestState): ChatMessage[] {
   const target = state.entities.find((e) => e.id === action.targetEntityId);
   const who = target ? target.name || target.id : 'whoever is here';
-  const roster = state.entities.map((e) => `- ${e.id}: ${e.name} (${e.faction})`).join('\n') || '(none)';
+  const roster = entityRoster(state);
   const system =
     `You are the NARRATOR for a quest scene in a dating-sim adventure. The player is making ` +
     `CONVERSATION — asking or talking — and NOTHING mechanical happens. Voice ${who}'s brief, ` +
@@ -909,7 +923,7 @@ function buildConverseMessages(node: QuestNode, action: QuestAction, playerText:
  *  in-fiction, so the player feels heard. The prompt forbids granting anything or
  *  resolving the scene, so it can never narrate a win the referee didn't award. */
 function buildUselessMessages(node: QuestNode, action: QuestAction, playerText: string, state: QuestState): ChatMessage[] {
-  const roster = state.entities.map((e) => `- ${e.id}: ${e.name} (${e.faction})`).join('\n') || '(none)';
+  const roster = entityRoster(state);
   const system =
     `You are the NARRATOR for a quest scene in a dating-sim adventure. The player tried ` +
     `something the scene does NOT support, so it has NO effect. In two or three sentences ` +

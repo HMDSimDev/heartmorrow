@@ -99,6 +99,9 @@ export const QuestEntityStateSchema = z.object({
   id: z.string().min(1),
   /** Display name (denormalised from the authored def for narration/UI). */
   name: z.string().default(''),
+  /** Short description for the narrator — a character's persona or an object's nature
+   *  (denormalised from the def). */
+  description: z.string().default(''),
   faction: QuestFactionSchema.default('neutral'),
   disposition: z.number().int().min(-100).max(100).default(0),
   hp: z.number().int().min(0).max(QUEST.MAX_HP).optional(),
@@ -126,6 +129,10 @@ export type QuestState = z.infer<typeof QuestStateSchema>;
 export const QuestEntityDefSchema = z.object({
   id: z.string().min(1),
   name: z.string().default(''),
+  /** A short description handed to the narrator — a person's persona ("young barista,
+   *  neurotic and high-strung") or an object's nature ("a battered strongbox, rusted
+   *  shut") — so it can portray the entity beyond its name. */
+  description: z.string().default(''),
   faction: QuestFactionSchema.default('neutral'),
   disposition: z.number().int().min(-100).max(100).default(0),
   hp: z.number().int().min(0).max(QUEST.MAX_HP).optional(),
@@ -644,6 +651,7 @@ export function initialQuestState(graph: QuestGraph, playerStats: Record<string,
     entities: node.entities.map((d) => ({
       id: d.id,
       name: d.name,
+      description: d.description,
       faction: d.faction,
       disposition: d.disposition,
       hp: d.hp,
@@ -788,6 +796,7 @@ function preClampGraph(input: unknown): unknown {
             const eo: Record<string, unknown> = { ...ent, id: pickId(ent.id, `e${j + 1}`, usedEnts) };
             if ('disposition' in ent) eo.disposition = numOr(ent.disposition, -100, 100, 0);
             if ('hp' in ent && ent.hp != null) eo.hp = numOr(ent.hp, 0, QUEST.MAX_HP, QUEST.MAX_HP);
+            if (typeof ent.description === 'string') eo.description = ent.description.slice(0, 500); // keep the prompt bounded
             return eo;
           })
         : node.entities;
@@ -856,6 +865,7 @@ export const QuestGenSchema = z.object({
               z.object({
                 id: z.string().default(''),
                 name: z.string().default(''),
+                description: z.string().default(''),
                 faction: QuestFactionSchema.default('neutral'),
                 disposition: z.number().default(0),
                 hp: z.number().optional(),

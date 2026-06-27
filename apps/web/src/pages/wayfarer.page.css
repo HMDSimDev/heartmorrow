@@ -842,6 +842,8 @@
 .wf-ed-subhead { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); }
 .wf-ed-subhead svg { color: var(--brass); flex: none; }
 .wf-ed-subhead .hint { text-transform: none; letter-spacing: 0; margin-left: 2px; color: var(--text-mute); opacity: 0.9; font-family: var(--font-body); font-size: 0.78rem; }
+.wf-ed-explain { margin: 0 0 2px; font-size: 0.78rem; line-height: 1.55; color: var(--text-mute); }
+.wf-ed-explain strong { color: var(--text-dim); font-weight: 600; }
 /* distinct left accents so the three sub-sections don't read as identical panels */
 .wf-ed-sub-cast { border-left: 2px solid rgba(157, 184, 222, 0.45); }
 .wf-ed-sub-cast .wf-ed-subhead svg { color: var(--moon); }
@@ -858,9 +860,25 @@
 .wf-ed-num { width: 64px; flex: none; }
 .wf-ed-id { width: 92px; flex: none; }
 .wf-ed-key { width: 112px; flex: none; }
-.wf-ed-colhead { font-family: var(--font-mono); font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-mute); padding: 0 2px; }
-.wf-ed-colhead > span { flex: 1; }
-.wf-ed-colhead > span.wf-ed-id, .wf-ed-colhead > span.wf-ed-num { flex: none; }
+.wf-ed-colhead { font-family: var(--font-mono); font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-mute); padding: 0; }
+
+/* Cast table: the header row and every entity's main row share ONE grid template,
+   so ID / Name / Side / Feeling / Health / delete line up exactly. Every track is a
+   FIXED width except the flexible name — an `auto` track would size to its content
+   (empty span in the header vs. the trash button in a row), which made the 1fr name
+   resolve differently between the two rows and shoved every later column out of line. */
+.wf-ed-castrow {
+  display: grid;
+  grid-template-columns: 88px minmax(110px, 1fr) 140px 74px 74px 40px;
+  gap: 6px;
+  align-items: center;
+}
+.wf-ed-castrow > input, .wf-ed-castrow > select, .wf-ed-castrow > button { width: 100%; min-width: 0; }
+
+/* a cast member: the grid row + a persona/description line for the narrator */
+.wf-ed-ent { display: flex; flex-direction: column; gap: 4px; }
+.wf-ed-ent + .wf-ed-ent { margin-top: 5px; padding-top: 5px; border-top: 1px dashed var(--border-soft); }
+.wf-ed-ent-desc { width: 100%; font-size: 0.84rem; }
 
 /* one approach — a "[verb] tests [stat] · [difficulty]" header + what each outcome does */
 .wf-ed-aff {
@@ -920,6 +938,32 @@
 .wf-ed-eff-hint { font-size: 0.72rem; color: var(--text-mute); padding-left: 2px; }
 .wf-ed-eff-warn { display: inline-flex; align-items: center; gap: 3px; font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--brass); border: 1px solid rgba(230, 177, 94, 0.45); background: rgba(230, 177, 94, 0.08); border-radius: 999px; padding: 1px 7px 1px 5px; white-space: nowrap; }
 .wf-ed-addeff { align-self: flex-start; }
+
+/* flag wiring: cross-highlight a flag's twins + a per-approach "what it unlocks" trace */
+.wf-ed-pred .wf-ed-flag { width: auto; min-width: 100px; }
+.wf-flag-hot {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px rgba(230, 177, 94, 0.45);
+  background: rgba(230, 177, 94, 0.06);
+}
+.wf-ed-trace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 9px;
+  font-size: 0.74rem;
+  color: var(--text-mute);
+  padding: 5px 9px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--border-soft);
+}
+.wf-ed-trace > svg { color: var(--brass); flex: none; }
+.wf-ed-trace-lead { font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.wf-ed-trace-item { display: inline-flex; align-items: center; gap: 4px; }
+.wf-ed-trace-item code { font-family: var(--font-mono); font-size: 0.86em; color: var(--sage); background: rgba(143, 207, 159, 0.12); padding: 0 5px; border-radius: 4px; }
+.wf-ed-trace-item.dangling { color: var(--brass); }
+.wf-ed-trace-item.dangling code { color: var(--brass); background: rgba(230, 177, 94, 0.12); }
 
 /* routing edges + goals */
 .wf-ed-edge { background: rgba(0, 0, 0, 0.12); padding: 6px 8px; border-radius: var(--radius-sm); }

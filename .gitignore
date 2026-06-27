@@ -43,3 +43,9 @@ coverage/
 .vitest/
 
 tools/screenshots/out/*
+
+*.sqlite-shm
+*.sqlite-wal
+
+docs/api.html
+docs/openapi.json

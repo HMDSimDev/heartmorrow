@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   QUEST_VERBS,
   DIFFICULTY_BANDS,
@@ -41,7 +41,7 @@ const VERB_LABEL: Record<string, string> = {
   use_item: 'Use item', aid: 'Aid / help', force: 'Force', attack: 'Attack', wait: 'Wait',
 };
 const DIFFICULTY_LABEL: Record<string, string> = {
-  trivial: 'Trivial · easy', normal: 'Normal', hard: 'Hard', desperate: 'Desperate · long-shot',
+  trivial: 'Trivial · ~90%', normal: 'Normal · ~65%', hard: 'Hard · ~40%', desperate: 'Desperate · ~20%',
 };
 const FACTION_LABEL: Record<string, string> = {
   party: 'In your party', ally: 'Ally', neutral: 'Neutral', hostile: 'Hostile',
@@ -99,6 +99,71 @@ const GRADE_GLOSS: Record<OutcomeGrade, string> = {
 const GRADES: OutcomeGrade[] = ['success', 'partial', 'fail', 'complication'];
 const STAT_OPTIONS = [...DATING_STAT_KEYS, 'grit', 'wits'] as const;
 const PREDICATE_KINDS = ['flag', 'entityFaction', 'entityHp', 'entityDisposition', 'hasItem', 'atNode', 'turnGte', 'always'] as const;
+
+// --- Flag wiring -----------------------------------------------------------
+// The hardest thing to see in the editor is which effect SETS a flag and which
+// route/goal CHECKS it. We index those relationships once, then (a) draw a trace
+// line under each approach and (b) cross-highlight a flag's twins when one is focused.
+
+interface FlagWiring {
+  setters: Map<string, string[]>; // flag -> human labels of effects that set/clear it
+  checkers: Map<string, string[]>; // flag -> human labels of routes/goals that check it
+}
+
+function computeWiring(graph: QuestGraph): FlagWiring {
+  const setters = new Map<string, string[]>();
+  const checkers = new Map<string, string[]>();
+  const add = (m: Map<string, string[]>, flag: string | undefined, label: string) => {
+    const f = flag?.trim();
+    if (!f) return;
+    (m.get(f) ?? m.set(f, []).get(f)!).push(label);
+  };
+  for (const n of graph.nodes) {
+    for (const a of n.affordances)
+      for (const grade of GRADES)
+        for (const e of a.effects[grade]) {
+          if (e.op === 'setFlag') add(setters, e.flag, `${VERB_LABEL[a.verb] ?? a.verb} · ${grade} (${n.id})`);
+          if (e.op === 'clearFlag') add(setters, e.flag, `cleared · ${VERB_LABEL[a.verb] ?? a.verb} (${n.id})`);
+        }
+    for (const edge of n.edges)
+      if (edge.when.kind === 'flag') add(checkers, edge.when.flag, `route ${n.id}→${edge.to}${edge.when.negate ? ' (not)' : ''}`);
+  }
+  for (const g of graph.goals)
+    if (g.predicate.kind === 'flag')
+      add(checkers, g.predicate.flag, `${g.outcome === 'win' ? 'Win' : 'Lose'} goal${g.label ? ` “${g.label}”` : ''}${g.predicate.negate ? ' (not)' : ''}`);
+  return { setters, checkers };
+}
+
+interface WiringCtx extends FlagWiring {
+  active: string | null;
+  setActive: (flag: string | null) => void;
+}
+const WiringContext = createContext<WiringCtx>({ setters: new Map(), checkers: new Map(), active: null, setActive: () => {} });
+
+/** A flag-name input that cross-highlights its twins on focus and explains, in its
+ *  tooltip, where the flag is set and checked. Used by effects + route/goal predicates. */
+function FlagInput({ value, onChange, placeholder = 'flag' }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const { setters, checkers, active, setActive } = useContext(WiringContext);
+  const flag = value.trim();
+  const hot = !!flag && active === flag;
+  const set = setters.get(flag) ?? [];
+  const checked = checkers.get(flag) ?? [];
+  const title = flag
+    ? `${set.length ? `Set by: ${set.join('; ')}` : 'Not set by anything yet'}\n${checked.length ? `Checked by: ${checked.join('; ')}` : 'Not checked by any route or goal'}`
+    : undefined;
+  return (
+    <input
+      list="wf-flags"
+      className={`wf-ed-flag${hot ? ' wf-flag-hot' : ''}`}
+      placeholder={placeholder}
+      title={title}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={() => setActive(flag || null)}
+      onBlur={() => setActive(null)}
+    />
+  );
+}
 
 interface Draft {
   id: string | null; // null = a brand-new quest
@@ -328,7 +393,7 @@ function GenerateModal({
 
 // --- The editor -------------------------------------------------------------
 
-function QuestEditor({ worldId, draft: initial, onClose, onSaved }: { worldId: string; draft: Draft; onClose: () => void; onSaved: () => void }) {
+export function QuestEditor({ worldId, draft: initial, onClose, onSaved }: { worldId: string; draft: Draft; onClose: () => void; onSaved: () => void }) {
   const [draft, setDraft] = useState<Draft>(initial);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -409,7 +474,11 @@ function QuestEditor({ worldId, draft: initial, onClose, onSaved }: { worldId: s
     }
   };
 
+  const wiring = useMemo(() => computeWiring(draft.graph), [draft.graph]);
+  const [activeFlag, setActiveFlag] = useState<string | null>(null);
+
   return (
+    <WiringContext.Provider value={{ ...wiring, active: activeFlag, setActive: setActiveFlag }}>
     <div className="wf-editor">
       {/* shared flag suggestions so authors reuse flag names instead of retyping them */}
       <datalist id="wf-flags">
@@ -551,6 +620,7 @@ function QuestEditor({ worldId, draft: initial, onClose, onSaved }: { worldId: s
         <Icon name="plus" size={14} /> Add goal
       </button>
     </div>
+    </WiringContext.Provider>
   );
 }
 
@@ -573,7 +643,7 @@ function NodeCard({
   const ents = node.entities.length;
   const affs = node.affordances.length;
   const routes = node.edges.length;
-  const summary = `${ents} entit${ents === 1 ? 'y' : 'ies'} · ${affs} approach${affs === 1 ? '' : 'es'} · ${routes} route${routes === 1 ? '' : 's'}${node.isTerminal ? ' · terminal' : ''}`;
+  const summary = `${ents} entit${ents === 1 ? 'y' : 'ies'} · ${affs} approach${affs === 1 ? '' : 'es'} · ${routes} route${routes === 1 ? '' : 's'}${node.isTerminal ? ' · ending scene' : ''}`;
   return (
     <section className={`card wf-ed-card wf-ed-node${isEntry ? ' wf-ed-node-entry' : ''}`}>
       <div className="wf-ed-rowhead">
@@ -582,14 +652,14 @@ function NodeCard({
         </button>
         <span className="wf-ed-scene-no" title={`Scene ${index + 1}`}>{index + 1}</span>
         <Field label="Scene id">
-          <input value={node.id} onChange={(e) => onChange((n) => (n.id = e.target.value))} />
+          <input title="A short identifier for this scene — routes and goals refer to it by this name." value={node.id} onChange={(e) => onChange((n) => (n.id = e.target.value))} />
         </Field>
         <Field label="Kind">
-          <input value={node.kind} onChange={(e) => onChange((n) => (n.kind = e.target.value))} />
+          <input title="A flavour tag for the narrator (e.g. scene, combat, social). Doesn't change the rules." value={node.kind} onChange={(e) => onChange((n) => (n.kind = e.target.value))} />
         </Field>
         {isEntry && <span className="wf-ed-entry" title="Play starts here">Entry</span>}
-        <label className="wf-ed-check">
-          <input type="checkbox" checked={node.isTerminal} onChange={(e) => onChange((n) => (n.isTerminal = e.target.checked))} /> Terminal
+        <label className="wf-ed-check" title="Reaching this scene ends the quest (resolved) the moment the player routes into it — use it for an exit or ending scene. Most scenes are not endings.">
+          <input type="checkbox" checked={node.isTerminal} onChange={(e) => onChange((n) => (n.isTerminal = e.target.checked))} /> Ending scene
         </label>
         {canRemove && <button className="btn danger sm" onClick={onRemove}><Icon name="trash" size={13} /></button>}
       </div>
@@ -603,28 +673,38 @@ function NodeCard({
       <div className="wf-ed-sub wf-ed-sub-cast">
         <div className="wf-ed-subhead"><Icon name="people" size={13} /> Cast <span className="hint">characters &amp; objects in this scene the player can affect</span></div>
         {node.entities.length > 0 && (
-          <div className="wf-ed-line wf-ed-colhead">
-            <span className="wf-ed-id">id</span>
+          <div className="wf-ed-castrow wf-ed-colhead">
+            <span>id</span>
             <span>name</span>
             <span>side</span>
-            <span className="wf-ed-num" title="how the character feels about the player">feeling</span>
-            <span className="wf-ed-num" title="health (leave blank if not a combatant)">health</span>
+            <span title="how the character feels about the player">feeling</span>
+            <span title="health (leave blank if not a combatant)">health</span>
             <span />
           </div>
         )}
         {node.entities.map((ent, ei) => (
-          <div key={ei} className="wf-ed-line">
-            <input className="wf-ed-id" placeholder="id" value={ent.id} onChange={(e) => onChange((n) => (n.entities[ei]!.id = e.target.value))} />
-            <input placeholder="name" value={ent.name} onChange={(e) => onChange((n) => (n.entities[ei]!.name = e.target.value))} />
-            <select value={ent.faction} onChange={(e) => onChange((n) => (n.entities[ei]!.faction = e.target.value as QuestNode['entities'][number]['faction']))}>
-              {QUEST_FACTIONS.map((f) => <option key={f} value={f}>{FACTION_LABEL[f] ?? f}</option>)}
-            </select>
-            <input className="wf-ed-num" type="number" title="feeling toward the player (−100…100)" value={ent.disposition} onChange={(e) => onChange((n) => (n.entities[ei]!.disposition = clampNum(e.target.value, -100, 100)))} />
-            <input className="wf-ed-num" type="number" title="health 0…100 (blank = none)" value={ent.hp ?? ''} placeholder="—" onChange={(e) => onChange((n) => (n.entities[ei]!.hp = e.target.value === '' ? undefined : clampNum(e.target.value, 0, QUEST.MAX_HP)))} />
-            <button className="btn danger sm" onClick={() => onChange((n) => { n.entities.splice(ei, 1); })}><Icon name="trash" size={12} /></button>
+          <div key={ei} className="wf-ed-ent">
+            <div className="wf-ed-castrow">
+              <input className="wf-ed-id" placeholder="id" value={ent.id} onChange={(e) => onChange((n) => (n.entities[ei]!.id = e.target.value))} />
+              <input placeholder="name" value={ent.name} onChange={(e) => onChange((n) => (n.entities[ei]!.name = e.target.value))} />
+              <select title="Whose side this character starts on. 'persuade' goals want them ally/party; 'defeat' goals target hostiles." value={ent.faction} onChange={(e) => onChange((n) => (n.entities[ei]!.faction = e.target.value as QuestNode['entities'][number]['faction']))}>
+                {QUEST_FACTIONS.map((f) => <option key={f} value={f}>{FACTION_LABEL[f] ?? f}</option>)}
+              </select>
+              <input className="wf-ed-num" type="number" title="feeling toward the player (−100…100)" value={ent.disposition} onChange={(e) => onChange((n) => (n.entities[ei]!.disposition = clampNum(e.target.value, -100, 100)))} />
+              <input className="wf-ed-num" type="number" title="health 0…100 (blank = none)" value={ent.hp ?? ''} placeholder="—" onChange={(e) => onChange((n) => (n.entities[ei]!.hp = e.target.value === '' ? undefined : clampNum(e.target.value, 0, QUEST.MAX_HP)))} />
+              <button className="btn danger sm" onClick={() => onChange((n) => { n.entities.splice(ei, 1); })}><Icon name="trash" size={12} /></button>
+            </div>
+            <input
+              className="wf-ed-ent-desc"
+              placeholder="what this is — e.g. “young barista, neurotic and high-strung” or “a battered strongbox, rusted shut” (for the narrator)"
+              title="A short description the narrator uses to portray this character or object. Not shown to the player verbatim — it just colours how it’s written."
+              maxLength={500}
+              value={ent.description ?? ''}
+              onChange={(e) => onChange((n) => (n.entities[ei]!.description = e.target.value))}
+            />
           </div>
         ))}
-        <button className="btn ghost sm wf-ed-add" onClick={() => onChange((n) => { n.entities.push({ id: `e${n.entities.length + 1}`, name: '', faction: 'neutral', disposition: 0 }); })}>
+        <button className="btn ghost sm wf-ed-add" onClick={() => onChange((n) => { n.entities.push({ id: `e${n.entities.length + 1}`, name: '', description: '', faction: 'neutral', disposition: 0 }); })}>
           <Icon name="plus" size={12} /> Add to cast
         </button>
       </div>
@@ -632,6 +712,9 @@ function NodeCard({
       {/* affordances */}
       <div className="wf-ed-sub wf-ed-sub-app">
         <div className="wf-ed-subhead"><Icon name="quest" size={13} /> Approaches <span className="hint">what the player can try here — and what each result does</span></div>
+        <p className="wf-ed-explain">
+          When the player tries an approach, the game rolls their <strong>stat</strong> against its <strong>difficulty</strong> — a higher stat or easier difficulty means better odds. The roll lands on one of the four outcomes (success → complication), and that outcome’s effects fire.
+        </p>
         {node.affordances.map((aff, ai) => (
           <AffordanceCard
             key={ai}
@@ -685,6 +768,13 @@ function AffordanceCard({
 }) {
   const [open, setOpen] = useState(true);
   const noSuccess = aff.effects.success.length === 0;
+  const { checkers } = useContext(WiringContext);
+  // Flags this approach SETS — the trace line shows what reads each of them.
+  const setFlags = useMemo(() => {
+    const out = new Set<string>();
+    for (const g of GRADES) for (const e of aff.effects[g]) if (e.op === 'setFlag' && e.flag?.trim()) out.add(e.flag.trim());
+    return [...out];
+  }, [aff]);
   return (
     <div className="card wf-ed-aff">
       {/* Header reads as a sentence: “[verb] tests [stat] · [difficulty]”, with a row
@@ -693,15 +783,15 @@ function AffordanceCard({
         <button type="button" className="btn ghost sm wf-ed-collapse" onClick={() => setOpen((o) => !o)} title={open ? 'Collapse approach' : 'Expand approach'}>
           <span className="wf-ed-chev" style={{ display: 'inline-flex', transform: open ? 'rotate(90deg)' : 'none' }}><Icon name="chevronRight" size={13} /></span>
         </button>
-        <select className="wf-ed-aff-verb" title="the action this approach represents" value={aff.verb} onChange={(e) => onChange((a) => (a.verb = e.target.value as NodeAffordance['verb']))}>
+        <select className="wf-ed-aff-verb" title="What kind of action this is (talk, sneak, fight…). Mostly flavour for the narrator — the stat and difficulty set the actual odds." value={aff.verb} onChange={(e) => onChange((a) => (a.verb = e.target.value as NodeAffordance['verb']))}>
           {QUEST_VERBS.filter((v) => v !== 'noop').map((v) => <option key={v} value={v}>{VERB_LABEL[v] ?? v}</option>)}
         </select>
-        <span className="wf-ed-aff-sep">tests</span>
-        <select title="player stat the check tests" value={aff.stat} onChange={(e) => onChange((a) => (a.stat = e.target.value))}>
+        <span className="wf-ed-aff-sep" title="the check rolls this player stat against the difficulty">tests</span>
+        <select title="The player's own character stat this check rolls against (charm, empathy, grit, wits…). Higher = better odds." value={aff.stat} onChange={(e) => onChange((a) => (a.stat = e.target.value))}>
           {STAT_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
         <span className="wf-ed-aff-sep">·</span>
-        <select title="how hard the check is — also the ceiling on how big its effects can be" value={aff.difficulty} onChange={(e) => onChange((a) => (a.difficulty = e.target.value as NodeAffordance['difficulty']))}>
+        <select title="Base success chance before the stat shifts it ±25%: Trivial ~90%, Normal ~65%, Hard ~40%, Desperate ~20%. Harder approaches also unlock bigger effects (side-switch, money, ending)." value={aff.difficulty} onChange={(e) => onChange((a) => (a.difficulty = e.target.value as NodeAffordance['difficulty']))}>
           {DIFFICULTY_BANDS.map((b) => <option key={b} value={b}>{DIFFICULTY_LABEL[b] ?? b}</option>)}
         </select>
         <span className="wf-ed-aff-dots" title="which outcomes do something">
@@ -744,6 +834,24 @@ function AffordanceCard({
             </div>
           ))}
         </div>
+        {setFlags.length > 0 && (
+          <div className="wf-ed-trace">
+            <Icon name="info" size={11} />
+            <span className="wf-ed-trace-lead">sets</span>
+            {setFlags.map((f) => {
+              const reads = checkers.get(f) ?? [];
+              return (
+                <span
+                  key={f}
+                  className={`wf-ed-trace-item${reads.length ? '' : ' dangling'}`}
+                  title={reads.length ? `Checked by: ${reads.join('; ')}` : 'No route or goal checks this flag yet'}
+                >
+                  <code>{f}</code> {reads.length ? `→ ${reads.join(', ')}` : '→ unused'}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </>)}
     </div>
   );
@@ -774,7 +882,7 @@ function EffectRow({
         </select>
 
         {(effect.op === 'setFlag' || effect.op === 'clearFlag') && (
-          <input list="wf-flags" placeholder="flag" value={effect.flag ?? ''} onChange={(e) => onChange((x) => (x.flag = e.target.value))} />
+          <FlagInput value={effect.flag ?? ''} onChange={(v) => onChange((x) => (x.flag = v))} />
         )}
 
         {effect.op === 'moveEntityToFaction' && (
@@ -909,7 +1017,7 @@ function PredicateRow({
 
       {predicate.kind === 'flag' && (
         <>
-          <input list="wf-flags" placeholder="flag" value={predicate.flag ?? ''} onChange={(e) => onChange((p) => (p.flag = e.target.value))} />
+          <FlagInput value={predicate.flag ?? ''} onChange={(v) => onChange((p) => (p.flag = v))} />
           <label className="wf-ed-check"><input type="checkbox" checked={!!predicate.negate} onChange={(e) => onChange((p) => (p.negate = e.target.checked))} /> not</label>
         </>
       )}
