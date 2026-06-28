@@ -70,6 +70,8 @@ export function cloneWorld(sourceId: string, name: string): World {
     // Authored wealth content (property + company DEFINITIONS) travels with the world.
     clonePropertiesToWorld(sourceId, created.id);
     cloneCompaniesToWorld(sourceId, created.id);
+    // Discovery: a cloned world copies featureFlags; seed acquaintances so it isn't all ???.
+    seedDiscoveryAcquaintances(created.id);
     return created;
   });
 }
@@ -82,6 +84,9 @@ export function updateWorld(id: string, patch: WorldUpdate): World {
   // backfill acquaintances (+ cold-start seed) the moment the flag flips on.
   if (saved.featureFlags.discovery && !current.featureFlags.discovery) {
     seedDiscoveryAcquaintances(saved.id);
+    // Pre-enable day records' town beats/narrative name NPCs you may not have met; drop them
+    // so the Calendar lazily reconstructs NPC-free records (worldSim=null) on next read.
+    getDb().run('DELETE FROM day_records WHERE world_id = ?', saved.id);
   }
   return saved;
 }

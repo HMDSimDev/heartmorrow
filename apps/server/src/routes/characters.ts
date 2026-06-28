@@ -33,7 +33,7 @@ import { previewCharacterPrompt } from '../services/conversation-service';
 import { getChronicle } from '../services/chronicle-service';
 import { getMoments } from '../services/moments-service';
 import { listMemorialCharacterIds } from '../services/crisis-service';
-import { listDiscoveredCharacterIds } from '../services/discovery-service';
+import { listDiscoveredCharacterIds, isRedacted } from '../services/discovery-service';
 import { listCanonFactsForCharacter, rejectCanonFact } from '../services/ex-canon-service';
 
 export async function characterRoutes(app: FastifyInstance): Promise<void> {
@@ -382,6 +382,7 @@ export async function characterRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { id } = req.params as { id: string };
       const character = getCharacter(id);
+      if (isRedacted(character.worldId, id)) return { name: '???', description: '' };
       const description = await ensureRoomDescription(id);
       return { name: `${character.name}'s Room`, description };
     },

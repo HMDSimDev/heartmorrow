@@ -333,6 +333,8 @@ export function composeDossier(characterId: string): CharacterDossier {
   const node = getSocialWeb(worldId ?? undefined).nodes.find((n) => n.id === characterId);
   const ties: DossierTie[] = (node?.ties ?? [])
     .map((t): DossierTie | null => {
+      // Discovery: a tie to someone you haven't met reveals that person exists — drop it.
+      if (isRedacted(worldId, t.targetId)) return null;
       const peer = charactersRepo.get(t.targetId);
       if (!peer) return null;
       return {
@@ -353,6 +355,11 @@ export function composeDossier(characterId: string): CharacterDossier {
   // Their remembered recent life + your shared history (memories come created_at DESC).
   const timeline: DossierTimelineEntry[] = listMemories(characterId)
     .slice(0, DOSSIER_TIMELINE_MAX)
+    // Discovery: drop memories that involve an unmet peer — the memory text itself can name them.
+    .filter((m) => {
+      const p = m.relatedCharacterId ? charactersRepo.get(m.relatedCharacterId) : null;
+      return !(p && p.id !== playerId && isRedacted(worldId, p.id));
+    })
     .map((m): DossierTimelineEntry => {
       const isLife = m.tags.includes(NPC_LIFE_TAG);
       const peer = m.relatedCharacterId ? charactersRepo.get(m.relatedCharacterId) : null;
@@ -360,7 +367,7 @@ export function composeDossier(characterId: string): CharacterDossier {
         id: m.id,
         text: m.text,
         kind: isLife ? 'life' : 'memory',
-        withName: peer && peer.id !== playerId ? peer.name : null,
+        withName: peer && peer.id !== playerId && !isRedacted(worldId, peer.id) ? peer.name : null,
         importance: Math.max(1, Math.min(5, m.importance)),
         createdAt: m.createdAt,
       };
@@ -375,7 +382,11 @@ export function composeDossier(characterId: string): CharacterDossier {
     .map((k) => ({
       claim: k.claim,
       fidelity: k.fidelity,
-      fromName: k.sourceKnowerId ? charactersRepo.get(k.sourceKnowerId)?.name ?? null : null,
+      // Discovery: don't name an unmet teller.
+      fromName:
+        k.sourceKnowerId && !isRedacted(worldId, k.sourceKnowerId)
+          ? charactersRepo.get(k.sourceKnowerId)?.name ?? null
+          : null,
     }));
 
   return {

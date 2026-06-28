@@ -119,7 +119,8 @@ export function CharacterProfile() {
       {({ character, relationship, memories }) => {
         // Discovery (play mode): block a deep-linked profile for someone you haven't met.
         const discoveryOn = !creatorMode && !!activeWorld?.featureFlags?.discovery;
-        if (discoveryOn && !(discoveredQ.data ?? []).includes(character.id)) {
+        const discoveredSet = new Set(discoveredQ.data ?? []);
+        if (discoveryOn && !discoveredSet.has(character.id)) {
           return (
             <div className="prof-layout">
               <div className="framed prof-mast">
@@ -410,13 +411,22 @@ export function CharacterProfile() {
                         <span className="trail" />
                       </div>
                       <div className="prof-conns">
-                        {connections.map((l, i) => (
-                          <Link className="prof-conn" to={`/characters/${l.targetId}`} key={i}>
-                            <span className="prof-conn-kind">{characterLinkLabel(l.kind)}</span>
-                            <span className="prof-conn-name flex-fill">{nameOf(l.targetId)}</span>
-                            <Icon name="chevronRight" size={15} />
-                          </Link>
-                        ))}
+                        {connections.map((l, i) => {
+                          // Discovery: don't name an unmet linked character.
+                          const targetUnmet = discoveryOn && !discoveredSet.has(l.targetId);
+                          return targetUnmet ? (
+                            <div className="prof-conn" key={i}>
+                              <span className="prof-conn-kind">{characterLinkLabel(l.kind)}</span>
+                              <span className="prof-conn-name flex-fill">???</span>
+                            </div>
+                          ) : (
+                            <Link className="prof-conn" to={`/characters/${l.targetId}`} key={i}>
+                              <span className="prof-conn-kind">{characterLinkLabel(l.kind)}</span>
+                              <span className="prof-conn-name flex-fill">{nameOf(l.targetId)}</span>
+                              <Icon name="chevronRight" size={15} />
+                            </Link>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

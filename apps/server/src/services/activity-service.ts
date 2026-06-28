@@ -24,6 +24,7 @@ import { addMoney, grantCareerXp, getSkillLevel, spendMoney } from './player-ser
 import { applyRelationshipChange, setRelationshipFlag, stampLastDate } from './stat-service';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
+import { assertMet } from './discovery-service';
 import { addMemoriesFromEvaluation } from './memory-service';
 import { appendChronicleLine } from './chronicle-service';
 import { detectMilestoneCrossing } from './milestone-service';
@@ -70,6 +71,7 @@ export function performActivity(input: PerformActivity): ActivityResult {
     character = getCharacter(data.characterId);
     if (!character.worldId) throw badRequest('That character is not part of a world.');
     if (character.worldId !== worldId) throw badRequest(`${character.name} isn't part of the active world.`);
+    assertMet(character); // discovery: can't spend time with someone you haven't met
     const day = ensureWorldState(worldId).day;
     const avail = getCharacterAvailability(worldId, day, character.id);
     if (!avail.available) {

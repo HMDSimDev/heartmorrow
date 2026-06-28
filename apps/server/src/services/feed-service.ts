@@ -52,7 +52,7 @@ import { notFound } from '../lib/errors';
 import { hasDated } from './text-message-service';
 import { pickGossipKnowledge } from './gossip-service';
 import { getRelationship } from './relationship-service';
-import { isRedacted } from './discovery-service';
+import { discoveryEnabled, isRedacted } from './discovery-service';
 import { getOrCreatePlayer } from './player-service';
 import { listMemories } from './memory-service';
 import { ensureWorldState } from './world-clock-service';
@@ -849,10 +849,25 @@ export function markFeedSeen(worldId: string, playerId: string = DEFAULT_PLAYER_
 /** Unread = NPC posts + NPC comments in this world since the player last opened Faces. */
 export function feedUnreadCount(worldId: string, playerId: string = DEFAULT_PLAYER_ID): number {
   const since = feedSeenRepo.get(worldId, playerId);
-  return (
-    feedPostsRepo.countCharacterPostsSince(worldId, since) +
-    feedCommentsRepo.countCharacterCommentsSince(worldId, since)
-  );
+  if (!discoveryEnabled(worldId)) {
+    return (
+      feedPostsRepo.countCharacterPostsSince(worldId, since) +
+      feedCommentsRepo.countCharacterCommentsSince(worldId, since)
+    );
+  }
+  // Discovery: count only what the redacted view actually shows — drop posts by unmet
+  // authors entirely (their comments go with them) and unmet commenters elsewhere.
+  let count = 0;
+  for (const p of feedPostsRepo.listByWorld(worldId)) {
+    if (p.authorType === 'character' && isRedacted(worldId, p.authorId)) continue;
+    if (p.authorType === 'character' && p.createdAt > since) count += 1;
+    for (const cm of feedCommentsRepo.listByPost(p.id)) {
+      if (cm.authorType !== 'character' || cm.createdAt <= since) continue;
+      if (isRedacted(worldId, cm.authorId)) continue;
+      count += 1;
+    }
+  }
+  return count;
 }
 
 // --- view assembly ----------------------------------------------------------

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { Character, Moment } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { useAppData } from '../../state/app-context';
+import { useDiscoveryGate } from '../../lib/useDiscovery';
 import { relativeTime } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
@@ -39,6 +40,7 @@ const KIND_EXPRESSION: Record<Moment['kind'], string> = {
 export function MomentsApp() {
   const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, dayTick } = useAppData();
+  const { discoveryOn, metIds } = useDiscoveryGate();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [moments, setMoments] = useState<Moment[]>([]);
@@ -48,13 +50,16 @@ export function MomentsApp() {
     void api
       .listCharacters()
       .then((cs) => {
-        // Only this world's people have a scrapbook here.
-        const inWorld = cs.filter((c) => !activeWorldId || c.worldId === activeWorldId);
+        // Only this world's people have a scrapbook here — and in a discovery world,
+        // only people you've met.
+        const inWorld = cs.filter(
+          (c) => (!activeWorldId || c.worldId === activeWorldId) && (!discoveryOn || metIds.has(c.id)),
+        );
         setCharacters(inWorld);
         setSelected((cur) => (cur && inWorld.some((c) => c.id === cur) ? cur : inWorld[0]?.id ?? null));
       })
       .catch(() => undefined);
-  }, [activeWorldId, dayTick]);
+  }, [activeWorldId, dayTick, discoveryOn, metIds]);
 
   // The `live` flag drops an out-of-order response so switching from A to B
   // mid-fetch can't leave A's moments showing under B. Re-keyed on dayTick so a

@@ -40,6 +40,7 @@ import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
 import { RelationshipBars } from '../components/StatBars';
 import { Banner, Empty, Field, Spinner } from '../components/ui';
+import { useDiscoveryGate } from '../lib/useDiscovery';
 import './date.page.css';
 
 /**
@@ -165,6 +166,8 @@ export function Chat() {
 
   // Abort any in-flight stream on unmount.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  const { discoveryOn, metIds } = useDiscoveryGate();
 
   useEffect(() => {
     void api.listCharacters().then(setCharacters).catch((e) => setError(errorMessage(e)));
@@ -920,7 +923,7 @@ export function Chat() {
               <div className="kicker">{t('chat.whoMeeting')}</div>
               <div className="date-pick-grid">
                 {characters
-                  .filter((c) => !activeWorldId || c.worldId === activeWorldId)
+                  .filter((c) => (!activeWorldId || c.worldId === activeWorldId) && (!discoveryOn || metIds.has(c.id)))
                   .map((c) => {
                     const avail = availability[c.id];
                     const unavailable = !!avail && !avail.available;

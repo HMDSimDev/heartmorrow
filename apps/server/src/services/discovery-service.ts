@@ -107,3 +107,12 @@ export function assertDiscoveryCanStart(character: Character, mode: Conversation
     throw badRequest(`${character.name} isn't someone you can date.`);
   }
 }
+
+/** Throw (without naming them) if discovery is on and the player hasn't met this character.
+ *  The shared gate for interactions outside the conversation flow (Together activities,
+ *  bonding minigames). No-op when discovery is off. */
+export function assertMet(character: Character): void {
+  if (isRedacted(character.worldId, character.id)) {
+    throw badRequest("You haven't met them yet.");
+  }
+}

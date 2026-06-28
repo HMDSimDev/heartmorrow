@@ -60,7 +60,7 @@ import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { getRelationship } from './relationship-service';
-import { assertDiscoveryCanStart } from './discovery-service';
+import { assertDiscoveryCanStart, isRedacted } from './discovery-service';
 import { getOrCreatePlayer, spendMoney } from './player-service';
 import { selectTopMemories } from './memory-service';
 import { addMemoriesFromEvaluation } from './memory-service';
@@ -363,6 +363,7 @@ function heardLately(character: Character): Array<{ subjectName: string; claim: 
     if (k.fidelity < KNOWLEDGE_GOSSIP_MIN_FIDELITY) continue;
     const subject = charactersRepo.get(k.subjectId);
     if (!subject || subject.worldId !== character.worldId) continue;
+    if (isRedacted(character.worldId, subject.id)) continue; // discovery: don't surface an unmet subject
     out.push({ subjectName: subject.name, claim: k.claim, fidelity: k.fidelity });
     if (out.length >= 4) break;
   }
@@ -391,6 +392,7 @@ function heardAboutPlayer(
     if (k.fidelity < PLAYER_GOSSIP.minFidelity) continue;
     const teller = charactersRepo.get(k.sourceKnowerId);
     if (!teller || teller.worldId !== character.worldId) continue;
+    if (isRedacted(character.worldId, teller.id)) continue; // discovery: don't name an unmet teller
     out.push({ tellerName: teller.name, claim: k.claim, fidelity: k.fidelity });
     if (out.length >= 3) break;
   }

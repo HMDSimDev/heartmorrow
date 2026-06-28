@@ -11,6 +11,7 @@ import { Empty } from '../components/ui';
 import { Icon, type IconName } from '../components/Icon';
 import { EnergyPips } from '../components/EnergyPips';
 import { useAppData } from '../state/app-context';
+import { useDiscoveryGate } from '../lib/useDiscovery';
 
 // How many faces the homepage "People in your life" strip previews before pointing
 // the player to the full roster. Newest-first, so a just-added person is always shown.
@@ -27,6 +28,7 @@ const TILES: { to: string; icon: IconName; titleKey: PagesKey; descKey: PagesKey
 export function Dashboard() {
   const { t } = useTranslation(['pages', 'common']);
   const { creatorMode, player, worldState, activeWorld, activeWorldId, dayTick } = useAppData();
+  const { discoveryOn, metIds } = useDiscoveryGate();
   const characters = useAsync(() => api.listCharacters(), [activeWorldId, dayTick]);
 
   const phase = worldState?.phase ?? null;
@@ -39,7 +41,7 @@ export function Dashboard() {
   // characters oldest-first, so reversing here keeps a just-added person visible
   // instead of letting them fall past the oldest faces.
   const people = (characters.data ?? [])
-    .filter((c) => !activeWorldId || c.worldId === activeWorldId)
+    .filter((c) => (!activeWorldId || c.worldId === activeWorldId) && (!discoveryOn || metIds.has(c.id)))
     .reverse();
   const hiddenCount = Math.max(0, people.length - PEOPLE_PREVIEW_CAP);
 

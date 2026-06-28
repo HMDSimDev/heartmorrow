@@ -14,6 +14,7 @@ import { datingStatLabel, relationshipStatLabel } from '../i18n/labels';
 import { Banner, Empty, Modal, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { PortraitPicker } from '../components/PortraitPicker';
+import { useDiscoveryGate } from '../lib/useDiscovery';
 import { GameView, type ActiveGame } from '../components/minigames/GameView';
 import './minigames.page.css';
 
@@ -31,6 +32,7 @@ export function Minigames() {
   // Synchronous re-entrancy guard: a single run can only be finished once, even
   // if a game component fires onComplete twice before `busy` state commits.
   const finishingRef = useRef(false);
+  const { discoveryOn, metIds } = useDiscoveryGate();
 
   useEffect(() => {
     void (async () => {
@@ -106,7 +108,9 @@ export function Minigames() {
 
   if (loading) return <Spinner />;
 
-  const visibleChars = characters.filter((c) => !activeWorldId || c.worldId === activeWorldId);
+  const visibleChars = characters.filter(
+    (c) => (!activeWorldId || c.worldId === activeWorldId) && (!discoveryOn || metIds.has(c.id)),
+  );
   const partner = visibleChars.find((c) => c.id === characterId) ?? null;
   // Minigames cost a daily action when tied to a world; gate Play at 0 energy
   // instead of letting the start 400 server-side.

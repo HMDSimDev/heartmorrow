@@ -23,6 +23,7 @@ import { buildMinigameReaction, favoriteMinigameFor, FAVORITE_BONUS, FLOP_PENALT
 import { worldsRepo, worldNotesRepo, minigameResultsRepo } from '../db/repositories';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
+import { assertMet } from './discovery-service';
 import { getLlmSettings } from './settings-service';
 import { applyCharacterDatingChange, applyRelationshipChange, stampLastDate } from './stat-service';
 import { assertCanAct, ensureWorldState, spendStamina } from './world-clock-service';
@@ -90,6 +91,8 @@ export async function startMinigame(input: MinigameStart): Promise<MinigameStart
 
   // Minigames cost a daily action when tied to a world; block at 0 stamina.
   if (world) assertCanAct(world.id);
+  // Discovery: a bonding minigame with a specific person requires having met them.
+  if (character) assertMet(character);
 
   // A career-gated job stays locked until the required skill is high enough.
   if (world && isCareerSkill(module.info.requiresSkill)) {

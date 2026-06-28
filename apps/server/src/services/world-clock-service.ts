@@ -232,7 +232,9 @@ export async function advanceDay(worldId: string): Promise<SleepResult> {
     calendar: { dayOfWeek: cal.dayOfWeek, season: cal.season, isWeekend: cal.isWeekend },
     weather: { label: weather.label, icon: weather.icon },
     holiday: cal.holiday ? { name: cal.holiday.name, blurb: cal.holiday.blurb } : null,
-    worldSim,
+    // Discovery: the recap modal's "around town" beats name NPCs you may not have met —
+    // blank them on the returned result (the persisted record + LLM narrative already self-suppress).
+    worldSim: discoveryEnabled(worldId) && worldSim ? { ...worldSim, beats: [] } : worldSim,
     income,
   };
 }

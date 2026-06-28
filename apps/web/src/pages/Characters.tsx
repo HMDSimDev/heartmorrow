@@ -223,8 +223,10 @@ export function Characters() {
           // them (creator mode) so they can be recovered instead of lost forever.
           const unassigned = creatorMode ? allCharacters.filter((c) => !c.worldId) : [];
           // Discovery (play mode only): unmet people show as ??? until you introduce
-          // yourself. Creator mode always sees the full roster.
-          const discoveryOn = !creatorMode && !!activeWorld?.featureFlags?.discovery;
+          // yourself. Creator mode always sees the full roster. Fail SAFE: until the world
+          // list is loaded, redact — flashing real names during load would leak (a brief
+          // redact→reveal flicker on non-discovery worlds is harmless).
+          const discoveryOn = !creatorMode && (!worldsLoaded || !!activeWorld?.featureFlags?.discovery);
           const discoveredSet = new Set(discoveredQ.data ?? []);
           const metCount = characters.filter((c) => discoveredSet.has(c.id)).length;
           return (

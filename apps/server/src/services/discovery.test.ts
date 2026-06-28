@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetDb, seedWorldAndCharacter } from '../test/helpers';
 import { DEFAULT_DATING_STATS, FeedPostSchema, NpcKnowledgeSchema } from '@dsim/shared';
-import { composeConstellation, composeDossier, createCharacter } from './character-service';
+import { composeConstellation, composeDossier, createCharacter, updateCharacter } from './character-service';
 import { applyRelationshipChange, stampLastSeen } from './stat-service';
-import { createWorld, updateWorld } from './world-service';
+import { cloneWorld, createWorld, updateWorld } from './world-service';
 import { createSession } from './conversation-service';
 import { getFeedView } from './feed-service';
 import { pickGossipKnowledge } from './gossip-service';
@@ -11,6 +11,7 @@ import { recordDay } from './day-record-service';
 import { dayRecordsRepo, feedPostsRepo, npcKnowledgeRepo } from '../db/repositories';
 import { newId } from '../lib/ids';
 import {
+  assertMet,
   getAcquaintanceStage,
   getDiscoveryState,
   isDiscovered,
@@ -236,5 +237,52 @@ describe('discovery redaction: gossip + recap do not name unmet people', () => {
       events: [],
     });
     expect(dayRecordsRepo.get(w.id, 1)?.beats.some((b) => b.text.includes('Mara'))).toBe(true);
+  });
+});
+
+describe('discovery redaction: a met character does not leak their unmet peers', () => {
+  const DS = DEFAULT_DATING_STATS;
+
+  it("drops a met character's ties to unmet peers, reveals them once met", () => {
+    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const a = createCharacter({ worldId: w.id, name: 'Ana', age: 30, datingStats: DS });
+    const b = createCharacter({ worldId: w.id, name: 'Bo', age: 31, datingStats: DS });
+    updateCharacter(a.id, { links: [{ targetId: b.id, kind: 'friend' }] });
+    stampMet(a.id, 1, null); // met Ana, not Bo
+
+    expect(composeDossier(a.id).ties.some((t) => t.targetId === b.id)).toBe(false);
+
+    stampMet(b.id, 1, null);
+    expect(composeDossier(a.id).ties.some((t) => t.targetId === b.id)).toBe(true);
+  });
+
+  it('flag off: dossier ties are not redacted', () => {
+    const w = createWorld({ name: 'Town' }); // discovery off
+    const a = createCharacter({ worldId: w.id, name: 'Ana', age: 30, datingStats: DS });
+    const b = createCharacter({ worldId: w.id, name: 'Bo', age: 31, datingStats: DS });
+    updateCharacter(a.id, { links: [{ targetId: b.id, kind: 'friend' }] });
+
+    expect(composeDossier(a.id).ties.some((t) => t.targetId === b.id)).toBe(true);
+  });
+});
+
+describe('discovery interaction gates + lifecycle', () => {
+  const DS = DEFAULT_DATING_STATS;
+
+  it('assertMet gates non-conversation interactions (together / minigames) on having met them', () => {
+    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const c = createCharacter({ worldId: w.id, name: 'Quinn', age: 27, datingStats: DS });
+    expect(() => assertMet(c)).toThrow(/met/i);
+    stampMet(c.id, 1, null);
+    expect(() => assertMet(c)).not.toThrow();
+  });
+
+  it('cloning a discovery world seeds acquaintances so it is not a wall of ???', () => {
+    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    createCharacter({ worldId: w.id, name: 'One', age: 25, datingStats: DS });
+    createCharacter({ worldId: w.id, name: 'Two', age: 26, datingStats: DS });
+
+    const copy = cloneWorld(w.id, 'Town Copy');
+    expect(listDiscoveredCharacterIds(copy.id).length).toBeGreaterThanOrEqual(1);
   });
 });

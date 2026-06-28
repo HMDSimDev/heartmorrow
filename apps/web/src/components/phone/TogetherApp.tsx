@@ -5,6 +5,7 @@ import { fitLabel, togetherFit } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
+import { useDiscoveryGate } from '../../lib/useDiscovery';
 import { relationshipStatLabel } from '../../i18n/labels';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PortraitPicker } from '../PortraitPicker';
@@ -55,16 +56,18 @@ export function TogetherApp() {
 
   const noEnergy = (worldState?.stamina ?? 0) <= 0;
   const onDate = !!activeDate;
+  const { discoveryOn, metIds } = useDiscoveryGate();
 
   useEffect(() => {
     api.listActivities().then(setActivities).catch(() => undefined);
     api.listCharacters().then(setAllCharacters).catch(() => undefined);
   }, [dayTick]);
 
-  // Time together happens in the active world, so only offer its characters.
+  // Time together happens in the active world, so only offer its characters — and in a
+  // discovery world, only people you've met.
   const characters = useMemo(
-    () => allCharacters.filter((c) => c.worldId === activeWorldId),
-    [allCharacters, activeWorldId],
+    () => allCharacters.filter((c) => c.worldId === activeWorldId && (!discoveryOn || metIds.has(c.id))),
+    [allCharacters, activeWorldId, discoveryOn, metIds],
   );
   useEffect(() => {
     if (characters.length && (target === null || !characters.some((c) => c.id === target))) {

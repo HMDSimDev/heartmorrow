@@ -34,7 +34,7 @@ import {
 } from '../db/repositories';
 import { newId } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
-import { getCharacter } from './character-service';
+import { getCharacter, seedDiscoveryAcquaintances } from './character-service';
 import { getWorld } from './world-service';
 import { ensureRelationship } from './relationship-service';
 import { getAsset, readAssetFile, saveUploadedAsset, safeUploadsPath } from './asset-service';
@@ -478,6 +478,8 @@ function importWorldPayload(
   // linkedCharacterId then resolves to null (the character isn't in this world).
   const cast = includeCharacters ? payload.characters : [];
   const { ids: characterIds, idMap: charIdMap } = importCharacterDefs(cast, newWorldId, assetIdMap);
+  // Discovery: if the imported world has discovery on, seed acquaintances so it isn't all ???.
+  if (includeCharacters) seedDiscoveryAcquaintances(newWorldId);
 
   for (const p of payload.properties as Property[]) {
     propertiesRepo.insert(

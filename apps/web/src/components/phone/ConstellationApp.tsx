@@ -280,11 +280,12 @@ function buildSky(
  */
 export function ConstellationApp() {
   const { t } = useTranslation(['phone', 'common']);
-  const { activeWorldId, creatorMode, dayTick } = useAppData();
+  const { activeWorldId, activeWorld, creatorMode, dayTick } = useAppData();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [nodes, setNodes] = useState<SocialWebNode[]>([]);
   const [playerEdges, setPlayerEdges] = useState<ConstellationEdge[]>([]);
   const [playerName, setPlayerName] = useState('');
+  const [discovered, setDiscovered] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [reloadKey, setReloadKey] = useState(0);
@@ -303,13 +304,15 @@ export function ConstellationApp() {
       api.listCharacters(activeWorldId ?? undefined),
       api.socialWeb(activeWorldId ?? undefined),
       api.constellation(activeWorldId ?? undefined),
+      api.listDiscovered(activeWorldId ?? undefined),
     ])
-      .then(([chars, web, cst]) => {
+      .then(([chars, web, cst, disc]) => {
         if (cancelled) return;
         setCharacters(chars);
         setNodes(web.nodes);
         setPlayerEdges(cst.edges);
         setPlayerName(cst.playerName);
+        setDiscovered(disc);
       })
       .catch((e) => {
         if (!cancelled) setError(errorMessage(e));
@@ -322,7 +325,14 @@ export function ConstellationApp() {
     };
   }, [activeWorldId, reloadKey, dayTick]);
 
-  const charById = useMemo(() => new Map(characters.map((c) => [c.id, c])), [characters]);
+  // Discovery (play mode): restrict the whole map to people you've MET. knownNodes/cards/sky/
+  // PersonCard all gate on charById, so intersecting it here hides unmet stars, cards, and peer
+  // chips — and drops ties pointing at unmet characters. Creator mode sees the full graph.
+  const charById = useMemo(() => {
+    const discoveryOn = !creatorMode && !!activeWorld?.featureFlags?.discovery;
+    const visible = discoveryOn ? characters.filter((c) => discovered.includes(c.id)) : characters;
+    return new Map(visible.map((c) => [c.id, c]));
+  }, [characters, discovered, creatorMode, activeWorld]);
 
   const knownNodes = useMemo(
     () =>
