@@ -577,6 +577,7 @@ export const api = {
 
   // minigames
   listMemorials: (worldId?: string) => get<string[]>(`/characters/memorials${worldQuery(worldId)}`),
+  listDiscovered: (worldId?: string) => get<string[]>(`/characters/discovered${worldQuery(worldId)}`),
   listMinigames: () => get<MinigameInfo[]>('/minigames'),
   startMinigame: (input: MinigameStart) => post<MinigameStartResponse>('/minigames/start', input),
   finishMinigame: (input: MinigameFinish) => post<MinigameFinishResponse>('/minigames/finish', input),

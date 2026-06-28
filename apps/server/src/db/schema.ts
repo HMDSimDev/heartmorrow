@@ -548,6 +548,37 @@ CREATE TABLE IF NOT EXISTS prompt_overrides (
   override_text TEXT NOT NULL,
   updated_at    INTEGER NOT NULL
 );
+
+-- Discovery: multi-participant roster for a conversation session (group Meets). The
+-- session's character_id stays the anchor/host; this layers the other present
+-- characters on top. Cascades when the session or a character is deleted.
+CREATE TABLE IF NOT EXISTS session_participants (
+  session_id   TEXT NOT NULL REFERENCES conversation_sessions(id) ON DELETE CASCADE,
+  character_id TEXT NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  seat         INTEGER NOT NULL DEFAULT 0,
+  role         TEXT NOT NULL DEFAULT 'present',
+  state        TEXT NOT NULL DEFAULT 'present',
+  rapport      INTEGER,
+  updated_at   INTEGER NOT NULL,
+  PRIMARY KEY (session_id, character_id)
+);
+CREATE INDEX IF NOT EXISTS idx_session_participants_session ON session_participants(session_id);
+
+-- Discovery: the LLM-authored "what's happening here" scene for a location at one
+-- (world, day, phase) — activities + groupings + prose, in the JSON data column.
+-- PERSISTED (not just an in-memory cache) so activities/groupings are stable on
+-- re-entry and across restart, and group-Meet eligibility doesn't flicker. Derived
+-- + idempotent by the natural key; cascades with the world.
+CREATE TABLE IF NOT EXISTS location_scenes (
+  world_id    TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+  location_id TEXT NOT NULL,
+  day         INTEGER NOT NULL,
+  phase       TEXT NOT NULL,
+  data        TEXT NOT NULL DEFAULT '{}',
+  created_at  INTEGER NOT NULL,
+  PRIMARY KEY (world_id, location_id, day, phase)
+);
+CREATE INDEX IF NOT EXISTS idx_location_scenes_world ON location_scenes(world_id, day, phase);
 `;
 
 /**
@@ -791,5 +822,29 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
     table: 'worlds',
     column: 'gambling_config',
     ddl: `ALTER TABLE worlds ADD COLUMN gambling_config TEXT NOT NULL DEFAULT '{}'`,
+  },
+  // --- Location-based discovery (feat/social-world) ---------------------------
+  {
+    // Can the player date this character? 0 = a fixture NPC (bartender/barista),
+    // present + talkable but never dateable. Default 1 keeps every existing
+    // character dateable (unchanged behavior).
+    table: 'characters',
+    column: 'dateable',
+    ddl: `ALTER TABLE characters ADD COLUMN dateable INTEGER NOT NULL DEFAULT 1`,
+  },
+  {
+    // Location ids this character frequents — a SOFT placement weight for discovery.
+    // Default '[]' = unhaunted (free placement only).
+    table: 'characters',
+    column: 'haunts',
+    ddl: `ALTER TABLE characters ADD COLUMN haunts TEXT NOT NULL DEFAULT '[]'`,
+  },
+  {
+    // Per-world discovery tuning (startKnownCount / unavailableChance / meetStaminaCost).
+    // JSON blob, default '{}' → the DiscoveryConfig defaults apply; only meaningful
+    // when featureFlags.discovery is on.
+    table: 'worlds',
+    column: 'discovery_config',
+    ddl: `ALTER TABLE worlds ADD COLUMN discovery_config TEXT NOT NULL DEFAULT '{}'`,
   },
 ];

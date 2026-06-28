@@ -29,6 +29,8 @@ export function Characters() {
   const state = useAsync(() => api.listCharacters(), [activeWorldId, dayTick]);
   const memorials = useAsync(() => api.listMemorials(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   const lost = new Set(memorials.data ?? []);
+  // Discovery: the ids the player has actually met (play mode renders the rest as ???).
+  const discoveredQ = useAsync(() => api.listDiscovered(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const [pendingDuplicate, setPendingDuplicate] = useState<{ id: string; name: string } | null>(null);
   const [actingId, setActingId] = useState<string | null>(null);
@@ -220,6 +222,11 @@ export function Characters() {
           // World-less ("unassigned") characters belong to no world's roster — surface
           // them (creator mode) so they can be recovered instead of lost forever.
           const unassigned = creatorMode ? allCharacters.filter((c) => !c.worldId) : [];
+          // Discovery (play mode only): unmet people show as ??? until you introduce
+          // yourself. Creator mode always sees the full roster.
+          const discoveryOn = !creatorMode && !!activeWorld?.featureFlags?.discovery;
+          const discoveredSet = new Set(discoveredQ.data ?? []);
+          const metCount = characters.filter((c) => discoveredSet.has(c.id)).length;
           return (
             <>
               {characters.length === 0 ? (
@@ -238,11 +245,31 @@ export function Characters() {
           ) : (
             <>
               <div className="ppl-count">
-                <Trans i18nKey="characters.soulCount" ns="pages" count={characters.length} components={[<span className="ppl-num" />]} />
+                {discoveryOn
+                  ? t('characters.metCount', { met: metCount, total: characters.length })
+                  : <Trans i18nKey="characters.soulCount" ns="pages" count={characters.length} components={[<span className="ppl-num" />]} />}
               </div>
               <div className="ppl-gallery">
                 {characters.map((c) => {
                   const memorial = lost.has(c.id);
+                  // Discovery: an unmet person is a ??? silhouette — no name, vitals, or Date.
+                  if (discoveryOn && !discoveredSet.has(c.id)) {
+                    return (
+                      <article className="ppl-plate ppl-unknown" key={c.id}>
+                        <div className="ppl-frame">
+                          <div className="ppl-portrait-link">
+                            <Portrait character={{ name: '???', portraitAssetId: null, expressionAssets: {} }} />
+                          </div>
+                        </div>
+                        <div className="ppl-nameplate">
+                          <h3 className="ppl-name">???</h3>
+                          <div className="ppl-meta">{t('characters.notMet')}</div>
+                        </div>
+                        <p className="ppl-desc ppl-empty-desc">{t('characters.unknownPerson')}</p>
+                        <div className="ppl-actions" />
+                      </article>
+                    );
+                  }
                   return (
                   <article
                     className={`ppl-plate${memorial ? ' ppl-memorial' : ''}${selecting && selected.has(c.id) ? ' is-selected' : ''}`}

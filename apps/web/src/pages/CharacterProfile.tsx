@@ -64,7 +64,7 @@ export function CharacterProfile() {
   const { t } = useTranslation(['pages', 'common']);
   const { id = '' } = useParams();
   const nav = useNavigate();
-  const { creatorMode, dayTick } = useAppData();
+  const { creatorMode, activeWorld, activeWorldId, dayTick } = useAppData();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -74,6 +74,7 @@ export function CharacterProfile() {
   const sessions = useAsync(() => api.listConversations(), [id]);
   const chronicle = useAsync(() => api.getChronicle(id), [id]);
   const characters = useAsync(() => api.listCharacters(), []);
+  const discoveredQ = useAsync(() => api.listDiscovered(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   // The character's world day, so we can tell "needs space" (still in the
   // post-breakup cooldown) from "open to reconciling" (cooldown elapsed).
   const worldId = bundle.data?.character.worldId ?? null;
@@ -116,6 +117,24 @@ export function CharacterProfile() {
   return (
     <Loader state={bundle}>
       {({ character, relationship, memories }) => {
+        // Discovery (play mode): block a deep-linked profile for someone you haven't met.
+        const discoveryOn = !creatorMode && !!activeWorld?.featureFlags?.discovery;
+        if (discoveryOn && !(discoveredQ.data ?? []).includes(character.id)) {
+          return (
+            <div className="prof-layout">
+              <div className="framed prof-mast">
+                <div className="prof-mast-titles">
+                  <span className="kicker">{t('profile.dossier')}</span>
+                  <h1>???</h1>
+                  <p>{t('profile.notMet')}</p>
+                </div>
+                <div className="prof-mast-actions">
+                  <Link className="btn" to="/characters">{t('profile.backToPeople')}</Link>
+                </div>
+              </div>
+            </div>
+          );
+        }
         const effective = effectiveDatingStats(character.datingStats, relationship.flags);
         const buffs = listActiveBuffs(relationship.flags);
         const storyFlags = Object.entries(relationship.flags)

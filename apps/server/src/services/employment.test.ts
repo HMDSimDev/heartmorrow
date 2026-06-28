@@ -8,7 +8,7 @@ import { getDb } from '../db/index';
 
 beforeEach(() => resetDb());
 
-const JOB = { title: 'Barista', place: 'Café Lumen', workdays: [0, 1, 2, 3, 4], shiftPhase: 'morning' as const };
+const JOB = { title: 'Barista', place: 'Café Lumen', workdays: [0, 1, 2, 3, 4], shiftPhase: 'morning' as const, locationId: null, shiftPhases: [] };
 
 describe('character employment (Phase 1)', () => {
   it('persists an authored job and round-trips through export/import', () => {

@@ -33,6 +33,7 @@ import { previewCharacterPrompt } from '../services/conversation-service';
 import { getChronicle } from '../services/chronicle-service';
 import { getMoments } from '../services/moments-service';
 import { listMemorialCharacterIds } from '../services/crisis-service';
+import { listDiscoveredCharacterIds } from '../services/discovery-service';
 import { listCanonFactsForCharacter, rejectCanonFact } from '../services/ex-canon-service';
 
 export async function characterRoutes(app: FastifyInstance): Promise<void> {
@@ -133,6 +134,23 @@ export async function characterRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId } = req.query as { worldId?: string };
       return listMemorialCharacterIds(worldId);
+    },
+  );
+
+  // Character ids the player has MET in a discovery world — the People tab renders the
+  // rest as ???. Static path, so it resolves before the `/characters/:id` param route.
+  app.get(
+    '/characters/discovered',
+    {
+      schema: docSchema({
+        tags: ['characters'],
+        summary: 'List character ids the player has met (discovery worlds)',
+        querystring: WorldScopedQuerySchema,
+      }),
+    },
+    async (req) => {
+      const { worldId } = req.query as { worldId?: string };
+      return worldId ? listDiscoveredCharacterIds(worldId) : [];
     },
   );
 

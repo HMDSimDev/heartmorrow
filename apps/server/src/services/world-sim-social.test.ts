@@ -68,6 +68,8 @@ const ALWAYS_AT: (place: string) => NonNullable<Character['employment']> = (plac
   place,
   workdays: [0, 1, 2, 3, 4, 5, 6],
   shiftPhase: 'morning',
+  locationId: null,
+  shiftPhases: [],
 });
 
 describe('world-sim conversation substance', () => {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { StructuredOutputMode } from './settings';
-import { WorldNoteScopeSchema } from './entities';
+import { WorldNoteScopeSchema, LocationKindSchema } from './entities';
 import { MAX_EVAL_DELTA, EMAILS_MAX_PER_DAY, MIN_CHARACTER_AGE, GUARDEDNESS_DEFAULT, WEALTH, GEN_TEXT } from '../constants';
 import { PhaseSchema } from '../time';
 import { ItemCategorySchema, ItemRaritySchema } from './items';
@@ -242,7 +242,7 @@ export type ShopItemGeneration = z.infer<typeof ShopItemGenerationSchema>;
  * assigns the id, so generated drafts can never set a name/desc/tags out of range.
  */
 export const LOCATION_GEN = {
-  MAX_LOCATIONS: 8,
+  MAX_LOCATIONS: 32,
   MAX_NAME: GEN_TEXT.label,
   MAX_DESCRIPTION: GEN_TEXT.line,
   MAX_TAGS: 6,
@@ -256,6 +256,8 @@ export const GeneratedLocationSchema = z.object({
   tags: z.array(z.string().min(1).max(LOCATION_GEN.MAX_TAG_LEN)).max(LOCATION_GEN.MAX_TAGS).default([]),
   /** True if the venue is sheltered from the weather (mirrors Location.indoor). */
   indoor: z.boolean().default(false),
+  /** Discovery: coarse venue category (mirrors Location.kind). */
+  kind: LocationKindSchema.default('other'),
 });
 export type GeneratedLocation = z.infer<typeof GeneratedLocationSchema>;
 
@@ -279,7 +281,7 @@ export const WORLD_GEN = {
   MAX_RULES: GEN_TEXT.prose,
   MAX_GLOBAL_NOTES: GEN_TEXT.prose,
   MIN_LOCATIONS: 3,
-  MAX_LOCATIONS: 8,
+  MAX_LOCATIONS: 32,
   MIN_NOTES: 3,
   MAX_NOTES: 6,
   MAX_NOTE_TITLE: GEN_TEXT.label,

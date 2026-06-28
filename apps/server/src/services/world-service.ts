@@ -12,7 +12,7 @@ import { getDb } from '../db/index';
 import { charactersRepo, worldsRepo, worldNotesRepo } from '../db/repositories';
 import { newId, playerIdForWorld } from '../lib/ids';
 import { notFound } from '../lib/errors';
-import { cloneCharactersToWorld } from './character-service';
+import { cloneCharactersToWorld, seedDiscoveryAcquaintances } from './character-service';
 import { clonePropertiesToWorld } from './property-service';
 import { cloneCompaniesToWorld } from './market-service';
 
@@ -77,7 +77,13 @@ export function cloneWorld(sourceId: string, name: string): World {
 export function updateWorld(id: string, patch: WorldUpdate): World {
   const current = getWorld(id);
   const next = WorldSchema.parse({ ...current, ...patch, id: current.id, updatedAt: Date.now() });
-  return worldsRepo.update(next);
+  const saved = worldsRepo.update(next);
+  // Enabling discovery on an existing save must not re-hide people you already know:
+  // backfill acquaintances (+ cold-start seed) the moment the flag flips on.
+  if (saved.featureFlags.discovery && !current.featureFlags.discovery) {
+    seedDiscoveryAcquaintances(saved.id);
+  }
+  return saved;
 }
 
 /**

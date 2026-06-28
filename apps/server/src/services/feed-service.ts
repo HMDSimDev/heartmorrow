@@ -52,6 +52,7 @@ import { notFound } from '../lib/errors';
 import { hasDated } from './text-message-service';
 import { pickGossipKnowledge } from './gossip-service';
 import { getRelationship } from './relationship-service';
+import { isRedacted } from './discovery-service';
 import { getOrCreatePlayer } from './player-service';
 import { listMemories } from './memory-service';
 import { ensureWorldState } from './world-clock-service';
@@ -738,7 +739,11 @@ function reactionForSentiment(rel: Relationship): ReactionKind | null {
 // --- reads / mutations on existing posts ------------------------------------
 
 export function getFeedView(worldId: string, playerId: string = DEFAULT_PLAYER_ID): FeedView {
-  const posts = feedPostsRepo.listByWorld(worldId).map((p) => toPostView(p, playerId));
+  const posts = feedPostsRepo
+    .listByWorld(worldId)
+    // Discovery: a post by someone you haven't met would spoil their existence — hide it.
+    .filter((p) => !(p.authorType === 'character' && isRedacted(worldId, p.authorId)))
+    .map((p) => toPostView(p, playerId));
   return { posts };
 }
 
@@ -889,6 +894,7 @@ function toPostView(post: FeedPost, playerId: string): FeedPostView {
   let playerReaction: ReactionKind | null = null;
   for (const r of feedReactionsRepo.listByPost(post.id)) {
     if (r.actorType === 'player' && r.actorId === playerId) playerReaction = r.kind;
+    if (r.actorType === 'character' && isRedacted(post.worldId, r.actorId)) continue; // unmet → hidden
     const disp = displayFor(r.actorType, r.actorId, post.worldId);
     if (!disp) continue;
     const g = groups.get(r.kind) ?? { count: 0, actorNames: [] };
@@ -904,6 +910,7 @@ function toPostView(post: FeedPost, playerId: string): FeedPostView {
 
   const comments: FeedCommentView[] = [];
   for (const cm of feedCommentsRepo.listByPost(post.id)) {
+    if (cm.authorType === 'character' && isRedacted(post.worldId, cm.authorId)) continue; // unmet → hidden
     const disp = displayFor(cm.authorType, cm.authorId, post.worldId);
     if (!disp) continue; // author character was deleted
     comments.push({

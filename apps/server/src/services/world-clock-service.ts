@@ -25,6 +25,7 @@ import { evaluateDespairArc } from './crisis-service';
 import { weatherForDay } from './ambiance-service';
 import { recordEvent } from './event-service';
 import { recordDay } from './day-record-service';
+import { discoveryEnabled } from './discovery-service';
 import { runDailyWealth } from './wealth-service';
 import { getLlmSettings } from './settings-service';
 import { callStructuredLlm } from '../llm/structured';
@@ -204,7 +205,7 @@ export async function advanceDay(worldId: string): Promise<SleepResult> {
   // 4. Recap LAST, fed the world-sim beats so the narrator can weave "Around town"
   //    into the SAME call (no extra LLM round-trip; npc_* events are deliberately
   //    NOT in RECAP_EVENT_TYPES, so the worldSim param is their only path in).
-  const { recap, recapError } = await generateDayRecap(simDay, events, worldSim);
+  const { recap, recapError } = await generateDayRecap(simDay, events, worldSim, worldId);
 
   // 4b. Persist the ended day to the almanac (the Calendar app's history). Best-
   //     effort: a failure here must never block the day rollover. There is no flat
@@ -242,8 +243,13 @@ async function generateDayRecap(
   day: number,
   events: GameEvent[],
   worldSim: WorldSimResult | null = null,
+  worldId: string | null = null,
 ): Promise<{ recap: DayRecap | null; recapError: string | null }> {
-  const townLines = (worldSim?.beats ?? []).map((b) => `- ${b.summary}`).join('\n');
+  // Discovery: keep undiscovered NPC names out of the LLM narrative by withholding the
+  // around-town lines (the structured town beats are likewise suppressed in day-record).
+  const townLines = discoveryEnabled(worldId)
+    ? ''
+    : (worldSim?.beats ?? []).map((b) => `- ${b.summary}`).join('\n');
   // Key "quiet" off DESCRIBABLE content, not the raw count: some event types (e.g.
   // player_money_change from passive daily income) intentionally render no line, so a
   // day carrying only those still reads as quiet. formatEventsForRecap is fed the

@@ -189,7 +189,7 @@ export function CharacterEditor() {
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
 
-  const DEFAULT_JOB: Employment = { title: '', place: '', workdays: [0, 1, 2, 3, 4], shiftPhase: 'morning' };
+  const DEFAULT_JOB: Employment = { title: '', place: '', workdays: [0, 1, 2, 3, 4], shiftPhase: 'morning', locationId: null, shiftPhases: [] };
   const patchEmp = (patch: Partial<Employment>) =>
     setForm((f) => ({ ...f, employment: { ...(f.employment ?? DEFAULT_JOB), ...patch } }));
   const toggleWorkday = (idx: number) =>

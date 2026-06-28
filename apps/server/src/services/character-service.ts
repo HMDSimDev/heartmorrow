@@ -23,6 +23,7 @@ import {
   warmthOf,
   GEN_TEXT,
   type Character,
+  type Relationship,
   type CharacterBundle,
   type CharacterCreate,
   type CharacterDossier,
@@ -46,10 +47,12 @@ import {
   type ProfileGeneration,
   type StructuredResult,
 } from '@dsim/shared';
-import { charactersRepo, npcEdgesRepo, npcKnowledgeRepo, worldsRepo } from '../db/repositories';
+import { charactersRepo, npcEdgesRepo, npcKnowledgeRepo, worldsRepo, worldStatesRepo } from '../db/repositories';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { notFound } from '../lib/errors';
 import { ensureRelationship, getRelationship } from './relationship-service';
+import { featureEnabled } from './world-feature-service';
+import { getAcquaintanceStage, isDiscovered, isRedacted, stampMet } from './discovery-service';
 import { getOrCreatePlayer } from './player-service';
 import { listMemories, NPC_LIFE_TAG } from './memory-service';
 import { getLlmSettings } from './settings-service';
@@ -234,6 +237,50 @@ export function getSocialWeb(worldId?: string): SocialWeb {
 const DOSSIER_TIMELINE_MAX = 30;
 const DOSSIER_HEARD_MAX = 3;
 
+/** The legacy "the player has interacted with them" signal (pre-discovery): a date/text
+ *  stamped lastSeenDay, a commitment, a past breakup, or an earned story flag. */
+function legacyHasMetFromRel(rel: Relationship): boolean {
+  const earnedFlag = Object.entries(rel.flags).some(([k, v]) => !isInternalFlagKey(k) && humanizeStoryFlag(k, v) != null);
+  return rel.flags['lastSeenDay'] != null || currentStatus(rel) !== 'none' || isBrokenUp(rel) || earnedFlag;
+}
+
+/** Whether the player has "met" `characterId` by the legacy signal — used by discovery
+ *  backfill ("people you already knew before discovery was turned on"). */
+export function legacyHasMet(characterId: string): boolean {
+  return legacyHasMetFromRel(getRelationship(characterId));
+}
+
+/** Whether the player has "met" a character for DISPLAY (People / Dossier / Constellation).
+ *  A discovery world gates on being INTRODUCED (acqStage acquaintance); other worlds use
+ *  the legacy interaction signal, so their behavior is unchanged. */
+function hasMetForDisplay(character: Character, rel: Relationship): boolean {
+  if (character.worldId && featureEnabled(character.worldId, 'discovery')) return isDiscovered(character.id);
+  return legacyHasMetFromRel(rel);
+}
+
+/**
+ * Make a discovery world non-destructive to enable and never a wall of ???:
+ *  1. BACKFILL — every character the player already interacted with (legacy signal)
+ *     becomes an acquaintance, so people you've dated/married don't vanish behind ???.
+ *  2. COLD-START — if nobody is known yet, seed the first `startKnownCount` dateable
+ *     characters so a fresh discovery world has at least one face to start from.
+ * Idempotent: only ever upgrades 'unknown' → 'acquaintance'. No-op when discovery is off.
+ */
+export function seedDiscoveryAcquaintances(worldId: string): void {
+  const world = worldsRepo.get(worldId);
+  if (!world?.featureFlags?.discovery) return;
+  const day = worldStatesRepo.get(worldId)?.day ?? 1;
+  const chars = charactersRepo.listByWorld(worldId);
+  for (const c of chars) {
+    if (getAcquaintanceStage(c.id) === 'unknown' && legacyHasMet(c.id)) stampMet(c.id, day, null);
+  }
+  if (!chars.some((c) => getAcquaintanceStage(c.id) === 'acquaintance')) {
+    for (const c of chars.filter((x) => x.dateable).slice(0, Math.max(0, world.discoveryConfig.startKnownCount))) {
+      stampMet(c.id, day, null);
+    }
+  }
+}
+
 /**
  * Compose a character's "dossier" — the read-model behind the Social app's
  * tap-to-open person sheet: who they are, where the player stands with them, their
@@ -244,9 +291,29 @@ const DOSSIER_HEARD_MAX = 3;
  */
 export function composeDossier(characterId: string): CharacterDossier {
   const character = getCharacter(characterId);
+  // Discovery: an unmet character is a ??? — never leak their name/portrait/ties, even
+  // on a direct (deep-linked) dossier fetch. Creator/editor views use other endpoints.
+  if (isRedacted(character.worldId, characterId)) {
+    return {
+      characterId,
+      name: '???',
+      portraitAssetId: null,
+      shortDescription: '',
+      hasMet: false,
+      standing: null,
+      ties: [],
+      timeline: [],
+      heardAboutYou: [],
+    };
+  }
   const worldId = character.worldId;
+  // `playerId` identifies the player as a gossip/memory SUBJECT (npc_knowledge.subjectId,
+  // memory.relatedCharacterId), which is keyed per-world. It is NOT the relationship-row
+  // key: relationships are keyed on DEFAULT_PLAYER_ID and world-isolated via characterId
+  // (see migrate-player-identity). Reading the relationship with `playerId` hit a row
+  // nothing writes, so `standing`/`hasMet` were computed from an empty phantom row.
   const playerId = playerIdForWorldOrDefault(worldId);
-  const rel = getRelationship(characterId, playerId);
+  const rel = getRelationship(characterId);
 
   // Earned, player-facing story flags (drop internal bookkeeping keys).
   const flags = Object.entries(rel.flags)
@@ -259,8 +326,7 @@ export function composeDossier(characterId: string): CharacterDossier {
   // default stats give every relationship a baseline warmth, so it can't tell a
   // stranger from an acquaintance. (Avoids importing hasDated: text-message-service →
   // character-service would cycle.)
-  const hasMet =
-    rel.flags['lastSeenDay'] != null || currentStatus(rel) !== 'none' || isBrokenUp(rel) || flags.length > 0;
+  const hasMet = hasMetForDisplay(character, rel);
   const standing = hasMet ? { warmthBand: warmthBand(rel), status: currentStatus(rel), flags } : null;
 
   // Their place in the web (this node's ties), strongest bonds first then by name.
@@ -336,11 +402,11 @@ export function composeConstellation(worldId?: string): ConstellationView {
   const edges: ConstellationEdge[] = [];
   for (const c of listCharacters(worldId)) {
     const rel = getRelationship(c.id);
-    const hasEarnedFlag = Object.entries(rel.flags).some(([k, v]) => !isInternalFlagKey(k) && humanizeStoryFlag(k, v) != null);
-    // "Met" = a real interaction. A date/text stamps lastSeenDay; a commitment, a
-    // breakup, or an earned story flag also counts. Default stats give EVERY relationship
-    // a small baseline warmth, so warmth alone can't tell a stranger from someone you know.
-    const met = rel.flags['lastSeenDay'] != null || currentStatus(rel) !== 'none' || isBrokenUp(rel) || hasEarnedFlag;
+    // "Met" = a real interaction. In a discovery world that means you've been introduced
+    // (acqStage); otherwise the legacy signal (lastSeenDay / commitment / breakup / earned
+    // flag). Default stats give EVERY relationship a small baseline warmth, so warmth alone
+    // can't tell a stranger from someone you know.
+    const met = hasMetForDisplay(c, rel);
     if (!met) continue;
     edges.push({
       characterId: c.id,

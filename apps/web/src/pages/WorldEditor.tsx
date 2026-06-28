@@ -199,7 +199,7 @@ export function WorldEditor() {
   const addLocation = () =>
     setField('locations', [
       ...(world?.locations ?? []),
-      { id: crypto.randomUUID(), name: 'New location', description: '', tags: [], indoor: false, priceTier: 0, imageAssetId: null },
+      { id: crypto.randomUUID(), name: 'New location', description: '', tags: [], indoor: false, priceTier: 0, imageAssetId: null, kind: 'other', discoverable: true, openPhases: [] },
     ]);
 
   const updateLocation = (i: number, patch: Partial<Location>) =>
@@ -401,6 +401,14 @@ export function WorldEditor() {
                         onChange={(e) => setFeature('gambling', e.target.checked)}
                       />
                       {t('pages:worldEditor.featureCasino')}
+                    </label>
+                    <label className="creator-flag">
+                      <input
+                        type="checkbox"
+                        checked={world.featureFlags.discovery}
+                        onChange={(e) => setFeature('discovery', e.target.checked)}
+                      />
+                      {t('pages:worldEditor.featureDiscovery')}
                     </label>
                   </div>
                   {world.featureFlags.gambling && (

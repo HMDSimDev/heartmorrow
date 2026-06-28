@@ -104,6 +104,7 @@ function rowToWorld(r: Row): World {
     lore: r.lore,
     featureFlags: fromJson(r.feature_flags, {}),
     gamblingConfig: fromJson(r.gambling_config, {}),
+    discoveryConfig: fromJson(r.discovery_config, {}),
     createdAt: Number(r.created_at),
     updatedAt: Number(r.updated_at),
   });
@@ -121,16 +122,16 @@ export const worldsRepo = {
   },
   insert(w: World): World {
     getDb().run(
-      `INSERT INTO worlds (id,name,summary,tone,global_notes,locations,rules,lore,feature_flags,gambling_config,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      w.id, w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.featureFlags), j(w.gamblingConfig), w.createdAt, w.updatedAt,
+      `INSERT INTO worlds (id,name,summary,tone,global_notes,locations,rules,lore,feature_flags,gambling_config,discovery_config,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      w.id, w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.featureFlags), j(w.gamblingConfig), j(w.discoveryConfig), w.createdAt, w.updatedAt,
     );
     return w;
   },
   update(w: World): World {
     getDb().run(
-      `UPDATE worlds SET name=?,summary=?,tone=?,global_notes=?,locations=?,rules=?,lore=?,feature_flags=?,gambling_config=?,updated_at=? WHERE id=?`,
-      w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.featureFlags), j(w.gamblingConfig), w.updatedAt, w.id,
+      `UPDATE worlds SET name=?,summary=?,tone=?,global_notes=?,locations=?,rules=?,lore=?,feature_flags=?,gambling_config=?,discovery_config=?,updated_at=? WHERE id=?`,
+      w.name, w.summary, w.tone, w.globalNotes, j(w.locations), w.rules, w.lore, j(w.featureFlags), j(w.gamblingConfig), j(w.discoveryConfig), w.updatedAt, w.id,
     );
     return w;
   },
@@ -221,6 +222,8 @@ function rowToCharacter(r: Row): Character {
     insecurities: fromJson(r.insecurities, []),
     quirks: fromJson(r.quirks, []),
     employment: fromJson(r.employment, null),
+    dateable: intToBool(r.dateable ?? 1),
+    haunts: fromJson(r.haunts, []),
     allowsExCanonization: Number(r.allows_ex_canonization ?? 0) === 1,
     datingStats: fromJson(r.dating_stats, {}),
     portraitAssetId: nStr(r.portrait_asset_id),
@@ -247,23 +250,23 @@ export const charactersRepo = {
   },
   insert(c: Character): Character {
     getDb().run(
-      `INSERT INTO characters (id,world_id,name,age,pronouns,gender,sexuality,short_description,personality,creator_notes,speech_style,likes,dislikes,boundaries,goals,relationship_preferences,relationship_style,guardedness,links,favorite_weather,disliked_weather,room_description,appearance,physical_needs,physical_desires,physical_dislikes,texting_style,online_persona,love_language,insecurities,quirks,employment,allows_ex_canonization,dating_stats,portrait_asset_id,expression_assets,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO characters (id,world_id,name,age,pronouns,gender,sexuality,short_description,personality,creator_notes,speech_style,likes,dislikes,boundaries,goals,relationship_preferences,relationship_style,guardedness,links,favorite_weather,disliked_weather,room_description,appearance,physical_needs,physical_desires,physical_dislikes,texting_style,online_persona,love_language,insecurities,quirks,employment,dateable,haunts,allows_ex_canonization,dating_stats,portrait_asset_id,expression_assets,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       c.id, c.worldId, c.name, c.age, c.pronouns, c.gender, c.sexuality, c.shortDescription, c.personality, c.creatorNotes, c.speechStyle,
       j(c.likes), j(c.dislikes), j(c.boundaries), j(c.goals), c.relationshipPreferences, c.relationshipStyle, c.guardedness, j(c.links),
       j(c.favoriteWeather), j(c.dislikedWeather), c.roomDescription,
-      c.appearance, j(c.physicalNeeds), j(c.physicalDesires), j(c.physicalDislikes), c.textingStyle, c.onlinePersona, c.loveLanguage, j(c.insecurities), j(c.quirks), j(c.employment), c.allowsExCanonization ? 1 : 0,
+      c.appearance, j(c.physicalNeeds), j(c.physicalDesires), j(c.physicalDislikes), c.textingStyle, c.onlinePersona, c.loveLanguage, j(c.insecurities), j(c.quirks), j(c.employment), boolToInt(c.dateable), j(c.haunts), c.allowsExCanonization ? 1 : 0,
       j(c.datingStats), c.portraitAssetId, j(c.expressionAssets), c.createdAt, c.updatedAt,
     );
     return c;
   },
   update(c: Character): Character {
     getDb().run(
-      `UPDATE characters SET world_id=?,name=?,age=?,pronouns=?,gender=?,sexuality=?,short_description=?,personality=?,creator_notes=?,speech_style=?,likes=?,dislikes=?,boundaries=?,goals=?,relationship_preferences=?,relationship_style=?,guardedness=?,links=?,favorite_weather=?,disliked_weather=?,room_description=?,appearance=?,physical_needs=?,physical_desires=?,physical_dislikes=?,texting_style=?,online_persona=?,love_language=?,insecurities=?,quirks=?,employment=?,allows_ex_canonization=?,dating_stats=?,portrait_asset_id=?,expression_assets=?,updated_at=? WHERE id=?`,
+      `UPDATE characters SET world_id=?,name=?,age=?,pronouns=?,gender=?,sexuality=?,short_description=?,personality=?,creator_notes=?,speech_style=?,likes=?,dislikes=?,boundaries=?,goals=?,relationship_preferences=?,relationship_style=?,guardedness=?,links=?,favorite_weather=?,disliked_weather=?,room_description=?,appearance=?,physical_needs=?,physical_desires=?,physical_dislikes=?,texting_style=?,online_persona=?,love_language=?,insecurities=?,quirks=?,employment=?,dateable=?,haunts=?,allows_ex_canonization=?,dating_stats=?,portrait_asset_id=?,expression_assets=?,updated_at=? WHERE id=?`,
       c.worldId, c.name, c.age, c.pronouns, c.gender, c.sexuality, c.shortDescription, c.personality, c.creatorNotes, c.speechStyle,
       j(c.likes), j(c.dislikes), j(c.boundaries), j(c.goals), c.relationshipPreferences, c.relationshipStyle, c.guardedness, j(c.links),
       j(c.favoriteWeather), j(c.dislikedWeather), c.roomDescription,
-      c.appearance, j(c.physicalNeeds), j(c.physicalDesires), j(c.physicalDislikes), c.textingStyle, c.onlinePersona, c.loveLanguage, j(c.insecurities), j(c.quirks), j(c.employment), c.allowsExCanonization ? 1 : 0,
+      c.appearance, j(c.physicalNeeds), j(c.physicalDesires), j(c.physicalDislikes), c.textingStyle, c.onlinePersona, c.loveLanguage, j(c.insecurities), j(c.quirks), j(c.employment), boolToInt(c.dateable), j(c.haunts), c.allowsExCanonization ? 1 : 0,
       j(c.datingStats), c.portraitAssetId, j(c.expressionAssets), c.updatedAt, c.id,
     );
     return c;

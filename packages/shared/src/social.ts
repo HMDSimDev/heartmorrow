@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { GIFT_BASE_CHANCE, GIFT_MIN_WARMTH, GIFT_WARMTH_FULL } from './constants';
 import { type RelationshipStatKey } from './stats';
+import { PhaseSchema } from './time';
 
 /**
  * Social-dynamics primitives. The jealousy probability model and walkout tuning
@@ -335,14 +336,23 @@ export const CHARACTER_LINK_ORDER: readonly CharacterLinkKind[] = [
  * (0 = Monday … 6 = Sunday); the world-sim uses them (with `place`) to decide who
  * is at `place` on a given day. `place` is a free-text workplace KEY — characters
  * who share the same `place` string are coworkers (who tend to run into each
- * other). `shiftPhase` is authored flavor (the phase they typically work); it is
- * not yet read by availability or world-sim logic.
+ * other). For DISCOVERY, `locationId` (a World.locations[] id, same world) is the
+ * structured link that pins a worker to a real venue during their shift; when set
+ * it is authoritative over `place`. `shiftPhases` is the set of phases on shift
+ * (empty → the placement engine coerces to [shiftPhase]). `shiftPhase` is the
+ * legacy single-phase field, kept for back-compat.
  */
 export const EmploymentSchema = z.object({
   title: z.string().min(1).max(60),
   place: z.string().min(1).max(60),
   workdays: z.array(z.number().int().min(0).max(6)).max(7).default([0, 1, 2, 3, 4]),
   shiftPhase: z.enum(['morning', 'afternoon', 'evening']).default('morning'),
+  /** Discovery: structured workplace link to a World.locations[] id (same world);
+   *  null = off-map / free-text only. Authoritative over `place` when set. */
+  locationId: z.string().nullable().default(null),
+  /** Discovery: phases this character is on shift. Empty → the placement engine
+   *  coerces to [shiftPhase] for back-compat. Supports multi-phase + night shifts. */
+  shiftPhases: z.array(PhaseSchema).default([]),
 });
 export type Employment = z.infer<typeof EmploymentSchema>;
 
@@ -938,6 +948,25 @@ export function jealousyProbability(otherRecentDates: number, committed = false)
   return Math.min(t.max, t.base + t.perOtherDate * otherRecentDates);
 }
 
+// --- Discovery: acquaintance state (stored in relationship.flags) ------------
+
+/**
+ * How "known" a character is to the player, for location-based discovery. Stored
+ * as the `acqStage` relationship flag (server-truth, never LLM-written):
+ *  - unknown      — shown as ??? in People; not dateable.
+ *  - glimpsed     — seen in a room but not spoken to (a discovery lead).
+ *  - acquaintance — you've introduced yourself; revealed + dateable.
+ */
+export const AcquaintanceStageSchema = z.enum(['unknown', 'glimpsed', 'acquaintance']);
+export type AcquaintanceStage = z.infer<typeof AcquaintanceStageSchema>;
+
+/** Reserved relationship-flag keys for discovery (internal bookkeeping). */
+export const ACQUAINTANCE_FLAG = 'acqStage';
+export const MET_DAY_FLAG = 'metDay';
+export const MET_LOCATION_FLAG = 'metAtLocationId';
+/** Prefix for per-location "you glimpsed them here" breadcrumb flags. */
+export const GLIMPSED_FLAG_PREFIX = 'glimpsed:';
+
 /**
  * True for relationship-flag keys that are internal bookkeeping (not player-
  * facing story flags). Supersedes the old `isBuffFlagKey`.
@@ -959,7 +988,11 @@ export function isInternalFlagKey(key: string): boolean {
     key.startsWith('rocks:') ||
     key.startsWith('breakup:') ||
     key.startsWith('beat:') ||
-    key.startsWith('harm:')
+    key.startsWith('harm:') ||
+    key === ACQUAINTANCE_FLAG ||
+    key === MET_DAY_FLAG ||
+    key === MET_LOCATION_FLAG ||
+    key.startsWith(GLIMPSED_FLAG_PREFIX)
   );
 }
 

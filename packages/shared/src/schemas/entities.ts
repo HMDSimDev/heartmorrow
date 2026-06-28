@@ -30,6 +30,25 @@ const ts = z.number().int().nonnegative();
 
 // --- World ------------------------------------------------------------------
 
+/**
+ * Coarse category of a venue, used by discovery to drive the location scene's
+ * default activities, icons, and which kinds of NPCs frequent it. A fixed
+ * canonical enum (free-text `tags` can't drive logic).
+ */
+export const LocationKindSchema = z.enum([
+  'cafe',
+  'bar',
+  'library',
+  'gym',
+  'park',
+  'restaurant',
+  'shop',
+  'workplace',
+  'campus',
+  'other',
+]);
+export type LocationKind = z.infer<typeof LocationKindSchema>;
+
 export const LocationSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -44,6 +63,13 @@ export const LocationSchema = z.object({
   /** Optional uploaded photo for this venue (an Asset id). Shown in the date
    *  location picker and the date scene. Null = use the generic placeholder. */
   imageAssetId: id.nullable().default(null),
+  /** Discovery: coarse category — drives scene activities, icons, frequenters. */
+  kind: LocationKindSchema.default('other'),
+  /** Discovery: false = back-of-house, not enterable/browsable. */
+  discoverable: z.boolean().default(true),
+  /** Discovery: phases this venue is open. [] = the three active phases
+   *  (morning/afternoon/evening); include 'night' for nightlife. */
+  openPhases: z.array(PhaseSchema).default([]),
 });
 export type Location = z.infer<typeof LocationSchema>;
 
@@ -61,6 +87,9 @@ export const FeatureFlagsSchema = z.object({
   /** The casino: wager money on slots/blackjack/roulette/video poker, behind a
    *  flat per-bet cap and a per-day wager cap so it never becomes a money engine. */
   gambling: z.boolean().default(false),
+  /** Location-based discovery: People start as ??? and become dateable only by
+   *  visiting Locations and introducing yourself (the "living world" mode). */
+  discovery: z.boolean().default(false),
 });
 export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 
@@ -80,6 +109,22 @@ export const GamblingConfigSchema = z.object({
 });
 export type GamblingConfig = z.infer<typeof GamblingConfigSchema>;
 
+/**
+ * Per-world tuning for location-based discovery (only meaningful when
+ * `featureFlags.discovery` is on). One JSON blob on the world, like
+ * {@link GamblingConfigSchema}.
+ */
+export const DiscoveryConfigSchema = z.object({
+  /** Acquaintances to seed at world creation so a fresh world isn't all ???. */
+  startKnownCount: z.number().int().min(0).default(1),
+  /** Per-phase chance a character is "nowhere" (home / unavailable). */
+  unavailableChance: z.number().min(0).max(1).default(0.25),
+  /** Stamina an introduction costs: >0 advances the phase like a light action;
+   *  0 = free (does not tick the clock). */
+  meetStaminaCost: z.number().int().min(0).default(1),
+});
+export type DiscoveryConfig = z.infer<typeof DiscoveryConfigSchema>;
+
 export const WorldSchema = z.object({
   id,
   name: z.string().min(1),
@@ -94,6 +139,8 @@ export const WorldSchema = z.object({
   featureFlags: FeatureFlagsSchema.default({}),
   /** Casino limits when `featureFlags.gambling` is on (per-bet + per-day caps). */
   gamblingConfig: GamblingConfigSchema.default({}),
+  /** Discovery tuning when `featureFlags.discovery` is on. */
+  discoveryConfig: DiscoveryConfigSchema.default({}),
   createdAt: ts,
   updatedAt: ts,
 });
@@ -155,6 +202,13 @@ export const CharacterSchema = z.object({
   links: z.array(CharacterLinkSchema).default([]),
   /** What this character does for work (drives NPC encounters/availability); null = unemployed. */
   employment: EmploymentSchema.nullable().default(null),
+  /** Discovery: can the player date this character? false = a fixture NPC
+   *  (bartender / barista) — present and talkable, but never dateable. */
+  dateable: z.boolean().default(true),
+  /** Discovery: Location ids this character frequents. A SOFT placement weight
+   *  (they lean toward these spots but can be anywhere), and how fixtures are
+   *  pinned to their venue off-shift. */
+  haunts: z.array(z.string()).default([]),
   /** Authored opt-in: may OTHER characters establish canon facts about this one by
    *  revealing them as their ex on a date? Default false = this character's truth is
    *  immutable by play (the safety gate for ex-canonization). */
@@ -281,7 +335,7 @@ export type Asset = z.infer<typeof AssetSchema>;
 
 // --- Conversation -----------------------------------------------------------
 
-export const ConversationModeSchema = z.enum(['chat', 'date', 'event', 'minigame']);
+export const ConversationModeSchema = z.enum(['chat', 'date', 'event', 'minigame', 'meet']);
 export type ConversationMode = z.infer<typeof ConversationModeSchema>;
 
 export const ConversationSessionSchema = z.object({

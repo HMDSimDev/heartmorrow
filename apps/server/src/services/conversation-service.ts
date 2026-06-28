@@ -60,6 +60,7 @@ import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { getRelationship } from './relationship-service';
+import { assertDiscoveryCanStart } from './discovery-service';
 import { getOrCreatePlayer, spendMoney } from './player-service';
 import { selectTopMemories } from './memory-service';
 import { addMemoriesFromEvaluation } from './memory-service';
@@ -138,6 +139,9 @@ export function createSession(input: ConversationCreate): ConversationSession {
   if (isMemorialized(getRelationship(character.id))) {
     throw badRequest(`${character.name} is no longer with us.`);
   }
+  // Discovery gate: in a discovery world you can only converse with people you've met
+  // (the introduction itself — mode 'meet' — is exempt). No-op when discovery is off.
+  assertDiscoveryCanStart(character, input.mode ?? 'chat');
   // The location the date actually happens at. "Anywhere" (a date-setup directive,
   // not a real id) is resolved to a concrete venue inside the date block below; it
   // never reaches a chat or worldless session as a literal location.
@@ -316,6 +320,9 @@ export function resolveSessionLocation(
       indoor: true,
       priceTier: 0, // staying in is always free
       imageAssetId: null,
+      kind: 'other',
+      discoverable: false, // a private room is not a browsable discovery venue
+      openPhases: [],
     };
   }
   // A property you own or rent: a virtual venue synthesized from its definition. Its
@@ -332,6 +339,9 @@ export function resolveSessionLocation(
       indoor: info.property.indoor,
       priceTier: 0,
       imageAssetId: info.property.assetId ?? null,
+      kind: 'other',
+      discoverable: false, // a property venue is not part of the discovery map
+      openPhases: [],
     };
   }
   return world ? world.locations.find((l) => l.id === locationId) ?? null : null;

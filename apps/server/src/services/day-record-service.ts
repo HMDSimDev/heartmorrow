@@ -13,6 +13,7 @@ import {
 } from '@dsim/shared';
 import { dayRecordsRepo, eventsRepo, worldStatesRepo } from '../db/repositories';
 import { weatherForDay } from './ambiance-service';
+import { discoveryEnabled } from './discovery-service';
 import { RECAP_EVENT_TYPES, beatFromEvent, summarizeRepeatables } from '../lib/day-events';
 
 /**
@@ -33,11 +34,16 @@ import { RECAP_EVENT_TYPES, beatFromEvent, summarizeRepeatables } from '../lib/d
 const MAX_BEATS_PER_DAY = 24;
 
 /** Collect the day's player-facing beats (+ the world-sim "around town" beats). */
-function buildBeats(events: GameEvent[], worldSim: WorldSimResult | null): DayRecordBeat[] {
+function buildBeats(events: GameEvent[], worldSim: WorldSimResult | null, discoveryOn = false): DayRecordBeat[] {
   const townBeats: DayRecordBeat[] = [];
-  for (const wb of worldSim?.beats ?? []) {
-    if (wb.summary && wb.summary.trim()) {
-      townBeats.push({ icon: '🏘️', text: wb.summary.trim().slice(0, GEN_TEXT.line), tone: 'neutral' });
+  // Discovery: "around town" beats name NPCs you may not have met — suppress them
+  // (WorldSimBeat carries no ids, so per-beat filtering isn't possible). Your own beats,
+  // which involve people you've met, are kept.
+  if (!discoveryOn) {
+    for (const wb of worldSim?.beats ?? []) {
+      if (wb.summary && wb.summary.trim()) {
+        townBeats.push({ icon: '🏘️', text: wb.summary.trim().slice(0, GEN_TEXT.line), tone: 'neutral' });
+      }
     }
   }
   const playerBeats: DayRecordBeat[] = [];
@@ -81,7 +87,7 @@ export interface RecordDayInput {
 /** Persist the day that just ended (the live path, from the world clock). */
 export function recordDay(worldId: string, day: number, input: RecordDayInput): DayRecord {
   const now = Date.now();
-  const beats = buildBeats(input.events, input.worldSim);
+  const beats = buildBeats(input.events, input.worldSim, discoveryEnabled(worldId));
   const existing = dayRecordsRepo.get(worldId, day);
   const rec = DayRecordSchema.parse({
     worldId,

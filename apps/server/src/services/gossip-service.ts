@@ -17,6 +17,7 @@ import { buildGossipTextMessages, buildKnowledgeGossipMessages } from '../prompt
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { hashFloat, type SeededRandom } from '../lib/seeded-random';
 import { recordEvent } from './event-service';
+import { isRedacted } from './discovery-service';
 
 /** Which notable events become gossip-worthy "news", and how a gossiper frames it. */
 const GOSSIP_NEWS: Record<string, string> = {
@@ -52,10 +53,11 @@ export async function generateGossipForDay(
     const subjectId = String((event.payload as Record<string, unknown>).characterId ?? '');
     const subject = charactersRepo.get(subjectId);
     if (!subject || subject.worldId !== worldId) continue;
+    if (isRedacted(worldId, subjectId)) continue; // discovery: don't reveal an unmet subject
 
     // Gossipers: characters the player has dated who are linked to the subject.
     const gossipers = worldChars.filter(
-      (g) => g.id !== subjectId && hasDated(g.id) && linkTo(g.links, subjectId) != null,
+      (g) => g.id !== subjectId && hasDated(g.id) && linkTo(g.links, subjectId) != null && !isRedacted(worldId, g.id),
     );
     if (gossipers.length === 0) continue;
 
@@ -119,6 +121,7 @@ export function pickGossipKnowledge(
     if (k.fidelity < KNOWLEDGE_GOSSIP_MIN_FIDELITY) continue;
     const subject = charactersRepo.get(k.subjectId);
     if (!subject || subject.worldId !== worldId) continue;
+    if (isRedacted(worldId, subject.id)) continue; // discovery: never surface an unmet subject (gossip text or feed)
     return { subjectId: subject.id, subjectName: subject.name, claim: k.claim, fidelity: k.fidelity, knowledgeId: k.id };
   }
   return null;
@@ -149,6 +152,7 @@ export async function generateKnowledgeGossipForDay(
   for (const gossiper of charactersRepo.listByWorld(worldId)) {
     if (queued >= KNOWLEDGE_GOSSIP_MAX_PER_DAY) break;
     if (!hasDated(gossiper.id)) continue; // only people you've dated can text you
+    if (isRedacted(worldId, gossiper.id)) continue; // discovery: only met people text you
     if (rng(`kgossip|${worldId}|${day}|${gossiper.id}`) >= KNOWLEDGE_GOSSIP_CHANCE) continue;
 
     const pick = pickGossipKnowledge(gossiper.id, worldId);
