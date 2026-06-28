@@ -1,7 +1,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
-import type { ActiveDate, Asset, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
+import type { ActiveDate, ActiveRoom, Asset, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
 import { deriveCalendar } from '@dsim/shared';
 import { api } from '../lib/api';
 import { idbGet, idbSet, idbDel } from '../lib/idb-kv';
@@ -111,6 +111,13 @@ interface AppData {
    *  before it knows whether a date is already underway. */
   activeDateLoaded: boolean;
   refreshActiveDate: () => Promise<void>;
+  /** The active world's single in-progress "Around Town" room (if any). Drives the
+   *  tab's auto-resume and the SAME day-spending lock a date does. Null when not out. */
+  activeRoom: ActiveRoom | null;
+  refreshActiveRoom: () => Promise<void>;
+  /** Set the room directly from a server response (enter / say / leave) without a
+   *  refetch round-trip — the room endpoints already return the full room. */
+  setActiveRoom: (room: ActiveRoom | null) => void;
   // Total reset
   resetProgress: () => Promise<void>;
 }
@@ -135,6 +142,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [unreadTexts, setUnreadTexts] = useState(0);
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
   const [activeDateLoaded, setActiveDateLoaded] = useState(false);
+  const [activeRoom, setActiveRoom] = useState<ActiveRoom | null>(null);
 
   const reloadPlayer = useCallback(async () => {
     try {
@@ -185,6 +193,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       /* leave the last-known value on a transient error */
     } finally {
       setActiveDateLoaded(true);
+    }
+  }, [activeWorldId]);
+  // The active world's live Around Town room — the source of truth for resuming the
+  // tab and for the day-spending lock. Only discovery worlds have one; a 4xx (feature
+  // off) just clears it. Refetched on world change; AroundTown drives explicit updates.
+  const refreshActiveRoom = useCallback(async () => {
+    if (!activeWorldId) {
+      setActiveRoom(null);
+      return;
+    }
+    try {
+      setActiveRoom((await api.activeRoom(activeWorldId)).room);
+    } catch {
+      setActiveRoom(null); // feature off / not in a room
     }
   }, [activeWorldId]);
 
@@ -243,6 +265,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshActiveDate();
   }, [refreshActiveDate]);
+
+  // Likewise re-derive the in-progress Around Town room on world change / first mount,
+  // so returning to the tab (or a refresh) resumes the same visit.
+  useEffect(() => {
+    void refreshActiveRoom();
+  }, [refreshActiveRoom]);
 
   const sleep = useCallback(async (): Promise<SleepResponse | null> => {
     if (!activeWorldId) return null;
@@ -405,8 +433,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     await api.resetData();
     setDayTick((t) => t + 1); // everything is day-derived after a reset
     setActiveDate(null); // a reset wipes all sessions
-    await Promise.all([reloadPlayer(), refreshWorldState(), refreshActiveDate()]);
-  }, [reloadPlayer, refreshWorldState, refreshActiveDate]);
+    setActiveRoom(null); // …including any open Around Town room
+    await Promise.all([reloadPlayer(), refreshWorldState(), refreshActiveDate(), refreshActiveRoom()]);
+  }, [reloadPlayer, refreshWorldState, refreshActiveDate, refreshActiveRoom]);
 
   const assetMap = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets]);
   const assetById = useCallback(
@@ -444,9 +473,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       activeDate,
       activeDateLoaded,
       refreshActiveDate,
+      activeRoom,
+      refreshActiveRoom,
+      setActiveRoom,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, activeRoom, refreshActiveRoom, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

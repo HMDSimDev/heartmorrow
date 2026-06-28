@@ -1,8 +1,8 @@
 import './aroundtown.page.css';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Character, Phase } from '@dsim/shared';
-import { api, type RoomOccupantView } from '../lib/api';
+import type { Character, Location } from '@dsim/shared';
+import { api, assetUrl } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { useDiscoveryGate } from '../lib/useDiscovery';
@@ -15,28 +15,22 @@ const KIND_ICON: Record<string, string> = {
   restaurant: '🍽', shop: '🛍', workplace: '💼', campus: '🎓', other: '📍',
 };
 
-interface RoomState {
-  locationId: string;
-  name: string;
-  day: number;
-  phase: Phase;
-  occupants: RoomOccupantView[];
-  messages: { role: 'player' | 'room'; text: string }[];
-  metNames: string[];
-}
-
 /**
  * Around Town — discovery's living-world view. The list of places is a free peek; stepping
  * into one (costs an action) opens it as a single freeform CHAT: a narrator + everyone
  * present. You introduce yourself / talk to anyone in natural language, and meeting someone
- * (the model flags it) reveals them in People. Unmet people stay anonymous.
+ * (the model flags it) reveals them in People — surfaced inline as its own chat bubble.
+ *
+ * The room is SERVER-TRUTH + RESUMABLE: it lives in `activeRoom` (app context), so leaving
+ * and returning to the tab drops you back into the same visit, and the same lock a date
+ * uses blocks day-spending actions while you're out. Unmet people stay anonymous.
  */
 export function AroundTown() {
   const { t } = useTranslation(['pages', 'common']);
-  const { activeWorldId, worldState, dayTick, refreshWorldState } = useAppData();
+  const { activeWorldId, worldState, dayTick, refreshWorldState, assetById, activeRoom, setActiveRoom } = useAppData();
   const { isMet } = useDiscoveryGate();
-  const [room, setRoom] = useState<RoomState | null>(null);
   const [entering, setEntering] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | undefined>();
   const [input, setInput] = useState('');
@@ -47,14 +41,15 @@ export function AroundTown() {
   const charsQ = useAsync(() => api.listCharacters(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   const charById = new Map((charsQ.data ?? []).map((c) => [c.id, c]));
   const nameOf = (id: string) => charById.get(id)?.name ?? '';
+  const imageOf = (loc: Location) => assetById(loc.imageAssetId)?.path ?? null;
 
-  const enter = async (locationId: string, name: string) => {
-    if (entering || !activeWorldId) return;
-    setEntering(locationId);
+  const enter = async (loc: Location) => {
+    if (entering || busy || !activeWorldId) return;
+    setEntering(loc.id);
     setErr(undefined);
     try {
-      const res = await api.enterRoom(activeWorldId, locationId);
-      setRoom({ locationId, name, day: res.day, phase: res.phase, occupants: res.occupants, messages: [{ role: 'room', text: res.reply }], metNames: [] });
+      const room = await api.enterRoom(activeWorldId, loc.id);
+      setActiveRoom(room);
       void refreshWorldState(); // entering cost an action (advances the clock)
     } catch (e) {
       setErr(errorMessage(e));
@@ -65,54 +60,77 @@ export function AroundTown() {
 
   const send = async () => {
     const text = input.trim();
-    if (!text || !room || busy || !activeWorldId) return;
+    if (!text || !activeRoom || busy || !activeWorldId) return;
     setInput('');
-    const history = room.messages;
-    setRoom((r) => (r ? { ...r, messages: [...r.messages, { role: 'player', text }] } : r));
     setBusy(true);
+    setErr(undefined);
+    // Echo the player's line immediately; the server returns the full room (this line +
+    // the reply) which replaces the optimistic copy. Roll it back if the turn fails.
+    const prev = activeRoom;
+    setActiveRoom({ ...prev, messages: [...prev.messages, { role: 'player', text }] });
     try {
-      const res = await api.roomSay(activeWorldId, room.locationId, room.day, room.phase, history, text);
-      const newNames = res.introduced.map(nameOf).filter(Boolean);
-      setRoom((r) =>
-        r ? { ...r, occupants: res.occupants, messages: [...r.messages, { role: 'room', text: res.reply }], metNames: [...r.metNames, ...newNames] } : r,
-      );
+      setActiveRoom(await api.roomSay(activeWorldId, text));
     } catch (e) {
+      setActiveRoom(prev);
       setErr(errorMessage(e));
     } finally {
       setBusy(false);
     }
   };
 
-  // --- room chat view ---
-  if (room) {
-    const knownHere = room.occupants.filter((o) => o.known).map((o) => nameOf(o.characterId)).filter(Boolean);
-    const unmetHere = room.occupants.length - room.occupants.filter((o) => o.known).length;
+  const leave = async () => {
+    if (!activeWorldId || leaving) return;
+    setLeaving(true);
+    try {
+      await api.leaveRoom(activeWorldId);
+      setActiveRoom(null);
+      setErr(undefined);
+    } catch (e) {
+      setErr(errorMessage(e));
+    } finally {
+      setLeaving(false);
+    }
+  };
+
+  // --- room chat view (server-truth; resumes automatically) ---
+  if (activeRoom) {
+    const photo = assetById(activeRoom.imageAssetId)?.path ?? null;
+    const knownHere = activeRoom.occupants.filter((o) => o.known).map((o) => nameOf(o.characterId)).filter(Boolean);
+    const unmetHere = activeRoom.occupants.filter((o) => !o.known).length;
     const whoParts = [...knownHere];
     if (unmetHere > 0) whoParts.push(t('aroundTown.unmetCount', { count: unmetHere }));
     return (
       <div className="stack">
-        <button className="btn ghost at-back" type="button" onClick={() => setRoom(null)}>‹ {t('aroundTown.back')}</button>
-        <div className="card at-room">
+        <button className="btn ghost at-back" type="button" onClick={() => void leave()} disabled={leaving}>
+          ‹ {t('aroundTown.leave')}
+        </button>
+        <div className={`card at-room${photo ? ' has-photo' : ''}`}>
+          {photo && (
+            <div className="at-room-photo" aria-hidden="true">
+              <img src={assetUrl(photo)} alt="" />
+            </div>
+          )}
           <div className="section-head">
-            <div className="titles"><span className="kicker">{t('aroundTown.youArrive')}</span><h2>{room.name}</h2></div>
+            <div className="titles"><span className="kicker">{t('aroundTown.youArrive')}</span><h2>{activeRoom.locationName}</h2></div>
             <span className="trail" />
           </div>
           {whoParts.length > 0 && <p className="muted at-room-who">{t('aroundTown.hereNow', { who: whoParts.join(', ') })}</p>}
 
           <div className="at-room-reel">
-            {room.messages.map((m, i) => (
-              <div key={i} className={`at-room-msg ${m.role}`}>{m.text}</div>
-            ))}
+            {activeRoom.messages.map((m, i) =>
+              m.role === 'meet' ? (
+                <div key={i} className="at-room-meet">
+                  <Icon name="people" size={14} /> {t('aroundTown.metNote', { names: m.text })}
+                </div>
+              ) : (
+                <div key={i} className={`at-room-msg ${m.role}`}>{m.text}</div>
+              ),
+            )}
             {busy && (
               <div className="at-room-msg room at-room-typing" aria-label="…"><span /><span /><span /></div>
             )}
           </div>
 
-          {room.metNames.length > 0 && (
-            <Banner kind="ok">
-              <Icon name="people" size={14} /> {t('aroundTown.metNote', { names: [...new Set(room.metNames)].join(', ') })}
-            </Banner>
-          )}
           {err && <Banner kind="error">{err}</Banner>}
 
           <div className="at-room-input">
@@ -155,14 +173,21 @@ export function AroundTown() {
             <div className="at-grid">
               {data.locations.map(({ location, open, occupantIds }) => {
                 const faces = occupantIds.map((id) => charById.get(id)).filter((c): c is Character => !!c && isMet(c.id));
+                const photo = imageOf(location);
+                const isEntering = entering === location.id;
                 return (
                   <button
                     key={location.id}
                     type="button"
-                    className={`at-card${open ? '' : ' at-closed'}`}
-                    disabled={!open || entering === location.id}
-                    onClick={() => open && void enter(location.id, location.name)}
+                    className={`at-card${open ? '' : ' at-closed'}${photo ? ' has-photo' : ''}${isEntering ? ' at-entering' : ''}`}
+                    disabled={!open || !!entering}
+                    onClick={() => open && void enter(location)}
                   >
+                    {photo && (
+                      <div className="at-card-photo" aria-hidden="true">
+                        <img src={assetUrl(photo)} alt="" />
+                      </div>
+                    )}
                     <div className="at-card-head">
                       <span className="at-kind" aria-hidden="true">{KIND_ICON[location.kind] ?? '📍'}</span>
                       <h3 className="at-name">{location.name}</h3>
@@ -185,6 +210,12 @@ export function AroundTown() {
                         </>
                       )}
                     </div>
+                    {isEntering && (
+                      <div className="at-entering-veil">
+                        <span className="at-spinner" aria-hidden="true" />
+                        <span>{t('aroundTown.entering')}</span>
+                      </div>
+                    )}
                   </button>
                 );
               })}

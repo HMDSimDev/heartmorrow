@@ -20,7 +20,7 @@ import './minigames.page.css';
 
 export function Minigames() {
   const { t } = useTranslation(['pages', 'common']);
-  const { reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate } = useAppData();
+  const { reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeRoom } = useAppData();
   const [games, setGames] = useState<MinigameInfo[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [characterId, setCharacterId] = useState<string | null>(null);
@@ -70,6 +70,10 @@ export function Minigames() {
       setError(t('minigames.errOnDate', { name: activeDate.characterName }));
       return;
     }
+    if (activeRoom) {
+      setError(t('minigames.errOnRoom', { place: activeRoom.locationName }));
+      return;
+    }
     setBusy(true);
     setError(undefined);
     setResult(null);
@@ -115,8 +119,11 @@ export function Minigames() {
   // Minigames cost a daily action when tied to a world; gate Play at 0 energy
   // instead of letting the start 400 server-side.
   const outOfEnergy = !!activeWorldId && (worldState?.stamina ?? 0) <= 0;
-  // Minigames are their own outing — not something you slip away to mid-date.
+  // Minigames are their own outing — not something you slip away to mid-date, or
+  // while you're already out at an Around Town room.
   const onDate = !!activeDate;
+  const onRoom = !activeDate && !!activeRoom;
+  const engaged = onDate || onRoom;
 
   return (
     <div className="stack">
@@ -132,6 +139,11 @@ export function Minigames() {
       {onDate && !active && (
         <Banner kind="info">
           {t('minigames.onDateBanner', { name: activeDate!.characterName })}
+        </Banner>
+      )}
+      {onRoom && !active && (
+        <Banner kind="info">
+          {t('minigames.onRoomBanner', { place: activeRoom!.locationName })}
         </Banner>
       )}
 
@@ -202,13 +214,15 @@ export function Minigames() {
               <button
                 className="btn primary block"
                 onClick={() => start(g.id)}
-                disabled={busy || outOfEnergy || onDate}
+                disabled={busy || outOfEnergy || engaged}
                 title={
                   onDate
                     ? t('minigames.finishDateFirst', { name: activeDate!.characterName })
-                    : outOfEnergy
-                      ? t('minigames.outOfEnergyTitle')
-                      : undefined
+                    : onRoom
+                      ? t('minigames.finishRoomFirst', { place: activeRoom!.locationName })
+                      : outOfEnergy
+                        ? t('minigames.outOfEnergyTitle')
+                        : undefined
                 }
               >
                 <Icon name="play" size={14} /> {t('minigames.play')}

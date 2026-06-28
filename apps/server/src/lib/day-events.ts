@@ -1,5 +1,5 @@
 import type { DayRecordBeat, GameEvent } from '@dsim/shared';
-import { charactersRepo } from '../db/repositories';
+import { charactersRepo, worldsRepo } from '../db/repositories';
 
 /**
  * The single place that turns a raw GameEvent into player-facing prose. Used by
@@ -25,6 +25,9 @@ export const RECAP_EVENT_TYPES = new Set([
   'date_left',
   'jealousy_triggered',
   'milestone_reached',
+  // Discovery: meeting a new person in a location's room chat. Names someone you JUST
+  // met, so it's a player beat (kept) — not a town beat (suppressed under discovery).
+  'meet',
   'dtr_accepted',
   'dtr_backfired',
   'gossip_text',
@@ -49,6 +52,17 @@ export function nameFor(characterId: unknown): string {
   return charactersRepo.get(characterId)?.name ?? '';
 }
 
+/** Resolve a location's name from a payload's {characterId, locationId}, or '' if it
+ *  can't be resolved (the character's world tells us which world's locations to read). */
+function placeFor(p: Record<string, unknown>): string {
+  const charId = p.characterId;
+  const locId = p.locationId;
+  if (typeof charId !== 'string' || typeof locId !== 'string') return '';
+  const world = charactersRepo.get(charId)?.worldId;
+  if (!world) return '';
+  return worldsRepo.get(world)?.locations.find((l) => l.id === locId)?.name ?? '';
+}
+
 /** A human one-liner for an event, or null if the event renders nothing. */
 export function describeEvent(e: GameEvent): string | null {
   const p = e.payload as Record<string, unknown>;
@@ -67,6 +81,12 @@ export function describeEvent(e: GameEvent): string | null {
       return `${nameFor(p.characterId)} lost interest and called the date off early.`;
     case 'jealousy_triggered':
       return `${nameFor(p.characterId)} found out about another date and was hurt.`;
+    case 'meet': {
+      const who = nameFor(p.characterId);
+      if (!who) return null;
+      const place = placeFor(p);
+      return place ? `Met ${who} at ${place}.` : `Met ${who}.`;
+    }
     case 'milestone_reached':
       return `You and ${nameFor(p.characterId)} reached a new milestone: ${String(p.label ?? p.band ?? '')}.`;
     case 'dtr_accepted':
@@ -201,6 +221,7 @@ const BEAT_STYLE: Record<string, { icon: string; tone: DayRecordBeat['tone'] }> 
   minigame_finish: { icon: '🎮', tone: 'neutral' },
   purchase: { icon: '🛍️', tone: 'neutral' },
   item_use: { icon: '🎁', tone: 'neutral' },
+  meet: { icon: '🤝', tone: 'good' },
   milestone_reached: { icon: '💞', tone: 'good' },
   dtr_accepted: { icon: '💍', tone: 'good' },
   reconciled: { icon: '🕊️', tone: 'good' },

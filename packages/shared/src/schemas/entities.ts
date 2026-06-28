@@ -364,6 +364,46 @@ export const MessageSchema = z.object({
 });
 export type Message = z.infer<typeof MessageSchema>;
 
+// --- Location room chat (discovery) ----------------------------------------
+
+/** One line in a location's room transcript. `meet` is a client-rendered marker
+ *  (its `text` holds the comma-joined names just met) — it is NEVER fed back to the
+ *  model as conversation history. */
+export const RoomMessageSchema = z.object({
+  role: z.enum(['player', 'room', 'meet']),
+  text: z.string(),
+});
+export type RoomMessage = z.infer<typeof RoomMessageSchema>;
+
+export const RoomOccupantSchema = z.object({
+  characterId: id,
+  /** Whether the player has met this person (else the client redacts them to ???). */
+  known: z.boolean(),
+});
+export type RoomOccupant = z.infer<typeof RoomOccupantSchema>;
+
+/**
+ * A persisted, resumable "Around Town" room session: the player is standing in a
+ * location's freeform chat. PINNED to the (day, phase) they entered on, so the cast
+ * present stays stable for the visit even as the clock advances. At most one is
+ * active (ended=0) per world — it drives both auto-resume and the same "you're busy"
+ * lock that dates use. `playerNamed` flips true once the player tells the room their
+ * name; until then no one present may use it.
+ */
+export const RoomSessionSchema = z.object({
+  id,
+  worldId: id,
+  locationId: z.string(),
+  day: z.number().int().positive(),
+  phase: PhaseSchema,
+  messages: z.array(RoomMessageSchema).default([]),
+  playerNamed: z.boolean().default(false),
+  ended: z.boolean().default(false),
+  createdAt: ts,
+  updatedAt: ts,
+});
+export type RoomSession = z.infer<typeof RoomSessionSchema>;
+
 // --- Shop / Inventory -------------------------------------------------------
 
 export const ShopItemSchema = z.object({

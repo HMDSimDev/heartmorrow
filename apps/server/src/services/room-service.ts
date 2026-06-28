@@ -1,43 +1,44 @@
-import { RoomTurnSchema, type Character, type Phase, type RoomTurn } from '@dsim/shared';
-import { charactersRepo, worldsRepo } from '../db/repositories';
+import {
+  RoomTurnSchema,
+  type ActiveRoom,
+  type Character,
+  type Phase,
+  type RoomMessage,
+  type RoomSession,
+  type RoomTurn,
+} from '@dsim/shared';
+import { charactersRepo, roomSessionsRepo, worldsRepo } from '../db/repositories';
 import { ensureWorldState, assertCanAct, spendStamina } from './world-clock-service';
 import { getPlacements, composeLocationScene } from './placement-service';
 import { isDiscovered, stampMet } from './discovery-service';
+import { getActiveDateForWorld } from './conversation-service';
 import { stampLastSeen } from './stat-service';
 import { getOrCreatePlayer } from './player-service';
-import { playerIdForWorldOrDefault } from '../lib/ids';
+import { playerIdForWorldOrDefault, newId } from '../lib/ids';
 import { getLlmSettings } from './settings-service';
 import { callStructuredLlm } from '../llm/structured';
 import { recordEvent } from './event-service';
 import { addMemoriesFromEvaluation } from './memory-service';
-import { notFound } from '../lib/errors';
+import { badRequest, notFound } from '../lib/errors';
 
 /**
  * Location ROOM chat — the heart of discovery. A location is a single freeform text chat:
  * the model voices a narrator + every character present, and the player introduces
- * themselves / talks to anyone through natural language. Entering costs one action; the
- * model flags (structured `introduced`) when an introduction genuinely lands, and the
- * server unlocks those characters + rolls the meeting into memory.
+ * themselves / talks to anyone through natural language. The model flags (structured
+ * `introduced`) when an introduction genuinely lands, and the server unlocks those
+ * characters + rolls the meeting into memory.
  *
- * Stateless: the client holds the transcript AND the (day, phase) it entered on, and sends
- * them back each turn. The room is PINNED to that entry block — entering spends an action
- * (which advances the clock), but the people you walked in on don't vanish mid-visit.
- * Discovery-feature-gated by the routes.
+ * SERVER-TRUTH + RESUMABLE: the room is a persisted `room_sessions` row (at most one
+ * active per world). It is PINNED to the (day, phase) the player entered on — entering
+ * spends an action (which advances the clock), but the people you walked in on don't
+ * vanish mid-visit. Leaving the tab and returning resumes the same room; the same
+ * "you're busy" lock that dates use blocks day-spending actions while you're out, and a
+ * live date blocks entering a room (and vice-versa). Discovery-feature-gated by the routes.
+ *
+ * The PLAYER's name is withheld from the model until they tell the room (mirroring how an
+ * unmet character's name is withheld from the player) — `playerNamed` flips it on.
  */
 
-export interface RoomOccupant {
-  characterId: string;
-  known: boolean;
-}
-export interface RoomReply {
-  reply: string;
-  occupants: RoomOccupant[];
-  introduced: string[];
-  /** The (day, phase) this room is pinned to — the moment the player walked in. The
-   *  client echoes these back on each `roomSay` so occupants stay stable for the visit. */
-  day: number;
-  phase: Phase;
-}
 export interface RoomTurnInput {
   role: 'player' | 'room';
   text: string;
@@ -68,7 +69,15 @@ function scrubUnmetNames(text: string, here: Character[], introducedNow: Set<str
   return out;
 }
 
-function occupantsOf(here: Character[]): RoomOccupant[] {
+/** Defense-in-depth: strip the PLAYER's name from room prose while it's still secret —
+ *  no one present knows it until the player says it, so the room must not use it. */
+function scrubPlayerName(text: string, playerName: string): string {
+  const name = playerName.trim();
+  if (name.length < 2) return text;
+  return text.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), 'you');
+}
+
+function occupantsOf(here: Character[]) {
   return here.map((c) => ({ characterId: c.id, known: isDiscovered(c.id) }));
 }
 
@@ -84,10 +93,11 @@ function buildRoomMessages(args: {
   locationName: string;
   here: Character[];
   playerName: string;
+  playerNamed: boolean;
   history: RoomTurnInput[];
   text: string;
 }) {
-  const { locationName, here, playerName, history, text } = args;
+  const { locationName, here, playerName, playerNamed, history, text } = args;
   const roster =
     here
       .map((c) => {
@@ -102,8 +112,12 @@ function buildRoomMessages(args: {
   const transcript =
     history
       .slice(-12)
-      .map((m) => `${m.role === 'player' ? playerName : 'Room'}: ${m.text}`)
+      .map((m) => `${m.role === 'player' ? 'Player' : 'Room'}: ${m.text}`)
       .join('\n') || '(just arrived)';
+  // The player's name is itself withheld until they introduce themselves to the room.
+  const playerLine = playerNamed
+    ? `The player's name is "${playerName}" — they've introduced themselves, so people here may use it.`
+    : `The player has NOT told anyone here their name yet — NO ONE present knows it. Address the player only as "you" (or a description); do NOT use or guess the player's name until they state it. When the player DOES tell the room their name this turn, set "playerIntroduced" to true.`;
   const system =
     'You run a LOCATION in a dating sim. You voice the NARRATOR and EVERY person present, addressing ' +
     'the player as "you" in short, evocative in-world prose (2–5 sentences). The player talks to people ' +
@@ -116,8 +130,8 @@ function buildRoomMessages(args: {
     '"introduced". Return JSON per the schema.';
   const user =
     `Location: ${locationName}\nPeople present:\n${roster}\n\n` +
-    `The player goes by "${playerName}".\n\nConversation so far:\n${transcript}\n\n` +
-    `${playerName} says/does: ${text}\n\nWrite the room's response.`;
+    `${playerLine}\n\nConversation so far:\n${transcript}\n\n` +
+    `The player says/does: ${text}\n\nWrite the room's response.`;
   return [
     { role: 'system' as const, content: system },
     { role: 'user' as const, content: user },
@@ -126,11 +140,18 @@ function buildRoomMessages(args: {
 
 /** Run one room turn through the model. Returns null on any failure so callers can fall
  *  back gracefully (the room must always be enterable + talkable). */
-async function runRoomLlm(locName: string, here: Character[], playerName: string, history: RoomTurnInput[], text: string): Promise<RoomTurn | null> {
+async function runRoomLlm(
+  locName: string,
+  here: Character[],
+  playerName: string,
+  playerNamed: boolean,
+  history: RoomTurnInput[],
+  text: string,
+): Promise<RoomTurn | null> {
   try {
     const result = await callStructuredLlm(
       RoomTurnSchema,
-      buildRoomMessages({ locationName: locName, here, playerName, history, text }),
+      buildRoomMessages({ locationName: locName, here, playerName, playerNamed, history, text }),
       { settings: getLlmSettings(), task: `Voice ${locName} for the player.`, schemaName: 'RoomTurn' },
     );
     return result.ok ? result.data : null;
@@ -139,9 +160,48 @@ async function runRoomLlm(locName: string, here: Character[], playerName: string
   }
 }
 
-/** Enter a location's chat: snapshot who's here NOW, spend one action (advancing the
- *  clock), and open with an LLM-authored arrival scene (templated fallback). */
-export async function enterRoom(worldId: string, locationId: string): Promise<RoomReply> {
+/** Build the client read-model for a persisted room session: live occupants (with
+ *  fresh `known` flags), the resolved venue name/photo, and the full transcript. Returns
+ *  null (and ends the session) if the pinned location no longer exists. */
+function composeActiveRoom(session: RoomSession): ActiveRoom | null {
+  const loc = worldsRepo.get(session.worldId)?.locations.find((l) => l.id === session.locationId);
+  if (!loc) {
+    roomSessionsRepo.endForWorld(session.worldId);
+    return null;
+  }
+  const here = occupantsAt(session.worldId, session.day, session.phase, session.locationId);
+  return {
+    sessionId: session.id,
+    worldId: session.worldId,
+    locationId: session.locationId,
+    locationName: loc.name,
+    imageAssetId: loc.imageAssetId,
+    day: session.day,
+    phase: session.phase,
+    occupants: occupantsOf(here),
+    messages: session.messages,
+  };
+}
+
+/** The world's live Around Town room (for auto-resume), or null. */
+export function getActiveRoom(worldId: string): ActiveRoom | null {
+  const session = roomSessionsRepo.activeForWorld(worldId);
+  return session ? composeActiveRoom(session) : null;
+}
+
+/**
+ * Enter a location's chat. If a room is already open for this world, RESUME it (no
+ * charge). Otherwise: refuse while a date is underway, snapshot who's here NOW, spend
+ * one action (advancing the clock), open with an LLM-authored arrival scene (templated
+ * fallback), and persist the session pinned to the entry (day, phase).
+ */
+export async function enterRoom(worldId: string, locationId: string): Promise<ActiveRoom> {
+  const existing = roomSessionsRepo.activeForWorld(worldId);
+  if (existing) {
+    const resumed = composeActiveRoom(existing);
+    if (resumed) return resumed; // already out and about — resume, don't re-charge
+  }
+  if (getActiveDateForWorld(worldId)) throw badRequest("Wrap up your date before heading out around town.");
   const loc = locationOf(worldId, locationId);
   assertCanAct(worldId);
   // Snapshot the CURRENT block BEFORE spending — the room is pinned to who's here right now.
@@ -158,41 +218,81 @@ export async function enterRoom(worldId: string, locationId: string): Promise<Ro
     loc.name,
     here,
     playerName,
+    false, // the player hasn't said their name on arrival
     [],
     '(The player has just walked in. Set the scene and let anyone present react — no one has been introduced yet.)',
   );
-  const reply = llm ? scrubUnmetNames(llm.reply, here, new Set()) : templatedOpener(loc.name, here, activities);
-  return { reply, occupants: occupantsOf(here), introduced: [], day, phase };
+  const reply = llm
+    ? scrubPlayerName(scrubUnmetNames(llm.reply, here, new Set()), playerName)
+    : templatedOpener(loc.name, here, activities);
+  const now = Date.now();
+  const session = roomSessionsRepo.insert({
+    id: newId('room'),
+    worldId,
+    locationId,
+    day,
+    phase,
+    messages: [{ role: 'room', text: reply }],
+    playerNamed: false,
+    ended: false,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return composeActiveRoom(session)!;
 }
 
-/** One room turn, pinned to the (day, phase) the player entered on. Flagged introductions
- *  unlock the character (revealed + dateable) and roll the meeting into their memory. */
-export async function roomSay(
-  worldId: string,
-  locationId: string,
-  day: number,
-  phase: Phase,
-  history: RoomTurnInput[],
-  text: string,
-): Promise<RoomReply> {
-  const loc = locationOf(worldId, locationId);
-  const here = occupantsAt(worldId, day, phase, locationId);
+/**
+ * One turn in the world's live room, server-truth: history is the persisted transcript
+ * (never client-supplied). Flagged introductions unlock the character (revealed +
+ * dateable) and roll the meeting into their memory; once the player introduces
+ * themselves the room may use their name.
+ */
+export async function roomSay(worldId: string, text: string): Promise<ActiveRoom> {
+  const session = roomSessionsRepo.activeForWorld(worldId);
+  if (!session) throw badRequest("You're not in a room right now — step into a place from Around Town first.");
+  const loc = locationOf(worldId, session.locationId);
+  const here = occupantsAt(worldId, session.day, session.phase, session.locationId);
   const playerName = getOrCreatePlayer(playerIdForWorldOrDefault(worldId)).name;
+  // The model only ever sees player/room turns — the inline 'meet' markers are UI.
+  const history: RoomTurnInput[] = session.messages
+    .filter((m): m is RoomMessage & { role: 'player' | 'room' } => m.role === 'player' || m.role === 'room')
+    .map((m) => ({ role: m.role, text: m.text }));
 
-  const llm = await runRoomLlm(loc.name, here, playerName, history, text);
+  const llm = await runRoomLlm(loc.name, here, playerName, session.playerNamed, history, text);
+
+  const messages: RoomMessage[] = [...session.messages, { role: 'player', text }];
+  let playerNamed = session.playerNamed;
+  let introduced: string[] = [];
+
   if (!llm) {
-    return { reply: 'The room carries on around you.', occupants: occupantsOf(here), introduced: [], day, phase };
+    messages.push({ role: 'room', text: 'The room carries on around you.' });
+  } else {
+    playerNamed = session.playerNamed || llm.playerIntroduced;
+    const hereIds = new Set(here.map((c) => c.id));
+    introduced = [...new Set(llm.introduced)].filter((id) => hereIds.has(id) && !isDiscovered(id));
+    const introducedSet = new Set(introduced);
+    // The character only learns the player's name if the player has actually shared it.
+    const metLabel = playerNamed ? playerName : 'someone new';
+    for (const id of introduced) {
+      stampLastSeen(id, session.day);
+      stampMet(id, session.day, session.locationId);
+      const ev = recordEvent('meet', { characterId: id, locationId: session.locationId, day: session.day });
+      addMemoriesFromEvaluation(id, [{ text: `Met ${metLabel} at ${loc.name}.`, importance: 2, tags: ['met_people'] }], ev.id);
+    }
+    let reply = scrubUnmetNames(llm.reply, here, introducedSet);
+    if (!playerNamed) reply = scrubPlayerName(reply, playerName);
+    messages.push({ role: 'room', text: reply });
+    if (introduced.length > 0) {
+      const names = introduced.map((id) => charactersRepo.get(id)?.name).filter((n): n is string => !!n);
+      if (names.length > 0) messages.push({ role: 'meet', text: names.join(', ') });
+    }
   }
 
-  const hereIds = new Set(here.map((c) => c.id));
-  const introduced = [...new Set(llm.introduced)].filter((id) => hereIds.has(id) && !isDiscovered(id));
-  const introducedSet = new Set(introduced);
-  for (const id of introduced) {
-    stampLastSeen(id, day);
-    stampMet(id, day, locationId);
-    const ev = recordEvent('meet', { characterId: id, locationId, day });
-    addMemoriesFromEvaluation(id, [{ text: `Met ${playerName} at ${loc.name}.`, importance: 2, tags: ['met_people'] }], ev.id);
-  }
+  const updated = roomSessionsRepo.update({ ...session, messages, playerNamed, updatedAt: Date.now() });
+  return composeActiveRoom(updated)!;
+}
 
-  return { reply: scrubUnmetNames(llm.reply, here, introducedSet), occupants: occupantsOf(here), introduced, day, phase };
+/** Leave the room (end the visit) — clears the lock. Idempotent. */
+export function leaveRoom(worldId: string): void {
+  roomSessionsRepo.endForWorld(worldId);
 }

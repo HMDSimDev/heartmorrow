@@ -765,7 +765,9 @@ function MemoryList({
             <div className="prof-mem-text">{m.text}</div>
             <div className="prof-mem-meta">
               <small className={`prof-mem-src${m.sourceEventId ? ' date' : ''}`}>
-                {m.sourceEventId ? (
+                {m.tags.includes('met_people') ? (
+                  <><Icon name="people" size={12} /> {t('profile.fromMeeting')}</>
+                ) : m.sourceEventId ? (
                   <><Icon name="date" size={12} /> {t('profile.fromDate')}</>
                 ) : (
                   <><Icon name="edit" size={12} /> {t('profile.addedManually')}</>

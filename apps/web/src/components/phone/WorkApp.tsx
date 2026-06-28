@@ -21,7 +21,7 @@ import './phone-life.css';
 
 export function WorkApp() {
   const { t } = useTranslation(['phone', 'common']);
-  const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate, player } = useAppData();
+  const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate, activeRoom, player } = useAppData();
   const [activities, setActivities] = useState<ActivityDef[]>([]);
   const [jobGames, setJobGames] = useState<MinigameInfo[]>([]);
   const [active, setActive] = useState<ActiveGame | null>(null);
@@ -34,6 +34,8 @@ export function WorkApp() {
   const stamina = worldState?.stamina ?? 0;
   const noEnergy = stamina <= 0;
   const onDate = !!activeDate;
+  const onRoom = !activeDate && !!activeRoom;
+  const engaged = onDate || onRoom;
 
   useEffect(() => {
     // A new day ends any half-finished shift left on screen.
@@ -69,6 +71,10 @@ export function WorkApp() {
       setError(t('work.errOnDate', { name: activeDate!.characterName }));
       return;
     }
+    if (onRoom) {
+      setError(t('work.errOnRoom', { place: activeRoom!.locationName }));
+      return;
+    }
     setBusy(true);
     setNote(undefined);
     setError(undefined);
@@ -94,6 +100,10 @@ export function WorkApp() {
     }
     if (onDate) {
       setError(t('work.errOnDate', { name: activeDate!.characterName }));
+      return;
+    }
+    if (onRoom) {
+      setError(t('work.errOnRoom', { place: activeRoom!.locationName }));
       return;
     }
     setBusy(true);
@@ -172,6 +182,11 @@ export function WorkApp() {
               {t('work.onDateNote', { name: activeDate!.characterName })}
             </p>
           )}
+          {onRoom && (
+            <p className="pl-board-note">
+              {t('work.onRoomNote', { place: activeRoom!.locationName })}
+            </p>
+          )}
         </div>
 
         {/* --- Career skills ------------------------------------------------ */}
@@ -244,7 +259,7 @@ export function WorkApp() {
                 <button
                   className="btn sm primary"
                   onClick={() => perform(a)}
-                  disabled={busy || cantAfford || onDate || reqLocked}
+                  disabled={busy || cantAfford || engaged || reqLocked}
                   title={
                     reqLocked
                       ? t('work.lockedTitle', { skill: skillName(a.requiresSkill), level: a.requiresLevel })
@@ -294,7 +309,7 @@ export function WorkApp() {
                     <button
                       className="btn sm primary"
                       onClick={() => startJob(g)}
-                      disabled={busy || noEnergy || onDate || reqLocked}
+                      disabled={busy || noEnergy || engaged || reqLocked}
                       title={
                         reqLocked
                           ? t('work.lockedTitle', { skill: skillName(g.requiresSkill), level: g.requiresLevel })

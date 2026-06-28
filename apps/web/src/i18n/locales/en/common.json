@@ -364,7 +364,10 @@
     "onDateWith": "On a date with {name}",
     "dateInProgress": "Date in progress with {name}",
     "endDayDateBlock": "You're on a date with {name} — finish it on the Date tab before ending the day.",
-    "onDateNote": "On a date — finish it to end the day."
+    "onDateNote": "On a date — finish it to end the day.",
+    "endDayRoomBlock": "You're out at {place} — head back before ending the day.",
+    "outAroundTownNote": "Out around town — head back to end the day.",
+    "outAroundTown": "Out at {place}"
   },
   "recap": {
     "newDay": "A new day dawns",

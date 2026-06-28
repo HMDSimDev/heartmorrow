@@ -12,7 +12,7 @@ import { Modal } from './ui';
 /** Compact day / time-of-day / stamina indicator + Sleep control for the active world. */
 export function DayHud() {
   const { t } = useTranslation();
-  const { worlds, activeWorldId, activeWorld, worldState, setActiveWorld, sleep, player, dayTick, activeDate } =
+  const { worlds, activeWorldId, activeWorld, worldState, setActiveWorld, sleep, player, dayTick, activeDate, activeRoom } =
     useAppData();
   const [recap, setRecap] = useState<SleepResponse | null>(null);
   const [sleeping, setSleeping] = useState(false);
@@ -112,11 +112,13 @@ export function DayHud() {
         <button
           className="btn sm primary hud-end"
           onClick={doSleep}
-          disabled={sleeping || !!activeDate}
+          disabled={sleeping || !!activeDate || !!activeRoom}
           title={
             activeDate
               ? t('hud.endDayDateBlock', { name: activeDate.characterName })
-              : undefined
+              : activeRoom
+                ? t('hud.endDayRoomBlock', { place: activeRoom.locationName })
+                : undefined
           }
         >
           {sleeping ? '…' : worldState.stamina <= 0 ? t('hud.sleep') : t('hud.endDay')}
@@ -124,6 +126,7 @@ export function DayHud() {
       </div>
 
       {activeDate && <small className="hud-note">{t('hud.onDateNote')}</small>}
+      {!activeDate && activeRoom && <small className="hud-note">{t('hud.outAroundTownNote')}</small>}
       {error && <small className="hud-err">{error}</small>}
       {recap && <RecapModal res={recap} onClose={() => setRecap(null)} />}
     </div>

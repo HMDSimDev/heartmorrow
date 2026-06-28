@@ -73,7 +73,7 @@ function CreatorRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   const { t } = useTranslation();
-  const { creatorMode, unreadTexts, activeWorldId, activeWorld, activeDate } = useAppData();
+  const { creatorMode, unreadTexts, activeWorldId, activeWorld, activeDate, activeRoom } = useAppData();
   const location = useLocation();
 
   // The world selector + onboarding are a full-screen experience OUTSIDE the
@@ -109,6 +109,16 @@ export default function App() {
           className="nav-badge nav-badge-live"
           title={t('hud.onDateWith', { name: activeDate.characterName })}
           aria-label={t('hud.dateInProgress', { name: activeDate.characterName })}
+        />
+      );
+    // You're out at an Around Town room — a live dot on that tab so a navigation away
+    // never hides that there's a visit to return to.
+    if (to === '/around-town' && activeRoom)
+      return (
+        <span
+          className="nav-badge nav-badge-live"
+          title={t('hud.outAroundTown', { place: activeRoom.locationName })}
+          aria-label={t('hud.outAroundTown', { place: activeRoom.locationName })}
         />
       );
     return null;

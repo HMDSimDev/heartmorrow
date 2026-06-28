@@ -88,7 +88,7 @@ function DateTrajectory({
 export function Chat() {
   const { t } = useTranslation(['pages', 'common']);
   const [params] = useSearchParams();
-  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, assetById } =
+  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, activeRoom, assetById } =
     useAppData();
   const [availability, setAvailability] = useState<Record<string, { available: boolean; reason: string | null }>>({});
   // The wallet of the SELECTED character's world (may differ from the active
@@ -403,7 +403,7 @@ export function Chat() {
 
   const start = async () => {
     if (!setup.characterId) return;
-    if (activeDate) return; // a date is already underway — resume it, never start a second
+    if (activeDate || activeRoom) return; // already busy (a date underway, or out around town)
     setStarting(true);
     setError(undefined);
     setEvalResult(null);
@@ -889,6 +889,19 @@ export function Chat() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      );
+    }
+    // You're out at an Around Town room — can't plan a date until you head back (the
+    // mirror of the room refusing to open while a date is live).
+    if (activeRoom) {
+      return (
+        <div className="stack">
+          <div className="page-head">
+            <div className="kicker">{t('chat.tonightsPlan')}</div>
+            <h1>{t('chat.outAroundTownTitle')}</h1>
+            <p>{t('chat.outAroundTownBody', { place: activeRoom.locationName })}</p>
           </div>
         </div>
       );

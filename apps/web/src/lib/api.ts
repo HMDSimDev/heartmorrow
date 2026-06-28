@@ -37,6 +37,7 @@ import type {
   TextMessage,
   TogetherResult,
   ActiveDate,
+  ActiveRoom,
   ConversationCreate,
   ConversationSession,
   DtrResponse,
@@ -385,17 +386,6 @@ export interface LocationSceneView {
   occupants: DiscoverySceneOccupant[];
   clusters: Array<{ id: number; memberIds: string[] }>;
 }
-export interface RoomOccupantView {
-  characterId: string;
-  known: boolean;
-}
-export interface RoomReplyView {
-  reply: string;
-  occupants: RoomOccupantView[];
-  introduced: string[];
-  day: number;
-  phase: Phase;
-}
 
 export const api = {
   health: () => get<{ ok: boolean }>('/health'),
@@ -618,15 +608,11 @@ export const api = {
   aroundTown: (worldId: string) => get<AroundTownView>(`/around-town${worldQuery(worldId)}`),
   locationScene: (worldId: string, locationId: string) =>
     get<LocationSceneView>(`/around-town/scene?worldId=${encodeURIComponent(worldId)}&locationId=${encodeURIComponent(locationId)}`),
-  enterRoom: (worldId: string, locationId: string) => post<RoomReplyView>('/around-town/enter', { worldId, locationId }),
-  roomSay: (
-    worldId: string,
-    locationId: string,
-    day: number,
-    phase: Phase,
-    history: Array<{ role: 'player' | 'room'; text: string }>,
-    text: string,
-  ) => post<RoomReplyView>('/around-town/say', { worldId, locationId, day, phase, history, text }),
+  // The live, resumable Around Town room (server-truth). enter/say return the full room.
+  activeRoom: (worldId: string) => get<{ room: ActiveRoom | null }>(`/around-town/active-room${worldQuery(worldId)}`),
+  enterRoom: (worldId: string, locationId: string) => post<ActiveRoom>('/around-town/enter', { worldId, locationId }),
+  roomSay: (worldId: string, text: string) => post<ActiveRoom>('/around-town/say', { worldId, text }),
+  leaveRoom: (worldId: string) => post<{ ok: true }>('/around-town/leave', { worldId }),
   listMinigames: () => get<MinigameInfo[]>('/minigames'),
   startMinigame: (input: MinigameStart) => post<MinigameStartResponse>('/minigames/start', input),
   finishMinigame: (input: MinigameFinish) => post<MinigameFinishResponse>('/minigames/finish', input),

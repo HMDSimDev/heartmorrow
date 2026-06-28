@@ -461,6 +461,10 @@ export type WorldSimColor = z.infer<typeof WorldSimColorSchema>;
 export const RoomTurnSchema = z.object({
   reply: z.string().min(1).max(GEN_TEXT.prose),
   introduced: z.array(z.string().min(1)).max(8).default([]),
+  /** True the turn the PLAYER tells the room their name. Until this fires no one
+   *  present knows the player's name, so the model addresses them by "you" / a
+   *  description only — never by name. */
+  playerIntroduced: z.boolean().default(false),
 });
 export type RoomTurn = z.infer<typeof RoomTurnSchema>;
 

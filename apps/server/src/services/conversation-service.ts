@@ -56,7 +56,7 @@ import {
   type RelationshipStatus,
   type SessionWithMessages,
 } from '@dsim/shared';
-import { charactersRepo, chroniclesRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
+import { charactersRepo, chroniclesRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, roomSessionsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
 import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
@@ -144,6 +144,11 @@ export function createSession(input: ConversationCreate): ConversationSession {
   // Discovery gate: in a discovery world you can only converse with people you've met
   // (the introduction itself — mode 'meet' — is exempt). No-op when discovery is off.
   assertDiscoveryCanStart(character, input.mode ?? 'chat');
+  // You can't start a date/meeting while you're out at a location's room chat — the
+  // mirror of the room refusing to open while a date is live (a plain `chat` is exempt).
+  if (input.mode && input.mode !== 'chat' && character.worldId && roomSessionsRepo.activeForWorld(character.worldId)) {
+    throw badRequest("You're out around town right now — head back before starting a date.");
+  }
   // The location the date actually happens at. "Anywhere" (a date-setup directive,
   // not a real id) is resolved to a concrete venue inside the date block below; it
   // never reaches a chat or worldless session as a literal location.

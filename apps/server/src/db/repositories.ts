@@ -34,6 +34,8 @@ import {
   StockPriceSchema,
   MarketNewsSchema,
   GamblingRoundSchema,
+  RoomSessionSchema,
+  type RoomSession,
   type Asset,
   type Character,
   type WorldState,
@@ -557,6 +559,58 @@ export const messagesRepo = {
       m.id, m.sessionId, m.role, m.text, j(m.metadata), m.createdAt,
     );
     return m;
+  },
+};
+
+// --- room sessions (discovery: resumable Around Town rooms) ------------------
+
+function rowToRoomSession(r: Row): RoomSession {
+  return RoomSessionSchema.parse({
+    id: r.id,
+    worldId: r.world_id,
+    locationId: r.location_id,
+    day: Number(r.day),
+    phase: r.phase,
+    messages: fromJson(r.messages, []),
+    playerNamed: intToBool(r.player_named),
+    ended: intToBool(r.ended),
+    createdAt: Number(r.created_at),
+    updatedAt: Number(r.updated_at),
+  });
+}
+
+export const roomSessionsRepo = {
+  get(id: string): RoomSession | undefined {
+    const r = getDb().get<Row>('SELECT * FROM room_sessions WHERE id = ?', id);
+    return r ? rowToRoomSession(r) : undefined;
+  },
+  /** The world's single live (not-ended) room session, if any — the source for
+   *  resuming an Around Town visit and for the "you're out" lock. */
+  activeForWorld(worldId: string): RoomSession | undefined {
+    const r = getDb().get<Row>(
+      'SELECT * FROM room_sessions WHERE world_id = ? AND ended = 0 ORDER BY updated_at DESC LIMIT 1',
+      worldId,
+    );
+    return r ? rowToRoomSession(r) : undefined;
+  },
+  insert(s: RoomSession): RoomSession {
+    getDb().run(
+      `INSERT INTO room_sessions (id,world_id,location_id,day,phase,messages,player_named,ended,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      s.id, s.worldId, s.locationId, s.day, s.phase, j(s.messages), boolToInt(s.playerNamed), boolToInt(s.ended), s.createdAt, s.updatedAt,
+    );
+    return s;
+  },
+  update(s: RoomSession): RoomSession {
+    getDb().run(
+      `UPDATE room_sessions SET location_id=?,day=?,phase=?,messages=?,player_named=?,ended=?,updated_at=? WHERE id=?`,
+      s.locationId, s.day, s.phase, j(s.messages), boolToInt(s.playerNamed), boolToInt(s.ended), s.updatedAt, s.id,
+    );
+    return s;
+  },
+  /** Atomically end every live room session for a world (idempotent; used on leave). */
+  endForWorld(worldId: string): void {
+    getDb().run('UPDATE room_sessions SET ended = 1, updated_at = ? WHERE world_id = ? AND ended = 0', Date.now(), worldId);
   },
 };
 

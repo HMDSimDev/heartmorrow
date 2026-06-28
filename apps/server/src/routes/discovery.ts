@@ -1,12 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import type { Phase } from '@dsim/shared';
 import { badRequest, notFound } from '../lib/errors';
 import { getWorld } from '../services/world-service';
 import { requireFeature } from '../services/world-feature-service';
 import { ensureWorldState } from '../services/world-clock-service';
 import { composeLocationScene, getPlacements, isLocationOpen } from '../services/placement-service';
 import { isRedacted, stampGlimpsed } from '../services/discovery-service';
-import { enterRoom, roomSay } from '../services/room-service';
+import { enterRoom, roomSay, getActiveRoom, leaveRoom } from '../services/room-service';
 import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 
 /**
@@ -75,7 +74,27 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // Enter a location's CHAT: costs one action; returns the opening scene + who's present.
+  // The world's live, resumable room session (if any) — for auto-resume on the tab,
+  // and the "you're out around town" lock that mirrors a live date.
+  app.get(
+    '/around-town/active-room',
+    {
+      schema: docSchema({
+        tags: ['discovery'],
+        summary: 'Get the in-progress Around Town room for a world',
+        querystring: WorldScopedQuerySchema,
+      }),
+    },
+    async (req) => {
+      const { worldId } = req.query as { worldId?: string };
+      if (!worldId) throw badRequest('worldId is required.');
+      requireFeature(worldId, 'discovery');
+      return { room: getActiveRoom(worldId) };
+    },
+  );
+
+  // Enter a location's CHAT: costs one action (or resumes an open room). Returns the
+  // persisted, pinned room session.
   app.post(
     '/around-town/enter',
     { schema: docSchema({ tags: ['discovery'], summary: "Enter a location's chat (costs one action)" }) },
@@ -87,24 +106,28 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
-  // One turn of a location chat: the model voices the room; flagged introductions unlock people.
+  // One turn of the live room: server-truth history. Flagged introductions unlock people.
   app.post(
     '/around-town/say',
-    { schema: docSchema({ tags: ['discovery'], summary: 'Send a line to a location chat' }) },
+    { schema: docSchema({ tags: ['discovery'], summary: 'Send a line to the live location chat' }) },
     async (req) => {
-      const { worldId, locationId, day, phase, history, text } = req.body as {
-        worldId?: string;
-        locationId?: string;
-        day?: number;
-        phase?: Phase;
-        history?: Array<{ role: 'player' | 'room'; text: string }>;
-        text?: string;
-      };
-      if (!worldId || !locationId || !text?.trim() || typeof day !== 'number' || !phase) {
-        throw badRequest('worldId, locationId, day, phase and text are required.');
-      }
+      const { worldId, text } = req.body as { worldId?: string; text?: string };
+      if (!worldId || !text?.trim()) throw badRequest('worldId and text are required.');
       requireFeature(worldId, 'discovery');
-      return roomSay(worldId, locationId, day, phase, Array.isArray(history) ? history : [], text);
+      return roomSay(worldId, text);
+    },
+  );
+
+  // Leave the room (ends the visit) — clears the lock. Idempotent.
+  app.post(
+    '/around-town/leave',
+    { schema: docSchema({ tags: ['discovery'], summary: 'Leave the live location chat' }) },
+    async (req) => {
+      const { worldId } = req.body as { worldId?: string };
+      if (!worldId) throw badRequest('worldId is required.');
+      requireFeature(worldId, 'discovery');
+      leaveRoom(worldId);
+      return { ok: true as const };
     },
   );
 }

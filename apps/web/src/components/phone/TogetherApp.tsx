@@ -46,7 +46,7 @@ const FIT_CLS: Record<TogetherResult['fit'], string> = {
 
 export function TogetherApp() {
   const { t } = useTranslation(['phone', 'common']);
-  const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate } = useAppData();
+  const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate, activeRoom } = useAppData();
   const [activities, setActivities] = useState<ActivityDef[]>([]);
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [target, setTarget] = useState<string | null>(null);
@@ -56,6 +56,8 @@ export function TogetherApp() {
 
   const noEnergy = (worldState?.stamina ?? 0) <= 0;
   const onDate = !!activeDate;
+  const onRoom = !activeDate && !!activeRoom;
+  const engaged = onDate || onRoom;
   const { discoveryOn, metIds } = useDiscoveryGate();
 
   useEffect(() => {
@@ -86,6 +88,10 @@ export function TogetherApp() {
     }
     if (onDate) {
       setError(t('together.errOnDate', { name: activeDate!.characterName }));
+      return;
+    }
+    if (onRoom) {
+      setError(t('together.errOnRoom', { place: activeRoom!.locationName }));
       return;
     }
     if (!target) {
@@ -128,6 +134,11 @@ export function TogetherApp() {
               {t('together.onDateNote', { name: activeDate!.characterName })}
             </p>
           )}
+          {onRoom && (
+            <p className="pl-board-note">
+              {t('together.onRoomNote', { place: activeRoom!.locationName })}
+            </p>
+          )}
         </div>
 
         {partnerOptions.length === 0 ? (
@@ -160,7 +171,7 @@ export function TogetherApp() {
                     <button
                       className="btn sm"
                       onClick={() => perform(a)}
-                      disabled={busy || !target || noEnergy || onDate}
+                      disabled={busy || !target || noEnergy || engaged}
                     >
                       <span className="pl-coin">{statLabel} ↗</span>
                     </button>

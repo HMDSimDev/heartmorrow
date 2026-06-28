@@ -1,18 +1,26 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DEFAULT_DATING_STATS } from '@dsim/shared';
+import { DEFAULT_DATING_STATS, ConversationSessionSchema } from '@dsim/shared';
 import { resetDb, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { createWorld } from './world-service';
 import { createCharacter, updateCharacter } from './character-service';
-import { enterRoom, roomSay } from './room-service';
-import { isDiscovered } from './discovery-service';
+import { enterRoom, roomSay, getActiveRoom, leaveRoom } from './room-service';
+import { createSession } from './conversation-service';
+import { isDiscovered, stampMet } from './discovery-service';
+import { updatePlayer } from './player-service';
 import { ensureWorldState } from './world-clock-service';
+import { sessionsRepo } from '../db/repositories';
+import { playerIdForWorld } from '../lib/ids';
 
 beforeEach(() => resetDb());
 afterEach(() => setAdapterOverride(null));
 const DS = DEFAULT_DATING_STATS;
-const scriptRoom = (reply: string, introduced: string[] = []) =>
-  setAdapterOverride(new ScriptedAdapter([JSON.stringify({ reply, introduced })]));
+
+/** One scripted room turn (RoomTurn JSON). The adapter repeats its LAST response, so
+ *  pass one entry per LLM call you expect (enter = 1 opener, each roomSay = 1). */
+const turn = (reply: string, extra: Record<string, unknown> = {}) =>
+  JSON.stringify({ reply, introduced: [], playerIntroduced: false, ...extra });
+const scriptRoom = (...turns: string[]) => setAdapterOverride(new ScriptedAdapter(turns));
 
 /** A discovery world whose named regulars work the cafe on the MORNING shift, so the
  *  default (morning) block deterministically places them at 'cafe' — and the AFTERNOON
@@ -33,51 +41,128 @@ function worldWithRegulars(names: string[]) {
 }
 
 describe('location room chat (discovery)', () => {
-  it('entering a location costs one action and reports who is present', async () => {
+  it('entering a location costs one action, reports who is present, and persists', async () => {
     const { w, chars } = worldWithRegulars(['Mara']);
-    scriptRoom('You step into the cafe.');
+    scriptRoom(turn('You step into the cafe.'));
     const before = ensureWorldState(w.id).stamina;
-    const res = await enterRoom(w.id, 'cafe');
-    expect(res.occupants.some((o) => o.characterId === chars[0]!.id)).toBe(true);
+    const room = await enterRoom(w.id, 'cafe');
+    expect(room.occupants.some((o) => o.characterId === chars[0]!.id)).toBe(true);
+    expect(room.messages[0]?.role).toBe('room');
     expect(ensureWorldState(w.id).stamina).toBe(before - 1);
+    // …and it's the world's live, resumable room now.
+    expect(getActiveRoom(w.id)?.sessionId).toBe(room.sessionId);
+  });
+
+  it('resumes the same room (no re-charge) on re-entry, and leaving clears it', async () => {
+    const { w } = worldWithRegulars(['Mara']);
+    scriptRoom(turn('You step in.'));
+    const first = await enterRoom(w.id, 'cafe');
+    const stamina = ensureWorldState(w.id).stamina;
+
+    const again = await enterRoom(w.id, 'cafe'); // resume — must NOT spend another action
+    expect(again.sessionId).toBe(first.sessionId);
+    expect(ensureWorldState(w.id).stamina).toBe(stamina);
+
+    leaveRoom(w.id);
+    expect(getActiveRoom(w.id)).toBeNull();
   });
 
   it('PINS the room to the block you entered on, even though entering advances the clock', async () => {
     const { w, chars } = worldWithRegulars(['Mara']); // Mara is a morning regular only
-    scriptRoom('You step in.');
+    scriptRoom(turn('You step in.'));
     expect(ensureWorldState(w.id).phase).toBe('morning');
 
-    const res = await enterRoom(w.id, 'cafe');
-    expect(res.phase).toBe('morning'); // room pinned to the moment you walked in
-    expect(res.occupants.some((o) => o.characterId === chars[0]!.id)).toBe(true); // Mara is here
+    const room = await enterRoom(w.id, 'cafe');
+    expect(room.phase).toBe('morning'); // pinned to the moment you walked in
+    expect(room.occupants.some((o) => o.characterId === chars[0]!.id)).toBe(true); // Mara is here
     expect(ensureWorldState(w.id).phase).not.toBe('morning'); // the action advanced the clock
   });
 
-  it('unlocks a character the model flags as introduced, and remembers the meeting', async () => {
-    const { w, chars } = worldWithRegulars(['Mara']);
-    const mara = chars[0]!;
-    scriptRoom('She looks up. "Oh — I\'m Mara."', [mara.id]);
-
-    const res = await roomSay(w.id, 'cafe', 1, 'morning', [], "Hi, I'm Sam — mind if I join you?");
-    expect(res.introduced).toContain(mara.id);
-    expect(isDiscovered(mara.id)).toBe(true);
+  it('roomSay is server-truth (no client history) and persists the turn', async () => {
+    const { w } = worldWithRegulars(['Mara']);
+    scriptRoom(turn('You arrive.'), turn('The room hums along.'));
+    await enterRoom(w.id, 'cafe');
+    const after = await roomSay(w.id, 'I look around.');
+    const texts = after.messages.map((m) => m.text);
+    expect(texts).toContain('I look around.'); // the player turn was stored
+    expect(texts).toContain('The room hums along.'); // the room's reply was stored
+    expect(getActiveRoom(w.id)?.messages.length).toBe(after.messages.length); // persisted
   });
 
-  it('scrubs an unmet character\'s name from the room prose (never leak identity)', async () => {
+  it('unlocks a character the model flags as introduced, surfaces a meet bubble, and remembers it', async () => {
     const { w, chars } = worldWithRegulars(['Mara']);
     const mara = chars[0]!;
-    scriptRoom('Mara keeps reading, not looking up.', []);
+    scriptRoom(turn('You arrive.'), turn('She looks up. "Oh — I\'m Mara."', { introduced: [mara.id] }));
+    await enterRoom(w.id, 'cafe');
 
-    const res = await roomSay(w.id, 'cafe', 1, 'morning', [], 'who is that by the window?');
-    expect(res.reply).not.toContain('Mara');
+    const after = await roomSay(w.id, "Hi, I'm Sam — mind if I join you?");
+    expect(isDiscovered(mara.id)).toBe(true);
+    expect(after.messages.some((m) => m.role === 'meet' && m.text.includes('Mara'))).toBe(true);
+  });
+
+  it("scrubs an unmet character's name from the room prose (never leak identity)", async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    scriptRoom(turn('You arrive.'), turn('Mara keeps reading, not looking up.'));
+    await enterRoom(w.id, 'cafe');
+
+    const after = await roomSay(w.id, 'who is that by the window?');
+    expect(after.messages.at(-1)?.text).not.toContain('Mara');
     expect(isDiscovered(mara.id)).toBe(false);
   });
 
   it('ignores introduced ids for people who are not actually present', async () => {
     const { w } = worldWithRegulars(['Mara']);
-    scriptRoom('No one by that name is here.', ['ghost-id']);
+    scriptRoom(turn('You arrive.'), turn('No one by that name is here.', { introduced: ['ghost-id'] }));
+    await enterRoom(w.id, 'cafe');
 
-    const res = await roomSay(w.id, 'cafe', 1, 'morning', [], 'is Devi here?');
-    expect(res.introduced).toEqual([]);
+    const after = await roomSay(w.id, 'is Devi here?');
+    expect(after.messages.some((m) => m.role === 'meet')).toBe(false);
+  });
+
+  it("withholds the PLAYER's name until they introduce themselves, then allows it", async () => {
+    const { w } = worldWithRegulars(['Mara']);
+    updatePlayer({ name: 'Sam' }, playerIdForWorld(w.id));
+    scriptRoom(
+      turn('You step in.'),
+      turn('"Nice to meet you, Sam."'), // playerIntroduced:false → must be scrubbed
+      turn('"Tell me more, Sam."', { playerIntroduced: true }), // player gave name → kept
+    );
+    await enterRoom(w.id, 'cafe');
+
+    const before = await roomSay(w.id, 'hello there');
+    expect(before.messages.at(-1)?.text).not.toContain('Sam');
+
+    const afterName = await roomSay(w.id, "I'm Sam, by the way.");
+    expect(afterName.messages.at(-1)?.text).toContain('Sam');
+  });
+
+  it("blocks starting a date while you're out at a room", async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    stampMet(mara.id, 1, 'cafe'); // so the discovery gate lets a date even be attempted
+    scriptRoom(turn('You step in.'));
+    await enterRoom(w.id, 'cafe');
+
+    expect(() => createSession({ characterId: mara.id, mode: 'date', locationId: 'cafe' })).toThrow(/around town/i);
+  });
+
+  it('blocks entering a room while a date is underway', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const now = Date.now();
+    sessionsRepo.insert(
+      ConversationSessionSchema.parse({
+        id: 'sess-date',
+        characterId: chars[0]!.id,
+        locationId: 'cafe',
+        mode: 'date',
+        summary: '',
+        ended: false,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    scriptRoom(turn('You step in.'));
+    await expect(enterRoom(w.id, 'cafe')).rejects.toThrow(/date/i);
   });
 });

@@ -10,6 +10,8 @@ import {
   ConversationModeSchema,
   ConversationSessionSchema,
   MessageSchema,
+  RoomMessageSchema,
+  RoomOccupantSchema,
   PlayerProfileSchema,
   RelationshipSchema,
   ShopItemSchema,
@@ -45,6 +47,7 @@ import {
   GamblingRoundSchema,
 } from './entities';
 import { DayRecapSchema, ITEM_GEN, LOCATION_GEN, PROPERTY_GEN, STOCK_GEN, WORLD_GEN } from './llm';
+import { PhaseSchema } from '../time';
 import { ItemCategorySchema, ItemRaritySchema } from './items';
 import { CharacterLinkKindSchema, RelationshipStatusSchema } from '../social';
 import { PropertyCategorySchema, StockSectorSchema } from '../wealth';
@@ -266,6 +269,27 @@ export const ActiveDateSchema = z.object({
   updatedAt: z.number(),
 });
 export type ActiveDate = z.infer<typeof ActiveDateSchema>;
+
+/**
+ * The world's single live "Around Town" room session — surfaced so the client can
+ * RESUME it on returning to the tab (the room lives server-side, not in component
+ * state) and lock day-spending actions while you're out, exactly as a date does.
+ * Null when you're not in a room. Occupants + location name/photo are resolved live;
+ * `messages` is the full transcript including the `meet` markers to render inline.
+ */
+export const ActiveRoomSchema = z.object({
+  sessionId: z.string(),
+  worldId: z.string(),
+  locationId: z.string(),
+  locationName: z.string(),
+  imageAssetId: z.string().nullable(),
+  /** The (day, phase) the room is pinned to — the moment the player walked in. */
+  day: z.number(),
+  phase: PhaseSchema,
+  occupants: z.array(RoomOccupantSchema),
+  messages: z.array(RoomMessageSchema),
+});
+export type ActiveRoom = z.infer<typeof ActiveRoomSchema>;
 
 // --- Shop / Inventory -------------------------------------------------------
 

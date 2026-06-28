@@ -579,6 +579,25 @@ CREATE TABLE IF NOT EXISTS location_scenes (
   PRIMARY KEY (world_id, location_id, day, phase)
 );
 CREATE INDEX IF NOT EXISTS idx_location_scenes_world ON location_scenes(world_id, day, phase);
+
+-- Discovery: a resumable "Around Town" room session — the player standing in a
+-- location's freeform chat. PINNED to the (day, phase) they entered on so occupants
+-- stay stable for the visit. At most one is active (ended=0) per world; it drives
+-- auto-resume + the same lock dates use. messages is the JSON transcript (incl. the
+-- 'meet' markers); player_named gates use of the player's name. Cascades with the world.
+CREATE TABLE IF NOT EXISTS room_sessions (
+  id           TEXT PRIMARY KEY,
+  world_id     TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+  location_id  TEXT NOT NULL,
+  day          INTEGER NOT NULL,
+  phase        TEXT NOT NULL,
+  messages     TEXT NOT NULL DEFAULT '[]',
+  player_named INTEGER NOT NULL DEFAULT 0,
+  ended        INTEGER NOT NULL DEFAULT 0,
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_room_sessions_active ON room_sessions(world_id, ended, updated_at);
 `;
 
 /**
