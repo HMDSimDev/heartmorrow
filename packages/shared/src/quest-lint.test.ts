@@ -11,6 +11,8 @@ import {
   resolveQuestAction,
   initialQuestState,
   QuestActionSchema,
+  availableAffordances,
+  currentNode,
   type QuestGraph,
   type QuestLintContext,
 } from './index';
@@ -264,9 +266,9 @@ describe('autoFixQuestGraph — safe deterministic repairs', () => {
     expect(stripped.nodes[0]!.affordances[0]!.effects.success.some((e) => e.op === 'adjustWarmth')).toBe(false);
   });
 
-  it('remaps a dangling effect entity to the lone ENTRY entity — even from a non-entry scene', () => {
-    // Verifier-requested: the runtime roster is frozen to the ENTRY node, so an effect in
-    // scene2 that targets a dangling id must remap to the ENTRY entity, not scene2's local one.
+  it('remaps a dangling effect entity to the HOST scene’s lone entity (per-scene rosters)', () => {
+    // Entities now load per-scene, so an effect in scene b that targets a dangling id should
+    // remap to scene b's own lone entity ('local') — the entity that exists when you're there.
     const graph = g({
       entryNodeId: 'a',
       maxTurns: 8,
@@ -274,11 +276,11 @@ describe('autoFixQuestGraph — safe deterministic repairs', () => {
         { id: 'a', setup: 'x', entities: [{ id: 'hero', name: 'Hero', faction: 'neutral' }], affordances: [{ verb: 'move', stat: 'grit', difficulty: 'desperate', hint: 'go', effects: { success: [{ op: 'moveToNode', nodeId: 'b' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false },
         { id: 'b', setup: 'y', entities: [{ id: 'local', name: 'Local', faction: 'neutral' }], affordances: [{ verb: 'persuade', stat: 'charm', difficulty: 'hard', hint: 'h', effects: { success: [{ op: 'moveEntityToFaction', entityId: 'ghost', faction: 'ally' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false },
       ],
-      goals: [{ id: 'win', kind: 'persuade', outcome: 'win', label: 'W', predicate: { kind: 'entityFaction', entityId: 'hero', faction: 'ally' } }],
+      goals: [{ id: 'win', kind: 'persuade', outcome: 'win', label: 'W', predicate: { kind: 'entityFaction', entityId: 'local', faction: 'ally' } }],
     });
     const { graph: fixed } = autoFixQuestGraph(graph, NONE);
     const eff = fixed.nodes.find((n) => n.id === 'b')!.affordances[0]!.effects.success.find((e) => e.op === 'moveEntityToFaction');
-    expect(eff?.entityId).toBe('hero'); // remapped to the ENTRY entity, not 'local'
+    expect(eff?.entityId).toBe('local'); // remapped to scene b's own entity
   });
 
   it('is idempotent: autoFix(autoFix(g)) deep-equals autoFix(g)', () => {
@@ -355,6 +357,187 @@ describe('terminal-node awareness (a win effect in a terminal scene can never fi
     });
     const { fixes } = autoFixQuestGraph(graph, NONE);
     expect(fixes.some((f) => f.code === 'AF_UNMARK_DEAD_TERMINAL')).toBe(false); // its approach only ends — it's a real ending
+  });
+});
+
+describe('conditionals — preconditions + compound predicates + per-scene entities', () => {
+  // The user's exact "impossible" quest, now authorable: ask Mira (room A) → unlock move
+  // boxes → unlock the OPTION to go to room B → ask the porter (who exists only in room B) →
+  // do the now-known help → WIN (an AND of both rooms' progress).
+  const miraQuest = () =>
+    g({
+      entryNodeId: 'roomA',
+      maxTurns: 14,
+      nodes: [
+        {
+          id: 'roomA', kind: 'scene', setup: 'Mira among crates.',
+          entities: [{ id: 'mira', name: 'Mira', faction: 'party', disposition: 30 }],
+          affordances: [
+            { verb: 'talk', stat: 'charm', difficulty: 'normal', hint: 'Ask Mira what is wrong.', effects: { success: [{ op: 'setFlag', flag: 'asked_mira' }], partial: [], fail: [], complication: [] } },
+            { verb: 'force', stat: 'grit', difficulty: 'normal', hint: 'Move the boxes.', when: { kind: 'flag', flag: 'asked_mira' }, effects: { success: [{ op: 'setFlag', flag: 'boxes_moved' }], partial: [], fail: [], complication: [] } },
+            { verb: 'move', stat: 'grit', difficulty: 'desperate', hint: 'Go to the back room.', when: { kind: 'flag', flag: 'boxes_moved' }, effects: { success: [{ op: 'moveToNode', nodeId: 'roomB' }], partial: [{ op: 'moveToNode', nodeId: 'roomB' }], fail: [], complication: [] } },
+          ],
+          edges: [], isTerminal: false,
+        },
+        {
+          id: 'roomB', kind: 'scene', setup: 'A back room; a porter waits.',
+          entities: [{ id: 'porter', name: 'Porter', faction: 'neutral', disposition: 0 }],
+          affordances: [
+            { verb: 'talk', stat: 'charm', difficulty: 'normal', hint: 'Ask what help is needed.', effects: { success: [{ op: 'setFlag', flag: 'asked_porter' }], partial: [], fail: [], complication: [] } },
+            { verb: 'aid', stat: 'empathy', difficulty: 'normal', hint: 'Do the help.', when: { kind: 'flag', flag: 'asked_porter' }, effects: { success: [{ op: 'setFlag', flag: 'helped' }], partial: [], fail: [], complication: [] } },
+          ],
+          edges: [], isTerminal: false,
+        },
+      ],
+      goals: [{ id: 'win', kind: 'flag', outcome: 'win', label: 'Help both rooms', predicate: { kind: 'all', clauses: [{ kind: 'flag', flag: 'boxes_moved' }, { kind: 'flag', flag: 'helped' }] } }],
+    });
+
+  it('the multi-room gated quest lints CLEAN and is win-reachable', () => {
+    const graph = miraQuest();
+    expect(blocking(graph)).toHaveLength(0);
+    expect(isWinReachableTiered(graph)).toBe(true);
+  });
+
+  it('preconditions gate approaches, the player-chosen move unlocks, the porter exists in room B, and the AND win fires', () => {
+    const graph = miraQuest();
+    let state = initialQuestState(graph);
+    const avail = () => availableAffordances(currentNode(graph, state), state).map((a) => a.verb);
+    const act = (verb: string) => {
+      const a = QuestActionSchema.parse({ verb, stat: 'grit', difficulty: 'normal', proposedEffects: [], rationale: '' });
+      const r = resolveQuestAction(state, graph, a, 0); // roll 0 → success
+      state = r.newState;
+      return r.outcome;
+    };
+    expect(avail()).toEqual(['talk']); // force + move are gated off at the start
+    expect(act('force').gated).toBe(true); // attempting a gated approach → a "not yet" beat
+    act('talk'); // asks Mira → sets asked_mira
+    expect(avail()).toContain('force'); // move-boxes unlocked
+    act('force'); // sets boxes_moved
+    expect(avail()).toContain('move'); // the OPTION to go to room B unlocked (player-chosen)
+    act('move'); // moveToNode roomB
+    expect(state.nodeId).toBe('roomB');
+    expect(state.entities.some((e) => e.id === 'porter')).toBe(true); // per-scene entity loaded
+    act('talk'); // asks the porter → sets asked_porter
+    const last = act('aid'); // sets helped → the all[boxes_moved, helped] win fires
+    expect(last.ended).toBe(true);
+    expect(last.endGoal?.outcome).toBe('win');
+  });
+
+  it('a compound AND win is not falsely flagged when each clause is reachable', () => {
+    expect(blocking(miraQuest()).some((p) => p.code.startsWith('WIN'))).toBe(false);
+  });
+
+  it('a one-shot approach (when NOT tried + sets tried) disappears after one use', () => {
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 8,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [{ verb: 'force', stat: 'grit', difficulty: 'normal', hint: 'Try the lever once.', when: { kind: 'flag', flag: 'tried', negate: true }, effects: { success: [{ op: 'setFlag', flag: 'tried' }, { op: 'setFlag', flag: 'won' }], partial: [{ op: 'setFlag', flag: 'tried' }], fail: [{ op: 'setFlag', flag: 'tried' }], complication: [{ op: 'setFlag', flag: 'tried' }] } }], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } }],
+    });
+    let state = initialQuestState(graph);
+    expect(availableAffordances(currentNode(graph, state), state)).toHaveLength(1);
+    // First attempt (roll 0.9 → fail) sets `tried`; the approach then vanishes.
+    const r = resolveQuestAction(state, graph, QuestActionSchema.parse({ verb: 'force', stat: 'grit', difficulty: 'normal', proposedEffects: [], rationale: '' }), 0.9);
+    state = r.newState;
+    expect(state.flags).toContain('tried');
+    expect(availableAffordances(currentNode(graph, state), state)).toHaveLength(0); // removed from the menu
+  });
+
+  it('a fully-gated non-terminal scene force-loses (no hang) instead of stalling forever', () => {
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 8,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [{ verb: 'force', stat: 'grit', difficulty: 'normal', hint: 'h', when: { kind: 'flag', flag: 'never' }, effects: { success: [{ op: 'setFlag', flag: 'won' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } }],
+    });
+    const r = resolveQuestAction(initialQuestState(graph), graph, QuestActionSchema.parse({ verb: 'force', stat: 'grit', difficulty: 'normal', proposedEffects: [], rationale: '' }), 0);
+    expect(r.outcome.ended).toBe(true);
+    expect(r.outcome.endGoal?.outcome).toBe('lose');
+    // It's also lint-flagged (so the author sees it before play).
+    expect(codes(graph).has('ENTRY_NO_AVAILABLE_AFFORDANCE')).toBe(true);
+  });
+
+  it('flags COMPOUND_EMPTY for an all/any with no clauses', () => {
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 8,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [{ verb: 'inspect', stat: 'intellect', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'won' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false }],
+      goals: [
+        { id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } },
+        { id: 'e', kind: 'flag', outcome: 'lose', label: 'L', predicate: { kind: 'any', clauses: [] } },
+      ],
+    });
+    expect(codes(graph).has('COMPOUND_EMPTY')).toBe(true);
+  });
+
+  it('does NOT flag a room-B entity referenced by a room-B effect (per-scene rosters)', () => {
+    const graph = miraQuest();
+    // The porter (room B) is targeted by nothing dangling; no EFFECT_ENTITY_REF / PRED_ENTITY_REF.
+    const all = lintQuestGraph(graph, NONE).map((p) => p.code);
+    expect(all).not.toContain('EFFECT_ENTITY_REF');
+    expect(all).not.toContain('PRED_ENTITY_REF');
+  });
+
+  it('the referee picks the AVAILABLE same-verb approach, not a leading gated duplicate', () => {
+    // Two "persuade" approaches: the FIRST is gated-off (flag X unset); the SECOND is ungated
+    // and wins. The referee must resolve the available one, not neutral-degrade as "gated".
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 8,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [
+        { verb: 'persuade', stat: 'charm', difficulty: 'hard', hint: 'locked', when: { kind: 'flag', flag: 'X' }, effects: { success: [{ op: 'setFlag', flag: 'other' }], partial: [], fail: [], complication: [] } },
+        { verb: 'persuade', stat: 'charm', difficulty: 'normal', hint: 'open', effects: { success: [{ op: 'setFlag', flag: 'won' }], partial: [], fail: [], complication: [] } },
+      ], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } }],
+    });
+    const r = resolveQuestAction(initialQuestState(graph), graph, QuestActionSchema.parse({ verb: 'persuade', stat: 'charm', difficulty: 'normal', proposedEffects: [], rationale: '' }), 0);
+    expect(r.outcome.neutral).toBeFalsy(); // resolved the ungated approach
+    expect(r.outcome.gated).toBeFalsy();
+    expect(r.newState.flags).toContain('won');
+  });
+
+  it('a terminal ENTRY node with no available approach force-loses (no hang)', () => {
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 8,
+      nodes: [{ id: 'a', setup: 'x', entities: [], isTerminal: true, affordances: [{ verb: 'force', stat: 'grit', difficulty: 'normal', hint: 'h', when: { kind: 'flag', flag: 'never' }, effects: { success: [{ op: 'setFlag', flag: 'won' }], partial: [], fail: [], complication: [] } }], edges: [] }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } }],
+    });
+    const r = resolveQuestAction(initialQuestState(graph), graph, QuestActionSchema.parse({ verb: 'force', stat: 'grit', difficulty: 'normal', proposedEffects: [], rationale: '' }), 0);
+    expect(r.outcome.ended).toBe(true);
+    expect(r.outcome.endGoal?.outcome).toBe('lose');
+  });
+
+  it('an AND-goal clause set only on a FAIL grade is winnable, not falsely blocked', () => {
+    // flag A only on force.fail, flag B on inspect.success; win = all[A,B]. Player fails force
+    // (sets A) and succeeds inspect (sets B) → both set → win. Must NOT be a blocking WIN_*.
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 8,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [
+        { verb: 'force', stat: 'grit', difficulty: 'normal', hint: 'risky', effects: { success: [], partial: [], fail: [{ op: 'setFlag', flag: 'A' }], complication: [{ op: 'setFlag', flag: 'A' }] } },
+        { verb: 'inspect', stat: 'intellect', difficulty: 'normal', hint: 'look', effects: { success: [{ op: 'setFlag', flag: 'B' }], partial: [], fail: [], complication: [] } },
+      ], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'all', clauses: [{ kind: 'flag', flag: 'A' }, { kind: 'flag', flag: 'B' }] } }],
+    });
+    expect(isWinReachableTiered(graph)).toBe(true);
+    expect(blocking(graph)).toHaveLength(0);
+  });
+
+  it('a def-satisfied entity win confined to a TERMINAL room is flagged (it can never fire)', () => {
+    // foe starts 'ally' in roomB, win = entityFaction foe=ally, but roomB is terminal → arriving
+    // resolves the scene before the goal check, so the win never fires. Must be caught.
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 8,
+      nodes: [
+        { id: 'a', setup: 'start', entities: [], affordances: [{ verb: 'move', stat: 'grit', difficulty: 'desperate', hint: 'go', effects: { success: [{ op: 'moveToNode', nodeId: 'b' }], partial: [{ op: 'moveToNode', nodeId: 'b' }], fail: [], complication: [] } }], edges: [], isTerminal: false },
+        { id: 'b', setup: 'end', entities: [{ id: 'foe', name: 'Foe', faction: 'ally', disposition: 0 }], affordances: [], edges: [], isTerminal: true },
+      ],
+      goals: [{ id: 'w', kind: 'persuade', outcome: 'win', label: 'W', predicate: { kind: 'entityFaction', entityId: 'foe', faction: 'ally' } }],
+    });
+    expect(isWinReachableTiered(graph)).toBe(false); // not a false-pass anymore
+    expect(blocking(graph).length).toBeGreaterThan(0);
   });
 });
 

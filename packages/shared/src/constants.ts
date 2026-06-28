@@ -321,4 +321,7 @@ export const QUEST = {
   DEFAULT_MAX_TURNS: 8,
   /** Consecutive goal-irrelevant turns before the referee force-resolves the scene. */
   STALL_LIMIT: 3,
+  /** Max sub-conditions in a compound (all/any) predicate — bounds a generated/untrusted
+   *  predicate (predicates are one level deep, so this is the only breadth a graph can carry). */
+  MAX_PREDICATE_CLAUSES: 8,
 } as const;

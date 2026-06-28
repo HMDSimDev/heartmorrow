@@ -77,10 +77,14 @@ export const PredicateKindSchema = z.enum([
   'atNode',
   'turnGte',
   'always',
+  // --- compound (one level over leaf clauses) ---
+  'all', // every clause is true (AND)
+  'any', // some clause is true (OR)
 ]);
 export type PredicateKind = z.infer<typeof PredicateKindSchema>;
 
-export const StatePredicateSchema = z.object({
+/** The fields of a single (non-compound) condition. */
+const leafPredicateShape = {
   kind: PredicateKindSchema,
   flag: z.string().optional(),
   entityId: z.string().optional(),
@@ -92,6 +96,22 @@ export const StatePredicateSchema = z.object({
   value: z.number().optional(),
   /** Invert the result (so `flag` can express "flag is NOT set"). */
   negate: z.boolean().optional(),
+} as const;
+
+/** A LEAF condition — no nested `clauses`. Compound predicates hold only leaves, so the
+ *  predicate tree is at most ONE level deep: enough for "X AND Y" / "X OR (NOT Y)", and
+ *  deliberately NON-recursive so `z.infer` works and the generation JSON-schema stays
+ *  expressible (a recursive z.lazy schema collapses under zod-to-json-schema). */
+export const LeafPredicateSchema = z.object(leafPredicateShape);
+export type LeafPredicate = z.infer<typeof LeafPredicateSchema>;
+
+/** A state predicate: a leaf condition, OR a compound (`kind:'all'|'any'`) whose `clauses`
+ *  are leaves. `negate` inverts either. Compiles authored goals / edges / affordance
+ *  preconditions over QuestState. */
+export const StatePredicateSchema = z.object({
+  ...leafPredicateShape,
+  /** For kind 'all' (AND) / 'any' (OR): the sub-conditions (each a LEAF). Ignored otherwise. */
+  clauses: z.array(LeafPredicateSchema).optional(),
 });
 export type StatePredicate = z.infer<typeof StatePredicateSchema>;
 
@@ -162,6 +182,12 @@ export const NodeAffordanceSchema = z.object({
   difficulty: DifficultyBandSchema,
   hint: z.string().default(''),
   effects: AffordanceEffectsSchema.default({}),
+  /** OPTIONAL precondition: this approach is offered only when the predicate holds in the
+   *  current state (a gate / unlock; absent = always available). A one-shot "tried once,
+   *  then gone" approach = `{kind:'flag', flag:'x_tried', negate:true}` here + the approach's
+   *  own effects set `x_tried`. A player-CHOSEN conditional move = a gated `move` approach
+   *  whose success carries `moveToNode` (distinct from an auto-firing edge). */
+  when: StatePredicateSchema.optional(),
 });
 export type NodeAffordance = z.infer<typeof NodeAffordanceSchema>;
 
@@ -231,6 +257,10 @@ export interface QuestOutcome {
    *  description of an off-menu attempt coming to nothing) — rendered like a normal
    *  beat, not muted. Only an inert `noop` (false) uses the fixed safe line. */
   voiced?: boolean;
+  /** A neutral beat where the verb matched an approach that exists but is GATED (its `when`
+   *  precondition isn't met yet) — so the narrator voices "the way isn't open yet" rather
+   *  than the generic off-menu line. */
+  gated?: boolean;
   endStatus?: QuestStatus;
   /** Which authored goal fired (if any), for the resolution screen. */
   endGoal?: { outcome: 'win' | 'lose'; label: string };
@@ -337,22 +367,31 @@ export function resolveQuestAction(
   const node = graph.nodes.find((n) => n.id === state.nodeId) ?? graph.nodes[0]!;
   const next = cloneState(state);
 
-  // 1. VALIDATE — find the affordance for the proposed verb.
-  const matched = node.affordances.find((a) => a.verb === action.verb) ?? null;
+  // 1. VALIDATE — find the first AVAILABLE affordance for the proposed verb (its optional
+  // `when` precondition holds in the CURRENT state — the same snapshot the interpreter/
+  // sceneView saw). Matching the first AVAILABLE one (not merely the first by verb) keeps the
+  // referee in lockstep with `availableAffordances`/the interpreter, so a leading GATED
+  // duplicate can't shadow an available same-verb approach. If a same-verb approach exists but
+  // none is available, it's treated as off-menu (matched=null) and tagged "not yet".
+  const verbMatches = node.affordances.filter((a) => a.verb === action.verb);
+  const matched = verbMatches.find((a) => !a.when || evalPredicate(a.when, state)) ?? null;
 
   // 1a. NEUTRAL DEGRADE (the plan's "fiction valve") — ANY verb the scene offers no
-  // affordance for resolves to a do-nothing beat: no roll, no effects, no turn consumed,
-  // no stall. This is what stops an OFF-MENU verb from being reskinned as the node's
-  // FIRST affordance and accidentally winning (the "use a rock" / off-menu "deceive"
-  // that fired the Force/Aid success). The only verbs that mutate state are the ones the
-  // author actually offered here. A `noop` (self-harm / meta / nonsense) is INERT — a
-  // fixed safe line, never sent to the model; every OTHER unmatched verb is VOICED — the
-  // narrator describes the reply (`talk`) or why the attempt came to nothing.
+  // AVAILABLE affordance for resolves to a do-nothing beat: no roll, no effects, no turn
+  // consumed, no stall. This stops an OFF-MENU verb from being reskinned as the node's FIRST
+  // affordance and accidentally winning, and stops a GATED approach from firing before its
+  // precondition is met. A `noop` is INERT; a gated approach is VOICED as "not yet"; every
+  // other unmatched verb is VOICED — the narrator describes the reply (`talk`) or the miss.
   if (action.verb === 'noop' || !matched) {
-    return {
-      newState: next, // turn unchanged — nothing mechanical happened
-      outcome: { grade: 'fail', appliedEffects: [], rejected: [], expression: 'thoughtful', ended: false, neutral: true, voiced: action.verb !== 'noop' },
-    };
+    const gated = verbMatches.length > 0 && action.verb !== 'noop'; // the verb exists here but isn't available yet
+    const outcome: QuestOutcome = { grade: 'fail', appliedEffects: [], rejected: [], expression: 'thoughtful', ended: false, neutral: true, voiced: action.verb !== 'noop', gated };
+    // TERMINATION SAFETY: a neutral beat consumes no turn and changes no state, so if the
+    // scene is DEADLOCKED (a non-terminal node where no affordance is currently available),
+    // the maxTurns/stall backstops can never trip — the run would hang. End it as a loss.
+    if (sceneDeadlocked(graph, state)) {
+      finish(outcome, graph.timeoutOutcome, { outcome: 'lose', label: 'The way is shut.' });
+    }
+    return { newState: next, outcome };
   }
 
   const affordance = matched; // a real, offered approach — resolve the check below
@@ -413,6 +452,13 @@ export function resolveQuestAction(
       break;
     }
   }
+
+  // 5c. PER-SCENE ENTITY LOADING — after BOTH routing paths (a moveToNode effect in step 5
+  // and a satisfied edge above have already set next.nodeId), merge the (now-current) node's
+  // entity defs into the roster: add-if-absent, so a newly-entered room's NPCs come into being
+  // AND any entity already present keeps its mutated state across a revisit. Runs before step 6
+  // so a goal/edge predicate referencing the entered room's entity evaluates against it.
+  mergeNodeEntities(next, graph);
 
   const outcome: QuestOutcome = {
     grade,
@@ -605,7 +651,13 @@ function applyEffect(state: QuestState, e: Effect): boolean {
 // ============================================================================
 
 export function evalPredicate(p: StatePredicate, state: QuestState): boolean {
-  const result = predicateCore(p, state);
+  // Compound (one level over leaf clauses), then apply `negate` once. Empty all = true
+  // (vacuous AND), empty any = false (vacuous OR) — the referee math stays pure; the lint
+  // flags an empty compound. predicateCore never sees 'all'/'any'.
+  let result: boolean;
+  if (p.kind === 'all') result = (p.clauses ?? []).every((c) => evalPredicate(c, state));
+  else if (p.kind === 'any') result = (p.clauses ?? []).some((c) => evalPredicate(c, state));
+  else result = predicateCore(p, state);
   return p.negate ? !result : result;
 }
 
@@ -645,20 +697,47 @@ function predicateCore(p: StatePredicate, state: QuestState): boolean {
 // Construction helpers (used by the service to spin up a run).
 // ============================================================================
 
+/** A fresh runtime entity from its authored def (denormalised; starts with no flags). */
+function defToEntityState(d: QuestEntityDef): QuestEntityState {
+  return { id: d.id, name: d.name, description: d.description, faction: d.faction, disposition: d.disposition, hp: d.hp, flags: [] };
+}
+
+/** Load the CURRENT node's entity defs into the roster, ADD-IF-ABSENT: a newly-entered
+ *  room's NPCs/objects come into being, while any entity already present keeps its mutated
+ *  state (so leaving and returning to a room doesn't reset it). The runtime roster therefore
+ *  accumulates across visited rooms — the fix for the "an NPC defined in room B never exists"
+ *  frozen-roster bug. Pure; mutates the passed (cloned) state. */
+function mergeNodeEntities(state: QuestState, graph: QuestGraph): void {
+  const node = graph.nodes.find((n) => n.id === state.nodeId);
+  if (!node) return;
+  for (const d of node.entities) if (!state.entities.some((e) => e.id === d.id)) state.entities.push(defToEntityState(d));
+}
+
+/** The approaches OFFERED at a node right now: those with no `when`, or whose `when`
+ *  precondition holds in `state`. The single source of truth for availability, shared by the
+ *  referee (match step) and the service (interpreter menu / scene hints). */
+export function availableAffordances(node: QuestNode, state: QuestState): NodeAffordance[] {
+  return node.affordances.filter((a) => !a.when || evalPredicate(a.when, state));
+}
+
+/** Is the scene DEADLOCKED — a node where no approach is currently available (all gated off,
+ *  or none authored) and the scene can't otherwise end? Then every attempt neutral-degrades
+ *  forever (a neutral beat consumes no turn), so maxTurns/stall can't end it: the referee must
+ *  force a loss. Edges can't rescue it (they only run after a matched affordance resolves). A
+ *  non-entry terminal node is exempt — it resolves on ARRIVAL (the step-6 terminal check) — but
+ *  a TERMINAL ENTRY node never "arrives" (you start there), so it must be caught here too. */
+function sceneDeadlocked(graph: QuestGraph, state: QuestState): boolean {
+  const node = currentNode(graph, state);
+  if (node.isTerminal && node.id !== graph.entryNodeId) return false; // ends on arrival anyway
+  return availableAffordances(node, state).length === 0;
+}
+
 /** Build the initial runtime state for a quest from its authored entry node. */
 export function initialQuestState(graph: QuestGraph, playerStats: Record<string, number> = {}): QuestState {
   const node = graph.nodes.find((n) => n.id === graph.entryNodeId) ?? graph.nodes[0]!;
   return QuestStateSchema.parse({
     nodeId: node.id,
-    entities: node.entities.map((d) => ({
-      id: d.id,
-      name: d.name,
-      description: d.description,
-      faction: d.faction,
-      disposition: d.disposition,
-      hp: d.hp,
-      flags: [],
-    })),
+    entities: node.entities.map(defToEntityState),
     flags: [],
     inventory: [],
     stats: playerStats,
@@ -698,6 +777,10 @@ function predicateReachable(p: StatePredicate, graph: QuestGraph): boolean {
     graph.nodes.some((n) => n.affordances.some((a) => ALL_GRADES.some((grade) => a.effects[grade].some(test))));
   const entity = (id?: string) => graph.nodes.flatMap((n) => n.entities).find((e) => e.id === id);
   switch (p.kind) {
+    case 'all':
+      return (p.clauses ?? []).every((c) => predicateReachable(c, graph));
+    case 'any':
+      return (p.clauses ?? []).some((c) => predicateReachable(c, graph));
     case 'always':
     case 'turnGte':
       return true;
@@ -775,11 +858,39 @@ function boundEffects(list: Effect[]): Effect[] {
   return out;
 }
 
+/** Strip a stray nested `clauses` so a compound's clause stays a LEAF (predicates are one
+ *  level deep). The strict schema also strips it, but bounding it here keeps untrusted input
+ *  small before the parse. */
+function stripClauses(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const { clauses: _drop, ...rest } = raw as Record<string, unknown>;
+  void _drop;
+  return rest;
+}
+
+/** Repair an untrusted predicate before the strict parse: a compound (all/any) keeps at most
+ *  MAX_PREDICATE_CLAUSES leaf clauses; a leaf carrying a stray `clauses` has it removed. */
+function clampPredicate(raw: unknown): unknown {
+  if (!raw || typeof raw !== 'object') return raw;
+  const p = raw as Record<string, unknown>;
+  const kind = typeof p.kind === 'string' ? p.kind : '';
+  if (kind === 'all' || kind === 'any') {
+    return { ...p, clauses: Array.isArray(p.clauses) ? p.clauses.slice(0, QUEST.MAX_PREDICATE_CLAUSES).map(stripClauses) : [] };
+  }
+  if ('clauses' in p) {
+    const out = { ...p };
+    delete out.clauses;
+    return out;
+  }
+  return p;
+}
+
 /** Defensive repair of an UNTRUSTED graph object so `QuestGraphSchema.parse` can't
  *  throw on the things the strict schema rejects: empty/duplicate ids (nodes,
  *  entities, goals) get unique fallbacks, and out-of-range numbers (maxTurns, entity
  *  disposition/hp) are clamped. A mediocre LLM that omits ids or over-ranges a number
- *  is REPAIRED here rather than rejected — everything else the schema coerces. */
+ *  is REPAIRED here rather than rejected — everything else the schema coerces. Predicate
+ *  preconditions / goals / routes are clamped to a bounded one-level shape. */
 function preClampGraph(input: unknown): unknown {
   if (!input || typeof input !== 'object') return input;
   const g = input as Record<string, unknown>;
@@ -805,12 +916,38 @@ function preClampGraph(input: unknown): unknown {
         : node.entities;
       const id = pickId(node.id, `scene${i + 1}`, usedNodes);
       mintedNodeIds.push(id);
-      // Drop edges with an empty/missing `to`: the strict schema's `to: z.string().min(1)`
-      // would THROW on `""` before boundQuestGraph's existing dangling-edge filter can run.
+      // Drop edges with an empty/missing `to` (the strict schema's `to: z.string().min(1)`
+      // would THROW on `""`), and clamp each route's `when` predicate.
       const edges = Array.isArray(node.edges)
-        ? node.edges.filter((e) => e != null && typeof e === 'object' && typeof (e as Record<string, unknown>).to === 'string' && ((e as Record<string, unknown>).to as string).length > 0)
+        ? node.edges
+            .filter((e) => e != null && typeof e === 'object' && typeof (e as Record<string, unknown>).to === 'string' && ((e as Record<string, unknown>).to as string).length > 0)
+            .map((e) => ({ ...(e as Record<string, unknown>), when: clampPredicate((e as Record<string, unknown>).when) }))
         : node.edges;
-      return { ...node, id, entities, ...(Array.isArray(node.edges) ? { edges } : {}) };
+      // Clamp each affordance's optional `when` precondition. A null/undefined `when` (a model
+      // emitting "when":null, or an imported graph) is STRIPPED — the strict schema's
+      // `.optional()` rejects null, and "no precondition" is the intended meaning anyway.
+      const affordances = Array.isArray(node.affordances)
+        ? node.affordances.map((a) => {
+            if (!a || typeof a !== 'object') return a;
+            const aff = a as Record<string, unknown>;
+            if (aff.when == null) {
+              if ('when' in aff) {
+                const { when: _drop, ...rest } = aff;
+                void _drop;
+                return rest;
+              }
+              return aff;
+            }
+            return { ...aff, when: clampPredicate(aff.when) };
+          })
+        : node.affordances;
+      return {
+        ...node,
+        id,
+        entities,
+        ...(Array.isArray(node.affordances) ? { affordances } : {}),
+        ...(Array.isArray(node.edges) ? { edges } : {}),
+      };
     });
     // entryNodeId is `z.string().min(1)` in the strict schema; a model that OMITS it leaves
     // the lenient default "" which throws here — and boundQuestGraph's post-parse entry repair
@@ -826,7 +963,11 @@ function preClampGraph(input: unknown): unknown {
     out.goals = g.goals.map((go, i) => {
       if (!go || typeof go !== 'object') return go;
       const goal = go as Record<string, unknown>;
-      return { ...goal, id: pickId(goal.id, `goal${i + 1}`, usedGoals) };
+      return {
+        ...goal,
+        id: pickId(goal.id, `goal${i + 1}`, usedGoals),
+        ...('predicate' in goal ? { predicate: clampPredicate(goal.predicate) } : {}),
+      };
     });
   }
   return out;
@@ -852,7 +993,27 @@ function numOr(v: unknown, lo: number, hi: number, fallback: number): number {
 // is finalised through `boundQuestGraph` before it is ever played or saved.
 // ============================================================================
 
-/** Predicate schema for generation — coerces an off-list kind to a harmless one. */
+/** Leaf predicate for generation — coerces an off-list kind / malformed element to a
+ *  harmless leaf so a weak model can never throw the parse. */
+const GenLeafPredicateSchema = z
+  .object({
+    kind: PredicateKindSchema.catch('always'),
+    flag: z.string().optional(),
+    entityId: z.string().optional(),
+    faction: QuestFactionSchema.optional(),
+    itemId: z.string().optional(),
+    nodeId: z.string().optional(),
+    op: z.enum(['lte', 'gte']).catch('gte').optional(),
+    value: z.number().optional(),
+    negate: z.boolean().optional(),
+  })
+  .catch({ kind: 'always' });
+
+/** Predicate schema for generation — leaf fields + an optional one-level `clauses` (each a
+ *  leaf) for compound `all`/`any`. A malformed NESTED clause degrades to a safe leaf (via
+ *  GenLeafPredicateSchema's `.catch`); the top-level predicate is NOT `.catch`-coerced (an
+ *  off-shape goal predicate must surface as a validation retry, never silently become a
+ *  win-on-turn-1 `always`). Use {@link GenWhenSchema} for an affordance `when` (drops `null`). */
 const GenPredicateSchema = z.object({
   kind: PredicateKindSchema.catch('always'),
   flag: z.string().optional(),
@@ -863,7 +1024,14 @@ const GenPredicateSchema = z.object({
   op: z.enum(['lte', 'gte']).catch('gte').optional(),
   value: z.number().optional(),
   negate: z.boolean().optional(),
+  clauses: z.array(GenLeafPredicateSchema).catch([]).optional(),
 });
+
+/** An affordance `when` for generation: a predicate, or a `null`/garbage value coerced to
+ *  "no precondition" (undefined) — a weak model emitting `"when":null` shouldn't fail the
+ *  whole draft. (Safe to coerce here, unlike a goal predicate, since a missing precondition
+ *  just means "always available".) */
+const GenWhenSchema = GenPredicateSchema.nullish().catch(undefined).transform((p) => p ?? undefined);
 
 export const QuestGenSchema = z.object({
   name: z.string().default('Untitled Quest'),
@@ -898,6 +1066,7 @@ export const QuestGenSchema = z.object({
                 difficulty: DifficultyBandSchema,
                 hint: z.string().default(''),
                 effects: AffordanceEffectsSchema.default({}),
+                when: GenWhenSchema,
               }),
             )
             .default([]),
@@ -1036,18 +1205,67 @@ export function entryEntityIds(graph: QuestGraph): Set<string> {
   return new Set(entryNode(graph).entities.map((e) => e.id));
 }
 
-function entryEntityDef(graph: QuestGraph, id: string | undefined): QuestEntityDef | undefined {
-  return id ? entryNode(graph).entities.find((e) => e.id === id) : undefined;
+
+/** An entity def by id, searched across ALL nodes (the runtime loads each scene's entities
+ *  as it's entered, so an entity is "real" if it's defined in any node). */
+function graphEntityDef(graph: QuestGraph, id: string | undefined): QuestEntityDef | undefined {
+  if (!id) return undefined;
+  for (const n of graph.nodes) {
+    const e = n.entities.find((x) => x.id === id);
+    if (e) return e;
+  }
+  return undefined;
 }
 
-/** Could an edge's `when` predicate EVER be satisfied during play? Conservative + safe:
- *  trivially-true / negated / turn / atNode kinds always pass; a flag/item/entity
- *  condition passes only if SOME tier-fireable effect can produce it (or it's already
- *  true at entry). This catches "edge keyed on a flag nothing sets" — a real softlock —
- *  while staying permissive about WHERE the producing effect lives (so it never
- *  over-prunes a legitimately reachable route). */
-function edgeConditionPossible(p: StatePredicate, graph: QuestGraph, entryEnts: Set<string>, sites: EffectSite[]): boolean {
-  if (p.negate) return true;
+/** All entity ids defined anywhere in the graph (every entity that can ever exist at runtime). */
+function allEntityIds(graph: QuestGraph): Set<string> {
+  const out = new Set<string>();
+  for (const n of graph.nodes) for (const e of n.entities) out.add(e.id);
+  return out;
+}
+
+/** The entity ids that can exist at runtime on a REACHABLE path — the union of every
+ *  reachable node's roster (per-scene entities load as the player enters each room). This
+ *  replaces the old entry-only `entryEntityIds` for "does this entity exist during play"
+ *  checks, so a room-B NPC is no longer falsely flagged as nonexistent. */
+export function reachableEntityIds(graph: QuestGraph): Set<string> {
+  const reach = reachableNodeIds(graph);
+  const out = new Set<string>();
+  for (const n of graph.nodes) if (reach.has(n.id)) for (const e of n.entities) out.add(e.id);
+  return out;
+}
+
+/** Does an entity's authored DEF already satisfy a leaf entity-predicate at load time? */
+function entityDefSatisfies(p: StatePredicate, def: QuestEntityDef | undefined): boolean {
+  if (!def) return false;
+  switch (p.kind) {
+    case 'entityFaction':
+      return def.faction === p.faction;
+    case 'entityDisposition': {
+      const op = p.op ?? 'gte';
+      return op === 'gte' ? def.disposition >= (p.value ?? 0) : def.disposition <= (p.value ?? 0);
+    }
+    case 'entityHp': {
+      if (def.hp == null) return false;
+      const op = p.op ?? 'lte';
+      return op === 'lte' ? def.hp <= (p.value ?? 0) : def.hp >= (p.value ?? 0);
+    }
+    default:
+      return false;
+  }
+}
+
+/** Could a predicate EVER hold during play — a STATIC, permissive over-approximation used to
+ *  gate route / affordance-precondition reachability (distinct from the referee's concrete
+ *  evalPredicate). Permissive about WHERE a producing effect lives (never over-prunes a legit
+ *  route) and about negation. Handles one-level compound (all/any). `roster` = the entity ids
+ *  considered to exist (caller passes all-entity ids for route gating, reachable-roster for
+ *  the lint). Catches "a gate keyed on a flag nothing produces". */
+function predSatisfiable(p: StatePredicate | undefined, graph: QuestGraph, roster: Set<string>, sites: EffectSite[]): boolean {
+  if (!p) return true;
+  if (p.negate) return true; // permissive on negation
+  if (p.kind === 'all') return (p.clauses ?? []).every((c) => predSatisfiable(c, graph, roster, sites));
+  if (p.kind === 'any') return (p.clauses ?? []).some((c) => predSatisfiable(c, graph, roster, sites));
   switch (p.kind) {
     case 'always':
     case 'turnGte':
@@ -1060,27 +1278,21 @@ function edgeConditionPossible(p: StatePredicate, graph: QuestGraph, entryEnts: 
     case 'entityFaction':
     case 'entityDisposition':
     case 'entityHp':
-      if (!p.entityId || !entryEnts.has(p.entityId)) return false;
-      if (predicateAlreadyTrueAtEntry(p, graph)) return true;
-      return sites.some(
-        (s) =>
-          effectAdvances(p, s.effect) &&
-          tierUnlockedBy(s.band).has(effectTier(s.effect)) &&
-          (s.effect.op !== 'moveEntityToFaction' || (!!s.effect.entityId && entryEnts.has(s.effect.entityId))) &&
-          (s.effect.op !== 'adjustStat' || !s.effect.entityId || entryEnts.has(s.effect.entityId)),
-      );
+      if (!p.entityId || !roster.has(p.entityId)) return false;
+      if (entityDefSatisfies(p, graphEntityDef(graph, p.entityId))) return true;
+      return sites.some((s) => effectAdvances(p, s.effect) && tierUnlockedBy(s.band).has(effectTier(s.effect)));
     default:
       return true;
   }
 }
 
-/** Nodes reachable from the entry node, CONSERVATIVELY: along authored edges whose
- *  condition can plausibly be satisfied (already pruned to real nodes by boundQuestGraph),
- *  and via a `moveToNode` effect that can actually fire — i.e. on a `desperate` affordance
- *  (moveToNode is a spine effect). */
+/** Nodes reachable from the entry node, CONSERVATIVELY: along authored edges whose `when`
+ *  is statically satisfiable, and via a `moveToNode` effect that can actually fire — a
+ *  `desperate` affordance (moveToNode is spine) whose own `when` precondition is satisfiable
+ *  (this is the player-CHOSEN conditional move). */
 export function reachableNodeIds(graph: QuestGraph): Set<string> {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-  const entryEnts = entryEntityIds(graph);
+  const allEnts = allEntityIds(graph);
   const sites = effectSites(graph);
   const startId = byId.has(graph.entryNodeId) ? graph.entryNodeId : graph.nodes[0]?.id;
   const seen = new Set<string>();
@@ -1091,9 +1303,10 @@ export function reachableNodeIds(graph: QuestGraph): Set<string> {
     seen.add(id);
     const node = byId.get(id);
     if (!node) continue;
-    for (const e of node.edges) if (byId.has(e.to) && edgeConditionPossible(e.when, graph, entryEnts, sites)) stack.push(e.to);
+    for (const e of node.edges) if (byId.has(e.to) && predSatisfiable(e.when, graph, allEnts, sites)) stack.push(e.to);
     for (const a of node.affordances) {
-      if (a.difficulty !== 'desperate') continue; // moveToNode (spine) only fires here
+      if (a.difficulty !== 'desperate') continue; // moveToNode (spine) only fires on a desperate approach
+      if (!predSatisfiable(a.when, graph, allEnts, sites)) continue; // a gated move follows only when its precondition is reachable
       for (const grade of ALL_GRADES)
         for (const eff of a.effects[grade])
           if (eff.op === 'moveToNode' && eff.nodeId && byId.has(eff.nodeId)) stack.push(eff.nodeId);
@@ -1122,6 +1335,8 @@ interface EffectSite {
   band: DifficultyBand;
   grade: OutcomeGrade;
   effect: Effect;
+  /** The host affordance's precondition (so reachability requires it be satisfiable). */
+  when?: StatePredicate;
 }
 
 function effectSites(graph: QuestGraph): EffectSite[] {
@@ -1130,7 +1345,7 @@ function effectSites(graph: QuestGraph): EffectSite[] {
     for (const a of n.affordances)
       for (const grade of ALL_GRADES)
         for (const effect of a.effects[grade])
-          out.push({ nodeId: n.id, verb: a.verb, band: a.difficulty, grade, effect });
+          out.push({ nodeId: n.id, verb: a.verb, band: a.difficulty, grade, effect, when: a.when });
   return out;
 }
 
@@ -1157,45 +1372,20 @@ function effectAdvances(p: StatePredicate, e: Effect): boolean {
   }
 }
 
-/** Can the effect at this site actually FIRE: its node is ACTABLE (reachable + you can take
- *  a turn there — not a non-entry terminal node), tier unlocked by the band, and (for an
- *  entity-targeting effect) the entity is in the runtime (entry) roster. */
-function siteCanFire(site: EffectSite, actable: Set<string>, entryEnts: Set<string>): boolean {
+/** Can the effect at this site actually FIRE: its node is ACTABLE (reachable + playable —
+ *  not a non-entry terminal node), its affordance's `when` precondition is satisfiable, the
+ *  effect's tier is unlocked by the band, and (for an entity-targeting effect) the entity is
+ *  in the reachable roster (defined in some reachable scene — per-scene entities load on entry). */
+function siteCanFire(site: EffectSite, actable: Set<string>, roster: Set<string>, graph: QuestGraph, sites: EffectSite[]): boolean {
   if (!actable.has(site.nodeId)) return false;
+  if (site.when && !predSatisfiable(site.when, graph, roster, sites)) return false;
   if (!tierUnlockedBy(site.band).has(effectTier(site.effect))) return false;
   const e = site.effect;
-  if (e.op === 'moveEntityToFaction' && (!e.entityId || !entryEnts.has(e.entityId))) return false;
-  if (e.op === 'adjustStat' && e.entityId && !entryEnts.has(e.entityId)) return false;
+  if (e.op === 'moveEntityToFaction' && (!e.entityId || !roster.has(e.entityId))) return false;
+  if (e.op === 'adjustStat' && e.entityId && !roster.has(e.entityId)) return false;
   return true;
 }
 
-/** Is a goal predicate already satisfied in the initial (entry) state? (so a win on it
- *  resolves on the first action, and a lose on it auto-loses). */
-function predicateAlreadyTrueAtEntry(p: StatePredicate, graph: QuestGraph): boolean {
-  const ent = entryEntityDef(graph, p.entityId);
-  switch (p.kind) {
-    case 'always':
-      return true;
-    case 'atNode':
-      return graph.entryNodeId === p.nodeId;
-    case 'turnGte':
-      return (p.value ?? 0) <= 0;
-    case 'entityFaction':
-      return !!ent && ent.faction === p.faction;
-    case 'entityDisposition': {
-      if (!ent) return false;
-      const op = p.op ?? 'gte';
-      return op === 'gte' ? ent.disposition >= (p.value ?? 0) : ent.disposition <= (p.value ?? 0);
-    }
-    case 'entityHp': {
-      if (!ent || ent.hp == null) return false;
-      const op = p.op ?? 'lte';
-      return op === 'lte' ? ent.hp <= (p.value ?? 0) : ent.hp >= (p.value ?? 0);
-    }
-    default:
-      return false;
-  }
-}
 
 /** For a numeric-threshold win (entityDisposition/entityHp) on an entry entity: the
  *  optimistic best case — starting value, the largest fireable success/partial step
@@ -1206,14 +1396,14 @@ function thresholdReach(
   p: StatePredicate,
   graph: QuestGraph,
   actable: Set<string>,
-  entryEnts: Set<string>,
+  roster: Set<string>,
   sites: EffectSite[],
 ): { start: number; bestStep: number; ok: boolean } | null {
   if (p.kind !== 'entityDisposition' && p.kind !== 'entityHp') return null;
-  const ent = entryEntityDef(graph, p.entityId);
+  const ent = graphEntityDef(graph, p.entityId); // the entity's start value comes from its own scene's def
   if (!ent) return null;
   const start = p.kind === 'entityHp' ? ent.hp ?? QUEST.MAX_HP : ent.disposition;
-  const steps = sites.filter((s) => (s.grade === 'success' || s.grade === 'partial') && effectAdvances(p, s.effect) && siteCanFire(s, actable, entryEnts));
+  const steps = sites.filter((s) => (s.grade === 'success' || s.grade === 'partial') && effectAdvances(p, s.effect) && siteCanFire(s, actable, roster, graph, sites));
   const bestStep = Math.max(0, ...steps.map((s) => Math.abs(clampInt(s.effect.delta ?? 0, -QUEST.STAT_DELTA_MAX, QUEST.STAT_DELTA_MAX))));
   const target = p.value ?? 0;
   const op = p.op ?? (p.kind === 'entityHp' ? 'lte' : 'gte');
@@ -1221,32 +1411,53 @@ function thresholdReach(
   return { start, bestStep, ok };
 }
 
-function predicateTierReachable(
+/** Can a single LEAF win-predicate actually be produced at runtime (tier + reachable+actable
+ *  node + satisfiable precondition + reachable-roster entity + enough threshold magnitude +
+ *  a survive-turn within the budget)? */
+/** Is the entity defined in at least one ACTABLE node (so a predicate already-true on its
+ *  authored def is actually observable during play — not stranded in a terminal room that
+ *  resolves on arrival before any goal check)? */
+function entityInActableNode(graph: QuestGraph, id: string | undefined, actable: Set<string>): boolean {
+  return !!id && graph.nodes.some((n) => actable.has(n.id) && n.entities.some((e) => e.id === id));
+}
+
+/** Can a single LEAF predicate be produced at runtime? `allowFailGrade` is set for a CLAUSE of
+ *  a compound — there, a flag set only on a FAIL grade is a legitimate contributor (you can
+ *  fail one approach and succeed another so both flags end set); for a TOP-LEVEL leaf win it
+ *  stays false, so a win achievable only by failing is left for the WIN_ONLY_ON_FAILURE lint. */
+function leafTierReachable(
   p: StatePredicate,
   graph: QuestGraph,
   reachable: Set<string>,
   actable: Set<string>,
-  entryEnts: Set<string>,
+  roster: Set<string>,
   sites: EffectSite[],
+  allowFailGrade = false,
 ): boolean {
-  if (p.negate) return true; // negated goals: permissive (never over-block on these)
+  if (p.negate) return true; // negated: permissive (never over-block)
+  const producible = (s: EffectSite) => (allowFailGrade || s.grade === 'success' || s.grade === 'partial');
   switch (p.kind) {
     case 'always':
+      return true;
     case 'turnGte':
-      return true; // existence; the maxTurns budget is checked separately
+      return (p.value ?? 0) <= graph.maxTurns; // a survive win must fit the turn budget
     case 'atNode':
       return !!p.nodeId && reachable.has(p.nodeId); // ARRIVING (even at a terminal node) satisfies atNode
     case 'flag':
     case 'hasItem':
-      return sites.some((s) => effectAdvances(p, s.effect) && siteCanFire(s, actable, entryEnts));
+      // A standalone win must be achievable by SUCCEEDING (success/partial), not only by
+      // failing — else it's a WIN_ONLY_ON_FAILURE defect the lint should surface.
+      return sites.some((s) => producible(s) && effectAdvances(p, s.effect) && siteCanFire(s, actable, roster, graph, sites));
     case 'entityFaction':
     case 'entityDisposition':
     case 'entityHp': {
-      if (!p.entityId || !entryEnts.has(p.entityId)) return false;
-      if (predicateAlreadyTrueAtEntry(p, graph)) return true;
-      if (!sites.some((s) => effectAdvances(p, s.effect) && siteCanFire(s, actable, entryEnts))) return false;
-      // A threshold win also needs ENOUGH magnitude within the turn budget to actually land.
-      const t = thresholdReach(p, graph, actable, entryEnts, sites);
+      if (!p.entityId || !roster.has(p.entityId)) return false;
+      // Already true on the entity's def — but only counts if the entity exists in an ACTABLE
+      // node (a def-satisfied win confined to a terminal room never fires: the scene resolves
+      // on arrival before the goal check).
+      if (entityInActableNode(graph, p.entityId, actable) && entityDefSatisfies(p, graphEntityDef(graph, p.entityId))) return true;
+      if (!sites.some((s) => producible(s) && effectAdvances(p, s.effect) && siteCanFire(s, actable, roster, graph, sites))) return false;
+      const t = thresholdReach(p, graph, actable, roster, sites);
       return t && t.bestStep > 0 ? t.ok : true;
     }
     default:
@@ -1254,51 +1465,77 @@ function predicateTierReachable(
   }
 }
 
+/** Is a win predicate (leaf OR one-level compound) actually achievable at runtime? A compound's
+ *  clauses allow a fail-grade producer (you can fail one and succeed another). */
+function predicateTierReachable(
+  p: StatePredicate,
+  graph: QuestGraph,
+  reachable: Set<string>,
+  actable: Set<string>,
+  roster: Set<string>,
+  sites: EffectSite[],
+): boolean {
+  if (p.negate) return true;
+  if (p.kind === 'all') return (p.clauses ?? []).length > 0 && (p.clauses ?? []).every((c) => leafTierReachable(c, graph, reachable, actable, roster, sites, true));
+  if (p.kind === 'any') return (p.clauses ?? []).some((c) => leafTierReachable(c, graph, reachable, actable, roster, sites, true));
+  return leafTierReachable(p, graph, reachable, actable, roster, sites);
+}
+
 /**
  * Like {@link isWinReachable}, but a win goal only counts as reachable if SOMETHING can
- * actually produce its state at runtime: a success/any-grade effect that (a) matches the
- * predicate, (b) is tier-unlocked by its affordance's difficulty band, (c) lives in a
- * reachable node, and (d) — for entity targets — points at an ENTRY-scene entity. This is
- * the check that decides whether the ensureWinGoal backup net needs to fire. STRICTER and
- * more accurate than {@link isWinReachable} (kept for back-compat / the editor's softer hint).
+ * actually produce its state at runtime: a tier-unlocked effect, in a reachable+actable node,
+ * behind a satisfiable precondition, against an entity that exists on a reachable path, with
+ * enough magnitude for a threshold and a survive-turn within the budget — recursing AND/OR
+ * compound goals. This decides whether the ensureWinGoal backup net needs to fire.
  */
 export function isWinReachableTiered(graph: QuestGraph): boolean {
   const wins = graph.goals.filter((g) => g.outcome === 'win');
   if (wins.length === 0) return false;
   const reachable = reachableNodeIds(graph);
   const actable = actableNodeIds(graph);
-  const entryEnts = entryEntityIds(graph);
+  const roster = reachableEntityIds(graph);
   const sites = effectSites(graph);
-  return wins.some((g) => {
-    if (g.predicate.kind === 'turnGte' && !g.predicate.negate && (g.predicate.value ?? 0) > graph.maxTurns) return false;
-    return predicateTierReachable(g.predicate, graph, reachable, actable, entryEnts, sites);
-  });
+  return wins.some((g) => predicateTierReachable(g.predicate, graph, reachable, actable, roster, sites));
 }
 
-function describePredicate(p: StatePredicate): string {
-  switch (p.kind) {
-    case 'flag':
-      return `flag "${p.flag ?? ''}" ${p.negate ? 'NOT set' : 'set'}`;
-    case 'entityFaction':
-      return `entity "${p.entityId ?? ''}" on side "${p.faction ?? ''}"`;
-    case 'entityDisposition':
-      return `entity "${p.entityId ?? ''}" feeling ${p.op ?? 'gte'} ${p.value ?? 0}`;
-    case 'entityHp':
-      return `entity "${p.entityId ?? ''}" hp ${p.op ?? 'lte'} ${p.value ?? 0}`;
-    case 'hasItem':
-      return `item "${p.itemId ?? ''}"`;
-    case 'atNode':
-      return `player at scene "${p.nodeId ?? ''}"`;
-    case 'turnGte':
-      return `turn >= ${p.value ?? 0}`;
-    case 'always':
-      return 'always';
-    default:
-      return p.kind;
-  }
+/** A short human/LLM-readable rendering of a predicate (compound-aware). */
+export function describePredicate(p: StatePredicate): string {
+  const body = (() => {
+    switch (p.kind) {
+      case 'flag':
+        return `flag "${p.flag ?? ''}" ${p.negate ? 'NOT set' : 'set'}`;
+      case 'entityFaction':
+        return `entity "${p.entityId ?? ''}" on side "${p.faction ?? ''}"`;
+      case 'entityDisposition':
+        return `entity "${p.entityId ?? ''}" feeling ${p.op ?? 'gte'} ${p.value ?? 0}`;
+      case 'entityHp':
+        return `entity "${p.entityId ?? ''}" hp ${p.op ?? 'lte'} ${p.value ?? 0}`;
+      case 'hasItem':
+        return `item "${p.itemId ?? ''}"`;
+      case 'atNode':
+        return `player at scene "${p.nodeId ?? ''}"`;
+      case 'turnGte':
+        return `turn >= ${p.value ?? 0}`;
+      case 'always':
+        return 'always';
+      case 'all':
+        return `(${(p.clauses ?? []).map(describePredicate).join(' AND ') || 'nothing'})`;
+      case 'any':
+        return `(${(p.clauses ?? []).map(describePredicate).join(' OR ') || 'nothing'})`;
+      default:
+        return p.kind;
+    }
+  })();
+  // flag already renders its own negate; for everything else, a leading NOT.
+  return p.negate && p.kind !== 'flag' ? `NOT ${body}` : body;
 }
 
 function samePredicate(a: StatePredicate, b: StatePredicate): boolean {
+  if (a.kind === 'all' || a.kind === 'any' || b.kind === 'all' || b.kind === 'any') {
+    const ac = a.clauses ?? [];
+    const bc = b.clauses ?? [];
+    return a.kind === b.kind && !!a.negate === !!b.negate && ac.length === bc.length && ac.every((c, i) => samePredicate(c, bc[i]!));
+  }
   return (
     a.kind === b.kind &&
     a.flag === b.flag &&
@@ -1339,6 +1576,12 @@ function effectComplete(e: Effect): boolean {
   }
 }
 
+/** The leaf conditions of a predicate (the clauses of a compound, else the predicate itself).
+ *  Predicates are one level deep, so this fully flattens. */
+function predLeaves(p: StatePredicate): StatePredicate[] {
+  return p.kind === 'all' || p.kind === 'any' ? p.clauses ?? [] : [p];
+}
+
 function dedupeProblems(list: QuestProblem[]): QuestProblem[] {
   const seen = new Set<string>();
   const out: QuestProblem[] = [];
@@ -1363,8 +1606,10 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
   const push = (p: QuestProblem) => problems.push(p);
   const reachable = reachableNodeIds(graph);
   const actable = actableNodeIds(graph);
-  const entryEnts = entryEntityIds(graph);
-  const entryEntList = [...entryEnts].join(', ') || '(none)';
+  // Entities that can exist on a reachable path (per-scene rosters load as rooms are entered)
+  // — the scope for "does this entity exist at play time" checks (NOT entry-only anymore).
+  const roster = reachableEntityIds(graph);
+  const rosterList = [...roster].join(', ') || '(none)';
   const nodeIds = graph.nodes.map((n) => n.id);
   const entryId = entryNode(graph).id;
   const sites = effectSites(graph);
@@ -1373,6 +1618,7 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
   );
   const entry = entryNode(graph);
   const wins = graph.goals.filter((g) => g.outcome === 'win');
+  const s0 = initialQuestState(graph); // the entry state — for available-affordance + auto-lose checks
 
   // --- Entry playability: the player must be able to DO something that progresses. ---
   if (entry.affordances.length === 0) {
@@ -1383,12 +1629,20 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
       repairInstruction: `The entry scene "${entry.id}" has zero affordances. Add 2-3 affordances (different verbs) grounded in its setup, each with a one-line hint and at least one real effect in its "success" array.`,
       targets: { nodeId: entry.id },
     });
-  } else if (!entry.affordances.some((a) => a.effects.success.some((e) => effectComplete(e) && tierUnlockedBy(a.difficulty).has(effectTier(e))))) {
+  } else if (availableAffordances(entry, s0).length === 0) {
+    push({
+      severity: 'blocking',
+      code: 'ENTRY_NO_AVAILABLE_AFFORDANCE',
+      message: `Every approach in the opening scene "${entry.id}" is gated off at the start, so the player can never act.`,
+      repairInstruction: `In entry scene "${entry.id}", at least one approach must have NO "when" precondition (or one true at the start) so the player can begin. Ungate one.`,
+      targets: { nodeId: entry.id },
+    });
+  } else if (!availableAffordances(entry, s0).some((a) => a.effects.success.some((e) => effectComplete(e) && tierUnlockedBy(a.difficulty).has(effectTier(e))))) {
     push({
       severity: 'blocking',
       code: 'ENTRY_NO_FIREABLE_SUCCESS',
-      message: `No approach in the opening scene "${entry.id}" does anything on success, so the player can't make progress.`,
-      repairInstruction: `In entry scene "${entry.id}", at least one affordance must have a complete effect in its "success" array whose size fits its difficulty (a setFlag fits any difficulty). Add one that advances a win goal.`,
+      message: `No available approach in the opening scene "${entry.id}" does anything on success, so the player can't make progress.`,
+      repairInstruction: `In entry scene "${entry.id}", at least one AVAILABLE affordance must have a complete effect in its "success" array whose size fits its difficulty (a setFlag fits any difficulty). Add one that advances a win goal.`,
       targets: { nodeId: entry.id },
     });
   }
@@ -1405,7 +1659,23 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
   for (const g of wins) {
     const p = g.predicate;
     const label = g.label || g.id;
-    if (p.kind === 'turnGte' && !p.negate && (p.value ?? 0) > graph.maxTurns) {
+    // The single source of truth: if the whole predicate (leaf OR compound) is genuinely
+    // achievable, the goal is fine — skip ALL leaf diagnostics (this is what prevents a
+    // reachable AND goal like all[X,Y] being mis-flagged by the leaf cascade).
+    if (predicateTierReachable(p, graph, reachable, actable, roster, sites)) continue;
+    if (p.negate) continue; // permissive on a negated win
+    // An unreachable COMPOUND goal: a generic, actionable blocker (the leaf cascade is for leaves).
+    if (p.kind === 'all' || p.kind === 'any') {
+      push({
+        severity: 'blocking',
+        code: 'WIN_DECOUPLED',
+        message: `Win "${label}" (${describePredicate(p)}) can't be fully achieved as wired.`,
+        repairInstruction: `Win goal "${label}" requires ${describePredicate(p)}, but at least one part can't be produced. Make every required condition the result of a reachable success effect (matching flag/entityId/itemId), on an approach whose difficulty unlocks it.`,
+        targets: { goalId: g.id },
+      });
+      continue;
+    }
+    if (p.kind === 'turnGte' && (p.value ?? 0) > graph.maxTurns) {
       push({
         severity: 'blocking',
         code: 'WIN_TURN_GTE_OVER_MAXTURNS',
@@ -1415,17 +1685,16 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
       });
       continue;
     }
-    if ((p.kind === 'entityFaction' || p.kind === 'entityDisposition' || p.kind === 'entityHp') && !p.negate && (!p.entityId || !entryEnts.has(p.entityId))) {
+    if ((p.kind === 'entityFaction' || p.kind === 'entityDisposition' || p.kind === 'entityHp') && (!p.entityId || !roster.has(p.entityId))) {
       push({
         severity: 'blocking',
         code: 'WIN_ENTITY_NOT_IN_ENTRY',
-        message: `Win "${label}" targets "${p.entityId ?? '(none)'}", which isn't in the opening scene, so it can never be true.`,
-        repairInstruction: `Win goal "${label}" targets entity "${p.entityId ?? ''}", absent from the entry scene (entities: ${entryEntList}). Entities only exist in the FIRST scene — add it there, or retarget the goal AND its effect to one of: ${entryEntList}.`,
+        message: `Win "${label}" targets "${p.entityId ?? '(none)'}", which exists in no reachable scene, so it can never be true.`,
+        repairInstruction: `Win goal "${label}" targets entity "${p.entityId ?? ''}", which is not defined in any reachable scene (reachable entities: ${rosterList}). Define it in a scene the player reaches, or retarget the goal AND its effect to one of: ${rosterList}.`,
         targets: { goalId: g.id, entityId: p.entityId },
       });
       continue;
     }
-    if (p.negate || predicateAlreadyTrueAtEntry(p, graph)) continue; // permissive / already winnable in 1 turn
     const advancing = sites.filter((s) => effectAdvances(p, s.effect));
     if (advancing.length === 0) {
       if (p.kind === 'atNode') {
@@ -1448,7 +1717,7 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
       });
       continue;
     }
-    const fireable = advancing.filter((s) => siteCanFire(s, actable, entryEnts));
+    const fireable = advancing.filter((s) => siteCanFire(s, actable, roster, graph, sites));
     if (fireable.length === 0) {
       const tierGated = advancing.find((s) => actable.has(s.nodeId) && !tierUnlockedBy(s.band).has(effectTier(s.effect)));
       // Reachable but NOT actable = a node the player arrives at but can't take a turn in,
@@ -1476,7 +1745,7 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
           severity: 'blocking',
           code: 'WIN_NODE_UNREACHABLE',
           message: `Win "${label}" can only be produced in a scene nothing routes to (or against an entity the entry scene lacks).`,
-          repairInstruction: `The only effect that wins "${label}" sits in an unreachable scene or targets a non-entry entity. Add a route to that scene, move the effect into a reachable scene, or retarget it to an entry-scene entity (${entryEntList}).`,
+          repairInstruction: `The only effect that wins "${label}" sits in an unreachable scene or targets an entity in no reachable scene. Add a route to that scene, move the effect into a reachable scene, or retarget it to a reachable-scene entity (${rosterList}).`,
           targets: { goalId: g.id },
         });
       }
@@ -1493,7 +1762,7 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
       });
       continue;
     }
-    const t = thresholdReach(p, graph, actable, entryEnts, sites);
+    const t = thresholdReach(p, graph, actable, roster, sites);
     if (t && t.bestStep > 0 && !t.ok) {
       push({
         severity: 'blocking',
@@ -1515,8 +1784,7 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
     });
   }
 
-  // --- Lose goals: auto-lose / win conflict. ---
-  const s0 = initialQuestState(graph);
+  // --- Lose goals: auto-lose / win conflict. (s0 computed above.) ---
   for (const g of graph.goals.filter((x) => x.outcome === 'lose')) {
     const p = g.predicate;
     const label = g.label || g.id;
@@ -1575,12 +1843,12 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
   // --- Reference integrity (effects): dangling entity / node / item refs. ---
   for (const s of sites) {
     const e = s.effect;
-    if ((e.op === 'moveEntityToFaction' || (e.op === 'adjustStat' && e.entityId)) && e.entityId && !entryEnts.has(e.entityId))
+    if ((e.op === 'moveEntityToFaction' || (e.op === 'adjustStat' && e.entityId)) && e.entityId && !roster.has(e.entityId))
       push({
         severity: 'warning',
         code: 'EFFECT_ENTITY_REF',
-        message: `Effect "${e.op}" on "${s.verb}" targets "${e.entityId}", not in the opening scene — it does nothing.`,
-        repairInstruction: `Effect "${e.op}" on "${s.verb}" in "${s.nodeId}" targets entity "${e.entityId}", absent from the entry scene (entities: ${entryEntList}). Retarget to one of ${entryEntList}, or define it in the entry scene.`,
+        message: `Effect "${e.op}" on "${s.verb}" targets "${e.entityId}", which exists in no reachable scene — it does nothing.`,
+        repairInstruction: `Effect "${e.op}" on "${s.verb}" in "${s.nodeId}" targets entity "${e.entityId}", not defined in any reachable scene (reachable entities: ${rosterList}). Retarget to one of ${rosterList}, or define it in this scene.`,
         targets: { nodeId: s.nodeId, verb: s.verb, entityId: e.entityId },
       });
     if (e.op === 'moveToNode' && e.nodeId && !nodeIds.includes(e.nodeId))
@@ -1609,36 +1877,50 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
       });
   }
 
-  // --- Reference integrity (predicates on lose goals + routes). ---
-  const predSites: { p: StatePredicate; where: string; goalId?: string }[] = [];
-  for (const g of graph.goals) predSites.push({ p: g.predicate, where: g.outcome === 'lose' ? 'lose goal' : 'win goal', goalId: g.id });
-  for (const n of graph.nodes) for (const edge of n.edges) predSites.push({ p: edge.when, where: `route ${n.id}->${edge.to}` });
-  for (const { p, where, goalId } of predSites) {
-    const isWin = !!goalId && wins.some((w) => w.id === goalId);
-    if ((p.kind === 'entityFaction' || p.kind === 'entityDisposition' || p.kind === 'entityHp') && !isWin && (!p.entityId || !entryEnts.has(p.entityId)))
-      push({
-        severity: 'warning',
-        code: 'PRED_ENTITY_REF',
-        message: `A ${where} references entity "${p.entityId ?? '(none)'}", not in the opening scene.`,
-        repairInstruction: `The ${where} references entity "${p.entityId ?? ''}", absent from the entry scene (entities: ${entryEntList}). Point it at one of ${entryEntList}.`,
-        targets: { goalId, entityId: p.entityId },
-      });
-    if (p.kind === 'atNode' && !isWin && (!p.nodeId || !nodeIds.includes(p.nodeId)))
-      push({
-        severity: 'warning',
-        code: 'ATNODE_DANGLING',
-        message: `A ${where} checks scene "${p.nodeId ?? '(none)'}", which doesn't exist.`,
-        repairInstruction: `The ${where} checks atNode "${p.nodeId ?? ''}" (scenes: ${nodeIds.join(', ')}). Point it at a real scene.`,
-        targets: { goalId },
-      });
-    if (p.kind === 'hasItem' && !isWin && (!p.itemId || !grantedItems.has(p.itemId)))
-      push({
-        severity: 'warning',
-        code: 'ITEM_REF_MISMATCH',
-        message: `A ${where} checks item "${p.itemId ?? '(none)'}", which is never granted.`,
-        repairInstruction: `The ${where} checks item "${p.itemId ?? ''}" (granted: ${[...grantedItems].join(', ') || 'none'}). Grant it on a success or fix the id.`,
-        targets: { goalId, itemId: p.itemId },
-      });
+  // --- Reference integrity (predicates on lose goals + routes + affordance preconditions). ---
+  const predSites: { p: StatePredicate; where: string; goalId?: string; isWin: boolean }[] = [];
+  for (const g of graph.goals) predSites.push({ p: g.predicate, where: g.outcome === 'lose' ? 'lose goal' : 'win goal', goalId: g.id, isWin: g.outcome === 'win' });
+  for (const n of graph.nodes) {
+    for (const edge of n.edges) predSites.push({ p: edge.when, where: `route ${n.id}->${edge.to}`, isWin: false });
+    for (const a of n.affordances) if (a.when) predSites.push({ p: a.when, where: `the "${a.verb}" precondition in "${n.id}"`, isWin: false });
+  }
+  for (const { p: pred, where, goalId, isWin } of predSites) {
+    if (isWin) continue; // win-goal predicates are diagnosed (with richer messages) in the win loop above
+    for (const p of predLeaves(pred)) {
+      if (p.negate) continue; // a "NOT" over a missing entity/flag is satisfiable, not a bug
+      if ((p.kind === 'entityFaction' || p.kind === 'entityDisposition' || p.kind === 'entityHp') && (!p.entityId || !roster.has(p.entityId)))
+        push({
+          severity: 'warning',
+          code: 'PRED_ENTITY_REF',
+          message: `A ${where} references entity "${p.entityId ?? '(none)'}", which exists in no reachable scene.`,
+          repairInstruction: `The ${where} references entity "${p.entityId ?? ''}", not defined in any reachable scene (reachable entities: ${rosterList}). Point it at one of ${rosterList}.`,
+          targets: { goalId, entityId: p.entityId },
+        });
+      if (p.kind === 'atNode' && (!p.nodeId || !nodeIds.includes(p.nodeId)))
+        push({
+          severity: 'warning',
+          code: 'ATNODE_DANGLING',
+          message: `A ${where} checks scene "${p.nodeId ?? '(none)'}", which doesn't exist.`,
+          repairInstruction: `The ${where} checks atNode "${p.nodeId ?? ''}" (scenes: ${nodeIds.join(', ')}). Point it at a real scene.`,
+          targets: { goalId },
+        });
+      if (p.kind === 'hasItem' && (!p.itemId || !grantedItems.has(p.itemId)))
+        push({
+          severity: 'warning',
+          code: 'ITEM_REF_MISMATCH',
+          message: `A ${where} checks item "${p.itemId ?? '(none)'}", which is never granted.`,
+          repairInstruction: `The ${where} checks item "${p.itemId ?? ''}" (granted: ${[...grantedItems].join(', ') || 'none'}). Grant it on a success or fix the id.`,
+          targets: { goalId, itemId: p.itemId },
+        });
+      if (p.kind === 'flag' && p.flag && !sites.some((s) => s.effect.op === 'setFlag' && s.effect.flag === p.flag))
+        push({
+          severity: 'warning',
+          code: 'PRED_FLAG_NEVER_SET',
+          message: `A ${where} checks flag "${p.flag}", which no approach ever sets.`,
+          repairInstruction: `The ${where} checks flag "${p.flag}" but no success effect sets it — so it (a gate/route) can never open. Set "${p.flag}" on a reachable approach's success, or fix the flag name.`,
+          targets: { goalId, flag: p.flag },
+        });
+    }
   }
 
   // --- Tier-dropped FLAVOR effects (not win-advancing, not warmth) — the editor's "won't fire". ---
@@ -1687,18 +1969,32 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
       repairInstruction: `Add a one-line "hint" to each approach in entry scene "${entry.id}".`,
       targets: { nodeId: entry.id },
     });
-  // Within a single scene that HAS a flag-winning approach, any OTHER success-bearing
-  // approach that wins nothing is a dead-end choice. Scoped per-scene (so a multi-scene
-  // quest's earlier scenes, where you can't win yet, aren't flagged) and considering ALL win
-  // flags (so an approach that wins a DIFFERENT flag isn't falsely flagged); one note per
-  // (scene, approach).
-  const winFlags = new Set(wins.filter((g) => g.predicate.kind === 'flag' && !g.predicate.negate && g.predicate.flag).map((g) => g.predicate.flag!));
+  // Within a single scene that HAS a SOLE-winning approach, any OTHER success-bearing approach
+  // that does nothing toward a win is a dead-end choice. "Sole-win" flags = a top-level flag
+  // goal, or a flag clause of an `any` (OR) goal — NOT a clause of an `all` (AND) goal (those
+  // are necessary-not-sufficient, so an approach setting one is a real progress step, not a
+  // dead end). Approaches that UNLOCK something (set a flag a precondition/edge consumes) or
+  // MOVE the scene are exempt. Scoped per-scene; one note per (scene, approach).
+  const winFlags = new Set<string>();
+  for (const g of wins) {
+    const p = g.predicate;
+    if (p.kind === 'flag' && !p.negate && p.flag) winFlags.add(p.flag);
+    else if (p.kind === 'any') for (const c of p.clauses ?? []) if (c.kind === 'flag' && !c.negate && c.flag) winFlags.add(c.flag);
+  }
   if (winFlags.size > 0) {
+    // Flags that gate any affordance or route — setting one is a meaningful unlock, not a dead end.
+    const gateFlags = new Set<string>();
+    for (const n of graph.nodes) {
+      for (const a of n.affordances) for (const lp of predLeaves(a.when ?? { kind: 'always' })) if (lp.kind === 'flag' && lp.flag) gateFlags.add(lp.flag);
+      for (const edge of n.edges) for (const lp of predLeaves(edge.when)) if (lp.kind === 'flag' && lp.flag) gateFlags.add(lp.flag);
+    }
     const setsAnyWinFlag = (a: NodeAffordance) => a.effects.success.some((e) => e.op === 'setFlag' && e.flag && winFlags.has(e.flag));
+    const isProgress = (a: NodeAffordance) =>
+      a.effects.success.some((e) => (e.op === 'setFlag' && e.flag && gateFlags.has(e.flag)) || e.op === 'moveToNode');
     for (const n of graph.nodes) {
       if (!actable.has(n.id) || !n.affordances.some(setsAnyWinFlag)) continue; // only scenes where a win is actually decided
       for (const a of n.affordances)
-        if (a.effects.success.length > 0 && !setsAnyWinFlag(a))
+        if (a.effects.success.length > 0 && !setsAnyWinFlag(a) && !isProgress(a))
           push({
             severity: 'warning',
             code: 'WIN_SINGLE_PATH_DEAD_ENDS',
@@ -1707,6 +2003,37 @@ export function lintQuestGraph(graph: QuestGraph, ctx: QuestLintContext): QuestP
             targets: { nodeId: n.id, verb: a.verb },
           });
     }
+  }
+
+  // --- Empty compound (all/any with no clauses) anywhere: an empty AND is vacuously true (a
+  // win fires turn 1 / a lose auto-fires), an empty OR is never true (an unwinnable goal). ---
+  const allPredicates: StatePredicate[] = [
+    ...graph.goals.map((g) => g.predicate),
+    ...graph.nodes.flatMap((n) => [...n.edges.map((e) => e.when), ...n.affordances.map((a) => a.when).filter((w): w is StatePredicate => !!w)]),
+  ];
+  for (const p of allPredicates)
+    if ((p.kind === 'all' || p.kind === 'any') && (p.clauses ?? []).length === 0)
+      push({
+        severity: 'warning',
+        code: 'COMPOUND_EMPTY',
+        message: `An "${p.kind}" (${p.kind === 'all' ? 'AND' : 'OR'}) condition has no sub-conditions, so it ${p.kind === 'all' ? 'is always true' : 'is never true'}.`,
+        repairInstruction: `Give the "${p.kind}" condition at least one sub-condition, or replace it with a single leaf condition.`,
+      });
+
+  // --- A reachable, non-terminal scene where NO approach can ever become available (every
+  // `when` is unsatisfiable, or there are none): the player gets stranded there (the referee
+  // force-loses it at runtime, but warn the author). ---
+  for (const n of graph.nodes) {
+    if (n.id === entryId || n.isTerminal || !reachable.has(n.id)) continue;
+    const everAvailable = n.affordances.some((a) => !a.when || predSatisfiable(a.when, graph, roster, sites));
+    if (n.affordances.length > 0 && !everAvailable)
+      push({
+        severity: 'warning',
+        code: 'NODE_SOFTLOCK',
+        message: `Scene "${n.id}" can be entered, but every approach there is gated by a condition that can never be met — the player gets stuck.`,
+        repairInstruction: `In scene "${n.id}", make at least one approach available: drop a "when" precondition, or gate it on a flag a reachable success actually sets.`,
+        targets: { nodeId: n.id },
+      });
   }
 
   // A non-entry TERMINAL scene ends the quest the instant it's reached, so its approaches
@@ -1764,12 +2091,14 @@ export function autoFixQuestGraph(graph: QuestGraph, ctx: QuestLintContext): { g
   const fixes: AutoFixNote[] = [];
   const note = (code: string, detail: string) => fixes.push({ code, detail });
   const nodeIds = new Set(g.nodes.map((n) => n.id));
-  const entryEnts = entryEntityIds(g);
-  const entryEntArr = [...entryEnts];
+  const roster = reachableEntityIds(g); // entities that exist on a reachable path (per-scene)
   const eachAff = (fn: (n: QuestNode, a: NodeAffordance) => void) => {
     for (const n of g.nodes) for (const a of n.affordances) fn(n, a);
   };
   const entryId = entryNode(g).id;
+  // Every LEAF win condition across all win goals (a compound AND/OR flattened) — so the
+  // win-advancing autofixes act on each clause, not just a top-level leaf predicate.
+  const winLeaves = g.goals.filter((x) => x.outcome === 'win').flatMap((x) => predLeaves(x.predicate));
 
   // Unmark a non-entry node wrongly flagged isTerminal when its OWN approaches decide a win.
   // Reaching a terminal node ends the quest before any approach runs, so a win-deciding
@@ -1779,9 +2108,7 @@ export function autoFixQuestGraph(graph: QuestGraph, ctx: QuestLintContext): { g
   // isTerminal.) This is the fix for the "attack once → routed to a terminal scene → win" trap.
   for (const node of g.nodes) {
     if (node.id === entryId || !node.isTerminal) continue;
-    const decidesWin = node.affordances.some((a) =>
-      a.effects.success.some((e) => g.goals.some((go) => go.outcome === 'win' && effectAdvances(go.predicate, e))),
-    );
+    const decidesWin = node.affordances.some((a) => a.effects.success.some((e) => winLeaves.some((lp) => effectAdvances(lp, e))));
     if (decidesWin) {
       node.isTerminal = false;
       note('AF_UNMARK_DEAD_TERMINAL', `unmarked isTerminal on ${node.id} (its approaches decide a win, which a terminal scene can never run)`);
@@ -1822,21 +2149,25 @@ export function autoFixQuestGraph(graph: QuestGraph, ctx: QuestLintContext): { g
     }
   });
 
-  // Remap an effect's dangling entityId to the entry roster when there is exactly ONE
-  // entry entity (the generator's common single-entity scene). Scope to the ENTRY roster
-  // for ALL nodes: entity effects mutate the persistent entry roster regardless of host node.
-  if (entryEntArr.length === 1)
-    eachAff((n, a) => {
-      for (const grade of ALL_GRADES)
-        for (const e of a.effects[grade])
-          if ((e.op === 'moveEntityToFaction' || (e.op === 'adjustStat' && e.entityId)) && e.entityId && !entryEnts.has(e.entityId)) {
-            note('AF_REMAP_SINGLE_ENTITY', `remapped ${e.op} entityId ${e.entityId}->${entryEntArr[0]} on ${a.verb}`);
-            e.entityId = entryEntArr[0];
-          }
-    });
+  // Remap an effect's dangling entityId (one not defined in any reachable scene) to the HOST
+  // scene's lone entity — the common single-entity-scene typo. Scoped per-scene (the runtime
+  // loads each room's roster), and only when unambiguous (the host node has exactly one entity).
+  eachAff((n, a) => {
+    if (n.entities.length !== 1) return;
+    const only = n.entities[0]!.id;
+    for (const grade of ALL_GRADES)
+      for (const e of a.effects[grade])
+        if ((e.op === 'moveEntityToFaction' || (e.op === 'adjustStat' && e.entityId)) && e.entityId && !roster.has(e.entityId)) {
+          note('AF_REMAP_SINGLE_ENTITY', `remapped ${e.op} entityId ${e.entityId}->${only} on ${a.verb} (${n.id})`);
+          e.entityId = only;
+        }
+  });
 
-  // Make an entity adjustStat's stray key explicit (hp if a defeat/hp goal targets it).
-  const hpEntities = new Set(g.goals.filter((x) => x.predicate.kind === 'entityHp').map((x) => x.predicate.entityId).filter(Boolean) as string[]);
+  // Make an entity adjustStat's stray key explicit (hp if a defeat/hp goal — incl. an hp clause
+  // of a compound goal — targets it).
+  const hpEntities = new Set(
+    g.goals.flatMap((x) => predLeaves(x.predicate)).filter((lp) => lp.kind === 'entityHp').map((lp) => lp.entityId).filter(Boolean) as string[],
+  );
   eachAff((n, a) => {
     for (const grade of ALL_GRADES)
       for (const e of a.effects[grade])
@@ -1880,12 +2211,13 @@ export function autoFixQuestGraph(graph: QuestGraph, ctx: QuestLintContext): { g
   }
 
   // Copy a win-advancing fail/complication effect into success (adds a success path;
-  // never removes the setback). Guarded against the MAX_EFFECTS_PER_OUTCOME cap.
-  for (const goal of g.goals.filter((x) => x.outcome === 'win'))
+  // never removes the setback). Guarded against the MAX_EFFECTS_PER_OUTCOME cap. Acts on
+  // each win-goal LEAF (so a compound AND/OR clause is covered too).
+  for (const lp of winLeaves)
     eachAff((n, a) => {
-      if (a.effects.success.some((e) => effectAdvances(goal.predicate, e))) return;
+      if (a.effects.success.some((e) => effectAdvances(lp, e))) return;
       for (const grade of ['fail', 'complication'] as const) {
-        const hit = a.effects[grade].find((e) => effectAdvances(goal.predicate, e));
+        const hit = a.effects[grade].find((e) => effectAdvances(lp, e));
         if (hit && a.effects.success.length < QUEST.MAX_EFFECTS_PER_OUTCOME && !a.effects.success.some((e) => sameEffect(e, hit))) {
           a.effects.success.push(structuredClone(hit));
           note('AF_FAILGRADE_TO_SUCCESS', `copied ${hit.op} into success on ${a.verb} (${n.id})`);
@@ -1897,16 +2229,16 @@ export function autoFixQuestGraph(graph: QuestGraph, ctx: QuestLintContext): { g
   // (TIERS_BY_BAND is nested, so raising never drops a previously-firing effect).
   {
     const reachable = reachableNodeIds(g);
-    for (const goal of g.goals.filter((x) => x.outcome === 'win'))
+    for (const lp of winLeaves)
       for (const n of g.nodes) {
         if (!reachable.has(n.id)) continue;
         for (const a of n.affordances) {
           let req: DifficultyBand = a.difficulty;
           for (const grade of ['success', 'partial'] as const)
             for (const e of a.effects[grade]) {
-              if (!effectAdvances(goal.predicate, e)) continue;
-              if (e.op === 'moveEntityToFaction' && (!e.entityId || !entryEnts.has(e.entityId))) continue;
-              if (e.op === 'adjustStat' && e.entityId && !entryEnts.has(e.entityId)) continue;
+              if (!effectAdvances(lp, e)) continue;
+              if (e.op === 'moveEntityToFaction' && (!e.entityId || !roster.has(e.entityId))) continue;
+              if (e.op === 'adjustStat' && e.entityId && !roster.has(e.entityId)) continue;
               const b = minBandForTier(effectTier(e));
               if (bandRank(b) > bandRank(req)) req = b;
             }

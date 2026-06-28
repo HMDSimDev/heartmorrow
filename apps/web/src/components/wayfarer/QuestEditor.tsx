@@ -70,6 +70,7 @@ const PREDICATE_LABEL: Record<string, string> = {
   flag: 'A flag is set', entityFaction: 'A character is on a side', entityHp: 'A character’s health',
   entityDisposition: 'A character’s feeling', hasItem: 'Player has an item', atNode: 'Player is at a scene',
   turnGte: 'On / after a turn', always: 'Always (true immediately)',
+  all: 'All of… (AND)', any: 'Any of… (OR)',
 };
 const GOAL_KIND_LABEL: Record<string, string> = {
   defeat: 'Defeat · drop a character to 0 health', persuade: 'Persuade · win a character over',
@@ -97,7 +98,9 @@ const GRADE_GLOSS: Record<OutcomeGrade, string> = {
 
 const GRADES: OutcomeGrade[] = ['success', 'partial', 'fail', 'complication'];
 const STAT_OPTIONS = [...DATING_STAT_KEYS, 'grit', 'wits'] as const;
-const PREDICATE_KINDS = ['flag', 'entityFaction', 'entityHp', 'entityDisposition', 'hasItem', 'atNode', 'turnGte', 'always'] as const;
+const PREDICATE_KINDS = ['flag', 'entityFaction', 'entityHp', 'entityDisposition', 'hasItem', 'atNode', 'turnGte', 'always', 'all', 'any'] as const;
+/** Leaf kinds only (a compound's clauses can't themselves be compound — one level deep). */
+const LEAF_PREDICATE_KINDS = PREDICATE_KINDS.filter((k) => k !== 'all' && k !== 'any');
 
 // --- Flag wiring -----------------------------------------------------------
 // The hardest thing to see in the editor is which effect SETS a flag and which
@@ -117,19 +120,23 @@ function computeWiring(graph: QuestGraph): FlagWiring {
     if (!f) return;
     (m.get(f) ?? m.set(f, []).get(f)!).push(label);
   };
+  // Register every flag a predicate (leaf OR a compound's clauses) checks.
+  const addFlagChecks = (pred: StatePredicate, label: string) => {
+    const leaves = pred.kind === 'all' || pred.kind === 'any' ? pred.clauses ?? [] : [pred];
+    for (const lp of leaves) if (lp.kind === 'flag') add(checkers, lp.flag, `${label}${lp.negate ? ' (not)' : ''}`);
+  };
   for (const n of graph.nodes) {
-    for (const a of n.affordances)
+    for (const a of n.affordances) {
       for (const grade of GRADES)
         for (const e of a.effects[grade]) {
           if (e.op === 'setFlag') add(setters, e.flag, `${VERB_LABEL[a.verb] ?? a.verb} · ${grade} (${n.id})`);
           if (e.op === 'clearFlag') add(setters, e.flag, `cleared · ${VERB_LABEL[a.verb] ?? a.verb} (${n.id})`);
         }
-    for (const edge of n.edges)
-      if (edge.when.kind === 'flag') add(checkers, edge.when.flag, `route ${n.id}→${edge.to}${edge.when.negate ? ' (not)' : ''}`);
+      if (a.when) addFlagChecks(a.when, `gate ${VERB_LABEL[a.verb] ?? a.verb} (${n.id})`); // unlock wiring
+    }
+    for (const edge of n.edges) addFlagChecks(edge.when, `route ${n.id}→${edge.to}`);
   }
-  for (const g of graph.goals)
-    if (g.predicate.kind === 'flag')
-      add(checkers, g.predicate.flag, `${g.outcome === 'win' ? 'Win' : 'Lose'} goal${g.label ? ` “${g.label}”` : ''}${g.predicate.negate ? ' (not)' : ''}`);
+  for (const g of graph.goals) addFlagChecks(g.predicate, `${g.outcome === 'win' ? 'Win' : 'Lose'} goal${g.label ? ` “${g.label}”` : ''}`);
   return { setters, checkers };
 }
 
@@ -746,6 +753,7 @@ function NodeCard({
             aff={aff}
             entities={node.entities}
             nodeIds={nodeIds}
+            allEntities={allEntities}
             characters={characters}
             onChange={(fn) => onChange((n) => fn(n.affordances[ai]!))}
             onRemove={() => onChange((n) => { n.affordances.splice(ai, 1); })}
@@ -782,11 +790,12 @@ function NodeCard({
 // --- affordance ------------------------------------------------------------
 
 function AffordanceCard({
-  aff, entities, nodeIds, characters, onChange, onRemove,
+  aff, entities, nodeIds, allEntities, characters, onChange, onRemove,
 }: {
   aff: NodeAffordance;
   entities: QuestNode['entities'];
   nodeIds: string[];
+  allEntities: { id: string; label: string }[];
   characters: Character[];
   onChange: (fn: (a: NodeAffordance) => void) => void;
   onRemove: () => void;
@@ -828,6 +837,19 @@ function AffordanceCard({
       </div>
       {open && (<>
         <input className="wf-ed-hint" placeholder="hint — what the player might try (shown to them)" value={aff.hint} onChange={(e) => onChange((a) => (a.hint = e.target.value))} />
+        {/* Optional precondition: this approach is offered only when the condition holds (a
+            gate / unlock). For a one-shot, gate on a flag's "not" + set that flag here. */}
+        <div className="wf-ed-line wf-ed-when">
+          <label className="wf-ed-check" title="When ticked, this approach only appears once the condition is met — a gate/unlock. Leave off for always-available.">
+            <input
+              type="checkbox"
+              checked={!!aff.when}
+              onChange={(e) => onChange((a) => { a.when = e.target.checked ? { kind: 'flag', flag: '' } : undefined; })}
+            />{' '}
+            Available when…
+          </label>
+          {aff.when && <PredicateRow predicate={aff.when} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((a) => fn(a.when!))} />}
+        </div>
         {noSuccess && (
           <div className="wf-ed-prob warn"><Icon name="info" size={12} /> Nothing happens on success — the player can’t make progress this way.</div>
         )}
@@ -1026,19 +1048,50 @@ function GoalCard({
 // --- predicate -------------------------------------------------------------
 
 function PredicateRow({
-  predicate, nodeIds, allEntities, onChange,
+  predicate, nodeIds, allEntities, onChange, leafOnly,
 }: {
   predicate: StatePredicate;
   nodeIds: string[];
   allEntities: { id: string; label: string }[];
   onChange: (fn: (p: StatePredicate) => void) => void;
+  /** A clause inside a compound — may not itself be compound (one level deep). */
+  leafOnly?: boolean;
 }) {
   const num = (v: string) => (v === '' ? 0 : Number(v));
+  const kinds = leafOnly ? LEAF_PREDICATE_KINDS : PREDICATE_KINDS;
   return (
     <span className="wf-ed-pred">
-      <select value={predicate.kind} onChange={(e) => onChange((p) => (p.kind = e.target.value as StatePredicate['kind']))}>
-        {PREDICATE_KINDS.map((k) => <option key={k} value={k}>{PREDICATE_LABEL[k] ?? k}</option>)}
+      <select
+        value={predicate.kind}
+        onChange={(e) =>
+          onChange((p) => {
+            const k = e.target.value as StatePredicate['kind'];
+            p.kind = k;
+            if (k === 'all' || k === 'any') {
+              if (!p.clauses || p.clauses.length === 0) p.clauses = [{ kind: 'flag', flag: '' }];
+            } else {
+              delete p.clauses; // a leaf carries no clauses
+            }
+          })
+        }
+      >
+        {kinds.map((k) => <option key={k} value={k}>{PREDICATE_LABEL[k] ?? k}</option>)}
       </select>
+
+      {(predicate.kind === 'all' || predicate.kind === 'any') && (
+        <span className="wf-ed-compound">
+          <label className="wf-ed-check"><input type="checkbox" checked={!!predicate.negate} onChange={(e) => onChange((p) => (p.negate = e.target.checked))} /> not</label>
+          {(predicate.clauses ?? []).map((_, i) => (
+            <span key={i} className="wf-ed-line wf-ed-compound-clause">
+              <PredicateRow predicate={predicate.clauses![i]!} nodeIds={nodeIds} allEntities={allEntities} leafOnly onChange={(fn) => onChange((p) => fn(p.clauses![i]!))} />
+              <button className="btn danger sm" title="Remove condition" onClick={() => onChange((p) => { p.clauses!.splice(i, 1); })}><Icon name="trash" size={11} /></button>
+            </span>
+          ))}
+          <button className="btn ghost sm wf-ed-add" onClick={() => onChange((p) => { p.clauses = p.clauses ?? []; p.clauses.push({ kind: 'flag', flag: '' }); })}>
+            <Icon name="plus" size={11} /> condition
+          </button>
+        </span>
+      )}
 
       {predicate.kind === 'flag' && (
         <>
