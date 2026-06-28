@@ -11,6 +11,26 @@ import { updatePlayer } from './player-service';
 import { ensureWorldState } from './world-clock-service';
 import { sessionsRepo } from '../db/repositories';
 import { playerIdForWorld } from '../lib/ids';
+import type { ChatAdapter, ChatRequest, ChatResult, LlmModelInfo } from '../llm/types';
+
+/** Adapter that records the prompt sent to it (to assert what the room tells the model). */
+class CapturingAdapter implements ChatAdapter {
+  readonly name = 'capturing';
+  last = '';
+  constructor(private readonly reply: string) {}
+  async chat(req: ChatRequest): Promise<ChatResult> {
+    this.last = JSON.stringify(req.messages);
+    return { content: this.reply };
+  }
+  async streamChat(req: ChatRequest, onDelta: (t: string) => void): Promise<ChatResult> {
+    const r = await this.chat(req);
+    onDelta(r.content);
+    return r;
+  }
+  async listModels(): Promise<LlmModelInfo[]> {
+    return [];
+  }
+}
 
 beforeEach(() => resetDb());
 afterEach(() => setAdapterOverride(null));
@@ -145,6 +165,45 @@ describe('location room chat (discovery)', () => {
     await enterRoom(w.id, 'cafe');
 
     expect(() => createSession({ characterId: mara.id, mode: 'date', locationId: 'cafe' })).toThrow(/around town/i);
+  });
+
+  it('instructs the opener to name people the player has already met', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    stampMet(chars[0]!.id, 1, 'cafe'); // already known to the player
+    const cap = new CapturingAdapter(turn('Mara glances up.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain('already met'); // roster marks them met
+    expect(cap.last.toLowerCase()).toContain('met by name'); // opener tells the model to name them
+  });
+
+  it('tells the model to keep the spotlight on whoever the player addresses (no pile-on)', async () => {
+    const { w } = worldWithRegulars(['Mara', 'Devi']);
+    const cap = new CapturingAdapter(turn('You step in.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain('FOCUS');
+    expect(cap.last).toContain('do NOT interject');
+  });
+
+  it('tells the model that co-present people with no social tie are strangers', async () => {
+    const { w } = worldWithRegulars(['Mara', 'Devi']); // both at the cafe, no tie between them
+    const cap = new CapturingAdapter(turn('You step in.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain('stranger to the others present');
+    expect(cap.last).not.toContain('knows here: id:'); // no tie listed on any roster line
+  });
+
+  it('passes the social connection (kind) so the model can color a tie', async () => {
+    const { w, chars } = worldWithRegulars(['Mara', 'Devi']);
+    const [mara, devi] = chars;
+    updateCharacter(mara!.id, { links: [{ targetId: devi!.id, kind: 'friend' }] });
+    const cap = new CapturingAdapter(turn('You step in.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain(`knows here: id:${devi!.id} (friend)`);
+    expect(cap.last).toContain(`knows here: id:${mara!.id} (friend)`); // surfaced symmetrically
   });
 
   it('blocks entering a room while a date is underway', async () => {

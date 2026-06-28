@@ -2,6 +2,7 @@ import {
   RoomTurnSchema,
   type ActiveRoom,
   type Character,
+  type CharacterLinkKind,
   type Phase,
   type RoomMessage,
   type RoomSession,
@@ -10,6 +11,7 @@ import {
 import { charactersRepo, roomSessionsRepo, worldsRepo } from '../db/repositories';
 import { ensureWorldState, assertCanAct, spendStamina } from './world-clock-service';
 import { getPlacements, composeLocationScene } from './placement-service';
+import { getSocialWeb } from './character-service';
 import { isDiscovered, stampMet } from './discovery-service';
 import { getActiveDateForWorld } from './conversation-service';
 import { stampLastSeen } from './stat-service';
@@ -81,6 +83,31 @@ function occupantsOf(here: Character[]) {
   return here.map((c) => ({ characterId: c.id, known: isDiscovered(c.id) }));
 }
 
+/**
+ * Symmetric social ties AMONG the people currently present (authored links + world-sim
+ * edges — the same web the co-presence clustering uses). Anyone not in another's map is
+ * a STRANGER to them: merely sharing the space, not a group. Lets the room prompt color
+ * who actually knows whom instead of treating every co-present person as a clique.
+ */
+function tiesAmong(worldId: string, here: Character[]): Map<string, Map<string, CharacterLinkKind>> {
+  const present = new Set(here.map((c) => c.id));
+  const out = new Map<string, Map<string, CharacterLinkKind>>();
+  const add = (a: string, b: string, kind: CharacterLinkKind) => {
+    let m = out.get(a);
+    if (!m) out.set(a, (m = new Map()));
+    if (!m.has(b)) m.set(b, kind); // first (highest-precedence) tie wins
+  };
+  for (const node of getSocialWeb(worldId).nodes) {
+    if (!present.has(node.id)) continue;
+    for (const tie of node.ties) {
+      if (!present.has(tie.targetId)) continue;
+      add(node.id, tie.targetId, tie.kind);
+      add(tie.targetId, node.id, tie.kind); // "they know each other"
+    }
+  }
+  return out;
+}
+
 function templatedOpener(locName: string, here: Character[], activities: Map<string, string>): string {
   if (here.length === 0) return `You step into ${locName}. It's quiet right now — no one's around.`;
   const lines = here.map((c) =>
@@ -90,6 +117,7 @@ function templatedOpener(locName: string, here: Character[], activities: Map<str
 }
 
 function buildRoomMessages(args: {
+  worldId: string;
   locationName: string;
   here: Character[];
   playerName: string;
@@ -97,16 +125,23 @@ function buildRoomMessages(args: {
   history: RoomTurnInput[];
   text: string;
 }) {
-  const { locationName, here, playerName, playerNamed, history, text } = args;
+  const { worldId, locationName, here, playerName, playerNamed, history, text } = args;
+  const ties = tiesAmong(worldId, here);
   const roster =
     here
       .map((c) => {
         const persona = (c.personality || c.shortDescription || '').replace(/\s+/g, ' ').slice(0, 200);
+        const myTies = ties.get(c.id);
+        const tieClause = myTies && myTies.size
+          ? `knows here: ${[...myTies].map(([tid, kind]) => `id:${tid} (${kind})`).join(', ')}`
+          : here.length > 1
+            ? 'knows no one else here (a stranger to the others present)'
+            : 'here alone';
         return `- id:${c.id} | ${
           isDiscovered(c.id)
             ? `name: ${c.name} (already met)`
             : `name: ${c.name} (NOT YET MET — do NOT use or reveal this name; refer to them only by description until they introduce themselves to the player, then use this exact name)`
-        } | ${persona}`;
+        } | ${persona} | ${tieClause}`;
       })
       .join('\n') || '(no one is here)';
   const transcript =
@@ -119,15 +154,30 @@ function buildRoomMessages(args: {
     ? `The player's name is "${playerName}" — they've introduced themselves, so people here may use it.`
     : `The player has NOT told anyone here their name yet — NO ONE present knows it. Address the player only as "you" (or a description); do NOT use or guess the player's name until they state it. When the player DOES tell the room their name this turn, set "playerIntroduced" to true.`;
   const system =
-    'You run a LOCATION in a dating sim. You voice the NARRATOR and EVERY person present, addressing ' +
+    'You run a LOCATION in a dating sim. You voice the NARRATOR and the people present, addressing ' +
     'the player as "you" in short, evocative in-world prose (2–5 sentences). The player talks to people ' +
-    'here in natural language — let the relevant person answer in their own voice and narrate the room. ' +
-    'RULES: only the listed people are present — NEVER invent anyone else. NEVER invent a name: each ' +
-    "person's real name is in the roster — use it ONLY once they've introduced themselves. Anyone marked " +
-    'NOT YET MET must be referred to by description (e.g. "the woman reading"), NEVER by name, until they ' +
-    'introduce themselves to the player THIS turn. When the player and a present person genuinely exchange ' +
-    'names / introduce themselves, use that person\'s real name from the roster and put their id in ' +
-    '"introduced". Return JSON per the schema.';
+    'here in natural language. ' +
+    'FOCUS: respond as ONLY the person (or people) the player is actually addressing or interacting with — ' +
+    'usually just ONE person speaks per turn. Everyone else stays in the background: they do NOT interject, ' +
+    'pile on, or introduce themselves just because the player walked in or is talking to someone else. A ' +
+    'bystander speaks only when there is a natural, earned reason (directly addressed, spoken about, or the ' +
+    'moment plainly pulls them in). No one forces an introduction — a stranger introduces themselves only ' +
+    'when the player actually turns to engage them. ' +
+    'RULES: only the listed people are present — NEVER invent anyone else, and NEVER invent a name. ' +
+    'A person whose roster line says "already met" is someone the player KNOWS — refer to them by their ' +
+    'real name right away (NEVER call a person the player has already met "a woman" / "a man" / "someone"). ' +
+    'A person marked NOT YET MET must be referred to only by description (e.g. "the woman reading"), NEVER ' +
+    'by name, until they introduce themselves to the player THIS turn. ' +
+    'CONNECTIONS (the social graph): each roster line\'s "knows here" is the COMPLETE list of who that ' +
+    'person already knows among those present, and how. It is the ONLY source of who-knows-whom here. If ' +
+    'two people are not listed as connected — or NObody lists any connection at all (an empty graph) — ' +
+    'then they do NOT know each other. DEFAULT TO STRANGERS: assume people are unacquainted unless the ' +
+    'graph says otherwise. Strangers are independently present, NOT a group — they sit and act separately ' +
+    'and do not talk to, sit with, or behave familiarly toward each other (each still reacts to the player ' +
+    'on their own). Only where a connection IS listed do those two know each other; color that interaction ' +
+    'by the relationship (partners affectionate, rivals cold, exes awkward, friends easy, etc.). ' +
+    'When the player and a present person genuinely exchange names / introduce themselves, use that ' +
+    'person\'s real name from the roster and put their id in "introduced". Return JSON per the schema.';
   const user =
     `Location: ${locationName}\nPeople present:\n${roster}\n\n` +
     `${playerLine}\n\nConversation so far:\n${transcript}\n\n` +
@@ -141,6 +191,7 @@ function buildRoomMessages(args: {
 /** Run one room turn through the model. Returns null on any failure so callers can fall
  *  back gracefully (the room must always be enterable + talkable). */
 async function runRoomLlm(
+  worldId: string,
   locName: string,
   here: Character[],
   playerName: string,
@@ -151,7 +202,7 @@ async function runRoomLlm(
   try {
     const result = await callStructuredLlm(
       RoomTurnSchema,
-      buildRoomMessages({ locationName: locName, here, playerName, playerNamed, history, text }),
+      buildRoomMessages({ worldId, locationName: locName, here, playerName, playerNamed, history, text }),
       { settings: getLlmSettings(), task: `Voice ${locName} for the player.`, schemaName: 'RoomTurn' },
     );
     return result.ok ? result.data : null;
@@ -215,12 +266,13 @@ export async function enterRoom(worldId: string, locationId: string): Promise<Ac
   // The action (advances the clock); the room stays pinned to `day`/`phase` above.
   spendStamina(worldId, 1);
   const llm = await runRoomLlm(
+    worldId,
     loc.name,
     here,
     playerName,
     false, // the player hasn't said their name on arrival
     [],
-    '(The player has just walked in. Set the scene and let anyone present react — no one has been introduced yet.)',
+    '(The player has just walked in. Set the scene in a sentence or two — the place and who is around. Greet people the player has already met by name; describe anyone not yet met without naming them. People are absorbed in their own business; no one rushes over to greet or introduce themselves just because the player arrived.)',
   );
   const reply = llm
     ? scrubPlayerName(scrubUnmetNames(llm.reply, here, new Set()), playerName)
@@ -258,7 +310,7 @@ export async function roomSay(worldId: string, text: string): Promise<ActiveRoom
     .filter((m): m is RoomMessage & { role: 'player' | 'room' } => m.role === 'player' || m.role === 'room')
     .map((m) => ({ role: m.role, text: m.text }));
 
-  const llm = await runRoomLlm(loc.name, here, playerName, session.playerNamed, history, text);
+  const llm = await runRoomLlm(worldId, loc.name, here, playerName, session.playerNamed, history, text);
 
   const messages: RoomMessage[] = [...session.messages, { role: 'player', text }];
   let playerNamed = session.playerNamed;
