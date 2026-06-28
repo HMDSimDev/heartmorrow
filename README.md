@@ -17,7 +17,7 @@ keys never leave your computer.
 > and explore the entire UI without an LLM connected. You only need one running to actually
 > *talk* to characters and simulate the world.
 
-Hop in the [Discord](https://discord.gg/AEEgXKd5) if you want to share your characters, get pro-tips, and discuss the game with others.
+Hop in the [Discord](https://discord.gg/S9NUYM82tP) if you want to share your characters, get pro-tips, and discuss the game with others.
 
 ---
 
