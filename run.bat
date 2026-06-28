@@ -2,12 +2,13 @@
 setlocal enabledelayedexpansion
 
 REM ============================================================================
-REM Heartmorrow launcher (Windows) — runs preflight checks, then `pnpm dev`.
+REM Heartmorrow launcher (Windows) - runs preflight checks, then production.
 REM Reports what's wrong and how to fix it before trying to start the app.
 REM ============================================================================
 
 set "PROBLEMS=0"
 set "ROOT=%~dp0"
+if "%APP_URL%"=="" set "APP_URL=http://127.0.0.1:5173"
 
 REM Prefer the self-contained toolchain from install.ps1, if present, over any
 REM system Node/pnpm — so a vendored install "just runs".
@@ -95,14 +96,55 @@ if !PROBLEMS! GTR 0 (
 )
 
 echo ====================================================
-echo   All checks passed. Starting Heartmorrow ^(pnpm dev^)...
-echo   Server: http://localhost:8787    Web: http://localhost:5173
+echo   All checks passed. Building production assets...
 echo ====================================================
 echo.
 
+call pnpm run build:app
+if errorlevel 1 (
+  echo.
+  echo ====================================================
+  echo   Production build failed. Fix the errors above, then re-run.
+  echo ====================================================
+  echo.
+  endlocal
+  exit /b 1
+)
+
+echo.
+echo ====================================================
+echo   Starting Heartmorrow ^(pnpm start^)...
+echo   Server: http://localhost:8787    Web: %APP_URL%
+echo ====================================================
+echo.
+
+call :openbrowser
 endlocal
-pnpm dev
+pnpm start
 exit /b %errorlevel%
+
+REM ---------------------------------------------------------------------------
+:openbrowser
+REM Best-effort browser open. Set NO_BROWSER=1 to skip.
+if /I "%NO_BROWSER%"=="1" (
+  echo   Browser auto-open disabled ^(NO_BROWSER=%NO_BROWSER%^).
+  goto :eof
+)
+if /I "%NO_BROWSER%"=="true" (
+  echo   Browser auto-open disabled ^(NO_BROWSER=%NO_BROWSER%^).
+  goto :eof
+)
+
+where powershell.exe >nul 2>&1
+if errorlevel 1 (
+  echo   Open %APP_URL% in your browser when the app is ready.
+  goto :eof
+)
+
+echo   Browser will open when the web app is ready ^(set NO_BROWSER=1 to skip^).
+set "HEARTMORROW_OPEN_URL=%APP_URL%"
+start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "$u=$env:HEARTMORROW_OPEN_URL; $ok=$false; for($i=0; $i -lt 60; $i++){ try { $r=Invoke-WebRequest -UseBasicParsing -Uri $u -TimeoutSec 1; if($r.StatusCode -ge 200){ $ok=$true; break } } catch {}; Start-Sleep -Seconds 1 }; if($ok){ Start-Process $u }" >nul 2>nul
+goto :eof
 
 REM ---------------------------------------------------------------------------
 :checkport

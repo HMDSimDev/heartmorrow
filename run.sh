@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Heartmorrow launcher (Linux/macOS) — runs preflight checks, then `pnpm dev`.
+# Heartmorrow launcher (Linux/macOS) - runs preflight checks, then production.
 # Reports what's wrong and how to fix it before trying to start the app.
 # ============================================================================
 set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROBLEMS=0
+APP_URL="${APP_URL:-http://127.0.0.1:5173}"
 
 # Prefer the self-contained toolchain from install.sh, if present, over any
 # system Node/pnpm — so a vendored install "just runs".
@@ -105,6 +106,56 @@ check_port() {
 check_port 8787 server
 check_port 5173 web
 
+browser_disabled() {
+  case "${NO_BROWSER:-}" in
+    1|true|TRUE|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+start_browser_opener() {
+  if browser_disabled; then
+    echo "  Browser auto-open disabled (NO_BROWSER=${NO_BROWSER})."
+    return 0
+  fi
+
+  echo "  Browser will open when the web app is ready (set NO_BROWSER=1 to skip)."
+  (
+    ready=0
+    if command -v curl >/dev/null 2>&1; then
+      for ((i = 0; i < 60; i += 1)); do
+        if curl -fsS "$APP_URL" >/dev/null 2>&1; then ready=1; break; fi
+        sleep 1
+      done
+    elif command -v wget >/dev/null 2>&1; then
+      for ((i = 0; i < 60; i += 1)); do
+        if wget -q --spider "$APP_URL" >/dev/null 2>&1; then ready=1; break; fi
+        sleep 1
+      done
+    else
+      # No readiness probe available; give the server a moment and try best-effort.
+      sleep 5
+      ready=1
+    fi
+
+    [ "$ready" -eq 1 ] || exit 0
+
+    if command -v termux-open-url >/dev/null 2>&1; then
+      termux-open-url "$APP_URL"
+    elif [ -n "${ANDROID_ROOT:-}" ] && command -v am >/dev/null 2>&1; then
+      am start -a android.intent.action.VIEW -d "$APP_URL"
+    elif command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$APP_URL"
+    elif command -v open >/dev/null 2>&1; then
+      open "$APP_URL"
+    elif command -v python3 >/dev/null 2>&1; then
+      python3 -m webbrowser "$APP_URL"
+    elif command -v python >/dev/null 2>&1; then
+      python -m webbrowser "$APP_URL"
+    fi
+  ) >/dev/null 2>&1 &
+}
+
 echo
 if [ "$PROBLEMS" -gt 0 ]; then
   echo "===================================================="
@@ -115,9 +166,25 @@ if [ "$PROBLEMS" -gt 0 ]; then
 fi
 
 echo "===================================================="
-echo "  All checks passed. Starting Heartmorrow (pnpm dev)..."
-echo "  Server: http://localhost:8787    Web: http://localhost:5173"
+echo "  All checks passed. Building production assets..."
 echo "===================================================="
 echo
 
-exec pnpm dev
+if ! pnpm run build:app; then
+  echo
+  echo "===================================================="
+  echo "  Production build failed. Fix the errors above, then re-run."
+  echo "===================================================="
+  echo
+  exit 1
+fi
+
+echo
+echo "===================================================="
+echo "  Starting Heartmorrow (pnpm start)..."
+echo "  Server: http://localhost:8787    Web: $APP_URL"
+echo "===================================================="
+echo
+
+start_browser_opener
+exec pnpm start
