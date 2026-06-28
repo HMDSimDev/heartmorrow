@@ -123,6 +123,8 @@
   "nav": {
     "home": "Home",
     "people": "People",
+    "aroundTown": "Around Town",
+    "aroundTownShort": "Town",
     "world": "World",
     "date": "Date",
     "phone": "Phone",

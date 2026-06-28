@@ -265,6 +265,22 @@
     "confirmDuplicateBody": "This creates a saved copy of {name} now and opens it. The copy is kept whether or not you edit it further.",
     "someone": "Someone"
   },
+  "aroundTown": {
+    "kicker": "Around town",
+    "title": "Around Town",
+    "blurb": "See who's out and about this part of the day — step into a spot to see who's there.",
+    "closed": "Closed",
+    "quiet": "Quiet right now",
+    "present": "{count, plural, one {# person here} other {# people here}}",
+    "emptyTitle": "Nowhere to go yet",
+    "emptyBody": "This world has no places to visit yet — add some locations in the World editor.",
+    "back": "Back to the map",
+    "youArrive": "You step inside",
+    "nobodyHere": "Nobody's here right now",
+    "nobodyHereBody": "Try another spot, or come back later in the day.",
+    "aStranger": "Someone you haven't met",
+    "together": "Together"
+  },
   "characters": {
     "kicker": "The Almanac · Cast",
     "title": "People",

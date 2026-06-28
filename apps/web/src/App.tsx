@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { ParseKeys } from 'i18next';
+import type { FeatureFlags } from '@dsim/shared';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppData } from './state/app-context';
@@ -7,6 +8,7 @@ import { DayHud } from './components/DayHud';
 import { Icon, type IconName } from './components/Icon';
 import { Dashboard } from './pages/Dashboard';
 import { Characters } from './pages/Characters';
+import { AroundTown } from './pages/AroundTown';
 import { CharacterProfile } from './pages/CharacterProfile';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { WorldEditor } from './pages/WorldEditor';
@@ -30,9 +32,10 @@ type CommonKey = ParseKeys<'common'>;
 // `hideOnBottomNav` keeps an item out of the cramped mobile bottom bar (which must
 // stay fully on-screen, no scroll) while still showing it in the roomy sidebar.
 // Help lives there: desktop gets a permanent tab; mobile reaches it via Settings.
-const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonKey; end?: boolean; creatorOnly?: boolean; hideOnBottomNav?: boolean }[] = [
+const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonKey; end?: boolean; creatorOnly?: boolean; featureOnly?: keyof FeatureFlags; hideOnBottomNav?: boolean }[] = [
   { to: '/', icon: 'home', labelKey: 'nav.home', end: true },
   { to: '/characters', icon: 'people', labelKey: 'nav.people' },
+  { to: '/around-town', icon: 'location', labelKey: 'nav.aroundTown', shortKey: 'nav.aroundTownShort', featureOnly: 'discovery' },
   { to: '/world', icon: 'chronicle', labelKey: 'nav.world', creatorOnly: true },
   { to: '/chat', icon: 'date', labelKey: 'nav.date' },
   { to: '/phone', icon: 'phone', labelKey: 'nav.phone' },
@@ -47,6 +50,7 @@ function routeKey(path: string): string {
   if (path === '/') return 'home';
   if (path === '/characters') return 'people';
   if (path.startsWith('/characters')) return 'profile'; // profile, new, edit
+  if (path.startsWith('/around-town')) return 'people';
   if (path.startsWith('/chat')) return 'date';
   if (path.startsWith('/phone')) return 'phone';
   if (path.startsWith('/shop')) return 'shop';
@@ -69,7 +73,7 @@ function CreatorRoute({ children }: { children: ReactNode }) {
 
 export default function App() {
   const { t } = useTranslation();
-  const { creatorMode, unreadTexts, activeWorldId, activeDate } = useAppData();
+  const { creatorMode, unreadTexts, activeWorldId, activeWorld, activeDate } = useAppData();
   const location = useLocation();
 
   // The world selector + onboarding are a full-screen experience OUTSIDE the
@@ -91,7 +95,9 @@ export default function App() {
     return <Navigate to="/worlds" replace />;
   }
 
-  const nav = NAV.filter((n) => creatorMode || !n.creatorOnly);
+  const nav = NAV.filter(
+    (n) => (creatorMode || !n.creatorOnly) && (!n.featureOnly || !!activeWorld?.featureFlags?.[n.featureOnly]),
+  );
   const badgeFor = (to: string) => {
     if (to === '/phone' && unreadTexts > 0)
       return <span className="nav-badge">{unreadTexts > 9 ? '9+' : unreadTexts}</span>;
@@ -176,6 +182,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/characters" element={<Characters />} />
+          <Route path="/around-town" element={<AroundTown />} />
           <Route path="/characters/new" element={<CreatorRoute><CharacterEditor /></CreatorRoute>} />
           <Route path="/characters/:id" element={<CharacterProfile />} />
           <Route path="/characters/:id/edit" element={<CreatorRoute><CharacterEditor /></CreatorRoute>} />

@@ -29,6 +29,7 @@ import type {
   ReactionKind,
   SocialWeb,
   Location,
+  Phase,
   PerformActivity,
   PhoneInbox,
   PhoneThreadSummary,
@@ -360,6 +361,31 @@ async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
 
 export type SettingsResponse = RedactedLlmSettings;
 
+// --- discovery: Around Town read-models (server route shapes) ---
+export interface AroundTownLocationView {
+  location: Location;
+  open: boolean;
+  occupantIds: string[];
+}
+export interface AroundTownView {
+  day: number;
+  phase: Phase;
+  locations: AroundTownLocationView[];
+}
+export interface DiscoverySceneOccupant {
+  characterId: string;
+  activity: string;
+  clusterId: number | null;
+  atWork: boolean;
+}
+export interface LocationSceneView {
+  location: Location;
+  day: number;
+  phase: Phase;
+  occupants: DiscoverySceneOccupant[];
+  clusters: Array<{ id: number; memberIds: string[] }>;
+}
+
 export const api = {
   health: () => get<{ ok: boolean }>('/health'),
 
@@ -578,6 +604,9 @@ export const api = {
   // minigames
   listMemorials: (worldId?: string) => get<string[]>(`/characters/memorials${worldQuery(worldId)}`),
   listDiscovered: (worldId?: string) => get<string[]>(`/characters/discovered${worldQuery(worldId)}`),
+  aroundTown: (worldId: string) => get<AroundTownView>(`/around-town${worldQuery(worldId)}`),
+  locationScene: (worldId: string, locationId: string) =>
+    get<LocationSceneView>(`/around-town/scene?worldId=${encodeURIComponent(worldId)}&locationId=${encodeURIComponent(locationId)}`),
   listMinigames: () => get<MinigameInfo[]>('/minigames'),
   startMinigame: (input: MinigameStart) => post<MinigameStartResponse>('/minigames/start', input),
   finishMinigame: (input: MinigameFinish) => post<MinigameFinishResponse>('/minigames/finish', input),

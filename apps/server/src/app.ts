@@ -25,6 +25,7 @@ import { packRoutes } from './routes/packs';
 import { benchRoutes } from './routes/bench';
 import { phoneRoutes } from './routes/phone';
 import { activityRoutes } from './routes/activities';
+import { discoveryRoutes } from './routes/discovery';
 import './services/phone-bootstrap'; // registers world-clock → phone lifecycle hooks
 
 export interface BuildAppOptions {
@@ -115,6 +116,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       await playerRoutes(api);
       await phoneRoutes(api);
       await activityRoutes(api);
+      await discoveryRoutes(api);
       await dataRoutes(api);
       await packRoutes(api);
       await benchRoutes(api);
