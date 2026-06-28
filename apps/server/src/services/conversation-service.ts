@@ -52,6 +52,7 @@ import {
   type Message,
   type PlayerBreakupResponse,
   type Relationship,
+  type RelationshipStatKey,
   type RelationshipStatus,
   type SessionWithMessages,
 } from '@dsim/shared';
@@ -60,11 +61,12 @@ import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { getRelationship } from './relationship-service';
-import { assertDiscoveryCanStart, isRedacted } from './discovery-service';
+import { assertDiscoveryCanStart, isRedacted, stampMet } from './discovery-service';
+import { getPlacements } from './placement-service';
 import { getOrCreatePlayer, spendMoney } from './player-service';
 import { selectTopMemories } from './memory-service';
 import { addMemoriesFromEvaluation } from './memory-service';
-import { applyRelationshipChange, decayRelationshipBuffs, setRelationshipFlag, stampLastDate } from './stat-service';
+import { applyRelationshipChange, decayRelationshipBuffs, setRelationshipFlag, stampLastDate, stampLastSeen } from './stat-service';
 import { assertCanAct, ensureWorldState, spendStamina } from './world-clock-service';
 import { propertyVenueInfo } from './property-service';
 import { getCharacterAvailability } from './availability-service';
@@ -146,9 +148,19 @@ export function createSession(input: ConversationCreate): ConversationSession {
   // not a real id) is resolved to a concrete venue inside the date block below; it
   // never reaches a chat or worldless session as a literal location.
   let resolvedLocationId: string | null = input.locationId ?? null;
-  // Real meetings (anything but a free-form chat) cost a daily action and require
-  // the character to be available today (world-bound only). 'chat' is exempt.
-  if (input.mode !== 'chat' && character.worldId) {
+  // A Meet (discovery introduction) is PRESENCE-gated, not availability-gated: the
+  // character must actually be at this location right now. It costs stamina (charged at
+  // end) but no venue money, and can't stack on another live date/meet.
+  if (input.mode === 'meet' && character.worldId) {
+    if (getActiveDateForWorld(character.worldId)) throw badRequest("Wrap up what you're already doing first.");
+    const meetState = ensureWorldState(character.worldId);
+    const here = getPlacements(character.worldId, meetState.day, meetState.phase).get(character.id)?.locationId ?? null;
+    if (!input.locationId || here !== input.locationId) throw badRequest(`${character.name} isn't here right now.`);
+    if ((worldsRepo.get(character.worldId)?.discoveryConfig.meetStaminaCost ?? 0) > 0) assertCanAct(character.worldId);
+    resolvedLocationId = input.locationId;
+  } else if (input.mode !== 'chat' && character.worldId) {
+    // Real meetings (anything but a free-form chat) cost a daily action and require
+    // the character to be available today (world-bound only). 'chat' is exempt.
     const day = ensureWorldState(character.worldId).day;
     // A character who just broke up with you needs space before they'll meet
     // again — keep texting them to thaw things; the date reopens after a cooldown.
@@ -231,7 +243,7 @@ export function getSessionWithMessages(id: string): SessionWithMessages {
  */
 export function getActiveDateForWorld(worldId: string): ActiveDate | null {
   for (const s of sessionsRepo.listActive()) {
-    if (s.mode !== 'date' && s.mode !== 'event') continue;
+    if (s.mode !== 'date' && s.mode !== 'event' && s.mode !== 'meet') continue;
     const character = charactersRepo.get(s.characterId);
     if (!character || character.worldId !== worldId) continue;
     const rapport = peekRapport(s.id);
@@ -415,7 +427,7 @@ function isFirstMeeting(session: ConversationSession, relationship: Relationship
     .some(
       (s) =>
         s.id !== session.id &&
-        (s.mode === 'date' || s.mode === 'event') &&
+        (s.mode === 'date' || s.mode === 'event' || s.mode === 'meet') &&
         messagesRepo.hasRole(s.id, 'player'),
     );
 }
@@ -666,7 +678,7 @@ export async function attemptWalkout(
   signal?: AbortSignal,
 ): Promise<WalkoutOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  if (session.ended || session.mode === 'chat' || session.mode === 'meet') return null;
   const character = getCharacter(session.characterId);
   const relationship = getRelationship(character.id);
 
@@ -842,7 +854,7 @@ export interface LeaveOutcome {
  */
 export async function maybeLeaveForLostInterest(sessionId: string, signal?: AbortSignal): Promise<LeaveOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  if (session.ended || session.mode === 'chat' || session.mode === 'meet') return null;
   if (!hasLostInterest(sessionId)) return null;
 
   const character = getCharacter(session.characterId);
@@ -921,7 +933,7 @@ export async function attemptPlayerBreakupIntent(
   signal?: AbortSignal,
 ): Promise<BreakupIntentOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  if (session.ended || session.mode === 'chat' || session.mode === 'meet') return null;
   if (!BREAKUP_INTENT_RE.test(playerText)) return null;
 
   const character = getCharacter(session.characterId);
@@ -980,7 +992,7 @@ export async function attemptPlayerFarewell(
   signal?: AbortSignal,
 ): Promise<FarewellOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  if (session.ended || session.mode === 'chat' || session.mode === 'meet') return null;
   if (!FAREWELL_INTENT_RE.test(playerText)) return null;
 
   const character = getCharacter(session.characterId);
@@ -1159,6 +1171,34 @@ export async function maybeAutoSummarize(sessionId: string): Promise<void> {
  * only if the structured result validates. On failure, no game state is
  * mutated by the evaluation (the session is still marked ended).
  */
+/** A Meet's bounded first-impression: read the live rapport and nudge a few points.
+ *  Positive routes through curiosity (uncapped) + a little comfort; a bad vibe dings
+ *  tension/comfort. Affection/chemistry stay date-only. All clamped to ~±3. */
+function applyMeetImpression(sessionId: string, characterId: string): Relationship {
+  const rapport = peekRapport(sessionId) ?? 50;
+  const signed = Math.max(-3, Math.min(3, Math.round((rapport - 50) / 12)));
+  const deltas: Partial<Record<RelationshipStatKey, number>> = {};
+  if (signed > 0) {
+    deltas.curiosity = signed;
+    deltas.comfort = Math.ceil(signed / 2);
+  } else if (signed < 0) {
+    deltas.tension = -signed;
+    deltas.comfort = signed;
+  }
+  return applyRelationshipChange(characterId, deltas, { source: 'meet', detail: { rapport } });
+}
+
+/** Record the introduction as one memory the character can reference later. */
+function writeMeetMemory(session: ConversationSession, character: Character, day: number): void {
+  const playerName = getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name;
+  const loc = character.worldId
+    ? worldsRepo.get(character.worldId)?.locations.find((l) => l.id === session.locationId)
+    : null;
+  const where = loc ? ` at ${loc.name}` : '';
+  const event = recordEvent('meet', { characterId: character.id, locationId: session.locationId, day });
+  addMemoriesFromEvaluation(character.id, [{ text: `Met ${playerName}${where}.`, importance: 2, tags: ['met_people'] }], event.id);
+}
+
 export async function endSession(sessionId: string): Promise<EndSessionResponse> {
   const session = getSession(sessionId);
   const messages = messagesRepo.listBySession(sessionId);
@@ -1285,6 +1325,24 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
       reconciled: false,
       ending: null,
     };
+  }
+
+  // A MEET (discovery introduction) has NO evaluator: charge the meet's stamina, apply a
+  // small bounded first-impression, unlock the character, and write one memory — then done.
+  // No last-DATE stamp, jealousy roll, or evaluator deltas (those are date/event only).
+  if (session.mode === 'meet') {
+    let relationship: Relationship | null = null;
+    if (endActor.worldId) {
+      const day = ensureWorldState(endActor.worldId).day;
+      const cost = Math.max(0, worldsRepo.get(endActor.worldId)?.discoveryConfig.meetStaminaCost ?? 0);
+      if (cost > 0) spendStamina(endActor.worldId, cost);
+      stampLastSeen(session.characterId, day);
+      relationship = applyMeetImpression(sessionId, session.characterId);
+      stampMet(session.characterId, day, session.locationId);
+      writeMeetMemory(session, endActor, day);
+    }
+    clearRapport(sessionId);
+    return endBase(false, null, { relationship, memoriesWritten: endActor.worldId ? 1 : 0 });
   }
 
   // Claimed: commit the one-time end costs (runs exactly once per session).

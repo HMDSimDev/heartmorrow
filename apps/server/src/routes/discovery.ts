@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
+import type { Phase } from '@dsim/shared';
 import { badRequest, notFound } from '../lib/errors';
 import { getWorld } from '../services/world-service';
 import { requireFeature } from '../services/world-feature-service';
 import { ensureWorldState } from '../services/world-clock-service';
 import { composeLocationScene, getPlacements, isLocationOpen } from '../services/placement-service';
 import { isRedacted, stampGlimpsed } from '../services/discovery-service';
+import { enterRoom, roomSay } from '../services/room-service';
 import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 
 /**
@@ -70,6 +72,39 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
         if (isRedacted(worldId, o.characterId)) stampGlimpsed(o.characterId, locationId);
       }
       return { location: loc, day: state.day, phase: state.phase, occupants: scene.occupants, clusters: scene.clusters };
+    },
+  );
+
+  // Enter a location's CHAT: costs one action; returns the opening scene + who's present.
+  app.post(
+    '/around-town/enter',
+    { schema: docSchema({ tags: ['discovery'], summary: "Enter a location's chat (costs one action)" }) },
+    async (req) => {
+      const { worldId, locationId } = req.body as { worldId?: string; locationId?: string };
+      if (!worldId || !locationId) throw badRequest('worldId and locationId are required.');
+      requireFeature(worldId, 'discovery');
+      return enterRoom(worldId, locationId);
+    },
+  );
+
+  // One turn of a location chat: the model voices the room; flagged introductions unlock people.
+  app.post(
+    '/around-town/say',
+    { schema: docSchema({ tags: ['discovery'], summary: 'Send a line to a location chat' }) },
+    async (req) => {
+      const { worldId, locationId, day, phase, history, text } = req.body as {
+        worldId?: string;
+        locationId?: string;
+        day?: number;
+        phase?: Phase;
+        history?: Array<{ role: 'player' | 'room'; text: string }>;
+        text?: string;
+      };
+      if (!worldId || !locationId || !text?.trim() || typeof day !== 'number' || !phase) {
+        throw badRequest('worldId, locationId, day, phase and text are required.');
+      }
+      requireFeature(worldId, 'discovery');
+      return roomSay(worldId, locationId, day, phase, Array.isArray(history) ? history : [], text);
     },
   );
 }

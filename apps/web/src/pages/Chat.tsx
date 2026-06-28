@@ -1110,6 +1110,7 @@ export function Chat() {
   // The date is over (evaluated or any terminal path) → no more composing, and the
   // actions collapse to "New date". Mirrors dateConcluded so the lock clears in step.
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
+  const isMeet = session.mode === 'meet'; // a discovery introduction — evaluator-less, reveal on end
   const locationName = session.locationId
     ? session.locationId.startsWith('room:')
       ? t('chat.loc.room', { name: character.name })
@@ -1153,6 +1154,16 @@ export function Chat() {
 
   // Compute the single most-important outcome to surface. Only one is shown at a time.
   const primaryOutcome = (() => {
+    if (isMeet && evalResult) {
+      return (
+        <div className="date-moment date-moment-milestone">
+          <div className="date-moment-seal" aria-hidden="true">✦</div>
+          <div className="date-moment-kicker">{t('chat.metKicker')}</div>
+          <div className="date-moment-title">{t('chat.metTitle', { name: character.name })}</div>
+          <p className="date-moment-body">{t('chat.metBody', { name: character.name })}</p>
+        </div>
+      );
+    }
     if (evalResult?.ending) {
       return (
         <div className="date-moment date-moment-ending">
@@ -1327,16 +1338,20 @@ export function Chat() {
               </button>
             ) : spokeThisSession ? (
               <>
-                <button className="btn sm block" onClick={summarize} disabled={busy || streaming.active}>
-                  <Icon name="recap" size={14} /> {t('chat.recap')}
-                </button>
+                {!isMeet && (
+                  <button className="btn sm block" onClick={summarize} disabled={busy || streaming.active}>
+                    <Icon name="recap" size={14} /> {t('chat.recap')}
+                  </button>
+                )}
                 <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active}>
-                  {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t('chat.endEvaluate')}</>}
+                  {busy
+                    ? isMeet ? t('chat.wrappingUp') : t('chat.evaluating')
+                    : <><Icon name={isMeet ? 'leave' : 'end'} size={14} /> {isMeet ? t('chat.endMeet') : t('chat.endEvaluate')}</>}
                 </button>
               </>
             ) : (
               <button className="btn ghost block date-end-btn" onClick={cancelDate} disabled={busy || streaming.active}>
-                {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {t('chat.cancelDate')}</>}
+                {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {isMeet ? t('chat.leaveMeet') : t('chat.cancelDate')}</>}
               </button>
             )}
           </div>

@@ -453,6 +453,18 @@ export const WorldSimColorSchema = z.object({
 export type WorldSimColor = z.infer<typeof WorldSimColorSchema>;
 
 /**
+ * One turn of a LOCATION room chat (discovery): the model voices the narrator + every
+ * character present, in short in-world prose. `introduced` lists the ids of present
+ * characters the player just met (names exchanged) this turn — the server unlocks those.
+ * UNMET people must be referred to by description, never by name, until introduced.
+ */
+export const RoomTurnSchema = z.object({
+  reply: z.string().min(1).max(GEN_TEXT.prose),
+  introduced: z.array(z.string().min(1)).max(8).default([]),
+});
+export type RoomTurn = z.infer<typeof RoomTurnSchema>;
+
+/**
  * Ex-canonization extraction: facts a character STATED about their ex on a date.
  * Categories are RESTRICTED to the lowest-corruption surfaces (no belief /
  * personality / history). `sourceQuote` is REQUIRED and the server verifies it is
