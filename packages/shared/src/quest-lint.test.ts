@@ -7,6 +7,7 @@ import {
   isWinReachableTiered,
   reachableNodeIds,
   actableNodeIds,
+  simulateQuestSolvable,
   entryEntityIds,
   resolveQuestAction,
   initialQuestState,
@@ -524,6 +525,30 @@ describe('conditionals — preconditions + compound predicates + per-scene entit
     expect(blocking(graph)).toHaveLength(0);
   });
 
+  it('credits a fireable endScene→resolved as a win path (a dead win goal is then only a warning)', () => {
+    // An explicit success-ending (endScene resolved on a desperate approach) makes the quest
+    // winnable even though the lone win goal is wired to a flag nothing sets.
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 5,
+      nodes: [{ id: 'a', setup: 'A door.', entities: [], affordances: [{ verb: 'force', stat: 'grit', difficulty: 'desperate', hint: 'Shoulder it open.', effects: { success: [{ op: 'endScene', status: 'resolved' }], partial: [{ op: 'endScene', status: 'resolved' }], fail: [], complication: [] } }], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'Get out', predicate: { kind: 'flag', flag: 'never_set' } }],
+    });
+    expect(isWinReachableTiered(graph)).toBe(true); // the endScene is the win
+    expect(blocking(graph)).toHaveLength(0); // the dead goal downgrades to a warning, not a block
+  });
+
+  it('does NOT credit an endScene that cannot fire (wrong band / unactable node)', () => {
+    // endScene on a `normal` approach is tier-gated (spine needs desperate) → not a win path.
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 5,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [{ verb: 'force', stat: 'grit', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'endScene', status: 'resolved' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'never_set' } }],
+    });
+    expect(isWinReachableTiered(graph)).toBe(false);
+  });
+
   it('a def-satisfied entity win confined to a TERMINAL room is flagged (it can never fire)', () => {
     // foe starts 'ally' in roomB, win = entityFaction foe=ally, but roomB is terminal → arriving
     // resolves the scene before the goal check, so the win never fires. Must be caught.
@@ -538,6 +563,78 @@ describe('conditionals — preconditions + compound predicates + per-scene entit
     });
     expect(isWinReachableTiered(graph)).toBe(false); // not a false-pass anymore
     expect(blocking(graph).length).toBeGreaterThan(0);
+  });
+});
+
+describe('simulateQuestSolvable (the bench winnability probe — drives the real referee)', () => {
+  it('solves a multi-room gated quest (gating order, per-scene entity, compound AND win)', () => {
+    // ask (sets asked) → unlocks move-boxes (sets boxes_moved) → unlocks the desperate move to
+    // roomB → ask the porter (sets asked_porter) → unlocks aid (sets helped) → win all[boxes,helped].
+    const graph = g({
+      entryNodeId: 'roomA',
+      maxTurns: 14,
+      nodes: [
+        {
+          id: 'roomA', kind: 'scene', setup: 'Mira among crates.',
+          entities: [{ id: 'mira', name: 'Mira', faction: 'party', disposition: 30 }],
+          affordances: [
+            { verb: 'talk', stat: 'charm', difficulty: 'normal', hint: 'Ask what is wrong.', effects: { success: [{ op: 'setFlag', flag: 'asked' }], partial: [], fail: [], complication: [] } },
+            { verb: 'force', stat: 'grit', difficulty: 'normal', hint: 'Move boxes.', when: { kind: 'flag', flag: 'asked' }, effects: { success: [{ op: 'setFlag', flag: 'boxes_moved' }], partial: [], fail: [], complication: [] } },
+            { verb: 'move', stat: 'grit', difficulty: 'desperate', hint: 'Head back.', when: { kind: 'flag', flag: 'boxes_moved' }, effects: { success: [{ op: 'moveToNode', nodeId: 'roomB' }], partial: [{ op: 'moveToNode', nodeId: 'roomB' }], fail: [], complication: [] } },
+          ],
+          edges: [], isTerminal: false,
+        },
+        {
+          id: 'roomB', kind: 'scene', setup: 'A porter waits.',
+          entities: [{ id: 'porter', name: 'Porter', faction: 'neutral', disposition: 0 }],
+          affordances: [
+            { verb: 'talk', stat: 'charm', difficulty: 'normal', hint: 'Ask what is needed.', effects: { success: [{ op: 'setFlag', flag: 'asked_porter' }], partial: [], fail: [], complication: [] } },
+            { verb: 'aid', stat: 'empathy', difficulty: 'normal', hint: 'Help.', when: { kind: 'flag', flag: 'asked_porter' }, effects: { success: [{ op: 'setFlag', flag: 'helped' }], partial: [], fail: [], complication: [] } },
+          ],
+          edges: [], isTerminal: false,
+        },
+      ],
+      goals: [{ id: 'win', kind: 'flag', outcome: 'win', label: 'Help both', predicate: { kind: 'all', clauses: [{ kind: 'flag', flag: 'boxes_moved' }, { kind: 'flag', flag: 'helped' }] } }],
+    });
+    const r = simulateQuestSolvable(graph);
+    expect(r.solvable).toBe(true);
+    expect(r.turns).toBeGreaterThan(0);
+  });
+
+  it('a tier-gated win (faction flip on a `normal` approach) is NOT solvable, but is on `hard`', () => {
+    expect(simulateQuestSolvable(factionFlipOnBand('normal')).solvable).toBe(false); // the flip never fires
+    expect(simulateQuestSolvable(factionFlipOnBand('hard')).solvable).toBe(true);
+  });
+
+  it('a win wired to a flag nothing sets is NOT solvable', () => {
+    const graph = g({
+      entryNodeId: 'a',
+      maxTurns: 6,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [{ verb: 'inspect', stat: 'intellect', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'other' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'never' } }],
+    });
+    expect(simulateQuestSolvable(graph).solvable).toBe(false);
+  });
+
+  it('a fireable endScene→resolved is solvable; an auto-lose quest is not', () => {
+    const ending = g({
+      entryNodeId: 'a',
+      maxTurns: 5,
+      nodes: [{ id: 'a', setup: 'A door.', entities: [], affordances: [{ verb: 'force', stat: 'grit', difficulty: 'desperate', hint: 'open', effects: { success: [{ op: 'endScene', status: 'resolved' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'out', predicate: { kind: 'flag', flag: 'never' } }],
+    });
+    expect(simulateQuestSolvable(ending).solvable).toBe(true);
+
+    const autoLose = g({
+      entryNodeId: 'a',
+      maxTurns: 5,
+      nodes: [{ id: 'a', setup: 'x', entities: [], affordances: [{ verb: 'inspect', stat: 'intellect', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'won' }], partial: [], fail: [], complication: [] } }], edges: [], isTerminal: false }],
+      goals: [
+        { id: 'w', kind: 'flag', outcome: 'win', label: 'W', predicate: { kind: 'flag', flag: 'won' } },
+        { id: 'l', kind: 'flag', outcome: 'lose', label: 'L', predicate: { kind: 'always' } },
+      ],
+    });
+    expect(simulateQuestSolvable(autoLose).solvable).toBe(false); // lose fires before any win
   });
 });
 

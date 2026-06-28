@@ -60,7 +60,8 @@ import {
   resolveQuestAction,
   initialQuestState,
   boundQuestGraph,
-  isWinReachable,
+  simulateQuestSolvable,
+  lintQuestGraph,
   BenchCaseMetaSchema,
   type BenchCaseMeta,
   type BenchCaseKind,
@@ -528,6 +529,41 @@ const QUEST_VERB_OPTIONS = [
 const QUEST_SCENE_LINES: BenchTranscriptLine[] = [
   { speaker: 'narrator', name: '', text: benchQuestNode.setup },
 ];
+
+/** Generation quality gate for a drafted quest: beyond schema validity, the bounded graph
+ *  must be ACTUALLY WINNABLE — proven by driving the real referee to a win ({@link
+ *  simulateQuestSolvable}), not the old static heuristic. Measures the RAW model output
+ *  (boundQuestGraph only; NOT the production autofix/repair pipeline) so the bench reflects a
+ *  model's unaided ability. Returns a fail reason, or null when the quest is winnable. */
+function validateGeneratedQuestWinnable(data: unknown): string | null {
+  try {
+    const g = boundQuestGraph((data as { graph?: unknown }).graph);
+    if (!g.nodes.some((n) => n.affordances.length > 0)) return 'No affordances — there’s nothing the player can try.';
+    if (!g.nodes.some((n) => n.affordances.some((a) => a.effects.success.length > 0))) return 'No success effects — nothing the player can actually achieve.';
+    // The real gate: can the engine be driven to a win? (catches tier-gating, precondition
+    // order, the stall/turn budgets, compound goals, per-scene entities, and endScene endings).
+    if (!simulateQuestSolvable(g).solvable) {
+      const blocking = lintQuestGraph(g, { partnerId: null }).find((p) => p.severity === 'blocking');
+      return blocking ? `Unwinnable: ${blocking.message}` : 'Unwinnable — no sequence of approaches reaches a win.';
+    }
+    return null;
+  } catch {
+    return 'Produced a structurally invalid quest graph.';
+  }
+}
+
+/** The branching case additionally requires the model to EXPRESS the gated/multi-step
+ *  structure the idea demands ("do part 1 before part 2") — a precondition, a route, or a
+ *  second scene — not collapse it to one ungated scene. (Still must be winnable.) */
+function validateGeneratedBranchingQuest(data: unknown): string | null {
+  const winnable = validateGeneratedQuestWinnable(data);
+  if (winnable) return winnable;
+  const g = boundQuestGraph((data as { graph?: unknown }).graph);
+  const branched =
+    g.nodes.length > 1 ||
+    g.nodes.some((n) => n.edges.length > 0 || n.affordances.some((a) => a.when));
+  return branched ? null : 'No gating — the model collapsed a two-part, "do this before that" idea into a single ungated scene.';
+}
 
 // Each script has at least the max slider's worth of turns (12) so a scripted run
 // is never silently truncated below the requested dialogueTurns.
@@ -1511,19 +1547,36 @@ export const BENCH_CASES: BenchCaseDef[] = [
       task: 'Generate a single-scene Wayfarer quest.',
       maxTokens: 2400,
     }),
-    // Beyond schema validity: the bounded graph must be RUNNABLE — at least one
-    // affordance, a success the player can land, and a reachable win goal.
-    validate: (data) => {
-      try {
-        const g = boundQuestGraph((data as { graph?: unknown }).graph);
-        if (!g.nodes.some((n) => n.affordances.length > 0)) return 'No affordances — there’s nothing the player can try.';
-        if (!g.nodes.some((n) => n.affordances.some((a) => a.effects.success.length > 0))) return 'No success effects — nothing the player can actually achieve.';
-        if (!isWinReachable(g)) return 'No reachable win — the win goal is wired to something no effect can satisfy.';
-        return null;
-      } catch {
-        return 'Produced a structurally invalid quest graph.';
-      }
+    // Beyond schema validity: prove the quest is ACTUALLY WINNABLE by driving the real
+    // referee to a win (not the old static heuristic, which was tier-/connectivity-blind).
+    validate: validateGeneratedQuestWinnable,
+  },
+  {
+    id: 'quest_generate_branching',
+    label: 'Quest generation — branching',
+    description: 'Draft a MULTI-STEP quest from a journey idea (help in one place unlocks the way onward to a second place with its own person). Tests whether the model can chain preconditions + a player-chosen move + a second scene and still produce a WINNABLE quest. "Pass" = the referee can be driven to a win.',
+    kind: 'generation',
+    group: 'Wayfarer quests',
+    setup: {
+      characterName: '',
+      characterBrief: '',
+      relationshipLine: '',
+      note: 'Idea: clear the jammed winch on the pier, which opens the way down to the tide-cellar, where an old diver needs a hand sealing the flood gate before the tide turns.',
+      transcript: [],
     },
+    structured: () => ({
+      messages: buildQuestGenMessages({
+        world: benchWorld,
+        prompt:
+          'A two-part harbor errand: first help the harbormaster clear a jammed winch on the pier; doing that opens the way down to the tide-cellar, where an old diver needs help sealing the flood gate before the tide turns. The player should have to do the first part before they can go down.',
+        partnerName: null,
+      }),
+      schema: QuestGenSchema,
+      schemaName: 'QuestGen',
+      task: 'Generate a branching (multi-scene, gated) Wayfarer quest.',
+      maxTokens: 2400,
+    }),
+    validate: validateGeneratedBranchingQuest,
   },
   {
     id: 'quest_narrate',

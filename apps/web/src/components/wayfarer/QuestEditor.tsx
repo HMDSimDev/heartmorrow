@@ -548,6 +548,20 @@ export function QuestEditor({ worldId, draft: initial, onClose, onSaved }: { wor
           route can check it — that’s how you connect “what happened” to “the quest is won”. Bigger effects (a side
           switch, money, ending the scene) only fire on <strong>harder</strong> approaches.
         </p>
+        <p>
+          <strong>Unlocks &amp; branching.</strong> Tick <strong>“Available only when…”</strong> on an approach to
+          gate it — it shows up only once a condition holds (usually a flag an earlier approach set). That’s how you
+          build a chain: <em>ask → that sets a flag → now “help” is available</em>. To let the player <em>choose</em> to
+          move on, add a second scene (the <strong>＋ Scene</strong> button on the map), then a <strong>Move</strong>
+          approach whose effect is <strong>“Go to another scene”</strong>, gated by “Available only when…”. (A
+          <strong>route</strong> jumps scenes automatically when its condition holds; a gated Move is the player’s call.)
+        </p>
+        <p>
+          <strong>Multiple conditions.</strong> Any condition (a goal’s “met when”, a route, or “Available only when…”)
+          starts as one check with a <strong>＋ require another</strong> button. Click it to add a second — they group
+          into a <strong>Match All of (AND)</strong> set you can flip to <strong>Any of (OR)</strong>. A win that needs
+          two things done is just both their flags under <em>All of</em>.
+        </p>
       </details>
 
       {problems.length > 0 && (
@@ -770,7 +784,7 @@ function NodeCard({
         {node.edges.map((edge, gi) => (
           <div key={gi} className="wf-ed-line wf-ed-edge">
             <span className="wf-ed-when">when</span>
-            <PredicateRow predicate={edge.when} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((n) => fn(n.edges[gi]!.when))} />
+            <ConditionEditor predicate={edge.when} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((n) => fn(n.edges[gi]!.when))} />
             <span className="wf-ed-when">→</span>
             <select value={edge.to} onChange={(e) => onChange((n) => (n.edges[gi]!.to = e.target.value))}>
               {nodeIds.map((id) => <option key={id} value={id}>{id}</option>)}
@@ -837,18 +851,23 @@ function AffordanceCard({
       </div>
       {open && (<>
         <input className="wf-ed-hint" placeholder="hint — what the player might try (shown to them)" value={aff.hint} onChange={(e) => onChange((a) => (a.hint = e.target.value))} />
-        {/* Optional precondition: this approach is offered only when the condition holds (a
-            gate / unlock). For a one-shot, gate on a flag's "not" + set that flag here. */}
-        <div className="wf-ed-line wf-ed-when">
-          <label className="wf-ed-check" title="When ticked, this approach only appears once the condition is met — a gate/unlock. Leave off for always-available.">
+        {/* Optional precondition (a GATE/UNLOCK): this approach is OFFERED only once the
+            condition holds. A gated "Move" approach is how you make a player-chosen branch;
+            a one-shot = gate on a flag's "not" + have this approach set that flag. */}
+        <div className={`wf-ed-cond${aff.when ? ' on' : ''}`}>
+          <label className="wf-ed-check" title="Gate this approach behind a condition — it appears only once that condition holds (an unlock). Leave off = always available. Tip: a gated ‘Move’ approach is a player-chosen branch.">
             <input
               type="checkbox"
               checked={!!aff.when}
               onChange={(e) => onChange((a) => { a.when = e.target.checked ? { kind: 'flag', flag: '' } : undefined; })}
             />{' '}
-            Available when…
+            Available only when…
           </label>
-          {aff.when && <PredicateRow predicate={aff.when} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((a) => fn(a.when!))} />}
+          {aff.when ? (
+            <ConditionEditor predicate={aff.when} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((a) => fn(a.when!))} />
+          ) : (
+            <span className="hint wf-ed-cond-hint">a gate/unlock — shown once a condition holds (e.g. a flag an earlier approach sets). Off = always available.</span>
+          )}
         </div>
         {noSuccess && (
           <div className="wf-ed-prob warn"><Icon name="info" size={12} /> Nothing happens on success — the player can’t make progress this way.</div>
@@ -1039,7 +1058,7 @@ function GoalCard({
       </div>
       <div className="wf-ed-line">
         <span className="wf-ed-when">met when</span>
-        <PredicateRow predicate={goal.predicate} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((g) => fn(g.predicate))} />
+        <ConditionEditor predicate={goal.predicate} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((g) => fn(g.predicate))} />
       </div>
     </section>
   );
@@ -1047,51 +1066,101 @@ function GoalCard({
 
 // --- predicate -------------------------------------------------------------
 
-function PredicateRow({
-  predicate, nodeIds, allEntities, onChange, leafOnly,
+/** The condition builder used by goals, routes, and approach preconditions. Presents a
+ *  predicate as ONE condition by default, with a clear "＋ Require another" button; once
+ *  there are two or more, a Match All / Match Any toggle appears. The AND/OR combinator is
+ *  NEVER hidden in the kind dropdown. Stored shape stays minimal — one condition is a bare
+ *  leaf, two+ is an all/any compound — so it round-trips and existing quests load unchanged. */
+function ConditionEditor({
+  predicate, nodeIds, allEntities, onChange,
 }: {
   predicate: StatePredicate;
   nodeIds: string[];
   allEntities: { id: string; label: string }[];
   onChange: (fn: (p: StatePredicate) => void) => void;
-  /** A clause inside a compound — may not itself be compound (one level deep). */
-  leafOnly?: boolean;
 }) {
-  const num = (v: string) => (v === '' ? 0 : Number(v));
-  const kinds = leafOnly ? LEAF_PREDICATE_KINDS : PREDICATE_KINDS;
-  return (
-    <span className="wf-ed-pred">
-      <select
-        value={predicate.kind}
-        onChange={(e) =>
-          onChange((p) => {
-            const k = e.target.value as StatePredicate['kind'];
-            p.kind = k;
-            if (k === 'all' || k === 'any') {
-              if (!p.clauses || p.clauses.length === 0) p.clauses = [{ kind: 'flag', flag: '' }];
-            } else {
-              delete p.clauses; // a leaf carries no clauses
-            }
-          })
-        }
-      >
-        {kinds.map((k) => <option key={k} value={k}>{PREDICATE_LABEL[k] ?? k}</option>)}
-      </select>
+  const LEAF_FIELDS = ['flag', 'entityId', 'faction', 'itemId', 'nodeId', 'op', 'value', 'negate'] as const;
+  const compound = predicate.kind === 'all' || predicate.kind === 'any';
 
-      {(predicate.kind === 'all' || predicate.kind === 'any') && (
-        <span className="wf-ed-compound">
-          <label className="wf-ed-check"><input type="checkbox" checked={!!predicate.negate} onChange={(e) => onChange((p) => (p.negate = e.target.checked))} /> not</label>
-          {(predicate.clauses ?? []).map((_, i) => (
-            <span key={i} className="wf-ed-line wf-ed-compound-clause">
-              <PredicateRow predicate={predicate.clauses![i]!} nodeIds={nodeIds} allEntities={allEntities} leafOnly onChange={(fn) => onChange((p) => fn(p.clauses![i]!))} />
-              <button className="btn danger sm" title="Remove condition" onClick={() => onChange((p) => { p.clauses!.splice(i, 1); })}><Icon name="trash" size={11} /></button>
-            </span>
-          ))}
-          <button className="btn ghost sm wf-ed-add" onClick={() => onChange((p) => { p.clauses = p.clauses ?? []; p.clauses.push({ kind: 'flag', flag: '' }); })}>
-            <Icon name="plus" size={11} /> condition
+  if (!compound) {
+    // One condition: the leaf editor + an obvious "require another" (→ wraps into All-of).
+    return (
+      <span className="wf-ed-condwrap">
+        <PredicateRow predicate={predicate} nodeIds={nodeIds} allEntities={allEntities} onChange={onChange} />
+        <button
+          className="btn ghost sm wf-ed-add"
+          title="Also require a second condition (combine with AND)"
+          onClick={() =>
+            onChange((p) => {
+              const leaf: StatePredicate = { kind: p.kind, flag: p.flag, entityId: p.entityId, faction: p.faction, itemId: p.itemId, nodeId: p.nodeId, op: p.op, value: p.value, negate: p.negate };
+              for (const f of LEAF_FIELDS) delete (p as Record<string, unknown>)[f];
+              p.kind = 'all';
+              p.clauses = [leaf, { kind: 'flag', flag: '' }];
+            })
+          }
+        >
+          <Icon name="plus" size={11} /> require another
+        </button>
+      </span>
+    );
+  }
+
+  const clauses = predicate.clauses ?? [];
+  return (
+    <span className="wf-ed-condgroup">
+      <span className="wf-ed-condgroup-head">
+        <span className="wf-ed-when">match</span>
+        <select className="wf-ed-match" value={predicate.kind} onChange={(e) => onChange((p) => (p.kind = e.target.value as StatePredicate['kind']))}>
+          <option value="all">All of (AND)</option>
+          <option value="any">Any of (OR)</option>
+        </select>
+        <label className="wf-ed-check" title="Invert the whole group"><input type="checkbox" checked={!!predicate.negate} onChange={(e) => onChange((p) => (p.negate = e.target.checked))} /> not</label>
+      </span>
+      {clauses.map((_, i) => (
+        <span key={i} className="wf-ed-line wf-ed-compound-clause">
+          <PredicateRow predicate={clauses[i]!} nodeIds={nodeIds} allEntities={allEntities} onChange={(fn) => onChange((p) => fn(p.clauses![i]!))} />
+          <button
+            className="btn danger sm"
+            title="Remove this condition"
+            onClick={() =>
+              onChange((p) => {
+                p.clauses!.splice(i, 1);
+                // Collapse back to a bare leaf when only one condition remains.
+                if (p.clauses!.length === 1) {
+                  const only = p.clauses![0]!;
+                  delete p.clauses;
+                  Object.assign(p, { kind: only.kind, flag: only.flag, entityId: only.entityId, faction: only.faction, itemId: only.itemId, nodeId: only.nodeId, op: only.op, value: only.value, negate: only.negate });
+                }
+              })
+            }
+          >
+            <Icon name="trash" size={11} />
           </button>
         </span>
-      )}
+      ))}
+      <button className="btn ghost sm wf-ed-add" onClick={() => onChange((p) => { p.clauses = p.clauses ?? []; p.clauses.push({ kind: 'flag', flag: '' }); })}>
+        <Icon name="plus" size={11} /> condition
+      </button>
+    </span>
+  );
+}
+
+/** A single LEAF condition row (one kind + its operands). Compounding is handled by
+ *  {@link ConditionEditor}, so the kind dropdown only ever offers leaf kinds. */
+function PredicateRow({
+  predicate, nodeIds, allEntities, onChange,
+}: {
+  predicate: StatePredicate;
+  nodeIds: string[];
+  allEntities: { id: string; label: string }[];
+  onChange: (fn: (p: StatePredicate) => void) => void;
+}) {
+  const num = (v: string) => (v === '' ? 0 : Number(v));
+  return (
+    <span className="wf-ed-pred">
+      <select value={predicate.kind} onChange={(e) => onChange((p) => { p.kind = e.target.value as StatePredicate['kind']; })}>
+        {LEAF_PREDICATE_KINDS.map((k) => <option key={k} value={k}>{PREDICATE_LABEL[k] ?? k}</option>)}
+      </select>
 
       {predicate.kind === 'flag' && (
         <>

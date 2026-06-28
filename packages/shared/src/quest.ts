@@ -1481,21 +1481,87 @@ function predicateTierReachable(
   return leafTierReachable(p, graph, reachable, actable, roster, sites);
 }
 
+/** A reachable, FIREABLE `endScene` with status 'resolved' is itself a WIN path: the runtime
+ *  frames a goal-less `resolved` ending as a success (see `sceneViewFor`), so a quest can be
+ *  won via an explicit success-ending even when no win GOAL is reachable. Requires the endScene
+ *  to actually fire (an actable node, a satisfiable precondition, and — endScene being a spine
+ *  effect — a `desperate` approach), mirroring the referee. (Bare terminal-node ARRIVAL also
+ *  resolves as a win at runtime, but we deliberately don't credit it here — that's the
+ *  accidental instant-win footgun the terminal-node lint/autofix guards against.) */
+function hasResolvedEnding(graph: QuestGraph, actable: Set<string>, roster: Set<string>, sites: EffectSite[]): boolean {
+  return sites.some((s) => s.effect.op === 'endScene' && (s.effect.status ?? 'resolved') === 'resolved' && siteCanFire(s, actable, roster, graph, sites));
+}
+
 /**
- * Like {@link isWinReachable}, but a win goal only counts as reachable if SOMETHING can
- * actually produce its state at runtime: a tier-unlocked effect, in a reachable+actable node,
- * behind a satisfiable precondition, against an entity that exists on a reachable path, with
- * enough magnitude for a threshold and a survive-turn within the budget — recursing AND/OR
- * compound goals. This decides whether the ensureWinGoal backup net needs to fire.
+ * Like {@link isWinReachable}, but a win only counts if SOMETHING can actually produce a WIN
+ * at runtime: a win goal whose state a tier-unlocked effect can reach (in a reachable+actable
+ * node, behind a satisfiable precondition, against a reachable-path entity, with enough
+ * threshold magnitude / survive-turn budget — recursing AND/OR goals), OR a fireable
+ * `endScene`-resolved success-ending. This decides whether the ensureWinGoal backup net fires.
  */
 export function isWinReachableTiered(graph: QuestGraph): boolean {
-  const wins = graph.goals.filter((g) => g.outcome === 'win');
-  if (wins.length === 0) return false;
   const reachable = reachableNodeIds(graph);
   const actable = actableNodeIds(graph);
   const roster = reachableEntityIds(graph);
   const sites = effectSites(graph);
+  if (hasResolvedEnding(graph, actable, roster, sites)) return true; // an explicit success-ending wins
+  const wins = graph.goals.filter((g) => g.outcome === 'win');
+  if (wins.length === 0) return false;
   return wins.some((g) => predicateTierReachable(g.predicate, graph, reachable, actable, roster, sites));
+}
+
+/**
+ * SOLVABILITY probe — can an optimal player actually be DRIVEN to a win, executing the REAL
+ * referee end-to-end? A bounded breadth-first search over the available approaches at each
+ * state (each tried with a FORCED success roll), deduping on a serialized state key, capped so
+ * a pathological graph can't run away. This is the ground-truth winnability check: unlike the
+ * static {@link isWinReachableTiered}, it runs the actual engine, so it accounts for gating
+ * order, per-scene entity loading, the stall + maxTurns budgets, compound goals, and
+ * endScene/terminal endings. Returns whether a win is reachable and the shortest winning path
+ * length found. Pure + deterministic.
+ *
+ * Forced-SUCCESS only: a coherent quest should be winnable by succeeding. A quest winnable
+ * ONLY by deliberately failing a check is a design smell this probe intentionally does not
+ * credit (it would report such a quest unsolvable). Used by the Heartmorrow Bench to score
+ * generated quests by ACTUAL winnability, not a static heuristic.
+ */
+export function simulateQuestSolvable(graph: QuestGraph): { solvable: boolean; turns: number } {
+  const start = initialQuestState(graph);
+  const keyOf = (s: QuestState): string =>
+    JSON.stringify([
+      s.nodeId,
+      [...s.flags].sort(),
+      s.entities.map((e) => [e.id, e.faction, e.disposition, e.hp ?? null]),
+      s.inventory.map((i) => [i.itemId, i.qty]).sort(),
+      s.turn,
+    ]);
+  const seen = new Set<string>([keyOf(start)]);
+  const queue: QuestState[] = [start];
+  let budget = 5000; // bound on states explored — real quests explore far fewer
+  while (queue.length > 0 && budget-- > 0) {
+    const state = queue.shift()!;
+    const node = currentNode(graph, state);
+    const available = availableAffordances(node, state);
+    // The player can only ever trigger the FIRST available affordance per verb (matching
+    // resolveQuestAction's selection), so branch over distinct available verbs.
+    const verbs = new Set<QuestVerb>(available.map((a) => a.verb));
+    for (const verb of verbs) {
+      const aff = available.find((a) => a.verb === verb)!;
+      const action = QuestActionSchema.parse({ verb, stat: aff.stat, difficulty: aff.difficulty, proposedEffects: [], rationale: '' });
+      const { newState, outcome } = resolveQuestAction(state, graph, action, 0); // roll 0 → forced success
+      if (outcome.ended) {
+        const won = outcome.endGoal ? outcome.endGoal.outcome === 'win' : outcome.endStatus === 'resolved';
+        if (won) return { solvable: true, turns: newState.turn };
+        continue; // a losing end — a dead branch
+      }
+      const k = keyOf(newState);
+      if (!seen.has(k)) {
+        seen.add(k);
+        queue.push(newState);
+      }
+    }
+  }
+  return { solvable: false, turns: 0 };
 }
 
 /** A short human/LLM-readable rendering of a predicate (compound-aware). */

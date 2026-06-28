@@ -97,8 +97,8 @@ describe('quest lobby + eligibility', () => {
       minWarmthBand: 3,
       graph: QuestGraphSchema.parse({
         entryNodeId: 'n',
-        nodes: [{ id: 'n', setup: '', affordances: [{ verb: 'aid', stat: 'empathy', difficulty: 'normal', hint: '' }] }],
-        goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'always' } }],
+        nodes: [{ id: 'n', setup: 's', affordances: [{ verb: 'aid', stat: 'empathy', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'done' }] } }] }],
+        goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'done' } }],
       }),
     });
     // At baseline warmth the partner gate is closed.
@@ -121,8 +121,8 @@ describe('quest lobby + eligibility', () => {
       minWarmthBand: 2,
       graph: QuestGraphSchema.parse({
         entryNodeId: 'n',
-        nodes: [{ id: 'n', setup: '', affordances: [{ verb: 'aid', stat: 'empathy', difficulty: 'normal', hint: '' }] }],
-        goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'always' } }],
+        nodes: [{ id: 'n', setup: 's', affordances: [{ verb: 'aid', stat: 'empathy', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'done' }] } }] }],
+        goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'done' } }],
       }),
     });
     expect(getRelationshipIfExists(unmet)).toBeUndefined();
@@ -147,6 +147,62 @@ describe('authoring CRUD', () => {
         }),
       }),
     ).toThrow(/win/i);
+  });
+
+  it('enforce: rejects an UNWINNABLE save (win wired to nothing) with the blocking reason', () => {
+    const { world } = seedWorldAndCharacter();
+    const input = {
+      worldId: world.id,
+      name: 'Unwinnable',
+      graph: QuestGraphSchema.parse({
+        entryNodeId: 'n',
+        nodes: [{ id: 'n', setup: 's', affordances: [{ verb: 'inspect', stat: 'wits', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'other' }] } }] }],
+        goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'never_set' } }],
+      }),
+    };
+    // The creator HTTP route enforces coherence → rejected.
+    expect(() => createQuest(input, { enforce: true })).toThrow(/can’t be saved|met|produce/i);
+    // Internal callers (seed/mock/tests) stay lenient → the same graph is allowed.
+    expect(() => createQuest(input)).not.toThrow();
+  });
+
+  it('enforce: rejects an AUTO-LOSE save (lose goal true at the start)', () => {
+    const { world } = seedWorldAndCharacter();
+    expect(() =>
+      createQuest(
+        {
+          worldId: world.id,
+          name: 'Auto-lose',
+          graph: QuestGraphSchema.parse({
+            entryNodeId: 'n',
+            nodes: [{ id: 'n', setup: 's', affordances: [{ verb: 'inspect', stat: 'wits', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'won' }] } }] }],
+            goals: [
+              { id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'won' } },
+              { id: 'l', kind: 'flag', outcome: 'lose', label: 'lose', predicate: { kind: 'always' } },
+            ],
+          }),
+        },
+        { enforce: true },
+      ),
+    ).toThrow(/can’t be saved|start/i);
+  });
+
+  it('enforce: accepts a coherent save', () => {
+    const { world } = seedWorldAndCharacter();
+    expect(() =>
+      createQuest(
+        {
+          worldId: world.id,
+          name: 'Fine',
+          graph: QuestGraphSchema.parse({
+            entryNodeId: 'n',
+            nodes: [{ id: 'n', setup: 's', affordances: [{ verb: 'inspect', stat: 'wits', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'won' }] } }] }],
+            goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'won' } }],
+          }),
+        },
+        { enforce: true },
+      ),
+    ).not.toThrow();
   });
 
   it('creates, lists, updates, and deletes (clearing any orphan run)', async () => {

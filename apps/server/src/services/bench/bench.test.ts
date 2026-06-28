@@ -49,6 +49,51 @@ describe('bench catalog', () => {
   });
 });
 
+describe('quest generation cases gate on ACTUAL winnability (the simulation probe)', () => {
+  const winnable = {
+    graph: {
+      entryNodeId: 'a',
+      maxTurns: 6,
+      nodes: [{ id: 'a', setup: 's', entities: [], affordances: [{ verb: 'persuade', stat: 'charm', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'won' }] } }] }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'won' } }],
+    },
+  };
+  // Win wired to a flag nothing sets — the OLD permissive isWinReachable could miss this class.
+  const unwinnable = {
+    graph: {
+      entryNodeId: 'a',
+      maxTurns: 6,
+      nodes: [{ id: 'a', setup: 's', entities: [], affordances: [{ verb: 'persuade', stat: 'charm', difficulty: 'normal', hint: 'h', effects: { success: [{ op: 'setFlag', flag: 'other' }] } }] }],
+      goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'never_set' } }],
+    },
+  };
+
+  it('quest_generate passes a winnable draft and fails an unwinnable one', () => {
+    const validate = getBenchCase('quest_generate')!.validate!;
+    expect(validate(winnable)).toBeNull();
+    expect(validate(unwinnable)).toMatch(/unwinnable/i);
+  });
+
+  it('quest_generate_branching additionally fails a single ungated scene', () => {
+    const validate = getBenchCase('quest_generate_branching')!.validate!;
+    // winnable but a single ungated scene → fails the branching requirement
+    expect(validate(winnable)).toMatch(/gating|two-part/i);
+    // winnable AND gated (a precondition) → passes
+    const branched = {
+      graph: {
+        entryNodeId: 'a',
+        maxTurns: 8,
+        nodes: [{ id: 'a', setup: 's', entities: [], affordances: [
+          { verb: 'talk', stat: 'charm', difficulty: 'normal', hint: 'ask', effects: { success: [{ op: 'setFlag', flag: 'asked' }] } },
+          { verb: 'persuade', stat: 'charm', difficulty: 'normal', hint: 'h', when: { kind: 'flag', flag: 'asked' }, effects: { success: [{ op: 'setFlag', flag: 'won' }] } },
+        ] }],
+        goals: [{ id: 'w', kind: 'flag', outcome: 'win', label: 'win', predicate: { kind: 'flag', flag: 'won' } }],
+      },
+    };
+    expect(validate(branched)).toBeNull();
+  });
+});
+
 describe('bench scoring', () => {
   it('engagement: off-by-1 passes, off-by-2+ fails; pure turn judges report agree=null', () => {
     const score = getBenchCase('judge_turn_good')!.score!;

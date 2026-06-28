@@ -351,18 +351,39 @@ function safeGraph(graph: unknown): QuestGraph {
   return bounded;
 }
 
+/** Server-side coherence GATE for a creator save (the HTTP authoring routes opt in via
+ *  `enforce`). `boundQuestGraph` guarantees a graph is SAFE (runnable); this additionally
+ *  rejects one that is INCOHERENT — unwinnable, auto-losing, or unplayable — mirroring the
+ *  BLOCKING problems the editor's live lint already shows (the client gate is cosmetic; this
+ *  is the real boundary). Internal callers (seed/mock/clone) and the runtime tests author
+ *  arbitrary-but-safe graphs directly and stay UNgated, so only untrusted creator input is
+ *  held to coherence. Throws `badRequest` listing the blocking problems. */
+export function assertQuestCoherent(graph: QuestGraph, partnerId: string | null): void {
+  const blocking = lintQuestGraph(graph, { partnerId }).filter((p) => p.severity === 'blocking');
+  if (blocking.length > 0) {
+    throw badRequest(`This quest can’t be saved yet — ${blocking.map((p) => p.message).join(' ')}`);
+  }
+}
+
 /** Create an authored quest (used by mock/seed worlds + the authoring CRUD). The
  *  graph is sanitised + clamped through {@link boundQuestGraph} on the way in, so a
- *  hand-authored, generated, or imported graph can never feed the referee garbage. */
-export function createQuest(input: {
-  worldId: string;
-  name: string;
-  blurb?: string;
-  partnerId?: string | null;
-  minWarmthBand?: number;
-  graph: QuestGraph;
-}): Quest {
+ *  hand-authored, generated, or imported graph can never feed the referee garbage.
+ *  `enforce` (the creator HTTP route) additionally rejects an INCOHERENT graph via
+ *  {@link assertQuestCoherent}; internal/seed/test callers leave it off. */
+export function createQuest(
+  input: {
+    worldId: string;
+    name: string;
+    blurb?: string;
+    partnerId?: string | null;
+    minWarmthBand?: number;
+    graph: QuestGraph;
+  },
+  opts: { enforce?: boolean } = {},
+): Quest {
   const now = Date.now();
+  const graph = safeGraph(input.graph);
+  if (opts.enforce) assertQuestCoherent(graph, input.partnerId ?? null);
   return questsRepo.insert(
     QuestSchema.parse({
       id: newId('quest'),
@@ -371,7 +392,7 @@ export function createQuest(input: {
       blurb: input.blurb ?? '',
       partnerId: input.partnerId ?? null,
       minWarmthBand: input.minWarmthBand ?? 0,
-      graph: safeGraph(input.graph),
+      graph,
       createdAt: now,
       updatedAt: now,
     }),
@@ -392,7 +413,9 @@ export function getQuestById(id: string): Quest {
   return q;
 }
 
-/** Update an authored quest. A supplied graph is re-sanitised + win-goal-checked. */
+/** Update an authored quest. A supplied graph is re-sanitised + win-goal-checked. `enforce`
+ *  (the creator HTTP route) additionally rejects an INCOHERENT supplied graph against the
+ *  EFFECTIVE partner anchor (the patched one, or the current if unchanged). */
 export function updateQuest(
   id: string,
   patch: {
@@ -402,15 +425,19 @@ export function updateQuest(
     minWarmthBand?: number;
     graph?: QuestGraph;
   },
+  opts: { enforce?: boolean } = {},
 ): Quest {
   const current = getQuestById(id);
+  const partnerId = patch.partnerId === undefined ? current.partnerId : patch.partnerId;
+  const graph = patch.graph ? safeGraph(patch.graph) : current.graph;
+  if (opts.enforce && patch.graph) assertQuestCoherent(graph, partnerId);
   const next = QuestSchema.parse({
     ...current,
     name: patch.name ?? current.name,
     blurb: patch.blurb ?? current.blurb,
-    partnerId: patch.partnerId === undefined ? current.partnerId : patch.partnerId,
+    partnerId,
     minWarmthBand: patch.minWarmthBand ?? current.minWarmthBand,
-    graph: patch.graph ? safeGraph(patch.graph) : current.graph,
+    graph,
     updatedAt: Date.now(),
   });
   return questsRepo.update(next);

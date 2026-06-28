@@ -969,6 +969,47 @@
 .wf-ed-edge { background: rgba(0, 0, 0, 0.12); padding: 6px 8px; border-radius: var(--radius-sm); }
 .wf-ed-when { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-mute); }
 .wf-ed-pred { display: inline-flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+
+/* affordance PRECONDITION (a gate/unlock — "Available only when…") */
+.wf-ed-cond {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-soft);
+}
+.wf-ed-cond.on {
+  border-style: solid;
+  border-color: rgba(157, 184, 222, 0.45); /* moon — matches the cast/entity accent */
+  background: rgba(157, 184, 222, 0.05);
+}
+.wf-ed-cond > .wf-ed-check { font-size: 0.8rem; white-space: nowrap; }
+.wf-ed-cond-hint { font-size: 0.74rem; }
+
+/* CONDITION builder. A single condition is a leaf row + a clear "require another" button
+   (inline). Two or more become a bordered GROUP: a "match All of / Any of" header, then a
+   stacked, removable clause list, then "add condition". The AND/OR combinator lives in the
+   header — never buried in the kind dropdown. */
+.wf-ed-condwrap { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.wf-ed-condgroup {
+  flex: 1 1 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(230, 177, 94, 0.34); /* brass — a grouped condition set */
+  background: color-mix(in oklab, var(--brass) 4%, transparent);
+}
+.wf-ed-condgroup-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wf-ed-match { width: auto; min-width: 124px; }
+.wf-ed-compound-clause { width: 100%; }
+.wf-ed-compound-clause > .wf-ed-pred { flex: 1; }
 .wf-ed-goal { border-left: 2px solid var(--brass-dim); }
 .wf-goal-win { border-left-color: var(--sage); }
 .wf-goal-lose { border-left-color: var(--ember); }

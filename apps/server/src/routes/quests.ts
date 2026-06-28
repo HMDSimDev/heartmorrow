@@ -91,7 +91,8 @@ export async function questRoutes(app: FastifyInstance): Promise<void> {
       const input = parseInput(QuestCreateSchema, req.body);
       requireFeature(input.worldId, 'quests');
       reply.code(201);
-      return createQuest(input);
+      // enforce coherence at the creator boundary (rejects an unwinnable/incoherent save).
+      return createQuest(input, { enforce: true });
     },
   );
 
@@ -101,7 +102,7 @@ export async function questRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { id } = req.params as { id: string };
       requireFeature(getQuestById(id).worldId, 'quests');
-      return updateQuest(id, parseInput(QuestUpdateSchema, req.body));
+      return updateQuest(id, parseInput(QuestUpdateSchema, req.body), { enforce: true });
     },
   );
 
