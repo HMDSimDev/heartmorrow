@@ -187,6 +187,8 @@ describe('location room chat (discovery)', () => {
     await enterRoom(w.id, 'cafe');
     expect(cap.last).toContain('Setting:');
     expect(cap.last).toContain('Time: morning');
+    // The day's real weather is threaded in so the room can't invent a different sky.
+    expect(cap.last).toContain('Weather right now:');
     expect(cap.last).toContain('working here (staff/on shift)');
   });
 

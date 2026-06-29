@@ -194,9 +194,15 @@ function buildRoomMessages(args: {
     : '';
   const desc = (loc.description || '').replace(/\s+/g, ' ').trim().slice(0, 240);
   const vibe = loc.tags.length ? ` Vibe: ${loc.tags.slice(0, 6).join(', ')}.` : '';
+  // Time of day + the day's ACTUAL weather are hard scene facts. They come straight from
+  // weatherForDay (the same source the UI shows), so the room must never narrate a
+  // different sky — e.g. "watching the rain" on an overcast day. Whether the venue is
+  // indoors tells the model how much the weather should even surface.
+  const weather = weatherForDay(worldId, day);
+  const where = loc.indoor ? 'indoors (the weather is outside)' : 'outdoors / open-air';
   const setting =
-    `Setting: ${loc.name}, a ${loc.kind}.${desc ? ` ${desc}` : ''}${vibe} ` +
-    `Time: ${phase}, ${weatherForDay(worldId, day).label.toLowerCase()}.`;
+    `Setting: ${loc.name}, a ${loc.kind} — ${where}.${desc ? ` ${desc}` : ''}${vibe} ` +
+    `Time: ${phase}. Weather right now: ${weather.label.toLowerCase()}.`;
   const transcript =
     history
       .slice(-12)
@@ -239,7 +245,10 @@ function buildRoomMessages(args: {
     'person\'s real name from the roster and put their id in "introduced". ' +
     'GROUNDING: keep the scene consistent — honor each person\'s "doing" (don\'t reinvent what they are ' +
     'up to), treat staff as staff (they serve; they do not chat the player up like a fellow patron), let ' +
-    'each voice match their "speech", and match the setting + time of day. People you have ALREADY MET ' +
+    'each voice match their "speech", and match the setting and time of day. WEATHER: the weather stated ' +
+    'above is the ONLY weather — never invent or imply a different one (do not mention rain, sun, snow, ' +
+    'wind, fog, or storms unless that is the stated weather), and indoors let it surface only where it ' +
+    'naturally would (a glance out a window, etc.). People you have ALREADY MET ' +
     'should treat the player according to the standing (and any "recently:" memory) noted on their line. ' +
     'Return JSON per the schema.';
   const user =
