@@ -8,7 +8,7 @@ import { useAppData } from '../state/app-context';
 import { useDiscoveryGate } from '../lib/useDiscovery';
 import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
-import { Banner, Empty, Loader } from '../components/ui';
+import { Banner, ConfirmDialog, Empty, Loader } from '../components/ui';
 
 const KIND_ICON: Record<string, string> = {
   cafe: '☕', bar: '🍸', library: '📚', gym: '🏋', park: '🌳',
@@ -27,10 +27,11 @@ const KIND_ICON: Record<string, string> = {
  */
 export function AroundTown() {
   const { t } = useTranslation(['pages', 'common']);
-  const { activeWorldId, worldState, dayTick, refreshWorldState, assetById, activeRoom, setActiveRoom } = useAppData();
+  const { activeWorldId, worldState, dayTick, bumpDayTick, refreshWorldState, assetById, activeRoom, setActiveRoom } = useAppData();
   const { isMet } = useDiscoveryGate();
   const [entering, setEntering] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | undefined>();
   const [input, setInput] = useState('');
@@ -80,11 +81,14 @@ export function AroundTown() {
 
   const leave = async () => {
     if (!activeWorldId || leaving) return;
+    setConfirmLeave(false);
     setLeaving(true);
+    setErr(undefined);
     try {
       await api.leaveRoom(activeWorldId);
       setActiveRoom(null);
-      setErr(undefined);
+      // Back to the map: refetch occupancy + anyone newly met during the visit.
+      bumpDayTick();
     } catch (e) {
       setErr(errorMessage(e));
     } finally {
@@ -101,20 +105,39 @@ export function AroundTown() {
     if (unmetHere > 0) whoParts.push(t('aroundTown.unmetCount', { count: unmetHere }));
     return (
       <div className="stack">
-        <button className="btn ghost at-back" type="button" onClick={() => void leave()} disabled={leaving}>
+        {confirmLeave && (
+          <ConfirmDialog
+            kicker={t('aroundTown.leaveConfirm.kicker')}
+            title={t('aroundTown.leaveConfirm.title')}
+            body={t('aroundTown.leaveConfirm.body')}
+            confirmLabel={t('aroundTown.leaveConfirm.confirm')}
+            busy={leaving}
+            onConfirm={() => void leave()}
+            onCancel={() => setConfirmLeave(false)}
+          />
+        )}
+        <button className="btn ghost at-back" type="button" onClick={() => setConfirmLeave(true)} disabled={leaving}>
           ‹ {t('aroundTown.leave')}
         </button>
-        <div className={`card at-room${photo ? ' has-photo' : ''}`}>
-          {photo && (
-            <div className="at-room-photo" aria-hidden="true">
-              <img src={assetUrl(photo)} alt="" />
-            </div>
-          )}
-          <div className="section-head">
-            <div className="titles"><span className="kicker">{t('aroundTown.youArrive')}</span><h2>{activeRoom.locationName}</h2></div>
-            <span className="trail" />
+        <div className="card flush at-room">
+          {/* Cinematic scene header — the venue photo as a backdrop with a legible
+              scrim, the place + who's-here floated over it as HUD chips (mirrors a date). */}
+          <div className={`at-scene${photo ? ' has-photo' : ''}`}>
+            {photo && (
+              <div className="at-scene-backdrop" aria-hidden="true">
+                <img src={assetUrl(photo)} alt="" />
+              </div>
+            )}
+            <span className="at-scene-lead">
+              <Icon name="location" size={16} className="ph" />
+              <span className="loc">{activeRoom.locationName}</span>
+            </span>
+            {whoParts.length > 0 && (
+              <span className="at-chip at-chip-who">
+                <Icon name="people" size={13} /> {whoParts.join(', ')}
+              </span>
+            )}
           </div>
-          {whoParts.length > 0 && <p className="muted at-room-who">{t('aroundTown.hereNow', { who: whoParts.join(', ') })}</p>}
 
           <div className="at-room-reel">
             {activeRoom.messages.map((m, i) =>
@@ -131,23 +154,24 @@ export function AroundTown() {
             )}
           </div>
 
-          {err && <Banner kind="error">{err}</Banner>}
-
-          <div className="at-room-input">
-            <textarea
-              value={input}
-              placeholder={t('aroundTown.sayPlaceholder')}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  void send();
-                }
-              }}
-            />
-            <button className="btn primary" onClick={() => void send()} disabled={busy || !input.trim()}>
-              <Icon name="send" size={15} />
-            </button>
+          <div className="at-room-foot">
+            {err && <Banner kind="error">{err}</Banner>}
+            <div className="at-room-input">
+              <textarea
+                value={input}
+                placeholder={t('aroundTown.sayPlaceholder')}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void send();
+                  }
+                }}
+              />
+              <button className="btn primary at-send" onClick={() => void send()} disabled={busy || !input.trim()}>
+                <Icon name="send" size={15} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

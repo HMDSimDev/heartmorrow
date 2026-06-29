@@ -83,6 +83,10 @@ interface AppData {
    *  total reset happens. Day-derived per-tab effects depend on it so they
    *  refetch after End day / reset without each page re-deriving worldState.day. */
   dayTick: number;
+  /** Force day-derived queries (placement, rosters, discovery met-state) to refetch
+   *  WITHOUT advancing the clock — e.g. after an Around Town visit that may have
+   *  revealed new people. Reuses the same refetch bus `sleep`/reset bump. */
+  bumpDayTick: () => void;
   setActiveWorld: (id: string) => void;
   reloadWorlds: () => Promise<void>;
   refreshWorldState: () => Promise<void>;
@@ -242,6 +246,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ACTIVE_WORLD_KEY, id);
     setActiveWorldId(id);
   }, []);
+
+  const bumpDayTick = useCallback(() => setDayTick((t) => t + 1), []);
 
   const refreshWorldState = useCallback(async () => {
     if (!activeWorldId) {
@@ -457,6 +463,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       activeWorld,
       worldState,
       dayTick,
+      bumpDayTick,
       setActiveWorld,
       reloadWorlds,
       refreshWorldState,
@@ -478,7 +485,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setActiveRoom,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, activeRoom, refreshActiveRoom, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, bumpDayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, activeRoom, refreshActiveRoom, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

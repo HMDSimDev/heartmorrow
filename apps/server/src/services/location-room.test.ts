@@ -8,6 +8,9 @@ import { enterRoom, roomSay, getActiveRoom, leaveRoom } from './room-service';
 import { createSession } from './conversation-service';
 import { isDiscovered, stampMet } from './discovery-service';
 import { updatePlayer } from './player-service';
+import { setRelationshipFlag } from './stat-service';
+import { addMemoriesFromEvaluation } from './memory-service';
+import { composeLocationScene } from './placement-service';
 import { ensureWorldState } from './world-clock-service';
 import { sessionsRepo } from '../db/repositories';
 import { playerIdForWorld } from '../lib/ids';
@@ -175,6 +178,69 @@ describe('location room chat (discovery)', () => {
     await enterRoom(w.id, 'cafe');
     expect(cap.last).toContain('already met'); // roster marks them met
     expect(cap.last.toLowerCase()).toContain('met by name'); // opener tells the model to name them
+  });
+
+  it("grounds the scene: setting, time of day, and each person's role (staff vs patron)", async () => {
+    const { w } = worldWithRegulars(['Mara']); // Mara works the cafe → staff, not a patron
+    const cap = new CapturingAdapter(turn('You step in.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain('Setting:');
+    expect(cap.last).toContain('Time: morning');
+    expect(cap.last).toContain('working here (staff/on shift)');
+  });
+
+  it('tells the model the standing of someone the player has already met', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    stampMet(chars[0]!.id, 1, 'cafe');
+    const cap = new CapturingAdapter(turn('Mara waves.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain('you two are '); // warmth standing surfaced for the met person
+  });
+
+  it("surfaces an already-met person's commitment status, not just warmth", async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    stampMet(mara.id, 1, 'cafe');
+    setRelationshipFlag(mara.id, 'status', 'dating', { source: 'test' });
+    const cap = new CapturingAdapter(turn('Mara smiles.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain("you're dating");
+  });
+
+  it('surfaces a recent memory for someone the player has already met', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    stampMet(mara.id, 1, 'cafe');
+    addMemoriesFromEvaluation(mara.id, [{ text: 'Shared a quiet coffee by the window.', importance: 4, tags: [] }], null);
+    const cap = new CapturingAdapter(turn('Mara waves.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    expect(cap.last).toContain('recently: Shared a quiet coffee');
+  });
+
+  it("lets an already-met person use the player's name without a re-introduction", async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    stampMet(chars[0]!.id, 1, 'cafe'); // already met → she knows the player from before
+    updatePlayer({ name: 'Sam' }, playerIdForWorld(w.id));
+    scriptRoom(turn('"Hey Sam, good to see you."'));
+    const room = await enterRoom(w.id, 'cafe');
+    expect(room.messages[0]?.text).toContain('Sam'); // not scrubbed — a met person knows your name
+  });
+
+  it('surfaces "here together" in the prompt exactly when the scene clusters tied people', async () => {
+    const { w, chars } = worldWithRegulars(['Mara', 'Devi']);
+    updateCharacter(chars[0]!.id, { links: [{ targetId: chars[1]!.id, kind: 'friend' }] });
+    const st = ensureWorldState(w.id);
+    const clustered = composeLocationScene(w.id, st.day, st.phase, 'cafe').clusters.some((c) => c.memberIds.length >= 2);
+    const cap = new CapturingAdapter(turn('You step in.'));
+    setAdapterOverride(cap);
+    await enterRoom(w.id, 'cafe');
+    // The bracketed group list ("[id:… + id:…]") appears ONLY in the data line, so it's a
+    // clean signal the cluster was passed (the phrase "Here TOGETHER" is also in the rules).
+    expect(cap.last.includes('[id:')).toBe(clustered);
   });
 
   it('tells the model to keep the spotlight on whoever the player addresses (no pile-on)', async () => {
