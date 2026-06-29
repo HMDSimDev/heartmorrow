@@ -30,6 +30,16 @@
   opacity: 0.55;
   cursor: default;
 }
+/* Barred after an ejection — dimmed, with an ember "Banned · Nd" tag. */
+.at-card.at-banned {
+  opacity: 0.7;
+  cursor: default;
+}
+.at-tag.banned {
+  color: var(--ember);
+  border-color: color-mix(in srgb, var(--ember) 45%, transparent);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+}
 .at-card:disabled {
   cursor: default;
 }
@@ -298,6 +308,34 @@
   background: color-mix(in srgb, var(--sage) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--sage) 30%, transparent);
 }
+/* The "shown the door" beat — a centered, ember-tinted counterpart to the meet chip,
+   marking the moment the player got thrown out. */
+.at-room-eject {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 92%;
+  padding: 5px 13px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  text-align: center;
+  color: var(--ember);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ember) 32%, transparent);
+}
+/* The composer is replaced by this when the visit ended in an ejection. */
+.at-room-kicked {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.at-room-kicked .btn {
+  align-self: flex-start;
+}
+
 /* Typing — three lamplit dots that bounce in turn (matches the date's). */
 .at-room-typing {
   align-self: flex-start;

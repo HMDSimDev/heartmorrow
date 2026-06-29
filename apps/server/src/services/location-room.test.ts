@@ -8,8 +8,11 @@ import { enterRoom, roomSay, getActiveRoom, leaveRoom } from './room-service';
 import { createSession } from './conversation-service';
 import { isDiscovered, stampMet } from './discovery-service';
 import { updatePlayer } from './player-service';
-import { setRelationshipFlag } from './stat-service';
-import { addMemoriesFromEvaluation } from './memory-service';
+import { setRelationshipFlag, applyRelationshipChange } from './stat-service';
+import { getRelationship } from './relationship-service';
+import { addMemoriesFromEvaluation, listMemories } from './memory-service';
+import { recordEvent } from './event-service';
+import { locationBanDaysLeft, assertNotBanned } from './location-ban-service';
 import { composeLocationScene } from './placement-service';
 import { ensureWorldState } from './world-clock-service';
 import { sessionsRepo } from '../db/repositories';
@@ -141,6 +144,107 @@ describe('location room chat (discovery)', () => {
 
     const after = await roomSay(w.id, 'is Devi here?');
     expect(after.messages.some((m) => m.role === 'meet')).toBe(false);
+  });
+
+  it('throws the player out when the model flags an ejection — ends the visit', async () => {
+    const { w } = worldWithRegulars(['Mara']);
+    scriptRoom(
+      turn('You step in.'),
+      turn('The barista has had enough. "Out. Now." A hand steers you to the door.', {
+        eject: true,
+        ejectReason: 'screamed abuse at a patron',
+      }),
+    );
+    await enterRoom(w.id, 'cafe');
+
+    const after = await roomSay(w.id, 'Fuck all of you!');
+    expect(after.ended).toBe(true); // the visit is over
+    expect(after.messages.some((m) => m.role === 'eject')).toBe(true); // a "shown the door" beat
+    expect(getActiveRoom(w.id)).toBeNull(); // the room is no longer live (lock cleared)
+  });
+
+  it('leaves a witness who KNOWS the player a memory naming the player and the reason', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    updatePlayer({ name: 'Sam' }, playerIdForWorld(w.id));
+    stampMet(mara.id, 1, 'cafe'); // Mara already knows the player → she witnesses it
+    scriptRoom(turn('You step in.'), turn('Security walks you out.', { eject: true, ejectReason: 'starting a fight' }));
+    await enterRoom(w.id, 'cafe');
+
+    await roomSay(w.id, 'I shove the guy next to me.');
+    const mem = listMemories(mara.id).find((m) => m.tags.includes('conflict'));
+    expect(mem).toBeTruthy();
+    expect(mem!.text).toContain('Sam'); // they know it was YOU (not "someone")
+    expect(mem!.text).toContain('starting a fight'); // …and what for
+  });
+
+  it('dings the relationship of a witness who knows you (tension up, warmth down)', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    stampMet(mara.id, 1, 'cafe');
+    // Seed mid-range stats so the penalty is observable (not clamped at the floor).
+    applyRelationshipChange(mara.id, { affection: 45, respect: 45, comfort: 45, trust: 45, tension: 10 }, { source: 'test' });
+    const before = getRelationship(mara.id);
+
+    scriptRoom(turn('You step in.'), turn('Out you go.', { eject: true, ejectReason: 'screaming abuse' }));
+    await enterRoom(w.id, 'cafe');
+    await roomSay(w.id, 'Fuck this place!');
+
+    const after = getRelationship(mara.id);
+    expect(after.tension).toBeGreaterThan(before.tension); // tension up
+    expect(after.affection).toBeLessThan(before.affection); // warmth down…
+    expect(after.respect).toBeLessThan(before.respect); // …across several feelings
+    expect(after.comfort).toBeLessThan(before.comfort);
+  });
+
+  it('bans the player from a venue after an ejection, blocking re-entry', async () => {
+    const { w } = worldWithRegulars(['Mara']);
+    scriptRoom(turn('You step in.'), turn('"Out." You\'re marched to the door.', { eject: true, ejectReason: 'abuse' }));
+    await enterRoom(w.id, 'cafe');
+
+    const after = await roomSay(w.id, 'Fuck this place!');
+    expect(after.ended).toBe(true);
+    expect(after.banDaysLeft).toBe(3); // first offense → a 3-day ban
+    await expect(enterRoom(w.id, 'cafe')).rejects.toThrow(/kicked out/i); // can't come back yet
+  });
+
+  it('escalates a repeat ejection to 7 days, caps there, and expires', () => {
+    const { w } = worldWithRegulars([]);
+    recordEvent('ejected', { worldId: w.id, locationId: 'cafe', day: 1 });
+    expect(locationBanDaysLeft(w.id, 'cafe', 1)).toBe(3); // first offense
+    expect(locationBanDaysLeft(w.id, 'cafe', 4)).toBe(0); // 1 + 3 → lapsed
+
+    recordEvent('ejected', { worldId: w.id, locationId: 'cafe', day: 10 });
+    expect(locationBanDaysLeft(w.id, 'cafe', 10)).toBe(7); // repeat offense → 7, not more
+    expect(locationBanDaysLeft(w.id, 'cafe', 17)).toBe(0); // 10 + 7 → lapsed
+    expect(locationBanDaysLeft(w.id, 'somewhere-else', 10)).toBe(0); // bans are per-venue
+  });
+
+  it('a date cannot be booked at a venue the player was thrown out of', async () => {
+    // One character → the availability guard always frees them, so we deterministically
+    // reach the date's venue-ban gate rather than an "unavailable today" refusal.
+    const w = createWorld({
+      name: 'Town',
+      featureFlags: { discovery: true },
+      locations: [{ id: 'cafe', name: 'The Glasshouse', kind: 'cafe' }],
+    });
+    const davi = createCharacter({ worldId: w.id, name: 'Davi', age: 28, datingStats: DS });
+    updateCharacter(davi.id, { dateable: true });
+    stampMet(davi.id, 1, 'cafe'); // discovery gate: you must have met them to date
+
+    scriptRoom(turn('You step in.'), turn('Security walks you out.', { eject: true, ejectReason: 'starting a fight' }));
+    await enterRoom(w.id, 'cafe');
+    await roomSay(w.id, 'Screw all of you!');
+
+    expect(() => createSession({ characterId: davi.id, mode: 'date', locationId: 'cafe' })).toThrow(/kicked out/i);
+  });
+
+  it('the shared ban gate throws only while banned, and never for a clean venue', () => {
+    const { w } = worldWithRegulars([]);
+    recordEvent('ejected', { worldId: w.id, locationId: 'cafe', day: 1 });
+    expect(() => assertNotBanned(w.id, 'cafe', 'The Glasshouse', 1)).toThrow(/kicked out/i);
+    expect(() => assertNotBanned(w.id, 'cafe', 'The Glasshouse', 4)).not.toThrow(); // lapsed
+    expect(() => assertNotBanned(w.id, 'park', 'The Park', 1)).not.toThrow(); // never ejected here
   });
 
   it("withholds the PLAYER's name until they introduce themselves, then allows it", async () => {

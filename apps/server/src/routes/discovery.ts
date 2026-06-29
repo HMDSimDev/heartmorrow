@@ -5,6 +5,7 @@ import { requireFeature } from '../services/world-feature-service';
 import { ensureWorldState } from '../services/world-clock-service';
 import { composeLocationScene, getPlacements, isLocationOpen } from '../services/placement-service';
 import { isRedacted, stampGlimpsed } from '../services/discovery-service';
+import { locationBanDaysLeft } from '../services/location-ban-service';
 import { enterRoom, roomSay, getActiveRoom, leaveRoom } from '../services/room-service';
 import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 
@@ -42,7 +43,13 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
       }
       const locations = world.locations
         .filter((l) => l.discoverable)
-        .map((l) => ({ location: l, open: isLocationOpen(l, state.phase), occupantIds: (byLoc.get(l.id) ?? []).sort() }));
+        .map((l) => ({
+          location: l,
+          open: isLocationOpen(l, state.phase),
+          occupantIds: (byLoc.get(l.id) ?? []).sort(),
+          // Days the player is still barred from here after an ejection (0 = welcome).
+          bannedDays: locationBanDaysLeft(worldId, l.id, state.day),
+        }));
       return { day: state.day, phase: state.phase, locations };
     },
   );

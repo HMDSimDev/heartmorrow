@@ -465,6 +465,14 @@ export const RoomTurnSchema = z.object({
    *  present knows the player's name, so the model addresses them by "you" / a
    *  description only — never by name. */
   playerIntroduced: z.boolean().default(false),
+  /** True only when the player's latest action gets them THROWN OUT of this venue:
+   *  genuinely hostile/abusive/threatening or unwelcome sexual behavior that CLASHES
+   *  with what this place is for. Behavior that fits the venue (a rage room, a fight
+   *  gym, a rowdy bar, an adult venue) is never grounds for it. When true, `reply` is
+   *  the moment it happens and the server ends the visit. */
+  eject: z.boolean().default(false),
+  /** A short, plain reason the player was ejected (for the log + witness memory). */
+  ejectReason: z.string().max(GEN_TEXT.label).default(''),
 });
 export type RoomTurn = z.infer<typeof RoomTurnSchema>;
 

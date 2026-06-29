@@ -366,11 +366,12 @@ export type Message = z.infer<typeof MessageSchema>;
 
 // --- Location room chat (discovery) ----------------------------------------
 
-/** One line in a location's room transcript. `meet` is a client-rendered marker
- *  (its `text` holds the comma-joined names just met) — it is NEVER fed back to the
- *  model as conversation history. */
+/** One line in a location's room transcript. `meet` and `eject` are client-rendered
+ *  markers (a `meet`'s `text` holds the comma-joined names just met; an `eject`'s holds
+ *  the short reason the player was thrown out) — neither is ever fed back to the model
+ *  as conversation history. */
 export const RoomMessageSchema = z.object({
-  role: z.enum(['player', 'room', 'meet']),
+  role: z.enum(['player', 'room', 'meet', 'eject']),
   text: z.string(),
 });
 export type RoomMessage = z.infer<typeof RoomMessageSchema>;

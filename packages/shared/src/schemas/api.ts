@@ -288,6 +288,13 @@ export const ActiveRoomSchema = z.object({
   phase: PhaseSchema,
   occupants: z.array(RoomOccupantSchema),
   messages: z.array(RoomMessageSchema),
+  /** True when this visit has just ENDED on the server — currently only when the player
+   *  was thrown out (see the `eject` marker in `messages`). The client shows the final
+   *  beat, locks the composer, and drops back to the map. A normal live room is false. */
+  ended: z.boolean().default(false),
+  /** When ejected, how many in-world days the player is now barred from this venue
+   *  (0 otherwise). Drives the "come back in N days" notice. */
+  banDaysLeft: z.number().default(0),
 });
 export type ActiveRoom = z.infer<typeof ActiveRoomSchema>;
 

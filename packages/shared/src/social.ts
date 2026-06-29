@@ -901,6 +901,12 @@ export const WALKOUT_PENALTY = { affection: -8, respect: -10, comfort: -6, tensi
 /** Min in-world days between walkouts for a character (avoids spam). */
 export const WALKOUT_COOLDOWN_DAYS = 1;
 
+/** What a character who KNOWS you loses in their regard after WITNESSING you get thrown
+ *  out of a place (Around Town). Lighter than a WALKOUT — they're a disapproving
+ *  bystander, not the person you mistreated — but a real ding: warmth slips across
+ *  several feelings (respect most) and tension rises. */
+export const EJECTION_WITNESS_PENALTY = { affection: -4, respect: -6, comfort: -3, trust: -2, tension: 8 } as const;
+
 // --- Jealousy (monogamous characters discovering you're seeing others) ------
 
 /**

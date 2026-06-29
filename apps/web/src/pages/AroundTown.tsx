@@ -103,9 +103,12 @@ export function AroundTown() {
     const unmetHere = activeRoom.occupants.filter((o) => !o.known).length;
     const whoParts = [...knownHere];
     if (unmetHere > 0) whoParts.push(t('aroundTown.unmetCount', { count: unmetHere }));
+    // The visit just ended on the server because the player got thrown out — show the
+    // final beat, lock the composer, and let them step back to the map (no confirm).
+    const ejected = activeRoom.ended;
     return (
       <div className="stack">
-        {confirmLeave && (
+        {confirmLeave && !ejected && (
           <ConfirmDialog
             kicker={t('aroundTown.leaveConfirm.kicker')}
             title={t('aroundTown.leaveConfirm.title')}
@@ -116,8 +119,13 @@ export function AroundTown() {
             onCancel={() => setConfirmLeave(false)}
           />
         )}
-        <button className="btn ghost at-back" type="button" onClick={() => setConfirmLeave(true)} disabled={leaving}>
-          ‹ {t('aroundTown.leave')}
+        <button
+          className="btn ghost at-back"
+          type="button"
+          onClick={() => (ejected ? void leave() : setConfirmLeave(true))}
+          disabled={leaving}
+        >
+          ‹ {ejected ? t('aroundTown.ejected.back') : t('aroundTown.leave')}
         </button>
         <div className="card flush at-room">
           {/* Cinematic scene header — the venue photo as a backdrop with a legible
@@ -145,6 +153,10 @@ export function AroundTown() {
                 <div key={i} className="at-room-meet">
                   <Icon name="people" size={14} /> {t('aroundTown.metNote', { names: m.text })}
                 </div>
+              ) : m.role === 'eject' ? (
+                <div key={i} className="at-room-eject">
+                  <Icon name="leave" size={14} /> {t('aroundTown.ejected.beat')}
+                </div>
               ) : (
                 <div key={i} className={`at-room-msg ${m.role}`}>{m.text}</div>
               ),
@@ -156,22 +168,31 @@ export function AroundTown() {
 
           <div className="at-room-foot">
             {err && <Banner kind="error">{err}</Banner>}
-            <div className="at-room-input">
-              <textarea
-                value={input}
-                placeholder={t('aroundTown.sayPlaceholder')}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-              />
-              <button className="btn primary at-send" onClick={() => void send()} disabled={busy || !input.trim()}>
-                <Icon name="send" size={15} />
-              </button>
-            </div>
+            {ejected ? (
+              <div className="at-room-kicked">
+                <Banner kind="error">{t('aroundTown.ejected.notice', { place: activeRoom.locationName, days: activeRoom.banDaysLeft })}</Banner>
+                <button className="btn primary" onClick={() => void leave()} disabled={leaving}>
+                  {t('aroundTown.ejected.back')}
+                </button>
+              </div>
+            ) : (
+              <div className="at-room-input">
+                <textarea
+                  value={input}
+                  placeholder={t('aroundTown.sayPlaceholder')}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      void send();
+                    }
+                  }}
+                />
+                <button className="btn primary at-send" onClick={() => void send()} disabled={busy || !input.trim()}>
+                  <Icon name="send" size={15} />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -195,17 +216,18 @@ export function AroundTown() {
             </Empty>
           ) : (
             <div className="at-grid">
-              {data.locations.map(({ location, open, occupantIds }) => {
+              {data.locations.map(({ location, open, occupantIds, bannedDays }) => {
                 const faces = occupantIds.map((id) => charById.get(id)).filter((c): c is Character => !!c && isMet(c.id));
                 const photo = imageOf(location);
                 const isEntering = entering === location.id;
+                const banned = bannedDays > 0;
                 return (
                   <button
                     key={location.id}
                     type="button"
-                    className={`at-card${open ? '' : ' at-closed'}${photo ? ' has-photo' : ''}${isEntering ? ' at-entering' : ''}`}
-                    disabled={!open || !!entering}
-                    onClick={() => open && void enter(location)}
+                    className={`at-card${open ? '' : ' at-closed'}${banned ? ' at-banned' : ''}${photo ? ' has-photo' : ''}${isEntering ? ' at-entering' : ''}`}
+                    disabled={!open || banned || !!entering}
+                    onClick={() => open && !banned && void enter(location)}
                   >
                     {photo && (
                       <div className="at-card-photo" aria-hidden="true">
@@ -215,7 +237,11 @@ export function AroundTown() {
                     <div className="at-card-head">
                       <span className="at-kind" aria-hidden="true">{KIND_ICON[location.kind] ?? '📍'}</span>
                       <h3 className="at-name">{location.name}</h3>
-                      {!open && <span className="at-tag">{t('aroundTown.closed')}</span>}
+                      {banned ? (
+                        <span className="at-tag banned">{t('aroundTown.bannedTag', { days: bannedDays })}</span>
+                      ) : (
+                        !open && <span className="at-tag">{t('aroundTown.closed')}</span>
+                      )}
                     </div>
                     {location.description && <p className="at-desc">{location.description}</p>}
                     <div className="at-who">

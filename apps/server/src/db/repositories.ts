@@ -804,6 +804,17 @@ export const eventsRepo = {
       )
       .map(rowToEvent);
   },
+  /** A world's events of one type, oldest first — e.g. the 'ejected' beats that drive
+   *  per-location bans. Legacy NULL-world rows are excluded (they predate world-keying). */
+  listByWorldType(worldId: string, type: string): GameEvent[] {
+    return getDb()
+      .all<Row>(
+        'SELECT * FROM game_events WHERE world_id = ? AND type = ? ORDER BY created_at ASC, rowid ASC',
+        worldId,
+        type,
+      )
+      .map(rowToEvent);
+  },
   /** Events whose payload.characterId matches, newest first (for the Moments timeline). */
   listByCharacter(characterId: string, limit = 300): GameEvent[] {
     return getDb()

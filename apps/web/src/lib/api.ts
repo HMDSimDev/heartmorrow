@@ -367,6 +367,8 @@ export interface AroundTownLocationView {
   location: Location;
   open: boolean;
   occupantIds: string[];
+  /** Days the player is still barred from this venue after an ejection (0 = welcome). */
+  bannedDays: number;
 }
 export interface AroundTownView {
   day: number;

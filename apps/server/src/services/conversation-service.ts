@@ -62,6 +62,7 @@ import { badRequest, notFound } from '../lib/errors';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { getRelationship } from './relationship-service';
 import { assertDiscoveryCanStart, isRedacted, stampMet } from './discovery-service';
+import { assertNotBanned } from './location-ban-service';
 import { getPlacements } from './placement-service';
 import { getOrCreatePlayer, spendMoney } from './player-service';
 import { selectTopMemories } from './memory-service';
@@ -198,6 +199,9 @@ export function createSession(input: ConversationCreate): ConversationSession {
       throw badRequest('You can only date at a place you own or lease.');
     }
     const venue = resolveSessionLocation(resolvedLocationId, character, world);
+    // You can't take a date to a place you've been thrown out of — the Around Town ban
+    // applies here too (no-op for venues you were never ejected from).
+    if (resolvedLocationId) assertNotBanned(character.worldId, resolvedLocationId, venue?.name ?? 'there', day);
     const cost = venueCost(venue?.priceTier);
     if (cost > 0) {
       const money = getOrCreatePlayer(playerIdForWorld(character.worldId)).money;

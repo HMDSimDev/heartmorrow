@@ -48,6 +48,18 @@ describe('day records — live persistence', () => {
     expect(rec!.beats.some((b) => /milestone/i.test(b.text) && b.tone === 'good')).toBe(true);
   });
 
+  it('surfaces an Around Town ejection in the day record', async () => {
+    const world = createWorld({ name: 'Town', locations: [{ id: 'cafe', name: 'The Glasshouse', kind: 'cafe' }] });
+    setAdapterOverride(recapAdapter());
+    getWorldState(world.id);
+    recordEvent('ejected', { worldId: world.id, locationId: 'cafe', day: 1, reason: 'screaming abuse' });
+
+    await advanceDay(world.id); // day 1 → 2
+
+    const rec = dayRecordsRepo.get(world.id, 1);
+    expect(rec!.beats.some((b) => /thrown out of The Glasshouse/i.test(b.text) && b.tone === 'bad')).toBe(true);
+  });
+
   it('collapses repeatable actions (work, bonding, texting) into one beat apiece', async () => {
     const a = makeWorld('Alpha');
     setAdapterOverride(recapAdapter());

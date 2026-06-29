@@ -279,6 +279,7 @@
     "title": "Around Town",
     "blurb": "See who's out and about this part of the day — step into a spot to see who's there.",
     "closed": "Closed",
+    "bannedTag": "Banned · {days}d",
     "quiet": "Quiet right now",
     "present": "{count, plural, one {# person here} other {# people here}}",
     "emptyTitle": "Nowhere to go yet",
@@ -293,7 +294,12 @@
     },
     "unmetCount": "{count, plural, one {# you haven't met} other {# you haven't met}}",
     "metNote": "You met {names} — they're in your People now.",
-    "sayPlaceholder": "Say or do something… (e.g. “I head over and introduce myself”)"
+    "sayPlaceholder": "Say or do something… (e.g. “I head over and introduce myself”)",
+    "ejected": {
+      "beat": "You were thrown out.",
+      "notice": "You've been kicked out of {place}. You can't come back for {days, plural, one {# day} other {# days}}.",
+      "back": "Back to the map"
+    }
   },
   "characters": {
     "kicker": "The Almanac · Cast",

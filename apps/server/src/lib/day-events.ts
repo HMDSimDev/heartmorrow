@@ -28,6 +28,8 @@ export const RECAP_EVENT_TYPES = new Set([
   // Discovery: meeting a new person in a location's room chat. Names someone you JUST
   // met, so it's a player beat (kept) — not a town beat (suppressed under discovery).
   'meet',
+  // Discovery: getting thrown out of a location's room. A player beat about you.
+  'ejected',
   'dtr_accepted',
   'dtr_backfired',
   'gossip_text',
@@ -86,6 +88,13 @@ export function describeEvent(e: GameEvent): string | null {
       if (!who) return null;
       const place = placeFor(p);
       return place ? `Met ${who} at ${place}.` : `Met ${who}.`;
+    }
+    case 'ejected': {
+      // 'ejected' carries worldId directly (no characterId), so resolve the venue from it.
+      const world = typeof p.worldId === 'string' ? worldsRepo.get(p.worldId) : null;
+      const place = (typeof p.locationId === 'string' && world?.locations.find((l) => l.id === p.locationId)?.name) || '';
+      const why = typeof p.reason === 'string' && p.reason.trim() ? ` for ${p.reason.trim()}` : '';
+      return `Got thrown out of ${place || 'a place'}${why}.`;
     }
     case 'milestone_reached':
       return `You and ${nameFor(p.characterId)} reached a new milestone: ${String(p.label ?? p.band ?? '')}.`;
@@ -222,6 +231,7 @@ const BEAT_STYLE: Record<string, { icon: string; tone: DayRecordBeat['tone'] }> 
   purchase: { icon: '🛍️', tone: 'neutral' },
   item_use: { icon: '🎁', tone: 'neutral' },
   meet: { icon: '🤝', tone: 'good' },
+  ejected: { icon: '🚫', tone: 'bad' },
   milestone_reached: { icon: '💞', tone: 'good' },
   dtr_accepted: { icon: '💍', tone: 'good' },
   reconciled: { icon: '🕊️', tone: 'good' },

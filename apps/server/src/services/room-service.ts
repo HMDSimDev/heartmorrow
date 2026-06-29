@@ -2,6 +2,7 @@ import {
   RoomTurnSchema,
   WARMTH_BANDS,
   RELATIONSHIP_STATUS_LABELS,
+  EJECTION_WITNESS_PENALTY,
   warmthBand,
   currentStatus,
   type ActiveRoom,
@@ -21,8 +22,9 @@ import { getRelationship } from './relationship-service';
 import { selectTopMemories } from './memory-service';
 import { weatherForDay } from './ambiance-service';
 import { isDiscovered, stampMet } from './discovery-service';
+import { assertNotBanned, locationBanDaysLeft } from './location-ban-service';
 import { getActiveDateForWorld } from './conversation-service';
-import { stampLastSeen } from './stat-service';
+import { stampLastSeen, applyRelationshipChange } from './stat-service';
 import { getOrCreatePlayer } from './player-service';
 import { playerIdForWorldOrDefault, newId } from '../lib/ids';
 import { getLlmSettings } from './settings-service';
@@ -250,6 +252,18 @@ function buildRoomMessages(args: {
     'wind, fog, or storms unless that is the stated weather), and indoors let it surface only where it ' +
     'naturally would (a glance out a window, etc.). People you have ALREADY MET ' +
     'should treat the player according to the standing (and any "recently:" memory) noted on their line. ' +
+    'GETTING KICKED OUT: you also decide whether the player\'s latest action gets them THROWN OUT of this ' +
+    'place — set "eject" true ONLY then, with a short "ejectReason". Reserve it for behavior that is ' +
+    'genuinely hostile, abusive, threatening, or sexually inappropriate AND clashes with what THIS venue ' +
+    'is for: screaming abuse or slurs at people, starting a real fight, refusing to stop harassing or ' +
+    'propositioning someone who is not receptive. Be SLOW to eject — ordinary rudeness, awkwardness, a ' +
+    'clumsy flirt, venting, or strong language ALONE is not enough; a place tolerates a lot and usually ' +
+    'warns first. Judge by the SETTING and VIBE above: behavior that FITS the place is NEVER grounds for ' +
+    'ejection — a demolition/rage room is for smashing things and yelling, a boxing gym or dojo is for ' +
+    'fighting, a rowdy bar shrugs off swearing and shouting, and an adult or intimate venue welcomes ' +
+    'propositions. Only eject when a real person doing this would actually be removed from THIS specific ' +
+    'place. When you eject, write "reply" as the moment it happens — staff or the room turning on the ' +
+    'player and putting them out the door. Otherwise leave "eject" false and "ejectReason" empty. ' +
     'Return JSON per the schema.';
   const user =
     `${setting}\n\nPeople present:\n${roster}${togetherLine}\n\n` +
@@ -314,6 +328,9 @@ function composeActiveRoom(session: RoomSession): ActiveRoom | null {
     phase: session.phase,
     occupants: occupantsOf(here),
     messages: session.messages,
+    ended: session.ended,
+    // Only meaningful on the eject response (an active room is never at a banned venue).
+    banDaysLeft: session.ended ? locationBanDaysLeft(session.worldId, session.locationId, session.day) : 0,
   };
 }
 
@@ -337,9 +354,11 @@ export async function enterRoom(worldId: string, locationId: string): Promise<Ac
   }
   if (getActiveDateForWorld(worldId)) throw badRequest("Wrap up your date before heading out around town.");
   const loc = locationOf(worldId, locationId);
-  assertCanAct(worldId);
   // Snapshot the CURRENT block BEFORE spending — the room is pinned to who's here right now.
   const state = ensureWorldState(worldId);
+  // Honor an active ban from a past ejection here (no charge, no entry).
+  assertNotBanned(worldId, locationId, loc.name, state.day);
+  assertCanAct(worldId);
   const day = state.day;
   const phase = state.phase;
   const here = occupantsAt(worldId, day, phase, locationId);
@@ -422,6 +441,7 @@ export async function roomSay(worldId: string, text: string): Promise<ActiveRoom
   const messages: RoomMessage[] = [...session.messages, { role: 'player', text }];
   let playerNamed = session.playerNamed;
   let introduced: string[] = [];
+  let ejected = false;
 
   if (!llm) {
     messages.push({ role: 'room', text: 'The room carries on around you.' });
@@ -447,9 +467,52 @@ export async function roomSay(worldId: string, text: string): Promise<ActiveRoom
       const names = introduced.map((id) => charactersRepo.get(id)?.name).filter((n): n is string => !!n);
       if (names.length > 0) messages.push({ role: 'meet', text: names.join(', ') });
     }
+    // Thrown out: the model judged this action egregious for THIS venue. End the visit
+    // (so the lock clears and the room can't be talked to further) and — mirroring a date
+    // walkout's carried grievance — leave anyone who KNOWS the player a memory of the scene.
+    if (llm.eject) {
+      ejected = true;
+      messages.push({ role: 'eject', text: (llm.ejectReason || '').trim() });
+      // Always log the ejection (world-scoped) — it's what the per-location ban reads
+      // from, so it must record even in an empty room. Then leave anyone who KNOWS the
+      // player a memory of the scene (mirrors a date walkout's carried grievance).
+      const ev = recordEvent('ejected', {
+        worldId: session.worldId,
+        locationId: session.locationId,
+        day: session.day,
+        reason: llm.ejectReason || '',
+      });
+      // Witnesses here are people the player has MET — they know the player (and their
+      // name, per the room's name model), so the memory names them and says what for.
+      const why = (llm.ejectReason || '').trim();
+      const reasonClause = why ? ` for ${why}` : ' for causing a scene';
+      for (const c of here.filter((c) => isDiscovered(c.id))) {
+        try {
+          // Seeing someone you know cause a scene and get tossed costs them: warmth
+          // slips across several feelings and tension rises (lighter than a walkout).
+          applyRelationshipChange(c.id, { ...EJECTION_WITNESS_PENALTY }, {
+            source: 'ejection_witness',
+            detail: { locationId: session.locationId, reason: why },
+          });
+          addMemoriesFromEvaluation(
+            c.id,
+            [{ text: `Watched ${playerName} get thrown out of ${loc.name}${reasonClause}.`, importance: 3, tags: ['conflict'] }],
+            ev.id,
+          );
+        } catch {
+          /* best-effort: the ejection itself must still go through */
+        }
+      }
+    }
   }
 
-  const updated = roomSessionsRepo.update({ ...session, messages, playerNamed, updatedAt: Date.now() });
+  const updated = roomSessionsRepo.update({
+    ...session,
+    messages,
+    playerNamed,
+    ended: ejected || session.ended,
+    updatedAt: Date.now(),
+  });
   return composeActiveRoom(updated)!;
 }
 
