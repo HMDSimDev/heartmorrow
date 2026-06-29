@@ -621,7 +621,7 @@ export function CharacterProfile() {
 
                 {/* ---- Tab: Memories ---- */}
                 <div className={panelClass('memories')}>
-                  <MemoriesSection memories={memories} characterName={character.name} onDelete={deleteMemory} />
+                  <MemoriesSection memories={memories} characterName={character.name} onDelete={deleteMemory} canDelete={creatorMode} />
                 </div>
               </div>
             </div>
@@ -700,10 +700,13 @@ function MemoriesSection({
   memories,
   characterName,
   onDelete,
+  canDelete,
 }: {
   memories: CharacterMemory[];
   characterName: string;
   onDelete: (id: string) => void;
+  /** Deleting a character's memories is a creator-only tool — hidden in Play mode. */
+  canDelete: boolean;
 }) {
   const { t } = useTranslation(['pages', 'common']);
   const [open, setOpen] = useState(true);
@@ -733,7 +736,7 @@ function MemoriesSection({
           <p className="hint" style={{ marginTop: 0 }}>
             {t('profile.memoriesHint', { name: characterName })}
           </p>
-          <MemoryList memories={memories} onDelete={onDelete} />
+          <MemoryList memories={memories} onDelete={onDelete} canDelete={canDelete} />
         </>
       ) : (
         <p className="muted" style={{ margin: 0 }}>
@@ -747,9 +750,11 @@ function MemoriesSection({
 function MemoryList({
   memories,
   onDelete,
+  canDelete,
 }: {
   memories: CharacterMemory[];
   onDelete: (id: string) => void;
+  canDelete: boolean;
 }) {
   const { t } = useTranslation(['pages', 'common']);
   return (
@@ -764,9 +769,11 @@ function MemoryList({
           <div className="flex-fill">
             <div className="prof-mem-text">{m.text}</div>
             <div className="prof-mem-meta">
-              <small className={`prof-mem-src${m.sourceEventId ? ' date' : ''}`}>
+              <small className={`prof-mem-src${m.sourceEventId && m.sourceType !== 'ejected' ? ' date' : ''}`}>
                 {m.tags.includes('met_people') ? (
                   <><Icon name="people" size={12} /> {t('profile.fromMeeting')}</>
+                ) : m.sourceType === 'ejected' ? (
+                  <><Icon name="leave" size={12} /> {t('profile.fromAroundTown')}</>
                 ) : m.sourceEventId ? (
                   <><Icon name="date" size={12} /> {t('profile.fromDate')}</>
                 ) : (
@@ -781,9 +788,11 @@ function MemoryList({
               ))}
             </div>
           </div>
-          <button className="btn sm danger ghost prof-mem-del" onClick={() => onDelete(m.id)} aria-label={t('profile.deleteMemory')}>
-            <Icon name="close" size={15} />
-          </button>
+          {canDelete && (
+            <button className="btn sm danger ghost prof-mem-del" onClick={() => onDelete(m.id)} aria-label={t('profile.deleteMemory')}>
+              <Icon name="close" size={15} />
+            </button>
+          )}
         </div>
       ))}
     </div>

@@ -47,7 +47,7 @@ import {
   type ProfileGeneration,
   type StructuredResult,
 } from '@dsim/shared';
-import { charactersRepo, npcEdgesRepo, npcKnowledgeRepo, worldsRepo, worldStatesRepo } from '../db/repositories';
+import { charactersRepo, eventsRepo, npcEdgesRepo, npcKnowledgeRepo, worldsRepo, worldStatesRepo } from '../db/repositories';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { notFound } from '../lib/errors';
 import { ensureRelationship, getRelationship } from './relationship-service';
@@ -805,9 +805,19 @@ export async function generateCharacterFromImage(
 
 export function getCharacterBundle(id: string): CharacterBundle {
   const character = getCharacter(id);
+  // Resolve each memory's source-event TYPE so the UI can show an accurate origin
+  // ("around town" for an ejection, "from a date" for a date eval, etc.) instead of
+  // assuming every event-sourced memory is a date. Event lookups are cached per id
+  // since several memories can share one source event (e.g. a date's beats).
+  const typeByEvent = new Map<string, string | null>();
+  const sourceTypeOf = (eventId: string | null): string | null => {
+    if (!eventId) return null;
+    if (!typeByEvent.has(eventId)) typeByEvent.set(eventId, eventsRepo.get(eventId)?.type ?? null);
+    return typeByEvent.get(eventId) ?? null;
+  };
   return {
     character,
     relationship: ensureRelationship(id),
-    memories: listMemories(id),
+    memories: listMemories(id).map((m) => ({ ...m, sourceType: sourceTypeOf(m.sourceEventId) })),
   };
 }

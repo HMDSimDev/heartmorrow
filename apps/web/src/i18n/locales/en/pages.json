@@ -265,6 +265,7 @@
     "importanceAria": "importance {n} of 5",
     "fromDate": "from a date",
     "fromMeeting": "when you met",
+    "fromAroundTown": "around town",
     "addedManually": "added manually",
     "deleteMemory": "Delete memory",
     "confirmDeleteTitle": "Delete {name}?",

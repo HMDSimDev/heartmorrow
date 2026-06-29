@@ -253,6 +253,11 @@ export const CharacterMemorySchema = z.object({
   /** Canonical memory tags only; legacy/off-list tags are dropped on read. */
   tags: MemoryTagArraySchema,
   sourceEventId: id.nullable().default(null),
+  /** Type of the linked source event ('session_eval', 'meet', 'ejected', …), populated
+   *  ON READ (e.g. the character bundle) from `sourceEventId`. Null in storage and when
+   *  there's no event. Lets the UI show an accurate origin instead of assuming every
+   *  event-sourced memory came "from a date". */
+  sourceType: z.string().nullable().default(null),
   /** The OTHER person this memory is about, when it's a shared/social moment (e.g.
    *  a world-sim meeting) — lets a memory be looked up by "who it involves" and the
    *  two parties' memories of the same encounter be cross-referenced. Null otherwise. */

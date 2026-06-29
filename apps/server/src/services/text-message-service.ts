@@ -24,6 +24,7 @@ import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest } from '../lib/errors';
 import { withKeyedLock } from '../lib/keyed-lock';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
+import { isDiscovered } from './discovery-service';
 import { readAssetFile } from './asset-service';
 import { getCharacterAvailability, currentAvailabilityFor, currentAvailabilityMap } from './availability-service';
 import { getRelationship } from './relationship-service';
@@ -49,7 +50,17 @@ export function hasDated(characterId: string): boolean {
     .some((s) => (s.mode === 'date' || s.mode === 'event') && messagesRepo.hasRole(s.id, 'player'));
 }
 
-/** Characters the player may text — only those they've actually dated (optionally
+/**
+ * Whether the PLAYER may text a character: once they've been on a date together, OR
+ * the player has met them somewhere (a discovery-world introduction makes them an
+ * acquaintance). Gates the contact picker, the thread view, and sending/retry.
+ * Non-discovery worlds have no acquaintance stage, so this stays "has dated" there.
+ */
+export function canTextCharacter(characterId: string): boolean {
+  return hasDated(characterId) || isDiscovered(characterId);
+}
+
+/** Characters the player may text — those they've dated OR met somewhere (optionally
  *  scoped to one world). Each carries current-day availability so the contact
  *  picker can flag a busy person before the player tries to message them. */
 export function listContactableCharacters(
@@ -58,7 +69,7 @@ export function listContactableCharacters(
   const characters = charactersRepo
     .list()
     .filter((c) => (worldId ? c.worldId === worldId : true))
-    .filter((c) => hasDated(c.id));
+    .filter((c) => canTextCharacter(c.id));
   const avail = currentAvailabilityMap(characters);
   return characters.map((c) => {
     const a = avail.get(c.id);
@@ -201,8 +212,8 @@ export interface ThreadView {
 
 export function getThreadView(characterId: string, playerId: string = DEFAULT_PLAYER_ID): ThreadView {
   const character = getCharacter(characterId);
-  if (!hasDated(characterId)) {
-    throw badRequest(`You haven't been on a date with ${character.name} yet — go on a date before texting.`);
+  if (!canTextCharacter(characterId)) {
+    throw badRequest(`You haven't met ${character.name} yet — meet them around town or go on a date before texting.`);
   }
   deliverDueTexts();
   const thread = getOrCreateThread(characterId, playerId);
@@ -251,8 +262,8 @@ export async function sendPlayerText(
   if (isMemorialized(getRelationship(characterId))) {
     throw badRequest(`${character.name} is no longer with us.`);
   }
-  if (!hasDated(characterId)) {
-    throw badRequest(`You can only text someone you've been on a date with.`);
+  if (!canTextCharacter(characterId)) {
+    throw badRequest(`You can only text someone you've met or been on a date with.`);
   }
   if (!text.trim() && !imageAssetId && !giftId) {
     throw badRequest('Type a message, attach an image, or send a gift.');
@@ -492,8 +503,8 @@ export async function retryPlayerTextReply(
   if (isMemorialized(getRelationship(characterId))) {
     throw badRequest(`${character.name} is no longer with us.`);
   }
-  if (!hasDated(characterId)) {
-    throw badRequest(`You can only text someone you've been on a date with.`);
+  if (!canTextCharacter(characterId)) {
+    throw badRequest(`You can only text someone you've met or been on a date with.`);
   }
   // Same per-character lock as sendPlayerText: re-evaluate the trailing message
   // INSIDE the critical section so two concurrent retries (or a retry racing a

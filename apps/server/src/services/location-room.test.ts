@@ -3,7 +3,7 @@ import { DEFAULT_DATING_STATS, ConversationSessionSchema } from '@dsim/shared';
 import { resetDb, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { createWorld } from './world-service';
-import { createCharacter, updateCharacter } from './character-service';
+import { createCharacter, updateCharacter, getCharacterBundle } from './character-service';
 import { enterRoom, roomSay, getActiveRoom, leaveRoom } from './room-service';
 import { createSession } from './conversation-service';
 import { isDiscovered, stampMet } from './discovery-service';
@@ -12,6 +12,7 @@ import { setRelationshipFlag, applyRelationshipChange } from './stat-service';
 import { getRelationship } from './relationship-service';
 import { addMemoriesFromEvaluation, listMemories } from './memory-service';
 import { recordEvent } from './event-service';
+import { canTextCharacter, listContactableCharacters } from './text-message-service';
 import { locationBanDaysLeft, assertNotBanned } from './location-ban-service';
 import { composeLocationScene } from './placement-service';
 import { ensureWorldState } from './world-clock-service';
@@ -178,6 +179,18 @@ describe('location room chat (discovery)', () => {
     expect(mem!.text).toContain('starting a fight'); // …and what for
   });
 
+  it('sources the witness memory as an ejection (so the UI never calls it "from a date")', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    stampMet(mara.id, 1, 'cafe');
+    scriptRoom(turn('You step in.'), turn('Out you go.', { eject: true, ejectReason: 'abuse' }));
+    await enterRoom(w.id, 'cafe');
+    await roomSay(w.id, 'Fuck this place!');
+
+    const mem = getCharacterBundle(mara.id).memories.find((m) => m.tags.includes('conflict'));
+    expect(mem?.sourceType).toBe('ejected'); // not a date eval → UI shows "around town"
+  });
+
   it('dings the relationship of a witness who knows you (tension up, warmth down)', async () => {
     const { w, chars } = worldWithRegulars(['Mara']);
     const mara = chars[0]!;
@@ -245,6 +258,21 @@ describe('location room chat (discovery)', () => {
     expect(() => assertNotBanned(w.id, 'cafe', 'The Glasshouse', 1)).toThrow(/kicked out/i);
     expect(() => assertNotBanned(w.id, 'cafe', 'The Glasshouse', 4)).not.toThrow(); // lapsed
     expect(() => assertNotBanned(w.id, 'park', 'The Park', 1)).not.toThrow(); // never ejected here
+  });
+
+  it('lets you text someone after meeting them in a room (no date required)', async () => {
+    const { w, chars } = worldWithRegulars(['Mara']);
+    const mara = chars[0]!;
+    expect(canTextCharacter(mara.id)).toBe(false); // a stranger you can't text yet
+    expect(listContactableCharacters(w.id).some((c) => c.id === mara.id)).toBe(false);
+
+    scriptRoom(turn('You arrive.'), turn('She looks up. "Oh — I\'m Mara."', { introduced: [mara.id] }));
+    await enterRoom(w.id, 'cafe');
+    await roomSay(w.id, "Hi, I'm Sam — good to meet you.");
+
+    expect(isDiscovered(mara.id)).toBe(true);
+    expect(canTextCharacter(mara.id)).toBe(true); // meeting unlocked texting…
+    expect(listContactableCharacters(w.id).some((c) => c.id === mara.id)).toBe(true); // …and the picker
   });
 
   it("withholds the PLAYER's name until they introduce themselves, then allows it", async () => {

@@ -784,6 +784,10 @@ export const eventsRepo = {
       .all<Row>('SELECT * FROM game_events ORDER BY created_at DESC LIMIT ?', limit)
       .map(rowToEvent);
   },
+  get(id: string): GameEvent | undefined {
+    const r = getDb().get<Row>('SELECT * FROM game_events WHERE id = ?', id);
+    return r ? rowToEvent(r) : undefined;
+  },
   /** Events created at or after a timestamp, oldest first (for the day recap).
    *  `rowid` breaks created_at ties so insertion order is stable (the day-record
    *  backfill segments this stream by day_advanced markers and relies on it). */
