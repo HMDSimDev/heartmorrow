@@ -62,7 +62,7 @@ import { badRequest, notFound } from '../lib/errors';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { getRelationship } from './relationship-service';
 import { assertDiscoveryCanStart, isRedacted, stampMet } from './discovery-service';
-import { assertNotBanned } from './location-ban-service';
+import { assertNotBanned, locationBanDaysLeft } from './location-ban-service';
 import { getPlacements } from './placement-service';
 import { getOrCreatePlayer, spendMoney } from './player-service';
 import { selectTopMemories } from './memory-service';
@@ -122,12 +122,16 @@ import { ThinkStripper, stripThink } from '../lib/think-filter';
  * are free), so "Anywhere" can't silently start a date you can't pay for. Returns null
  * only when the world has no venues at all (a locationless date is the fallback then).
  */
-function pickAnywhereVenue(locations: readonly Location[], money: number): string | null {
+function pickAnywhereVenue(locations: readonly Location[], money: number, worldId: string, currentDay: number): string | null {
   if (locations.length === 0) return null;
-  const free = locations.find((l) => venueCost(l.priceTier) === 0);
+  // Never auto-route an "Anywhere" date to a venue you've been thrown out of. If you're
+  // welcome nowhere right now, fall through to a locationless date rather than throwing.
+  const allowed = locations.filter((l) => locationBanDaysLeft(worldId, l.id, currentDay) === 0);
+  if (allowed.length === 0) return null;
+  const free = allowed.find((l) => venueCost(l.priceTier) === 0);
   if (free) return free.id;
   // No free venue exists — fall back to the cheapest one you can afford.
-  const cheapestFirst = [...locations].sort((a, b) => venueCost(a.priceTier) - venueCost(b.priceTier));
+  const cheapestFirst = [...allowed].sort((a, b) => venueCost(a.priceTier) - venueCost(b.priceTier));
   const affordable = cheapestFirst.find((l) => venueCost(l.priceTier) <= money);
   if (affordable) return affordable.id;
   const cheapest = cheapestFirst[0]!;
@@ -193,7 +197,7 @@ export function createSession(input: ConversationCreate): ConversationSession {
     // "Anywhere": auto-pick the first free public venue, else the cheapest the player
     // can currently afford — refusing the date outright when nothing is affordable.
     if (resolvedLocationId === 'anywhere') {
-      resolvedLocationId = pickAnywhereVenue(world?.locations ?? [], getOrCreatePlayer(playerIdForWorld(character.worldId)).money);
+      resolvedLocationId = pickAnywhereVenue(world?.locations ?? [], getOrCreatePlayer(playerIdForWorld(character.worldId)).money, character.worldId, day);
     }
     if (resolvedLocationId?.startsWith('prop:') && !propertyVenueInfo(resolvedLocationId, character.worldId)) {
       throw badRequest('You can only date at a place you own or lease.');

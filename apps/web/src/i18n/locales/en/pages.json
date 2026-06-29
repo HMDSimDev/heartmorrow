@@ -1535,6 +1535,46 @@
           }
         ]
       },
+      "around-town": {
+        "label": "Around town",
+        "title": "Meeting people around town",
+        "overview": "In some worlds you don't begin knowing everyone. Your People list opens mostly as ???, and you get to know the cast by going out and meeting them. The Around Town tab shows the places in town and who is out and about right now; step into a spot, talk to whoever is there, and introduce yourself, and they become someone you can date and text.",
+        "sections": [
+          {
+            "heading": "Stepping into a place",
+            "body": [
+              "Around Town lists the places you can visit and, for people you have already met, the faces who are there this part of the day. Who is where shifts with the clock and with people's routines, so a regular might hold down the same café every morning while others drift around, it is worth looking in at different times of day.",
+              "Browsing the list is free. Stepping inside costs one action, the same energy a date or an activity spends. Once you are in, you are in a freeform scene with a narrator and everyone present, and you talk or act in plain language: \"I head over and introduce myself,\" \"I ask what she's reading,\" whatever fits the moment."
+            ]
+          },
+          {
+            "heading": "Meeting someone",
+            "body": [
+              "People you have not met stay anonymous, described but never named, until you actually introduce yourself and they introduce themselves back. When that happens they are revealed in your People list and become someone you can ask out on a date.",
+              "You do not have to give your own name right away, and until you do, no one in the room knows it either. Meeting someone sticks, so the next time you cross paths, or text them, they know you."
+            ]
+          },
+          {
+            "heading": "Texting people you've met",
+            "body": [
+              "You can text anyone you have met around town or been on a date with, there is no need to date someone first just to message them. Open the Messages app on your phone and they will be in your contacts."
+            ]
+          },
+          {
+            "heading": "Don't get thrown out",
+            "body": [
+              "Every place has a vibe, and crossing it has consequences. Being genuinely hostile or abusive, or pushing unwanted advances that do not fit where you are, can get you thrown out, and the room reads the setting, so what counts depends on the place. A quiet café or library has little patience; a rowdy bar shrugs off far more; and somewhere built for it, a boxing gym, say, will not blink at things that would empty a tearoom. Ordinary rudeness or a clumsy line will not do it, and you usually get a warning first.",
+              "Anyone there who already knows you will remember the scene, and think a little less of you for it."
+            ]
+          },
+          {
+            "heading": "Getting banned",
+            "body": [
+              "Get thrown out and you are barred from that one place for a few days, three the first time and up to a week if you keep getting thrown out of the same spot. The location shows how long you are shut out, and you cannot go back, or take a date there, until it lifts. Everywhere else is unaffected, and once the cooldown passes you are welcome again."
+            ]
+          }
+        ]
+      },
       "phone": {
         "label": "Your phone",
         "title": "Your phone",

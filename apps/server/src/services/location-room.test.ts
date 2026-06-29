@@ -252,6 +252,28 @@ describe('location room chat (discovery)', () => {
     expect(() => createSession({ characterId: davi.id, mode: 'date', locationId: 'cafe' })).toThrow(/kicked out/i);
   });
 
+  it('an "anywhere" date skips a venue you are banned from', async () => {
+    // One character → availability guard always frees them; two free venues so the
+    // auto-pick has somewhere else to land once the cafe is off-limits.
+    const w = createWorld({
+      name: 'Town',
+      featureFlags: { discovery: true },
+      locations: [
+        { id: 'cafe', name: 'The Glasshouse', kind: 'cafe' },
+        { id: 'park', name: 'Harborside Park', kind: 'park' },
+      ],
+    });
+    const davi = createCharacter({ worldId: w.id, name: 'Davi', age: 28, datingStats: DS });
+    updateCharacter(davi.id, { dateable: true });
+    stampMet(davi.id, 1, 'cafe');
+    scriptRoom(turn('You step in.'), turn('Out.', { eject: true, ejectReason: 'abuse' }));
+    await enterRoom(w.id, 'cafe');
+    await roomSay(w.id, 'Screw this place!');
+
+    const session = createSession({ characterId: davi.id, mode: 'date', locationId: 'anywhere' });
+    expect(session.locationId).toBe('park'); // not the banned cafe (the first free venue)
+  });
+
   it('the shared ban gate throws only while banned, and never for a clean venue', () => {
     const { w } = worldWithRegulars([]);
     recordEvent('ejected', { worldId: w.id, locationId: 'cafe', day: 1 });
