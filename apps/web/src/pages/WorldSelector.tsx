@@ -28,6 +28,10 @@ import { useDraft } from '../lib/useDraft';
 import { draftKey } from '../lib/drafts';
 import { Settings } from './Settings';
 import './worldselect.page.css';
+// The onboarding welcome reuses the People page's framed portrait plates (.ppl-*),
+// so pull in their styles here — the class names are People-page-scoped and never
+// collide with the world selector's own .wsel-/.wonb- styles.
+import './characters.page.css';
 
 /** The deliberate "which world am I playing?" landing page. Reachable at any time
  *  via the "Switch world" link, and the app's entry point when no world is active. */
@@ -397,6 +401,12 @@ export function WorldOnboarding() {
   const [importIds, setImportIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  // The LLM welcome opening is generated when LEAVING the import step (step 3 → 4),
+  // so the welcome screen opens already-written. We block that transition until the
+  // generation resolves — `preparing` flags that wait; an empty `welcomeIntro` means
+  // it failed / the model was down, and the welcome falls back to the shipped copy.
+  const [welcomeIntro, setWelcomeIntro] = useState('');
+  const [preparing, setPreparing] = useState(false);
   // AI "generate the whole world" (blank mode only): a free-form idea + the
   // generated draft (lore/rules/locations) the player can edit before creating.
   const [genPrompt, setGenPrompt] = useState('');
@@ -563,12 +573,23 @@ export function WorldOnboarding() {
     setBusy(true);
     setError(undefined);
     try {
+      // Import first so the welcome's cast reflects anyone just brought over.
       if (importIds.size > 0) await api.importCharacters(world.id, [...importIds]);
+      // Compose the welcome intro now, and don't advance to the welcome screen until
+      // it's done — or failed, in which case we proceed with the shipped fallback copy.
+      setPreparing(true);
+      try {
+        const res = await api.generateWelcomeIntro(world.id);
+        setWelcomeIntro(res.ok ? res.data.trim() : '');
+      } catch {
+        setWelcomeIntro(''); // model unreachable → fall back on the welcome screen
+      }
       setStep(4);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
+      setPreparing(false);
     }
   };
 
@@ -925,12 +946,20 @@ export function WorldOnboarding() {
             selected={importIds}
             onToggle={toggleImport}
             busy={busy}
+            preparing={preparing}
             onBack={() => setStep(2)}
             onContinue={importThenContinue}
           />
         )}
 
-        {step === 4 && world && <OnboardWelcome world={world} persona={persona.name.trim() || 'You'} onEnter={finish} />}
+        {step === 4 && world && (
+          <OnboardWelcome
+            world={world}
+            persona={persona.name.trim() || 'You'}
+            intro={welcomeIntro}
+            onEnter={finish}
+          />
+        )}
       </div>
     </div>
   );
@@ -942,6 +971,7 @@ function ImportPeopleStep({
   selected,
   onToggle,
   busy,
+  preparing,
   onBack,
   onContinue,
 }: {
@@ -949,6 +979,9 @@ function ImportPeopleStep({
   selected: Set<string>;
   onToggle: (id: string) => void;
   busy: boolean;
+  /** True once imports are done and the welcome intro is being composed (the
+   *  transition is held here until generation resolves). */
+  preparing: boolean;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -1020,11 +1053,13 @@ function ImportPeopleStep({
           {t('worldOnboarding.back')}
         </button>
         <button className="btn primary" onClick={onContinue} disabled={busy}>
-          {busy
-            ? t('worldOnboarding.importing')
-            : selected.size > 0
-              ? t('worldOnboarding.importN', { count: selected.size })
-              : t('worldOnboarding.skip')}{' '}
+          {preparing
+            ? t('worldOnboarding.welcomeIntroLoading')
+            : busy
+              ? t('worldOnboarding.importing')
+              : selected.size > 0
+                ? t('worldOnboarding.importN', { count: selected.size })
+                : t('worldOnboarding.skip')}{' '}
           <Icon name="chevronRight" size={16} />
         </button>
       </div>
@@ -1032,22 +1067,53 @@ function ImportPeopleStep({
   );
 }
 
-/** The final onboarding beat: how-to-play + a preview of who lives in this world. */
-function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: string; onEnter: () => void }) {
+/** The final onboarding beat: an LLM-written welcome + how-to-play + a preview of
+ *  who lives in this world. The `intro` was composed on the prior step's Continue, so
+ *  it's ready here — an empty string means generation failed and we use shipped copy. */
+function OnboardWelcome({
+  world,
+  persona,
+  intro,
+  onEnter,
+}: {
+  world: World;
+  persona: string;
+  intro: string;
+  onEnter: () => void;
+}) {
   const { t } = useTranslation('pages');
   const { creatorMode } = useAppData();
   const cast = useAsync(() => api.listCharacters(world.id), [world.id]);
   const people = cast.data ?? [];
+  const introParas = intro
+    ? intro.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
+    : [];
 
   return (
     <>
-      <p className="wonb-flavor">
-        {t('worldOnboarding.welcomeFlavor', {
-          persona,
-          summary: world.summary || t('worldOnboarding.newChapter'),
-        })}
-      </p>
+      <div className="wonb-cast-head">
+        <span className="kicker">{t('worldOnboarding.welcomeIntroKicker')}</span>
+        <span className="trail" />
+      </div>
+      {introParas.length > 0 ? (
+        <div className="wonb-intro">
+          {introParas.map((p, i) => (
+            <p key={i}>{p}</p>
+          ))}
+        </div>
+      ) : (
+        <p className="wonb-flavor">
+          {t('worldOnboarding.welcomeFlavor', {
+            persona,
+            summary: world.summary || t('worldOnboarding.newChapter'),
+          })}
+        </p>
+      )}
 
+      <div className="wonb-cast-head">
+        <span className="kicker">{t('worldOnboarding.howToHead')}</span>
+        <span className="trail" />
+      </div>
       <ul className="wonb-howto">
         {HOW_TO_PLAY.map((h, i) => (
           <li key={i}>
@@ -1069,11 +1135,23 @@ function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: st
       ) : people.length > 0 ? (
         <div className="wonb-cast">
           {people.slice(0, 12).map((c) => (
-            <div className="wonb-cast-card" key={c.id}>
-              <Portrait character={c} />
-              <span className="wonb-cast-name truncate">{c.name}</span>
-              {c.shortDescription && <span className="wonb-cast-desc">{c.shortDescription}</span>}
-            </div>
+            <article className="ppl-plate" key={c.id}>
+              <div className="ppl-frame">
+                <div className="ppl-portrait-link">
+                  <Portrait character={c} />
+                </div>
+              </div>
+              <div className="ppl-nameplate">
+                <h3 className="ppl-name">{c.name}</h3>
+              </div>
+              {c.shortDescription && (
+                <p className="ppl-desc">
+                  {c.shortDescription.length > 90
+                    ? `${c.shortDescription.slice(0, 90).trimEnd()}…`
+                    : c.shortDescription}
+                </p>
+              )}
+            </article>
           ))}
         </div>
       ) : (

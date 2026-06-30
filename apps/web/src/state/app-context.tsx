@@ -94,6 +94,15 @@ interface AppData {
   // Mode + theme (client-side)
   creatorMode: boolean;
   setCreatorMode: (on: boolean) => void;
+  /** Global "must meet people" / location-discovery mode — a player setting (NOT a
+   *  per-world property). When on, People start as ??? until you meet them out in
+   *  town; Around Town itself is always available regardless. */
+  discoveryMode: boolean;
+  /** True once the global settings have been fetched at least once, so discovery-gated
+   *  surfaces can fail SAFE (redact) until the real value is known. */
+  discoveryReady: boolean;
+  /** Re-fetch the global settings (e.g. after the Settings page saves the toggle). */
+  reloadSettings: () => Promise<void>;
   /** Advanced mode: reveals power-user settings (sampler knobs + the Prompt Editor).
    *  Client-only UI gating, persisted to localStorage; the server enforces nothing. */
   advancedMode: boolean;
@@ -147,6 +156,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
   const [activeDateLoaded, setActiveDateLoaded] = useState(false);
   const [activeRoom, setActiveRoom] = useState<ActiveRoom | null>(null);
+  const [discoveryMode, setDiscoveryMode] = useState(false);
+  const [discoveryReady, setDiscoveryReady] = useState(false);
+
+  const reloadSettings = useCallback(async () => {
+    try {
+      setDiscoveryMode((await api.getSettings()).discoveryMode);
+    } catch {
+      /* server may not be up yet — leave the last-known value */
+    } finally {
+      setDiscoveryReady(true);
+    }
+  }, []);
 
   const reloadPlayer = useCallback(async () => {
     try {
@@ -200,8 +221,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   }, [activeWorldId]);
   // The active world's live Around Town room — the source of truth for resuming the
-  // tab and for the day-spending lock. Only discovery worlds have one; a 4xx (feature
-  // off) just clears it. Refetched on world change; AroundTown drives explicit updates.
+  // tab and for the day-spending lock. Any world can have one (Around Town is always
+  // available); an error just clears it. Refetched on world change; AroundTown drives updates.
   const refreshActiveRoom = useCallback(async () => {
     if (!activeWorldId) {
       setActiveRoom(null);
@@ -218,7 +239,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     void reloadPlayer();
     void reloadAssets();
     void reloadWorlds();
-  }, [reloadPlayer, reloadAssets, reloadWorlds]);
+    void reloadSettings();
+  }, [reloadPlayer, reloadAssets, reloadWorlds, reloadSettings]);
 
   // Poll the unread-text count so the sidebar badge stays current (texts can
   // arrive in the background as the world clock advances).
@@ -470,6 +492,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       sleep,
       creatorMode,
       setCreatorMode,
+      discoveryMode,
+      discoveryReady,
+      reloadSettings,
       advancedMode,
       setAdvancedMode,
       theme,
@@ -485,7 +510,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setActiveRoom,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, bumpDayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, activeRoom, refreshActiveRoom, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, bumpDayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, discoveryMode, discoveryReady, reloadSettings, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, activeRoom, refreshActiveRoom, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

@@ -55,6 +55,7 @@ type Form = ConnectionForm & {
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
   tragicOutcomesEnabled: boolean;
+  discoveryMode: boolean;
   roleOverrides: Record<RoleKey, LlmRoleConnection>;
   image: ImageGenSettings;
 };
@@ -87,7 +88,7 @@ interface PlayerForm {
  *  Settings under its own "Settings" heading, so the title isn't shown twice. */
 export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, i18n } = useTranslation(['pages', 'common']);
-  const { reloadPlayer, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, activeWorldId, theme, setTheme } = useAppData();
+  const { reloadPlayer, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, activeWorldId, theme, setTheme, reloadSettings, bumpDayTick } = useAppData();
   const [player, setPlayer] = useState<PlayerForm | null>(null);
   const [playerSaved, setPlayerSaved] = useState(false);
   const [playerSaving, setPlayerSaving] = useState(false);
@@ -111,6 +112,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const [ackContent, setAckContent] = useState(false);
   const [ackAge, setAckAge] = useState(false);
   const [nsfwSaving, setNsfwSaving] = useState(false);
+  const [discoverySaving, setDiscoverySaving] = useState(false);
   const [tragicModalOpen, setTragicModalOpen] = useState(false);
   const [ackTragic, setAckTragic] = useState(false);
   const [tragicSaving, setTragicSaving] = useState(false);
@@ -153,6 +155,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,
           tragicOutcomesEnabled: s.tragicOutcomesEnabled,
+          discoveryMode: s.discoveryMode,
           roleOverrides: { evaluator: s.roleOverrides.evaluator, vision: s.roleOverrides.vision },
           image: s.image,
         });
@@ -187,6 +190,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
     nsfwEnabled: form.nsfwEnabled,
     rapportCadence: form.rapportCadence,
     tragicOutcomesEnabled: form.tragicOutcomesEnabled,
+    discoveryMode: form.discoveryMode,
     roleOverrides: { evaluator: form.roleOverrides.evaluator, vision: form.roleOverrides.vision },
     image: form.image,
   });
@@ -212,6 +216,11 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           : f,
       );
       setSavedNote(t('settings.toast.saved'));
+      // Discovery is a global, app-wide toggle — refresh the cached value so every
+      // tab reflects it now, and bump the day tick so met-state / rosters refetch
+      // (turning discovery on backfills people you've met server-side).
+      await reloadSettings();
+      bumpDayTick();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -306,6 +315,24 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
       return false;
     } finally {
       setNsfwSaving(false);
+    }
+  };
+
+  // Persist the global "must meet people" mode on its own (a minimal PATCH) so the
+  // toggle takes effect immediately app-wide. Turning it on backfills met-state
+  // server-side, so refresh the cached setting + bump the day tick to refetch rosters.
+  const persistDiscovery = async (enabled: boolean): Promise<void> => {
+    setDiscoverySaving(true);
+    setError(undefined);
+    try {
+      const s = await api.updateSettings({ discoveryMode: enabled });
+      setForm((f) => (f ? { ...f, discoveryMode: s.discoveryMode } : f));
+      await reloadSettings();
+      bumpDayTick();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setDiscoverySaving(false);
     }
   };
 
@@ -477,6 +504,35 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             <Icon name="edit" size={14} /> {t('settings.mode.creator')}
           </button>
         </div>
+      </div>
+
+      <div className="framed set-section">
+        <div className="section-head">
+          <div className="titles">
+            <div className="kicker">{t('settings.discovery.kicker')}</div>
+            <h2>{t('settings.discovery.head')}</h2>
+          </div>
+          <div className="trail" />
+        </div>
+        <p className="set-lede">{t('settings.discovery.lede')}</p>
+        <div className="set-status-line">
+          {form.discoveryMode ? (
+            <>
+              <span className="badge warn">{t('settings.discovery.on')}</span>
+              <button className="btn sm" onClick={() => persistDiscovery(false)} disabled={discoverySaving}>
+                {discoverySaving ? t('settings.discovery.saving') : t('settings.discovery.disable')}
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="badge">{t('settings.discovery.off')}</span>
+              <button className="btn sm primary" onClick={() => persistDiscovery(true)} disabled={discoverySaving}>
+                {discoverySaving ? t('settings.discovery.saving') : t('settings.discovery.enable')}
+              </button>
+            </>
+          )}
+        </div>
+        <p className="hint" style={{ marginBottom: 0, marginTop: 12 }}>{t('settings.discovery.hint')}</p>
       </div>
 
       <div className="framed set-section">

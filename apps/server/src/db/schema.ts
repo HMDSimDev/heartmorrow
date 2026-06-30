@@ -861,7 +861,7 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
   {
     // Per-world discovery tuning (startKnownCount / unavailableChance / meetStaminaCost).
     // JSON blob, default '{}' → the DiscoveryConfig defaults apply; only meaningful
-    // when featureFlags.discovery is on.
+    // when the global discoveryMode setting is on.
     table: 'worlds',
     column: 'discovery_config',
     ddl: `ALTER TABLE worlds ADD COLUMN discovery_config TEXT NOT NULL DEFAULT '{}'`,

@@ -14,11 +14,15 @@ import { createShopItem } from './services/shop-service';
 import { createProperty } from './services/property-service';
 import { createCompany } from './services/market-service';
 import { getOrCreatePlayer } from './services/player-service';
+import { updateLlmSettings } from './services/settings-service';
 import { newId, playerIdForWorld } from './lib/ids';
 
 function seed(): void {
   ensureDirectories();
   initDatabase();
+  // The sample save is a "you already know these people" demo — keep discovery off so
+  // the seeded cast is visible immediately (the product default is on for real worlds).
+  updateLlmSettings({ discoveryMode: false });
 
   if (worldsRepo.list().length > 0 && process.env.FORCE_SEED !== '1') {
     // eslint-disable-next-line no-console

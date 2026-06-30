@@ -79,16 +79,20 @@ export function cloneWorld(sourceId: string, name: string): World {
 export function updateWorld(id: string, patch: WorldUpdate): World {
   const current = getWorld(id);
   const next = WorldSchema.parse({ ...current, ...patch, id: current.id, updatedAt: Date.now() });
-  const saved = worldsRepo.update(next);
-  // Enabling discovery on an existing save must not re-hide people you already know:
-  // backfill acquaintances (+ cold-start seed) the moment the flag flips on.
-  if (saved.featureFlags.discovery && !current.featureFlags.discovery) {
-    seedDiscoveryAcquaintances(saved.id);
-    // Pre-enable day records' town beats/narrative name NPCs you may not have met; drop them
-    // so the Calendar lazily reconstructs NPC-free records (worldSim=null) on next read.
-    getDb().run('DELETE FROM day_records WHERE world_id = ?', saved.id);
-  }
-  return saved;
+  return worldsRepo.update(next);
+}
+
+/**
+ * Run when the GLOBAL `discoveryMode` setting is flipped ON (from the settings route).
+ * Discovery is no longer a per-world flag, so enabling it must backfill EVERY world:
+ *  - seed acquaintances in each (so no save becomes a wall of ??? — people you've
+ *    already interacted with stay known, plus a cold-start face or two);
+ *  - drop all day_records, whose pre-enable town beats may name NPCs you haven't met,
+ *    so the Calendar lazily rebuilds NPC-free records (worldSim=null) on next read.
+ */
+export function onDiscoveryGloballyEnabled(): void {
+  for (const w of listWorlds()) seedDiscoveryAcquaintances(w.id);
+  getDb().run('DELETE FROM day_records');
 }
 
 /**

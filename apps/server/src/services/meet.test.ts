@@ -3,11 +3,15 @@ import { DEFAULT_DATING_STATS } from '@dsim/shared';
 import { resetDb } from '../test/helpers';
 import { createWorld } from './world-service';
 import { createCharacter, updateCharacter } from './character-service';
+import { updateLlmSettings } from './settings-service';
 import { addPlayerMessage, createSession, endSession, getActiveDateForWorld } from './conversation-service';
 import { isDiscovered } from './discovery-service';
 import { listMemories } from './memory-service';
 
-beforeEach(() => resetDb());
+beforeEach(() => {
+  resetDb();
+  updateLlmSettings({ discoveryMode: true }); // the Meet only matters when discovery is active
+});
 const DS = DEFAULT_DATING_STATS;
 
 /** A discovery world whose named characters all work the cafe on the morning shift, so
@@ -15,7 +19,6 @@ const DS = DEFAULT_DATING_STATS;
 function worldWithRegulars(names: string[]) {
   const w = createWorld({
     name: 'Town',
-    featureFlags: { discovery: true },
     locations: [{ id: 'cafe', name: 'The Glasshouse', kind: 'cafe' }],
   });
   const chars = names.map((n) => createCharacter({ worldId: w.id, name: n, age: 28, datingStats: DS }));

@@ -180,6 +180,16 @@ export const LlmSettingsSchema = z.object({
    */
   rapportCadence: z.enum(['every', 'periodic']).default('every'),
   /**
+   * "Living world" / location-discovery mode, as a GLOBAL player choice (not a
+   * per-world property — worlds never decide this). When on, People start as ???
+   * and only become dateable/textable once you introduce yourself out in town;
+   * when off, everyone is known from the start (the classic experience). Around
+   * Town itself is ALWAYS available regardless of this toggle — this only governs
+   * whether you must MEET people first. ON by default (a fresh world starts you
+   * knowing no one); the player can switch to the classic game in Settings.
+   */
+  discoveryMode: z.boolean().default(true),
+  /**
    * Opt-in to dark tragic outcomes (a character's self-harm as the consequence of
    * sustained, severe mistreatment). Requires `nsfwEnabled` to even be toggleable.
    * OFF by default; when off, the entire mechanic has zero footprint. Gated in the

@@ -603,7 +603,10 @@
     "importing": "Importing…",
     "importN": "Import {count} & continue",
     "skip": "Skip",
-    "welcomeFlavor": "The lamps are lit, {persona}. {summary} Here's the shape of a day before you step in:",
+    "welcomeIntroKicker": "Your story begins",
+    "welcomeIntroLoading": "Composing your welcome",
+    "howToHead": "The shape of your days",
+    "welcomeFlavor": "The lamps are lit, {persona}. {summary}",
     "newChapter": "A new chapter is yours to write.",
     "peopleYouCouldMeet": "The people you could meet",
     "blankPageCreator": "This world is a blank page — no one lives here yet. Once you step inside, head to People to create the characters who call it home.",
@@ -810,7 +813,6 @@
     "featureProperty": "Property — rent or buy places, collect rent, date there for a buff",
     "featureStock": "Stock market — invest in fictional in-world companies",
     "featureCasino": "Casino — wager money on slots, blackjack, roulette & video poker",
-    "featureDiscovery": "Discovery — start as strangers; meet people by visiting locations (People begin as ???)",
     "maxBet": "Max bet (◈)",
     "maxBetHint": "Flat per-bet cap · up to {max}",
     "dailyCap": "Daily wager cap (◈)",
@@ -1038,6 +1040,17 @@
       "creatorDesc": "shows them. Also in Phone → Settings.",
       "play": "Play mode",
       "creator": "Creator mode"
+    },
+    "discovery": {
+      "kicker": "Meeting people",
+      "head": "Start as strangers",
+      "lede": "On by default. A fresh world starts you knowing no one: everyone shows up as ??? until you go out to Around Town, find them, and introduce yourself — only then can you date or text them. Turn it off for the classic game, where everyone is in your circle from the start. Either way, Around Town is always available. This applies to every world.",
+      "on": "Meet-to-unlock ON",
+      "off": "Off",
+      "saving": "Saving…",
+      "disable": "Disable",
+      "enable": "Start as strangers",
+      "hint": "Turning this on backfills people you've already met, so no save becomes a wall of ???."
     },
     "nsfw": {
       "kicker": "Maturity",
@@ -1538,7 +1551,7 @@
       "around-town": {
         "label": "Around town",
         "title": "Meeting people around town",
-        "overview": "In some worlds you don't begin knowing everyone. Your People list opens mostly as ???, and you get to know the cast by going out and meeting them. The Around Town tab shows the places in town and who is out and about right now; step into a spot, talk to whoever is there, and introduce yourself, and they become someone you can date and text.",
+        "overview": "Around Town is always available: the tab shows the places in town and who is out and about right now; step into a spot and talk to whoever is there. By default a new world starts you knowing no one — your People list opens as ??? and you only get to know the cast by going out, finding them, and introducing yourself; only then can you date or text them. Prefer to know everyone from the start? Turn off \"Start as strangers\" in Settings (it applies to every world).",
         "sections": [
           {
             "heading": "Stepping into a place",

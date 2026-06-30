@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { badRequest, notFound } from '../lib/errors';
 import { getWorld } from '../services/world-service';
-import { requireFeature } from '../services/world-feature-service';
 import { ensureWorldState } from '../services/world-clock-service';
 import { composeLocationScene, getPlacements, isLocationOpen } from '../services/placement-service';
 import { isRedacted, stampGlimpsed } from '../services/discovery-service';
@@ -10,11 +9,11 @@ import { enterRoom, roomSay, getActiveRoom, leaveRoom } from '../services/room-s
 import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
 
 /**
- * Location-based discovery reads — the "Around Town" tab. All gated by
- * `featureFlags.discovery`. Placement is derived live from the world's current
- * time-block, so the views always reflect "right now"; the client refetches on the
- * phase tick. Occupants are returned as ids + templated activities (never names), so
- * the client redacts unmet people to ??? itself.
+ * The "Around Town" tab — ALWAYS available (no world gates it). Placement is derived
+ * live from the world's current time-block, so the views always reflect "right now";
+ * the client refetches on the phase tick. Occupants are returned as ids + templated
+ * activities (never names), so the client redacts unmet people to ??? itself when the
+ * global discovery mode is on (when it's off, everyone is simply known).
  */
 export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
   // The town this time-block: discoverable venues (closed ones flagged) + who's present.
@@ -30,7 +29,6 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId } = req.query as { worldId?: string };
       if (!worldId) throw badRequest('worldId is required.');
-      requireFeature(worldId, 'discovery');
       const world = getWorld(worldId);
       const state = ensureWorldState(worldId);
       const placements = getPlacements(worldId, state.day, state.phase);
@@ -68,7 +66,6 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId, locationId } = req.query as { worldId?: string; locationId?: string };
       if (!worldId || !locationId) throw badRequest('worldId and locationId are required.');
-      requireFeature(worldId, 'discovery');
       const world = getWorld(worldId);
       const loc = world.locations.find((l) => l.id === locationId);
       if (!loc || !loc.discoverable) throw notFound('That location is not part of this world.');
@@ -95,7 +92,6 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId } = req.query as { worldId?: string };
       if (!worldId) throw badRequest('worldId is required.');
-      requireFeature(worldId, 'discovery');
       return { room: getActiveRoom(worldId) };
     },
   );
@@ -108,7 +104,6 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId, locationId } = req.body as { worldId?: string; locationId?: string };
       if (!worldId || !locationId) throw badRequest('worldId and locationId are required.');
-      requireFeature(worldId, 'discovery');
       return enterRoom(worldId, locationId);
     },
   );
@@ -120,7 +115,6 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId, text } = req.body as { worldId?: string; text?: string };
       if (!worldId || !text?.trim()) throw badRequest('worldId and text are required.');
-      requireFeature(worldId, 'discovery');
       return roomSay(worldId, text);
     },
   );
@@ -132,7 +126,6 @@ export async function discoveryRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { worldId } = req.body as { worldId?: string };
       if (!worldId) throw badRequest('worldId is required.');
-      requireFeature(worldId, 'discovery');
       leaveRoom(worldId);
       return { ok: true as const };
     },

@@ -9,7 +9,7 @@ import {
 } from '@dsim/shared';
 import { getRelationship } from './relationship-service';
 import { setRelationshipFlag } from './stat-service';
-import { featureEnabled } from './world-feature-service';
+import { getLlmSettings } from './settings-service';
 import { charactersRepo } from '../db/repositories';
 import { badRequest } from '../lib/errors';
 
@@ -19,8 +19,9 @@ import { badRequest } from '../lib/errors';
  * (DEFAULT_PLAYER_ID, world-isolated via characterId — see migrate-player-identity),
  * so a Meet's stat nudge and the unlock it grants always land on the SAME row.
  *
- * Only meaningful when the world has `featureFlags.discovery` on; callers gate on the
- * flag. With discovery off these are inert (stage is just 'unknown').
+ * Whether discovery is ACTIVE is a GLOBAL player choice (`LlmSettings.discoveryMode`),
+ * not a per-world property — so every redaction/gate below keys off that one toggle.
+ * With it off these are inert (stage is just 'unknown' and nothing is hidden).
  */
 
 function stageOf(raw: unknown): AcquaintanceStage {
@@ -37,9 +38,11 @@ export function isDiscovered(characterId: string): boolean {
   return getAcquaintanceStage(characterId) === 'acquaintance';
 }
 
-/** Whether location-based discovery is enabled for a world. */
-export function discoveryEnabled(worldId: string | null | undefined): boolean {
-  return !!worldId && featureEnabled(worldId, 'discovery');
+/** Whether location-based discovery (must-meet-people) is active. A GLOBAL player
+ *  setting now — the `worldId` arg is accepted for call-site stability but ignored,
+ *  since no world decides this any longer. */
+export function discoveryEnabled(_worldId?: string | null): boolean {
+  return getLlmSettings().discoveryMode;
 }
 
 /** True when a character must be hidden behind ??? for the player: discovery is on for
@@ -98,7 +101,7 @@ export function stampGlimpsed(characterId: string, locationId: string): void {
  * discovery is off, so non-discovery worlds behave exactly as before.
  */
 export function assertDiscoveryCanStart(character: Character, mode: ConversationMode): void {
-  if (!character.worldId || !featureEnabled(character.worldId, 'discovery')) return;
+  if (!character.worldId || !discoveryEnabled()) return;
   if (mode === 'meet') return;
   if (getAcquaintanceStage(character.id) !== 'acquaintance') {
     throw badRequest(`You haven't met ${character.name} yet.`);

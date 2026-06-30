@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { LlmSettingsSchema, LlmSettingsUpdateSchema, PromptEstimateRequestSchema } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
 import { getLlmSettings, getRedactedLlmSettings, updateLlmSettings } from '../services/settings-service';
+import { onDiscoveryGloballyEnabled } from '../services/world-service';
 import { runHealthCheck } from '../llm/health';
 import { getAdapter } from '../llm/provider';
 import { describeLlmError } from '../llm/errors';
@@ -14,7 +15,11 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch('/settings', { schema: docSchema({ tags: ['settings'], summary: 'Update LLM settings', body: LlmSettingsUpdateSchema }) }, async (req) => {
     const update = parseInput(LlmSettingsUpdateSchema, req.body);
-    updateLlmSettings(update);
+    const wasDiscovery = getLlmSettings().discoveryMode;
+    const saved = updateLlmSettings(update);
+    // Turning the global "must meet people" mode ON backfills every world so no save
+    // becomes a wall of ??? and stale recaps don't name people you haven't met yet.
+    if (!wasDiscovery && saved.discoveryMode) onDiscoveryGloballyEnabled();
     return getRedactedLlmSettings();
   });
 

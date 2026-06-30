@@ -320,6 +320,24 @@ export const WorldGenerationSchema = z.object({
 });
 export type WorldGeneration = z.infer<typeof WorldGenerationSchema>;
 
+// --- Welcome intro (onboarding: a warm second-person opening for a new world) ---
+
+/**
+ * Bounds for the onboarding WELCOME-INTRO generator. The result is a single short
+ * prose field; the server trims it to `MAX_INTRO` (the Zod `.max()` still rejects a
+ * true runaway so it's retried, never silently truncated). A few short paragraphs is
+ * the target — `blurb` is only the runaway guard, not the goal.
+ */
+export const WELCOME_INTRO = {
+  MAX_INTRO: GEN_TEXT.blurb,
+} as const;
+
+/** A warm, second-person opening that welcomes the player into their new world. */
+export const WelcomeIntroSchema = z.object({
+  intro: z.string().min(1).max(WELCOME_INTRO.MAX_INTRO),
+});
+export type WelcomeIntroGeneration = z.infer<typeof WelcomeIntroSchema>;
+
 // --- Property generation (creator tool: batch in-world properties) ----------
 
 /**

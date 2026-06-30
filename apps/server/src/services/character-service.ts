@@ -51,8 +51,7 @@ import { charactersRepo, eventsRepo, npcEdgesRepo, npcKnowledgeRepo, worldsRepo,
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { notFound } from '../lib/errors';
 import { ensureRelationship, getRelationship } from './relationship-service';
-import { featureEnabled } from './world-feature-service';
-import { getAcquaintanceStage, isDiscovered, isRedacted, stampMet } from './discovery-service';
+import { discoveryEnabled, getAcquaintanceStage, isDiscovered, isRedacted, stampMet } from './discovery-service';
 import { getOrCreatePlayer } from './player-service';
 import { listMemories, NPC_LIFE_TAG } from './memory-service';
 import { getLlmSettings } from './settings-service';
@@ -254,21 +253,24 @@ export function legacyHasMet(characterId: string): boolean {
  *  A discovery world gates on being INTRODUCED (acqStage acquaintance); other worlds use
  *  the legacy interaction signal, so their behavior is unchanged. */
 function hasMetForDisplay(character: Character, rel: Relationship): boolean {
-  if (character.worldId && featureEnabled(character.worldId, 'discovery')) return isDiscovered(character.id);
+  if (character.worldId && discoveryEnabled()) return isDiscovered(character.id);
   return legacyHasMetFromRel(rel);
 }
 
 /**
- * Make a discovery world non-destructive to enable and never a wall of ???:
+ * Make enabling discovery non-destructive — without seeding strangers:
  *  1. BACKFILL — every character the player already interacted with (legacy signal)
  *     becomes an acquaintance, so people you've dated/married don't vanish behind ???.
- *  2. COLD-START — if nobody is known yet, seed the first `startKnownCount` dateable
- *     characters so a fresh discovery world has at least one face to start from.
+ *  2. COLD-START — seed `startKnownCount` dateable faces if nobody is known yet. This
+ *     defaults to 0, so a brand-new world starts you knowing LITERALLY no one; a world
+ *     author can opt into a starting face or two via `discoveryConfig.startKnownCount`.
  * Idempotent: only ever upgrades 'unknown' → 'acquaintance'. No-op when discovery is off.
+ * Gated on the GLOBAL `discoveryMode` setting (worlds no longer decide).
  */
 export function seedDiscoveryAcquaintances(worldId: string): void {
+  if (!getLlmSettings().discoveryMode) return;
   const world = worldsRepo.get(worldId);
-  if (!world?.featureFlags?.discovery) return;
+  if (!world) return;
   const day = worldStatesRepo.get(worldId)?.day ?? 1;
   const chars = charactersRepo.listByWorld(worldId);
   for (const c of chars) {

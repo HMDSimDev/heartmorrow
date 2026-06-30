@@ -306,37 +306,43 @@
   height: 1px;
   background: linear-gradient(90deg, color-mix(in oklab, var(--brass) 40%, transparent), transparent);
 }
+/* The welcome's "people you could meet" preview reuses the People page's framed
+   portrait plates (.ppl-*, imported in WorldSelector.tsx). This grid just sizes the
+   plates for the narrower onboarding panel; the shared frame styles do the rest. */
 .wonb-cast {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 16px;
 }
-.wonb-cast-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 4px;
-}
-.wonb-cast-card .portrait {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  overflow: hidden;
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--brass) 40%, transparent);
-}
+/* The import step's compact picker still uses a plain centered name under a round
+   portrait — keep that label style. */
 .wonb-cast-name {
   font-family: var(--font-display);
   font-size: 0.95rem;
   max-width: 100%;
 }
-.wonb-cast-desc {
-  font-size: 0.74rem;
-  color: var(--text-mute);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+
+/* The LLM-written welcome opening (falls back to .wonb-flavor copy on failure). */
+.wonb-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 8px;
+}
+.wonb-intro p {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.02rem;
+  line-height: 1.62;
+}
+/* The first line gets a lamplit drop-cap flourish — this is the player's first page. */
+.wonb-intro p:first-child::first-letter {
+  font-family: var(--font-display);
+  font-size: 2.6rem;
+  line-height: 0.8;
+  float: left;
+  margin: 6px 8px 0 0;
+  color: var(--brass);
 }
 .wonb-blank {
   color: var(--text-dim);

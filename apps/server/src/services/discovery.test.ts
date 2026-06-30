@@ -3,7 +3,9 @@ import { resetDb, seedWorldAndCharacter } from '../test/helpers';
 import { DEFAULT_DATING_STATS, FeedPostSchema, NpcKnowledgeSchema } from '@dsim/shared';
 import { composeConstellation, composeDossier, createCharacter, updateCharacter } from './character-service';
 import { applyRelationshipChange, stampLastSeen } from './stat-service';
-import { cloneWorld, createWorld, updateWorld } from './world-service';
+import { cloneWorld, createWorld, onDiscoveryGloballyEnabled } from './world-service';
+import { updateLlmSettings } from './settings-service';
+import { migrateDiscoveryBackfill } from '../db/migrate-discovery-backfill';
 import { createSession } from './conversation-service';
 import { getFeedView } from './feed-service';
 import { pickGossipKnowledge } from './gossip-service';
@@ -82,9 +84,10 @@ describe('discovery acquaintance state (stored on the relationship flags)', () =
 
 describe('discovery gating (Phase 1): you can only interact with people you have met', () => {
   const DS = DEFAULT_DATING_STATS;
+  beforeEach(() => updateLlmSettings({ discoveryMode: true }));
 
   it('blocks conversing with an unknown character, allows it once met', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const c = createCharacter({ worldId: w.id, name: 'Stranger', age: 27, datingStats: DS });
 
     expect(() => createSession({ characterId: c.id, mode: 'chat', locationId: null })).toThrow(/met/i);
@@ -94,7 +97,7 @@ describe('discovery gating (Phase 1): you can only interact with people you have
   });
 
   it('a met fixture (dateable:false) can be chatted with but never dated', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const fix = createCharacter({ worldId: w.id, name: 'Barkeep', age: 40, datingStats: DS, dateable: false });
     stampMet(fix.id, 1, null);
 
@@ -103,7 +106,7 @@ describe('discovery gating (Phase 1): you can only interact with people you have
   });
 
   it('"met" follows acquaintance state, not the legacy signal, in a discovery world', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const c = createCharacter({ worldId: w.id, name: 'Nadia', age: 29, datingStats: DS });
     stampLastSeen(c.id, 1); // a legacy "seen" signal — must NOT count as met under discovery
 
@@ -124,17 +127,31 @@ describe('discovery enable is non-destructive (backfill + cold-start seed)', () 
     const known = createCharacter({ worldId: w.id, name: 'Old Flame', age: 31, datingStats: DS });
     stampLastSeen(known.id, 2); // interacted with before discovery existed
 
-    updateWorld(w.id, { featureFlags: { discovery: true } });
+    updateLlmSettings({ discoveryMode: true });
+    onDiscoveryGloballyEnabled(); // what the settings route runs when the toggle flips on
 
     expect(getAcquaintanceStage(known.id)).toBe('acquaintance');
   });
 
-  it('cold-starts exactly startKnownCount (default 1) acquaintances when nobody is known', () => {
+  it('starts you knowing NO ONE (startKnownCount defaults to 0) when nobody was known before', () => {
     const w = createWorld({ name: 'Town' }); // discovery OFF
     const a = createCharacter({ worldId: w.id, name: 'A', age: 25, datingStats: DS });
     const b = createCharacter({ worldId: w.id, name: 'B', age: 26, datingStats: DS });
 
-    updateWorld(w.id, { featureFlags: { discovery: true } });
+    updateLlmSettings({ discoveryMode: true });
+    onDiscoveryGloballyEnabled();
+
+    const known = [a, b].filter((c) => getAcquaintanceStage(c.id) === 'acquaintance');
+    expect(known.length).toBe(0);
+  });
+
+  it('honors a world author opting into a starting acquaintance via discoveryConfig', () => {
+    const w = createWorld({ name: 'Town', discoveryConfig: { startKnownCount: 1 } });
+    const a = createCharacter({ worldId: w.id, name: 'A', age: 25, datingStats: DS });
+    const b = createCharacter({ worldId: w.id, name: 'B', age: 26, datingStats: DS });
+
+    updateLlmSettings({ discoveryMode: true });
+    onDiscoveryGloballyEnabled();
 
     const known = [a, b].filter((c) => getAcquaintanceStage(c.id) === 'acquaintance');
     expect(known.length).toBe(1);
@@ -143,9 +160,10 @@ describe('discovery enable is non-destructive (backfill + cold-start seed)', () 
 
 describe('discovery redaction (Phase 1): the Phone does not leak unmet identities', () => {
   const DS = DEFAULT_DATING_STATS;
+  beforeEach(() => updateLlmSettings({ discoveryMode: true }));
 
   it('composeDossier returns ??? for an undiscovered character, real once met', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const c = createCharacter({ worldId: w.id, name: 'Mystery', age: 30, datingStats: DS });
 
     const hidden = composeDossier(c.id);
@@ -159,7 +177,7 @@ describe('discovery redaction (Phase 1): the Phone does not leak unmet identitie
   });
 
   it('hides feed posts by undiscovered characters, shows them once met', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const c = createCharacter({ worldId: w.id, name: 'Poster', age: 28, datingStats: DS });
     feedPostsRepo.insert(
       FeedPostSchema.parse({
@@ -180,7 +198,7 @@ describe('discovery redaction (Phase 1): the Phone does not leak unmet identitie
   });
 
   it('listDiscoveredCharacterIds returns only met characters', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const met = createCharacter({ worldId: w.id, name: 'Known', age: 25, datingStats: DS });
     const unmet = createCharacter({ worldId: w.id, name: 'Unknown', age: 26, datingStats: DS });
     stampMet(met.id, 1, null);
@@ -193,9 +211,10 @@ describe('discovery redaction (Phase 1): the Phone does not leak unmet identitie
 
 describe('discovery redaction: gossip + recap do not name unmet people', () => {
   const DS = DEFAULT_DATING_STATS;
+  beforeEach(() => updateLlmSettings({ discoveryMode: true }));
 
   it('pickGossipKnowledge withholds gossip about an undiscovered subject', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const knower = createCharacter({ worldId: w.id, name: 'Knower', age: 30, datingStats: DS });
     const subject = createCharacter({ worldId: w.id, name: 'Subject', age: 28, datingStats: DS });
     npcKnowledgeRepo.insert(
@@ -218,7 +237,7 @@ describe('discovery redaction: gossip + recap do not name unmet people', () => {
   });
 
   it('suppresses around-town NPC beats from the day record under discovery', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     recordDay(w.id, 1, {
       recap: null,
       worldSim: { day: 1, beats: [{ kind: 'met', summary: 'Mara and Bo caught up at the cafe.' }], newLinks: [] },
@@ -229,6 +248,7 @@ describe('discovery redaction: gossip + recap do not name unmet people', () => {
   });
 
   it('keeps around-town beats when discovery is off', () => {
+    updateLlmSettings({ discoveryMode: false });
     const w = createWorld({ name: 'Town' });
     recordDay(w.id, 1, {
       recap: null,
@@ -242,9 +262,10 @@ describe('discovery redaction: gossip + recap do not name unmet people', () => {
 
 describe('discovery redaction: a met character does not leak their unmet peers', () => {
   const DS = DEFAULT_DATING_STATS;
+  beforeEach(() => updateLlmSettings({ discoveryMode: true }));
 
   it("drops a met character's ties to unmet peers, reveals them once met", () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const a = createCharacter({ worldId: w.id, name: 'Ana', age: 30, datingStats: DS });
     const b = createCharacter({ worldId: w.id, name: 'Bo', age: 31, datingStats: DS });
     updateCharacter(a.id, { links: [{ targetId: b.id, kind: 'friend' }] });
@@ -257,6 +278,7 @@ describe('discovery redaction: a met character does not leak their unmet peers',
   });
 
   it('flag off: dossier ties are not redacted', () => {
+    updateLlmSettings({ discoveryMode: false });
     const w = createWorld({ name: 'Town' }); // discovery off
     const a = createCharacter({ worldId: w.id, name: 'Ana', age: 30, datingStats: DS });
     const b = createCharacter({ worldId: w.id, name: 'Bo', age: 31, datingStats: DS });
@@ -268,21 +290,62 @@ describe('discovery redaction: a met character does not leak their unmet peers',
 
 describe('discovery interaction gates + lifecycle', () => {
   const DS = DEFAULT_DATING_STATS;
+  beforeEach(() => updateLlmSettings({ discoveryMode: true }));
 
   it('assertMet gates non-conversation interactions (together / minigames) on having met them', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+    const w = createWorld({ name: 'Town' });
     const c = createCharacter({ worldId: w.id, name: 'Quinn', age: 27, datingStats: DS });
     expect(() => assertMet(c)).toThrow(/met/i);
     stampMet(c.id, 1, null);
     expect(() => assertMet(c)).not.toThrow();
   });
 
-  it('cloning a discovery world seeds acquaintances so it is not a wall of ???', () => {
-    const w = createWorld({ name: 'Town', featureFlags: { discovery: true } });
+  it('cloning a world starts the new save knowing no one (a fresh, clean discovery slate)', () => {
+    const w = createWorld({ name: 'Town' });
     createCharacter({ worldId: w.id, name: 'One', age: 25, datingStats: DS });
     createCharacter({ worldId: w.id, name: 'Two', age: 26, datingStats: DS });
 
     const copy = cloneWorld(w.id, 'Town Copy');
-    expect(listDiscoveredCharacterIds(copy.id).length).toBeGreaterThanOrEqual(1);
+    expect(listDiscoveredCharacterIds(copy.id).length).toBe(0);
+  });
+});
+
+describe('discovery default-on backfill migration (existing saves keep already-met people)', () => {
+  const DS = DEFAULT_DATING_STATS;
+
+  it('marks already-interacted people as acquaintances, leaving never-met people ???', () => {
+    updateLlmSettings({ discoveryMode: true });
+    const w = createWorld({ name: 'Town' });
+    const known = createCharacter({ worldId: w.id, name: 'Old Flame', age: 31, datingStats: DS });
+    const stranger = createCharacter({ worldId: w.id, name: 'Newcomer', age: 27, datingStats: DS });
+    stampLastSeen(known.id, 3); // a classic-game interaction signal, no acquaintance flag yet
+
+    migrateDiscoveryBackfill();
+
+    expect(getAcquaintanceStage(known.id)).toBe('acquaintance');
+    expect(getAcquaintanceStage(stranger.id)).toBe('unknown');
+  });
+
+  it('runs only once — a later interaction is not retroactively backfilled', () => {
+    updateLlmSettings({ discoveryMode: true });
+    const w = createWorld({ name: 'Town' });
+    migrateDiscoveryBackfill(); // sets the marker (no one met yet)
+
+    const c = createCharacter({ worldId: w.id, name: 'Later', age: 29, datingStats: DS });
+    stampLastSeen(c.id, 5);
+    migrateDiscoveryBackfill(); // no-op: marker already set
+
+    expect(getAcquaintanceStage(c.id)).toBe('unknown');
+  });
+
+  it('does nothing when the player has discovery turned off', () => {
+    updateLlmSettings({ discoveryMode: false });
+    const w = createWorld({ name: 'Town' });
+    const known = createCharacter({ worldId: w.id, name: 'Known', age: 30, datingStats: DS });
+    stampLastSeen(known.id, 2);
+
+    migrateDiscoveryBackfill();
+
+    expect(getAcquaintanceStage(known.id)).toBe('unknown');
   });
 });

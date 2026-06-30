@@ -87,9 +87,6 @@ export const FeatureFlagsSchema = z.object({
   /** The casino: wager money on slots/blackjack/roulette/video poker, behind a
    *  flat per-bet cap and a per-day wager cap so it never becomes a money engine. */
   gambling: z.boolean().default(false),
-  /** Location-based discovery: People start as ??? and become dateable only by
-   *  visiting Locations and introducing yourself (the "living world" mode). */
-  discovery: z.boolean().default(false),
 });
 export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 
@@ -110,13 +107,15 @@ export const GamblingConfigSchema = z.object({
 export type GamblingConfig = z.infer<typeof GamblingConfigSchema>;
 
 /**
- * Per-world tuning for location-based discovery (only meaningful when
- * `featureFlags.discovery` is on). One JSON blob on the world, like
+ * Per-world tuning for location-based discovery (only meaningful when the GLOBAL
+ * `LlmSettings.discoveryMode` is on — worlds no longer decide WHETHER discovery is
+ * active, only how it behaves here). One JSON blob on the world, like
  * {@link GamblingConfigSchema}.
  */
 export const DiscoveryConfigSchema = z.object({
-  /** Acquaintances to seed at world creation so a fresh world isn't all ???. */
-  startKnownCount: z.number().int().min(0).default(1),
+  /** How many acquaintances to seed on a fresh world. 0 (the default) means you start
+   *  knowing literally no one — every face is a stranger until you meet them in town. */
+  startKnownCount: z.number().int().min(0).default(0),
   /** Per-phase chance a character is "nowhere" (home / unavailable). */
   unavailableChance: z.number().min(0).max(1).default(0.25),
   /** Stamina an introduction costs: >0 advances the phase like a light action;
@@ -139,7 +138,7 @@ export const WorldSchema = z.object({
   featureFlags: FeatureFlagsSchema.default({}),
   /** Casino limits when `featureFlags.gambling` is on (per-bet + per-day caps). */
   gamblingConfig: GamblingConfigSchema.default({}),
-  /** Discovery tuning when `featureFlags.discovery` is on. */
+  /** Discovery tuning, applied when the global `LlmSettings.discoveryMode` is on. */
   discoveryConfig: DiscoveryConfigSchema.default({}),
   createdAt: ts,
   updatedAt: ts,

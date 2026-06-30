@@ -79,6 +79,7 @@ import {
 } from './db/repositories';
 import { createWorld, createWorldNote } from './services/world-service';
 import { createCharacter, updateCharacter } from './services/character-service';
+import { updateLlmSettings } from './services/settings-service';
 import { createShopItem } from './services/shop-service';
 import { createProperty } from './services/property-service';
 import { createCompany } from './services/market-service';
@@ -367,6 +368,9 @@ function setMoney(amount: number, playerId: string): void {
 function mock(): void {
   ensureDirectories();
   initDatabase();
+  // The showcase is an established save whose whole cast should be visible for
+  // screenshots — keep discovery off here (the product default is on for real worlds).
+  updateLlmSettings({ discoveryMode: false });
   purgeExisting(); // idempotent: clears any prior run so re-running never duplicates
 
   // --- World ----------------------------------------------------------------

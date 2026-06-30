@@ -25,7 +25,7 @@ const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // forget month-old drafts
 export function Characters() {
   const { t } = useTranslation(['pages', 'common']);
   const nav = useNavigate();
-  const { creatorMode, activeWorldId, activeWorld, worlds, worldsLoaded, dayTick } = useAppData();
+  const { creatorMode, activeWorldId, activeWorld, worlds, worldsLoaded, dayTick, discoveryMode, discoveryReady } = useAppData();
   const state = useAsync(() => api.listCharacters(), [activeWorldId, dayTick]);
   const memorials = useAsync(() => api.listMemorials(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   const lost = new Set(memorials.data ?? []);
@@ -223,10 +223,10 @@ export function Characters() {
           // them (creator mode) so they can be recovered instead of lost forever.
           const unassigned = creatorMode ? allCharacters.filter((c) => !c.worldId) : [];
           // Discovery (play mode only): unmet people show as ??? until you introduce
-          // yourself. Creator mode always sees the full roster. Fail SAFE: until the world
-          // list is loaded, redact — flashing real names during load would leak (a brief
-          // redact→reveal flicker on non-discovery worlds is harmless).
-          const discoveryOn = !creatorMode && (!worldsLoaded || !!activeWorld?.featureFlags?.discovery);
+          // yourself. Creator mode always sees the full roster. Fail SAFE: until the global
+          // settings are loaded, redact — flashing real names during load would leak (a brief
+          // redact→reveal flicker with discovery off is harmless).
+          const discoveryOn = !creatorMode && (!discoveryReady || discoveryMode);
           const discoveredSet = new Set(discoveredQ.data ?? []);
           const metCount = characters.filter((c) => discoveredSet.has(c.id)).length;
           return (

@@ -456,6 +456,8 @@ export const api = {
     post<StructuredResult<Location[]>>(`/worlds/${worldId}/locations/generate`, input),
   generateWorld: (input: GenerateWorldInput) =>
     post<StructuredResult<WorldGenDraft>>(`/worlds/generate`, input),
+  generateWelcomeIntro: (worldId: string) =>
+    post<StructuredResult<string>>(`/worlds/${worldId}/welcome-intro`),
   listWorldNotes: (worldId: string) => get<WorldNote[]>(`/worlds/${worldId}/notes`),
   createWorldNote: (worldId: string, input: WorldNoteCreate) =>
     post<WorldNote>(`/worlds/${worldId}/notes`, input),

@@ -2,11 +2,16 @@ import { LlmSettingsSchema, type LlmSettings } from '@dsim/shared';
 import { initDatabase } from '../db/index';
 import { createWorld } from '../services/world-service';
 import { createCharacter } from '../services/character-service';
+import { updateLlmSettings } from '../services/settings-service';
 import type { ChatAdapter, ChatRequest, ChatResult, LlmModelInfo } from '../llm/types';
 
-/** Reset to a fresh in-memory database for each test. */
+/** Reset to a fresh in-memory database for each test. The product default for
+ *  `discoveryMode` is ON, but the bulk of the suite predates discovery and assumes
+ *  everyone is known — so the TEST baseline is discovery OFF. Tests that exercise
+ *  discovery opt in with `updateLlmSettings({ discoveryMode: true })`. */
 export function resetDb(): void {
   initDatabase({ memory: true });
+  updateLlmSettings({ discoveryMode: false });
 }
 
 export function testSettings(overrides: Partial<LlmSettings> = {}): LlmSettings {

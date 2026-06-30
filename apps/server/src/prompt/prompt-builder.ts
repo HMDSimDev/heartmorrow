@@ -1273,6 +1273,58 @@ export function buildWorldGenMessages(input: GenerateWorldParsed): ChatMessage[]
   ];
 }
 
+/** Messages for the onboarding WELCOME INTRO — greets the player into their new
+ *  world. World setting, persona, and cast are all reference DATA. */
+export function buildWelcomeIntroMessages(args: {
+  world: Pick<World, 'name' | 'summary' | 'tone' | 'lore'>;
+  persona: Pick<PlayerProfile, 'name' | 'pronouns' | 'personaNotes'>;
+  /** A small sample of the world's cast, so the welcome can hint at who's out there. */
+  cast: Array<Pick<Character, 'name' | 'shortDescription'>>;
+}): ChatMessage[] {
+  const w = args.world;
+  const worldLines: string[] = [];
+  if (w.name.trim()) worldLines.push(`Name: ${w.name.trim()}`);
+  if (w.summary.trim()) worldLines.push(`Setting: ${w.summary.trim()}`);
+  if (w.tone.trim()) worldLines.push(`Tone: ${w.tone.trim()}`);
+  // Lore can be long; a soft slice keeps the prompt lean while still flavoring the voice.
+  if (w.lore.trim()) worldLines.push(`Lore: ${w.lore.trim().slice(0, 1200)}`);
+  const worldBlock = worldLines.length
+    ? `=== WORLD (reference only) ===\n${worldLines.join('\n')}`
+    : '=== WORLD ===\n(an as-yet-unwritten place — lean on warm, hopeful atmosphere)';
+
+  // Persona: only surface a real, chosen name (skip the "You"/"Player" defaults).
+  const personaName = args.persona.name.trim();
+  const namedPlayer = personaName && personaName.toLowerCase() !== 'you' && personaName.toLowerCase() !== 'player';
+  const youLines: string[] = [];
+  if (namedPlayer) youLines.push(`Name: ${personaName}`);
+  if (args.persona.pronouns.trim()) youLines.push(`Pronouns: ${args.persona.pronouns.trim()}`);
+  if (args.persona.personaNotes.trim()) youLines.push(`About them: ${args.persona.personaNotes.trim().slice(0, 600)}`);
+  const youBlock = youLines.length
+    ? `=== YOU — the player you're welcoming (reference only) ===\n${youLines.join('\n')}`
+    : '=== YOU ===\n(a newcomer just arriving — address them warmly, no name given)';
+
+  const sampledCast = args.cast.slice(0, 10);
+  const peopleBlock = sampledCast.length
+    ? `=== PEOPLE who already live here (reference only — allude in the abstract, never invent plot) ===\n` +
+      sampledCast
+        .map((c) => `- ${c.name.trim()}${c.shortDescription?.trim() ? ` — ${c.shortDescription.trim().slice(0, 160)}` : ''}`)
+        .join('\n')
+    : '=== PEOPLE ===\n(no one is here yet — speak to the promise of the faces still to come)';
+
+  return [
+    { role: 'system', content: resolvePrompt('WELCOME_INTRO_GUARDRAILS') },
+    {
+      role: 'user',
+      content:
+        `${worldBlock}\n\n${youBlock}\n\n${peopleBlock}\n\n` +
+        `=== REQUEST (reference only) ===\n` +
+        `Write the welcome now: two or three short paragraphs, second person, ushering ${
+          namedPlayer ? personaName : 'this newcomer'
+        } into ${w.name.trim() || 'this world'} and the journey ahead.`,
+    },
+  ];
+}
+
 /** Messages for the creator-mode property batch generator. World/lore are DATA. */
 export function buildPropertyGenMessages(input: GeneratePropertiesParsed): ChatMessage[] {
   const w = input.world;

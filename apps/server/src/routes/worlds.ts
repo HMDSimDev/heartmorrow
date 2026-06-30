@@ -11,7 +11,7 @@ import {
   ImportCharactersSchema,
 } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
-import { generateLocations, generateWorld } from '../services/location-service';
+import { generateLocations, generateWelcomeIntro, generateWorld } from '../services/location-service';
 import {
   cloneWorld,
   createWorld,
@@ -24,7 +24,7 @@ import {
   updateWorld,
   updateWorldNote,
 } from '../services/world-service';
-import { cloneCharactersToWorld } from '../services/character-service';
+import { cloneCharactersToWorld, seedDiscoveryAcquaintances } from '../services/character-service';
 import { getActiveDateForWorld } from '../services/conversation-service';
 import { advanceDay, getWorldState } from '../services/world-clock-service';
 import { getWorldAvailability } from '../services/availability-service';
@@ -48,6 +48,14 @@ export async function worldRoutes(app: FastifyInstance): Promise<void> {
     return generateWorld(input);
   });
 
+  // Onboarding: write the warm second-person WELCOME shown as the player steps into a
+  // freshly-created world. Read-only — derives everything (setting, saved persona, cast)
+  // server-side and persists nothing; the client falls back to shipped copy on failure.
+  app.post('/worlds/:id/welcome-intro', { schema: docSchema({ tags: ['worlds'], summary: 'Generate the onboarding welcome intro for a world' }) }, async (req) => {
+    const { id } = req.params as { id: string };
+    return generateWelcomeIntro(id);
+  });
+
   // Start a new save from an existing world: clones its definition, notes, and cast.
   app.post('/worlds/:id/clone', { schema: docSchema({ tags: ['worlds'], summary: 'Clone a world into a new save', body: CloneWorldSchema }) }, async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -61,8 +69,12 @@ export async function worldRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     getWorld(id); // validate the target exists
     const { sourceCharacterIds } = parseInput(ImportCharactersSchema, req.body);
+    const imported = cloneCharactersToWorld(sourceCharacterIds, id);
+    // Location-mode worlds: seed a starting acquaintance or two so the freshly-imported
+    // cast isn't entirely ??? (idempotent; a no-op when discovery is off).
+    seedDiscoveryAcquaintances(id);
     reply.code(201);
-    return cloneCharactersToWorld(sourceCharacterIds, id);
+    return imported;
   });
 
   app.get('/worlds/:id', { schema: docSchema({ tags: ['worlds'], summary: 'Get a world by id' }) }, async (req) => {

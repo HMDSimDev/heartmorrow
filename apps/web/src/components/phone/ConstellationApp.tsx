@@ -280,7 +280,7 @@ function buildSky(
  */
 export function ConstellationApp() {
   const { t } = useTranslation(['phone', 'common']);
-  const { activeWorldId, activeWorld, creatorMode, dayTick } = useAppData();
+  const { activeWorldId, creatorMode, dayTick, discoveryMode, discoveryReady } = useAppData();
   const [characters, setCharacters] = useState<Character[]>([]);
   const [nodes, setNodes] = useState<SocialWebNode[]>([]);
   const [playerEdges, setPlayerEdges] = useState<ConstellationEdge[]>([]);
@@ -329,10 +329,10 @@ export function ConstellationApp() {
   // PersonCard all gate on charById, so intersecting it here hides unmet stars, cards, and peer
   // chips — and drops ties pointing at unmet characters. Creator mode sees the full graph.
   const charById = useMemo(() => {
-    const discoveryOn = !creatorMode && !!activeWorld?.featureFlags?.discovery;
+    const discoveryOn = !creatorMode && (!discoveryReady || discoveryMode);
     const visible = discoveryOn ? characters.filter((c) => discovered.includes(c.id)) : characters;
     return new Map(visible.map((c) => [c.id, c]));
-  }, [characters, discovered, creatorMode, activeWorld]);
+  }, [characters, discovered, creatorMode, discoveryMode, discoveryReady]);
 
   const knownNodes = useMemo(
     () =>

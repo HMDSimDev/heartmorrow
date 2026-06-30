@@ -3,15 +3,18 @@ import { DEFAULT_DATING_STATS } from '@dsim/shared';
 import { resetDb } from '../test/helpers';
 import { createWorld } from './world-service';
 import { createCharacter, updateCharacter } from './character-service';
+import { updateLlmSettings } from './settings-service';
 import { clusterOccupants, composeLocationScene, getLocationOccupancy, getPlacements } from './placement-service';
 
-beforeEach(() => resetDb());
+beforeEach(() => {
+  resetDb();
+  updateLlmSettings({ discoveryMode: true }); // Around Town + discovery active for these tests
+});
 
 const DS = DEFAULT_DATING_STATS;
 const townWorld = () =>
   createWorld({
     name: 'Town',
-    featureFlags: { discovery: true },
     locations: [
       { id: 'cafe', name: 'Cafe', kind: 'cafe' },
       { id: 'park', name: 'Park', kind: 'park' },

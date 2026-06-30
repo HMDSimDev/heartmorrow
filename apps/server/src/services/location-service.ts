@@ -3,11 +3,13 @@ import {
   GenerateWorldInputSchema,
   LocationGenerationSchema,
   LocationSchema,
+  WelcomeIntroSchema,
   WorldGenerationSchema,
   WorldGenDraftSchema,
   WorldNoteCreateSchema,
   LOCATION_GEN,
   WORLD_GEN,
+  WELCOME_INTRO,
   type GenerateLocationsInput,
   type GenerateWorldInput,
   type GeneratedLocation,
@@ -17,11 +19,17 @@ import {
   type WorldNoteCreate,
   type StructuredResult,
 } from '@dsim/shared';
-import { buildLocationGenMessages, buildWorldGenMessages } from '../prompt/prompt-builder';
+import {
+  buildLocationGenMessages,
+  buildWelcomeIntroMessages,
+  buildWorldGenMessages,
+} from '../prompt/prompt-builder';
 import { callStructuredLlm } from '../llm/structured';
 import { getLlmSettings } from './settings-service';
 import { getWorld } from './world-service';
-import { newId } from '../lib/ids';
+import { listCharacters } from './character-service';
+import { getOrCreatePlayer } from './player-service';
+import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 
 /**
  * Coerce one generated location into a real, server-owned Location: assign the
@@ -126,4 +134,36 @@ export async function generateWorld(input: GenerateWorldInput): Promise<Structur
     notes: result.data.notes.map(boundGeneratedNote),
   });
   return { ok: true, data: draft, attempts: result.attempts };
+}
+
+/**
+ * Generate the onboarding WELCOME INTRO: a warm, second-person opening that ushers the
+ * player into their newly-created world, shown on the final onboarding beat in place of
+ * the static "lamps are lit" copy. The world setting, the saved persona, and a sample
+ * of the cast are all loaded server-side and passed as reference DATA. Read-only:
+ * persists nothing. Fails safe (typed StructuredResult) so the client can fall back to
+ * the shipped copy when the model is down or can't comply.
+ */
+export async function generateWelcomeIntro(worldId: string): Promise<StructuredResult<string>> {
+  const world = getWorld(worldId); // throws notFound if the world is gone
+  const persona = getOrCreatePlayer(playerIdForWorldOrDefault(worldId));
+  const cast = listCharacters(worldId);
+  const settings = getLlmSettings();
+  const result = await callStructuredLlm(
+    WelcomeIntroSchema,
+    buildWelcomeIntroMessages({
+      world,
+      persona,
+      cast: cast.map((c) => ({ name: c.name, shortDescription: c.shortDescription })),
+    }),
+    {
+      settings,
+      task: 'Write a warm, second-person welcome (2–3 short paragraphs) ushering the player into their new world.',
+      schemaName: 'WelcomeIntro',
+    },
+  );
+  if (!result.ok) {
+    return { ok: false, error: result.error, attempts: result.attempts, lastRaw: result.lastRaw };
+  }
+  return { ok: true, data: result.data.intro.trim().slice(0, WELCOME_INTRO.MAX_INTRO), attempts: result.attempts };
 }

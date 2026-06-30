@@ -15,6 +15,7 @@ import { recordEvent } from './event-service';
 import { canTextCharacter, listContactableCharacters } from './text-message-service';
 import { locationBanDaysLeft, assertNotBanned } from './location-ban-service';
 import { composeLocationScene } from './placement-service';
+import { updateLlmSettings } from './settings-service';
 import { ensureWorldState } from './world-clock-service';
 import { sessionsRepo } from '../db/repositories';
 import { playerIdForWorld } from '../lib/ids';
@@ -39,7 +40,10 @@ class CapturingAdapter implements ChatAdapter {
   }
 }
 
-beforeEach(() => resetDb());
+beforeEach(() => {
+  resetDb();
+  updateLlmSettings({ discoveryMode: true }); // room name-redaction + unlock need discovery active
+});
 afterEach(() => setAdapterOverride(null));
 const DS = DEFAULT_DATING_STATS;
 
@@ -55,7 +59,6 @@ const scriptRoom = (...turns: string[]) => setAdapterOverride(new ScriptedAdapte
 function worldWithRegulars(names: string[]) {
   const w = createWorld({
     name: 'Town',
-    featureFlags: { discovery: true },
     locations: [{ id: 'cafe', name: 'The Glasshouse', kind: 'cafe' }],
   });
   const chars = names.map((n) => createCharacter({ worldId: w.id, name: n, age: 28, datingStats: DS }));
@@ -238,7 +241,6 @@ describe('location room chat (discovery)', () => {
     // reach the date's venue-ban gate rather than an "unavailable today" refusal.
     const w = createWorld({
       name: 'Town',
-      featureFlags: { discovery: true },
       locations: [{ id: 'cafe', name: 'The Glasshouse', kind: 'cafe' }],
     });
     const davi = createCharacter({ worldId: w.id, name: 'Davi', age: 28, datingStats: DS });
@@ -257,7 +259,6 @@ describe('location room chat (discovery)', () => {
     // auto-pick has somewhere else to land once the cafe is off-limits.
     const w = createWorld({
       name: 'Town',
-      featureFlags: { discovery: true },
       locations: [
         { id: 'cafe', name: 'The Glasshouse', kind: 'cafe' },
         { id: 'park', name: 'Harborside Park', kind: 'park' },

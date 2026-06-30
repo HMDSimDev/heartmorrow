@@ -64,7 +64,7 @@ export function CharacterProfile() {
   const { t } = useTranslation(['pages', 'common']);
   const { id = '' } = useParams();
   const nav = useNavigate();
-  const { creatorMode, activeWorld, activeWorldId, dayTick } = useAppData();
+  const { creatorMode, activeWorldId, dayTick, discoveryMode, discoveryReady } = useAppData();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDuplicate, setConfirmDuplicate] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -118,7 +118,7 @@ export function CharacterProfile() {
     <Loader state={bundle}>
       {({ character, relationship, memories }) => {
         // Discovery (play mode): block a deep-linked profile for someone you haven't met.
-        const discoveryOn = !creatorMode && !!activeWorld?.featureFlags?.discovery;
+        const discoveryOn = !creatorMode && (!discoveryReady || discoveryMode);
         const discoveredSet = new Set(discoveredQ.data ?? []);
         if (discoveryOn && !discoveredSet.has(character.id)) {
           return (
