@@ -63,6 +63,7 @@ function buildEnvLlmDefaults(): LlmSettings {
     structuredMode: process.env.LLM_STRUCTURED_MODE,
     endpointMode: process.env.LLM_ENDPOINT_MODE,
     anthropicVersion: process.env.LLM_ANTHROPIC_VERSION,
+    ollamaThink: process.env.LLM_OLLAMA_THINK,
     maxRetries: process.env.LLM_MAX_RETRIES ? Number(process.env.LLM_MAX_RETRIES) : undefined,
   };
   // Drop undefined keys so schema defaults take over.

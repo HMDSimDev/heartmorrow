@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { LlmModelInfo, StructuredOutputMode, EndpointMode, LlmRoleConnection } from '@dsim/shared';
+import type { LlmModelInfo, StructuredOutputMode, EndpointMode, OllamaThink, LlmRoleConnection } from '@dsim/shared';
 import { Field } from './ui';
 import { Icon } from './Icon';
 
@@ -9,7 +9,10 @@ import { Icon } from './Icon';
 export type ConnectionForm = Omit<LlmRoleConnection, 'enabled'>;
 
 /** Provider chips, in display order. Mirrors Settings' base console. */
-const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'anthropic', 'responses'];
+const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'ollama', 'anthropic', 'responses'];
+
+/** The Ollama `think` choices, in display order, with their i18n option-label key. */
+const OLLAMA_THINK_OPTS: OllamaThink[] = ['default', 'off', 'on', 'low', 'medium', 'high', 'max'];
 
 const NULLABLE_KEYS = ['topP', 'topK', 'minP', 'frequencyPenalty', 'presencePenalty', 'repeatPenalty'] as const;
 type NullableKey = (typeof NULLABLE_KEYS)[number];
@@ -129,7 +132,9 @@ export function ConnectionConsole({
                 ? t('settings.fields.baseUrlHintAnthropic')
                 : value.endpointMode === 'lmstudio'
                   ? t('settings.fields.baseUrlHintLmstudio')
-                  : t('settings.fields.baseUrlHintDefault')
+                  : value.endpointMode === 'ollama'
+                    ? t('settings.fields.baseUrlHintOllama')
+                    : t('settings.fields.baseUrlHintDefault')
             }
           >
             <input value={value.baseUrl} onChange={(e) => onChange({ baseUrl: e.target.value })} />
@@ -210,6 +215,20 @@ export function ConnectionConsole({
           <Field label={t('settings.fields.maxTokens')}>
             <input type="number" value={value.maxTokens} onChange={(e) => onChange({ maxTokens: Number(e.target.value) })} />
           </Field>
+          {value.endpointMode === 'ollama' && (
+            <Field label={t('settings.fields.ollamaThink')} hint={t('settings.fields.ollamaThinkHint')}>
+              <select
+                value={value.ollamaThink}
+                onChange={(e) => onChange({ ollamaThink: e.target.value as OllamaThink })}
+              >
+                {OLLAMA_THINK_OPTS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {t(`settings.fields.ollamaThinkOpts.${opt}`)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           {advancedMode && (
             <>
               <Field label={t('settings.fields.advancedSampling')} hint={t('settings.fields.advancedSamplingHint')}>
