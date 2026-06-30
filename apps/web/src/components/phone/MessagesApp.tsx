@@ -604,6 +604,29 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
     }
   };
 
+  // Rewrite the character's most recent reply (a bad/looping line) without re-judging.
+  // Optimistically drop the old reply; load() reconciles from server truth either way
+  // (on success the new reply is there; on failure the original is kept, untouched).
+  const regenerate = async () => {
+    if (sending || uploadingImage) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.sender !== 'character') return;
+    setSending(true);
+    setError(undefined);
+    setFailed(null);
+    setMessages((prev) => prev.slice(0, -1));
+    try {
+      const res = await api.phoneRegenerateReply(characterId);
+      await load();
+      if (res.error) setError(t('messages.thread.noReply', { error: res.error }));
+    } catch (e) {
+      await load();
+      setError(errorMessage(e));
+    } finally {
+      setSending(false);
+    }
+  };
+
   const dayLabel = (m: TextMessage) => (m.dayNumber != null ? t('messages.day', { day: m.dayNumber }) : t('messages.earlier'));
 
   const claim = async (textId: string) => {
@@ -618,6 +641,24 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       setClaimingId(null);
     }
   };
+
+  // The id of the trailing character reply, when it's a plain line the player may
+  // regenerate: not a gift reaction (the reply, or the text that prompted it, carries
+  // a gift), not the in-flight optimistic bubble, and not mid-send / mid-recovery.
+  const lastMsg = messages[messages.length - 1];
+  const prevMsg = messages[messages.length - 2];
+  const regenId =
+    lastMsg &&
+    lastMsg.sender === 'character' &&
+    !lastMsg.attachment &&
+    !lastMsg.id.startsWith('opt-') &&
+    !(prevMsg && prevMsg.sender === 'player' && prevMsg.attachment) &&
+    messages.some((m) => m.sender === 'player') && // a reply to your text, not a proactive one
+    !sending &&
+    !uploadingImage &&
+    !failed
+      ? lastMsg.id
+      : null;
 
   return (
     <div className="phone-app">
@@ -650,6 +691,16 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
                   </a>
                 )}
                 {m.body && <div className="pcom-bubble">{m.body}</div>}
+                {m.id === regenId && (
+                  <button
+                    className="pcom-regen-btn"
+                    onClick={() => void regenerate()}
+                    aria-label={t('messages.thread.regen')}
+                    title={t('messages.thread.regenTitle')}
+                  >
+                    <Icon name="refresh" size={12} />
+                  </button>
+                )}
                 {/* NPC-sent gift: claimable. */}
                 {m.attachment && m.sender === 'character' && (
                   <button className="pcom-gift" disabled={m.attachment.claimed || claimingId !== null} onClick={() => claim(m.id)}>

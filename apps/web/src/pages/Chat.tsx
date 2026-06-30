@@ -32,7 +32,7 @@ import {
   type PropertyView,
   type ActiveDate,
 } from '@dsim/shared';
-import { api, streamChat, streamRetry, assetUrl } from '../lib/api';
+import { api, streamChat, streamRetry, streamRegenerate, assetUrl } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { intentLabel, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
@@ -656,6 +656,56 @@ export function Chat() {
     }
   };
 
+  // Rewrite the character's MOST RECENT reply (a bad/looping line) without re-judging
+  // the turn. Optimistically drop the old reply — the server deletes it and streams a
+  // fresh one against the same player turn. On failure the reply is gone server-side,
+  // so we surface the standard reply-retry (which also regenerates, never re-judges).
+  const regenerate = async () => {
+    if (!session || streaming.active || busy || locked) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'character') return;
+    setError(undefined);
+    setNotice(undefined);
+    setFailed(null);
+    setMessages((prev) => prev.slice(0, -1));
+    setStreaming({ active: true, text: '' });
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let settled = false;
+    try {
+      await streamRegenerate(
+        session.id,
+        {
+          onDelta: (delta) => setStreaming((s) => ({ active: true, text: s.text + delta })),
+          onDone: (m) => {
+            settled = true;
+            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+            setStreaming({ active: false, text: '' });
+          },
+          onError: (msg) => {
+            settled = true;
+            setError(msg);
+            setStreaming({ active: false, text: '' });
+            setFailed({ kind: 'reply' });
+          },
+          onNotice: (msg) => setNotice(msg),
+        },
+        controller.signal,
+      );
+      if (!settled && !controller.signal.aborted) {
+        setStreaming({ active: false, text: '' });
+        setError(t('chat.replyDropped'));
+        setFailed({ kind: 'reply' });
+      }
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        setError(errorMessage(e));
+        setFailed({ kind: 'reply' });
+      }
+      setStreaming({ active: false, text: '' });
+    }
+  };
+
   const newConversation = () => {
     abortRef.current?.abort();
     setStreaming({ active: false, text: '' });
@@ -1107,6 +1157,25 @@ export function Chat() {
   // The date is over (evaluated or any terminal path) → no more composing, and the
   // actions collapse to "New date". Mirrors dateConcluded so the lock clears in step.
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
+  // The id of the trailing character reply, when it's a plain line the player may
+  // regenerate (not a consequence-bearing walkout/farewell/etc, and not mid-stream
+  // or mid-recovery). Drives the small "rewrite this reply" button on that bubble.
+  const lastMsg = messages[messages.length - 1];
+  const regenId =
+    lastMsg &&
+    lastMsg.role === 'character' &&
+    !lastMsg.metadata?.walkout &&
+    !lastMsg.metadata?.left &&
+    !lastMsg.metadata?.farewell &&
+    !lastMsg.metadata?.breakupIntent &&
+    messages.some((m) => m.role === 'player') && // a reply to your turn, not the opener
+    !locked &&
+    !streaming.active &&
+    !busy &&
+    !failed &&
+    !breakupPending
+      ? lastMsg.id
+      : null;
   const locationName = session.locationId
     ? session.locationId.startsWith('room:')
       ? t('chat.loc.room', { name: character.name })
@@ -1401,6 +1470,16 @@ export function Chat() {
                 className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
               >
                 {m.text}
+                {m.id === regenId && (
+                  <button
+                    className="date-regen-btn"
+                    onClick={() => void regenerate()}
+                    aria-label={t('chat.regen')}
+                    title={t('chat.regenTitle')}
+                  >
+                    <Icon name="refresh" size={13} />
+                  </button>
+                )}
               </div>
             ))}
             {streaming.active && (

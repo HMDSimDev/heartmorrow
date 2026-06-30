@@ -540,6 +540,39 @@ export function persistStreamedReply(sessionId: string, text: string): Message {
 }
 
 /**
+ * Remove the session's trailing character reply so it can be REGENERATED in place
+ * (the player asked to rewrite a bad/looping line). Called inside the per-session
+ * reply lock by the regenerate route, which then re-runs `streamReply` against the
+ * now-trailing player turn — deliberately WITHOUT re-judging (the rapport already
+ * moved when the turn was first sent; a regenerate only rewrites the prose).
+ *
+ * Throws when the last message isn't a plain, regenerable character line: a player
+ * turn or narrator beat (nothing to rewrite), or a consequence-bearing line whose
+ * effects are already applied and must not be silently dropped — a walkout, a
+ * lost-interest exit, an amicable farewell, or a breakup-intent reaction.
+ */
+export function dropReplyForRegen(sessionId: string): void {
+  const session = getSession(sessionId);
+  if (session.ended) throw badRequest('This date has already ended.');
+  const messages = messagesRepo.listBySession(sessionId);
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== 'character') {
+    throw badRequest('There’s no reply here to regenerate.');
+  }
+  // Only a reply to one of YOUR turns can be regenerated — not the character's
+  // scene-opening greeting (regenerating it has no player turn to answer).
+  if (!messages.some((m) => m.role === 'player')) {
+    throw badRequest('There’s nothing of yours here for them to reply to yet.');
+  }
+  const md = last.metadata ?? {};
+  if (md.walkout || md.left || md.farewell || md.breakupIntent) {
+    throw badRequest('That line ended the date, so it can’t be regenerated.');
+  }
+  messagesRepo.delete(last.id);
+  touchSession(session);
+}
+
+/**
  * Set the scene when a date opens, so the player has something to react to.
  *
  * - On a FIRST date the character breaks the ice: a single in-character opening

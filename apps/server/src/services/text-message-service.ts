@@ -527,6 +527,117 @@ export async function retryPlayerTextReply(
   });
 }
 
+/**
+ * Regenerate the character's MOST RECENT reply in a thread — for when the model
+ * produced a bad/looping line. Rewrites ONLY the reply prose: unlike the initial
+ * send (and the failed-reply retry), it deliberately does NOT run the impartial
+ * TextJudge, because the relationship already moved when the player's text was first
+ * sent — re-judging would double-apply (or contradict) that delta. The new reply
+ * replaces the old one only on success; on a model failure the original reply is
+ * left untouched, so a bad regenerate never destroys the line you already had.
+ *
+ * Refuses to regenerate a gift REACTION (its line came from the gift flow, which
+ * applied its own deltas) — there's nothing to plainly rewrite.
+ */
+export async function regenerateTextReply(
+  characterId: string,
+  playerId: string = DEFAULT_PLAYER_ID,
+): Promise<SendTextResult> {
+  const character = getCharacter(characterId);
+  if (isMemorialized(getRelationship(characterId))) {
+    throw badRequest(`${character.name} is no longer with us.`);
+  }
+  if (!hasDated(characterId)) {
+    throw badRequest(`You can only text someone you've been on a date with.`);
+  }
+  // Same per-character lock as send/retry so a regenerate can't interleave with them.
+  return withKeyedLock(`text-reply:${characterId}`, async () => {
+    const thread = getOrCreateThread(characterId, playerId);
+    const msgs = textMessagesRepo.listDeliveredByThread(thread.id);
+    const last = msgs[msgs.length - 1];
+    if (!last || last.sender !== 'character') {
+      throw badRequest('There’s no reply here to regenerate.');
+    }
+    // The text that prompted this reply (the most recent player message before it).
+    const prompting = [...msgs].reverse().find((m) => m.sender === 'player');
+    // Only a reply to one of YOUR texts can be regenerated — not a proactive text
+    // the character sent you on their own (there's no message of yours to answer).
+    if (!prompting) {
+      throw badRequest('There’s no text of yours here for them to reply to.');
+    }
+    // A gift exchange persists the reaction atomically with a gift-bearing player
+    // text; that reaction isn't a plain reply, so it can't be regenerated this way.
+    if (last.attachment || prompting.attachment) {
+      throw badRequest('A gift reaction can’t be regenerated.');
+    }
+    const day = character.worldId ? ensureWorldState(character.worldId).day : null;
+    // Rebuild the prompting text's photo (if any) so the new reply still reacts to it.
+    let imageDataUrl: string | null = null;
+    if (prompting?.imageAssetId) {
+      try {
+        const { buffer, mimeType } = readAssetFile(prompting.imageAssetId);
+        imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
+      } catch {
+        imageDataUrl = null; // the asset is gone — reply to the text alone
+      }
+    }
+
+    // Reply-only generation. KEEP IN SYNC with generateTextReply's reply call above —
+    // same prompt inputs, minus the judge (which must not re-run on a regenerate).
+    const settings = getLlmSettings();
+    const effectiveSettings = imageDataUrl
+      ? { ...settings, model: settings.visionModel.trim() || settings.model }
+      : settings;
+    const player = getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId));
+    const recentTexts = getRecentTexts(character.id, 12, playerId);
+    const chronicleRow = chroniclesRepo.getByCharacter(character.id, DEFAULT_PLAYER_ID);
+    const chronicle = chronicleRow ? { chronicle: chronicleRow.chronicle, recentLines: chronicleRow.recentLines } : null;
+    const result = await callStructuredLlm(
+      TextReplySchema,
+      buildTextReplyMessages({
+        character,
+        relationship: getRelationship(character.id),
+        recentTexts,
+        playerName: player.name,
+        playerGender: player.gender,
+        worldDay: day,
+        chronicle,
+        memories: selectTopMemories(character.id, 5),
+        acquaintances: listAcquaintances(character),
+        npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
+        imageDataUrl,
+      }),
+      { settings: effectiveSettings, task: 'Rewrite the character’s last text reply in character (short).', schemaName: 'TextReply' },
+    );
+
+    // Failure: keep the original reply intact (no deltas were ever in play here).
+    if (!result.ok) {
+      recordEvent('text_regen_failed', { characterId: character.id, error: result.error });
+      return { playerMessage: prompting, reply: last, error: result.error, relationshipDelta: {} };
+    }
+
+    // Success: swap the old reply for the new one. No judge — the relationship is
+    // unchanged from before the regenerate.
+    textMessagesRepo.delete(last.id);
+    const replyAt = Date.now();
+    const reply = textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: newId('txt'),
+        threadId: thread.id,
+        sender: 'character',
+        body: result.data.body,
+        status: 'delivered',
+        dayNumber: last.dayNumber,
+        deliveredAt: replyAt,
+        createdAt: replyAt,
+      }),
+    );
+    threadsRepo.update({ ...thread, lastMessageAt: replyAt, updatedAt: replyAt });
+    recordEvent('text_regenerated', { characterId: character.id, tone: result.data.tone });
+    return { playerMessage: prompting, reply, error: null, relationshipDelta: {} };
+  });
+}
+
 export function claimTextGift(textId: string, playerId: string = DEFAULT_PLAYER_ID) {
   // One atomic unit: mark claimed FIRST (gates re-entry), then grant. If the
   // grant throws, the whole transaction — including the claimed flag — rolls back.

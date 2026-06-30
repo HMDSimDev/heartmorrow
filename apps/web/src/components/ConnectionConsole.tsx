@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { LlmModelInfo, StructuredOutputMode, EndpointMode, OllamaThink, LlmRoleConnection } from '@dsim/shared';
+import type { LlmModelInfo, StructuredOutputMode, EndpointMode, OllamaThink, KoboldTemplate, LlmRoleConnection } from '@dsim/shared';
 import { Field } from './ui';
 import { Icon } from './Icon';
 
@@ -9,10 +9,13 @@ import { Icon } from './Icon';
 export type ConnectionForm = Omit<LlmRoleConnection, 'enabled'>;
 
 /** Provider chips, in display order. Mirrors Settings' base console. */
-const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'ollama', 'anthropic', 'responses'];
+const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'ollama', 'koboldcpp', 'anthropic', 'responses'];
 
 /** The Ollama `think` choices, in display order, with their i18n option-label key. */
 const OLLAMA_THINK_OPTS: OllamaThink[] = ['default', 'off', 'on', 'low', 'medium', 'high', 'max'];
+
+/** KoboldCpp chat-template presets, in display order (i18n keys mirror these). */
+const KOBOLD_TEMPLATES: KoboldTemplate[] = ['alpaca', 'chatml', 'llama3', 'vicuna', 'mistral', 'plain'];
 
 const NULLABLE_KEYS = ['topP', 'topK', 'minP', 'frequencyPenalty', 'presencePenalty', 'repeatPenalty'] as const;
 type NullableKey = (typeof NULLABLE_KEYS)[number];
@@ -134,7 +137,9 @@ export function ConnectionConsole({
                   ? t('settings.fields.baseUrlHintLmstudio')
                   : value.endpointMode === 'ollama'
                     ? t('settings.fields.baseUrlHintOllama')
-                    : t('settings.fields.baseUrlHintDefault')
+                    : value.endpointMode === 'koboldcpp'
+                      ? t('settings.fields.baseUrlHintKobold')
+                      : t('settings.fields.baseUrlHintDefault')
             }
           >
             <input value={value.baseUrl} onChange={(e) => onChange({ baseUrl: e.target.value })} />
@@ -224,6 +229,20 @@ export function ConnectionConsole({
                 {OLLAMA_THINK_OPTS.map((opt) => (
                   <option key={opt} value={opt}>
                     {t(`settings.fields.ollamaThinkOpts.${opt}`)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          {value.endpointMode === 'koboldcpp' && (
+            <Field label={t('settings.fields.koboldTemplate')} hint={t('settings.fields.koboldTemplateHint')}>
+              <select
+                value={value.koboldTemplate}
+                onChange={(e) => onChange({ koboldTemplate: e.target.value as KoboldTemplate })}
+              >
+                {KOBOLD_TEMPLATES.map((tpl) => (
+                  <option key={tpl} value={tpl}>
+                    {t(`settings.fields.koboldTemplateOpts.${tpl}`)}
                   </option>
                 ))}
               </select>

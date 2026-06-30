@@ -345,6 +345,31 @@
   box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
+/* "Regenerate this reply" — a small, quiet control under the character's last text.
+   Rewrites the prose without changing the relationship. */
+.pcom-regen-btn {
+  margin-top: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, color 0.15s ease, transform 0.2s ease;
+}
+.pcom-regen-btn:hover,
+.pcom-regen-btn:focus-visible {
+  opacity: 1;
+  color: var(--accent);
+  transform: rotate(-45deg);
+}
+
 /* Gift attachment — a brass keepsake offer. */
 .pcom-gift {
   margin-top: 5px;

@@ -6,6 +6,8 @@
     "settlingIn": "settling in",
     "retry": "Retry",
     "retrying": "Retrying…",
+    "regen": "Regenerate reply",
+    "regenTitle": "Rewrite this reply (doesn't change how the date is scored)",
     "sendFailed": "Your message didn't send.",
     "replyFailed": "They didn't reply — something went wrong.",
     "replyDropped": "The reply didn't come through.",
@@ -1052,6 +1054,11 @@
         "tag": "native /api/chat",
         "desc": "Ollama's native API — toggle the model's thinking on/off or set a reasoning level, plus model listing with loaded state and quant. Point Base URL at the server root (e.g. http://localhost:11434)."
       },
+      "koboldcpp": {
+        "name": "KoboldCpp",
+        "tag": "native /api/v1",
+        "desc": "KoboldCpp's native API — a text-completion endpoint, so pick the instruction template that matches your loaded model. Point Base URL at the server root (e.g. http://localhost:5001)."
+      },
       "anthropic": {
         "name": "Anthropic",
         "tag": "messages",
@@ -1120,6 +1127,7 @@
       "baseUrlHintAnthropic": "e.g. https://api.anthropic.com/v1 (or your compatible proxy)",
       "baseUrlHintLmstudio": "e.g. http://localhost:1234/api/v0 (LM Studio native API)",
       "baseUrlHintOllama": "e.g. http://localhost:11434 (the Ollama server root — not the /v1 path).",
+      "baseUrlHintKobold": "e.g. http://localhost:5001 (the KoboldCpp server root — not the /v1 path).",
       "baseUrlHintDefault": "e.g. http://localhost:1234/v1 or http://localhost:1234/",
       "apiKey": "API key",
       "apiKeyHintSet": "A key is set. Leave blank to keep it.",
@@ -1140,6 +1148,16 @@
         "medium": "Medium",
         "high": "High",
         "max": "Max"
+      },
+      "koboldTemplate": "Instruction template",
+      "koboldTemplateHint": "KoboldCpp's native API is a raw text-completion endpoint, so Heartmorrow formats each turn for you. Pick the template that matches your loaded model's training format — the wrong one still works but gives worse replies. Alpaca is a safe general default; use ChatML / Llama 3 / Mistral / Vicuna to match those families, or Plain for base models.",
+      "koboldTemplateOpts": {
+        "alpaca": "Alpaca (### Instruction)",
+        "chatml": "ChatML (<|im_start|>)",
+        "llama3": "Llama 3",
+        "vicuna": "Vicuna (USER/ASSISTANT)",
+        "mistral": "Mistral ([INST])",
+        "plain": "Plain (no markers)"
       },
       "model": "Model",
       "modelHint": "Type any model name, or pick from the loaded list below.",
@@ -1289,6 +1307,7 @@
               "OpenAI-compatible: works with LM Studio, Ollama, llama.cpp, vLLM, and similar local servers. Point the Base URL at your own server.",
               "LM Studio: its own native connection, with richer model details and per-response speed stats.",
               "Ollama: its own native connection, which adds a Thinking control — turn a model's reasoning on or off, or set its depth (Low–Max for models that support levels).",
+              "KoboldCpp: its own native connection. Because it's a raw text engine, pick the Instruction template that matches your loaded model (Alpaca, ChatML, Llama 3, and so on).",
               "Anthropic: a hosted service that needs an API key.",
               "Local models usually need no key; hosted services do.",
               "There's a separate option for generating character portraits, but it's optional and not needed to play."
@@ -1354,7 +1373,8 @@
             "heading": "Talking, live",
             "body": [
               "A date is a back-and-forth conversation. Type whatever you want in the box and send it; the character types back in real time, with a typing indicator while they think and a portrait whose expression shifts to match their mood. There are no scripted choices — say anything, in your own words.",
-              "Above the box are optional intent chips that frame how a line is meant: Flirt, Tease, and Open Up are always there, and Reassure and Apologize appear when there's tension to smooth over. They're never required, and they don't move anything by themselves — they just tell the character how you meant a message to land, and a move that fits the moment reads better than one that doesn't."
+              "Above the box are optional intent chips that frame how a line is meant: Flirt, Tease, and Open Up are always there, and Reassure and Apologize appear when there's tension to smooth over. They're never required, and they don't move anything by themselves — they just tell the character how you meant a message to land, and a move that fits the moment reads better than one that doesn't.",
+              "If a reply comes out garbled or repetitive, hover the character's most recent line and tap the small refresh button to regenerate it. That rewrites just that reply — it doesn't change how the message was scored or how the date is going, so it's only fixing the wording. (Texting has the same button under a character's last text.)"
             ]
           },
           {

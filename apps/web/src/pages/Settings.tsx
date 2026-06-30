@@ -39,7 +39,7 @@ const ACCENT_PRESETS = [
  * a short tag and a one-line descriptor shown when it's active. Display strings
  * live under `settings.providers.<value>` so they localize; the value doubles as
  * the catalog key. */
-const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'ollama', 'anthropic', 'responses'];
+const PROVIDER_MODES: EndpointMode[] = ['chat_completions', 'lmstudio', 'ollama', 'koboldcpp', 'anthropic', 'responses'];
 
 /** Roles with an optional independent endpoint/model. `prose` always uses base. */
 type RoleKey = 'evaluator' | 'vision';
@@ -63,7 +63,7 @@ type Form = ConnectionForm & {
 const CONNECTION_FIELDS = [
   'baseUrl', 'apiKey', 'model', 'temperature', 'maxTokens', 'topP', 'topK', 'minP',
   'frequencyPenalty', 'presencePenalty', 'repeatPenalty', 'structuredMode',
-  'omitSchemaInPrompt', 'endpointMode', 'anthropicVersion', 'ollamaThink', 'maxRetries',
+  'omitSchemaInPrompt', 'endpointMode', 'anthropicVersion', 'ollamaThink', 'koboldTemplate', 'maxRetries',
 ] as const;
 
 /** A connection → settings-patch object, dropping a blank API key so the server
@@ -150,6 +150,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           endpointMode: s.endpointMode,
           anthropicVersion: s.anthropicVersion,
           ollamaThink: s.ollamaThink,
+          koboldTemplate: s.koboldTemplate,
           maxRetries: s.maxRetries,
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,

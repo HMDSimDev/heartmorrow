@@ -6,6 +6,7 @@ import {
   getThreadView,
   listContactableCharacters,
   listThreadSummaries,
+  regenerateTextReply,
   retryPlayerTextReply,
   sendPlayerText,
   unreadTextCount,
@@ -73,6 +74,13 @@ export async function phoneRoutes(app: FastifyInstance): Promise<void> {
   app.post('/phone/threads/:characterId/retry-reply', { schema: docSchema({ tags: ['phone'], summary: 'Retry generating a reply to the last unanswered text' }) }, async (req) => {
     const { characterId } = req.params as { characterId: string };
     return retryPlayerTextReply(characterId);
+  });
+
+  // Regenerate the character's LAST reply (when it was bad/looping) — rewrites the
+  // prose only, without re-running the relationship judge.
+  app.post('/phone/threads/:characterId/regenerate-reply', { schema: docSchema({ tags: ['phone'], summary: 'Regenerate the last reply (no re-judge)' }) }, async (req) => {
+    const { characterId } = req.params as { characterId: string };
+    return regenerateTextReply(characterId);
   });
 
   app.post('/phone/messages/:textId/claim-gift', { schema: docSchema({ tags: ['phone'], summary: 'Claim a gift from a text message' }) }, async (req) => {

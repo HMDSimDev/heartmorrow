@@ -281,6 +281,29 @@ export async function streamRetry(
   await pumpSse(res, handlers);
 }
 
+/**
+ * Regenerate the character's MOST RECENT reply (a bad/looping line). The server
+ * drops the trailing reply and rewrites it against the same player turn, streaming
+ * the same delta/done/error/notice events as {@link streamChat}. It does NOT re-run
+ * the relationship judge — a regenerate only rewrites the prose.
+ */
+export async function streamRegenerate(
+  sessionId: string,
+  handlers: StreamHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/regenerate-stream`, {
+    method: 'POST',
+    signal,
+  });
+  if (!res.ok || !res.body) {
+    const { message } = await parseErrorBody(res, `The server couldn’t start the reply (${res.status}).`);
+    handlers.onError?.(message);
+    return;
+  }
+  await pumpSse(res, handlers);
+}
+
 /** Read an SSE response body to completion, dispatching each event to handlers. */
 async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
   const reader = res.body!.getReader();
@@ -616,6 +639,16 @@ export const api = {
       relationshipDelta: Partial<Record<string, number>>;
       giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
     }>(`/phone/threads/${characterId}/retry-reply`),
+  /** Regenerate the character's last text reply (a bad/looping line). Rewrites the
+   *  prose only — the relationship judge does NOT re-run. Same shape as phoneSend. */
+  phoneRegenerateReply: (characterId: string) =>
+    post<{
+      playerMessage: TextMessage;
+      reply: TextMessage | null;
+      error: string | null;
+      relationshipDelta: Partial<Record<string, number>>;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+    }>(`/phone/threads/${characterId}/regenerate-reply`),
   phoneClaimGift: (textId: string) =>
     post<{ item: ShopItem; inventoryItem: InventoryItem }>(`/phone/messages/${textId}/claim-gift`),
   phoneEmails: (worldId?: string) => get<Email[]>(`/phone/emails${worldQuery(worldId)}`),

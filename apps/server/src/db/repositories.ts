@@ -555,6 +555,9 @@ export const messagesRepo = {
     );
     return m;
   },
+  delete(id: string): void {
+    getDb().run('DELETE FROM messages WHERE id = ?', id);
+  },
 };
 
 // --- shop + inventory -------------------------------------------------------
@@ -925,6 +928,9 @@ export const textMessagesRepo = {
       m.body, m.status, m.attachment ? j(m.attachment) : null, m.deliveredAt, m.id,
     );
     return m;
+  },
+  delete(id: string): void {
+    getDb().run('DELETE FROM text_messages WHERE id = ?', id);
   },
 };
 

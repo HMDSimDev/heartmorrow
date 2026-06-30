@@ -64,6 +64,7 @@ function buildEnvLlmDefaults(): LlmSettings {
     endpointMode: process.env.LLM_ENDPOINT_MODE,
     anthropicVersion: process.env.LLM_ANTHROPIC_VERSION,
     ollamaThink: process.env.LLM_OLLAMA_THINK,
+    koboldTemplate: process.env.LLM_KOBOLD_TEMPLATE,
     maxRetries: process.env.LLM_MAX_RETRIES ? Number(process.env.LLM_MAX_RETRIES) : undefined,
   };
   // Drop undefined keys so schema defaults take over.

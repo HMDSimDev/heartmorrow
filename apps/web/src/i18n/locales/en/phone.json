@@ -56,6 +56,8 @@
       "unsupportedImage": "Unsupported image type. Please choose a {label} image.",
       "retry": "Retry",
       "retrying": "Retrying…",
+      "regen": "Regenerate reply",
+      "regenTitle": "Rewrite this reply (doesn't change the relationship)",
       "sendFailed": "Message didn't send.",
       "replyFailed": "No reply came through."
     }

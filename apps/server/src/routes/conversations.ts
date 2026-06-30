@@ -8,6 +8,7 @@ import {
   attemptWalkout,
   confirmPlayerBreakup,
   createSession,
+  dropReplyForRegen,
   endSession,
   generateReply,
   getSessionWithMessages,
@@ -279,6 +280,70 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       });
     } catch (err) {
       if (!ac.signal.aborted) send('error', { message: (err as Error).message || 'The reply failed unexpectedly — tap retry.' });
+    } finally {
+      finish();
+    }
+  });
+
+  // Regenerate the character's MOST RECENT reply via SSE — for when the model
+  // produced a bad/looping line. Drops the trailing reply and rewrites it against
+  // the same player turn. Like retry-stream, it streams delta → done|error|notice
+  // and deliberately skips the walkout/breakup/farewell/rapport judges: the turn was
+  // already scored when it was first sent, so a regenerate only rewrites the prose —
+  // it never moves the relationship (no double-judging).
+  app.post('/conversations/:id/regenerate-stream', { schema: docSchema({ tags: ['conversations'], summary: 'Regenerate the last reply, stream via SSE' }) }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const send = (event: string, data: unknown) => {
+      raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const ac = new AbortController();
+    let finished = false;
+    const onClose = () => {
+      if (!finished) ac.abort();
+    };
+    raw.on('close', onClose);
+
+    const finish = () => {
+      finished = true;
+      raw.off('close', onClose);
+      raw.end();
+    };
+
+    try {
+      // Share retry-stream's per-session lock so a regenerate can't interleave with a
+      // send/retry. Drop the trailing reply INSIDE the lock, then rewrite it (null
+      // verdict → no re-judge) against the now-trailing player turn.
+      await withKeyedLock(`conv-reply:${id}`, async () => {
+        dropReplyForRegen(id); // throws → caught below → SSE 'error'
+        const { content, finishReason } = await streamReply(id, (delta) => send('delta', { text: delta }), ac.signal, null);
+        if (!content.trim()) {
+          send('error', {
+            message:
+              finishReason === 'length'
+                ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
+                : 'The model returned an empty reply.',
+          });
+        } else {
+          const message = persistStreamedReply(id, content);
+          if (finishReason === 'length') {
+            send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
+          }
+          send('done', { message });
+          void maybeAutoSummarize(id);
+        }
+      });
+    } catch (err) {
+      if (!ac.signal.aborted) send('error', { message: (err as Error).message || 'Couldn’t regenerate the reply — try again.' });
     } finally {
       finish();
     }
