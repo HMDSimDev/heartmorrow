@@ -23,7 +23,7 @@
     "@dsim/shared": "workspace:*",
     "@fastify/cors": "^10.0.2",
     "@fastify/multipart": "^9.0.3",
-    "@fastify/static": "^8.0.4",
+    "@fastify/static": "^9.1.3",
     "@fastify/swagger": "^9.7.0",
     "fastify": "^5.2.1",
     "fflate": "^0.8.3",
@@ -35,6 +35,6 @@
     "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^3.2.6"
   }
 }

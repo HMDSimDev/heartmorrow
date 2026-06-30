@@ -56,12 +56,33 @@ else
   ok "pnpm $(pnpm -v)"
 fi
 
-# --- Dependencies installed -------------------------------------------------
+# --- Dependencies installed & in sync with the lockfile ---------------------
+# pnpm stores a copy of the lockfile it installed from at
+# node_modules/.pnpm/lock.yaml. If it no longer matches pnpm-lock.yaml (e.g.
+# after a git pull bumped a dependency), the install is stale — reconcile it.
+INSTALLED_LOCK="$ROOT/node_modules/.pnpm/lock.yaml"
 if [ ! -d "$ROOT/node_modules" ]; then
   err "Dependencies are not installed (no node_modules)."
-  hint "Fix: pnpm install"
+  hint "Fix: ./install.sh   (or: pnpm install)"
+elif [ ! -f "$INSTALLED_LOCK" ] || ! cmp -s "$ROOT/pnpm-lock.yaml" "$INSTALLED_LOCK"; then
+  warn "Dependencies are out of date (pnpm-lock.yaml changed since the last install)."
+  if [ "${NO_AUTO_INSTALL:-}" = "1" ]; then
+    err "Auto-sync is disabled (NO_AUTO_INSTALL=1)."
+    hint "Fix: pnpm install   (then re-run ./run.sh)"
+  elif ! command -v pnpm >/dev/null 2>&1; then
+    err "Cannot auto-sync because pnpm is not on PATH."
+    hint "Fix: install pnpm, then run ./install.sh (or pnpm install)."
+  else
+    echo "     Syncing dependencies (pnpm install)..."
+    if ( cd "$ROOT" && pnpm install ); then
+      ok "Dependencies synced to the current lockfile"
+    else
+      err "Automatic 'pnpm install' failed (offline? see errors above)."
+      hint "Fix: run ./install.sh, or 'pnpm install' manually, then re-run."
+    fi
+  fi
 else
-  ok "node_modules present"
+  ok "node_modules present and in sync with the lockfile"
 fi
 
 # --- Workspace esbuild build approval --------------------------------------
