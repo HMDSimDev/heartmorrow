@@ -632,7 +632,6 @@ function LocationCard({
             <AssetPicker
               value={location.imageAssetId ?? null}
               onChange={(imageAssetId) => onUpdate({ imageAssetId })}
-              uploadType="location"
               filterType="location"
             />
             <small className="muted">{t('worldEditor.photoHint')}</small>

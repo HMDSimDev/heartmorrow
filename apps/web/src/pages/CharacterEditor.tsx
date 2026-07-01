@@ -759,7 +759,7 @@ export function CharacterEditor() {
                   <h2>{t('pages:characterEditor.secPortrait')}</h2>
                   <span className="trail" />
                 </div>
-                <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} />
+                <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} characterName={form.name} />
                 <div className="ce-image-gen">
                   <button className="btn sm primary" onClick={() => setGenOpen(true)}>
                     <Icon name="generate" size={13} />
@@ -816,7 +816,8 @@ export function CharacterEditor() {
                     </div>
                     <AssetPicker
                       value={row.assetId}
-                      uploadType="expression"
+                      characterName={form.name}
+                      expressionName={row.name}
                       onChange={(v) => {
                         const rows = [...form.expressionRows];
                         rows[i] = { ...rows[i]!, assetId: v };

@@ -49,7 +49,7 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   await app.register(cors, { origin: config.corsOrigins, credentials: true });
 
   await app.register(multipart, {
-    limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 10 },
+    limits: { fileSize: MAX_UPLOAD_BYTES, files: 100, fields: 10 },
   });
 
   // Serve uploaded assets from the controlled uploads directory only.

@@ -510,6 +510,18 @@ export const api = {
     }
     return res.json();
   },
+  /** Upload multiple image files at once. Filenames are parsed server-side for
+   *  character + expression metadata. Returns all created assets. */
+  uploadAssetsBatch: async (files: File[]): Promise<Asset[]> => {
+    const form = new FormData();
+    for (const f of files) form.append('files', f);
+    const res = await fetch(`${BASE}/assets/batch`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const { message } = await parseErrorBody(res, `Batch upload failed (${res.status}).`);
+      throw new ApiError(message, res.status);
+    }
+    return res.json();
+  },
   deleteAsset: (id: string) => del<{ ok: true }>(`/assets/${id}`),
 
   // conversations

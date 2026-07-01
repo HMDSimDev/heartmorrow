@@ -4,9 +4,11 @@ import {
   AssetSchema,
   ALLOWED_IMAGE_MIME_TYPES,
   MAX_UPLOAD_BYTES,
+  EXPRESSIONS,
   type Asset,
   type AssetType,
   type AllowedImageMimeType,
+  type Expression,
 } from '@dsim/shared';
 import { config, ensureDirectories } from '../config';
 import { assetsRepo } from '../db/repositories';
@@ -37,6 +39,75 @@ export function safeUploadsPath(relativePath: string): string {
     throw badRequest('Resolved path escapes the uploads directory.');
   }
   return target;
+}
+
+/**
+ * Parse an image filename to extract character name and expression. Looks for
+ * known expression words or "portrait" anywhere in the filename (not just at
+ * specific positions), so any naming convention works as long as the trigger
+ * words are present:
+ *
+ *   - `Nicky - Happy_00001_.png`       → "Nicky", expression "happy"
+ *   - `Silvija, portrait (1).jpg`      → "Silvija", expression null, type portrait
+ *   - `Donna Pinciotti - Happy_1.png`  → "Donna Pinciotti", expression "happy"
+ *   - `nicky-happy.png`                → "Nicky", expression "happy"
+ *   - `happy_nicky.png`                → "Nicky", expression "happy"
+ *   - `portrait_silvija_1.jpg`         → "Silvija", type portrait
+ *
+ * Returns null when no known expression or "portrait" keyword is found.
+ */
+export interface ParsedAssetFilename {
+  characterName: string;
+  expression: Expression | null;
+  type: AssetType;
+}
+
+/** Build a regex that matches any known expression word (case-insensitive,
+ *  whole-word) plus surrounding separator/noise characters, so it can be
+ *  removed cleanly from filenames regardless of position. */
+const EXPR_PATTERN = new RegExp(
+  `[-_\\s,()]*?(${EXPRESSIONS.join('|')})[-_\\s\\d,()]*`,
+  'i',
+);
+
+const PORTRAIT_PATTERN = /[-_\s,()]*?portrait[-_\s\d,()]*/i;
+
+/** Clean up leftover separator debris and tidy the character name. */
+function tidyCharacterName(raw: string): string {
+  return raw
+    .replace(/[-_\s,()]+/g, ' ')   // collapse separators → space
+    .replace(/\s{2,}/g, ' ')       // collapse multiple spaces
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase()); // Title Case
+}
+
+export function parseAssetFilename(originalFilename: string): ParsedAssetFilename | null {
+  const name = originalFilename.replace(/\.[^/.]+$/, '').trim();
+
+  // 1. Look for any known expression keyword anywhere in the filename.
+  const exprExec = EXPR_PATTERN.exec(name);
+  if (exprExec) {
+    const rawExpression = exprExec[1]!.toLowerCase();
+    const expression = rawExpression as Expression;
+    // Character name = the filename with the matched expression block removed.
+    const remainder = name.slice(0, exprExec.index) + name.slice(exprExec.index + exprExec[0].length);
+    const characterName = tidyCharacterName(remainder);
+    if (characterName) {
+      return { characterName, expression, type: 'expression' };
+    }
+  }
+
+  // 2. Look for "portrait" keyword anywhere in the filename.
+  const portExec = PORTRAIT_PATTERN.exec(name);
+  if (portExec) {
+    const remainder = name.slice(0, portExec.index) + name.slice(portExec.index + portExec[0].length);
+    const characterName = tidyCharacterName(remainder);
+    if (characterName) {
+      return { characterName, expression: null, type: 'portrait' };
+    }
+  }
+
+  return null;
 }
 
 export interface SaveAssetInput {
@@ -71,6 +142,17 @@ export function saveUploadedAsset(input: SaveAssetInput): Asset {
   const absPath = safeUploadsPath(storedName);
   fs.writeFileSync(absPath, input.buffer);
 
+  // Derive character + expression tags from the filename (deterministic parsing).
+  const parsed = parseAssetFilename(input.originalFilename);
+  const tags = [...(input.tags ?? [])];
+  if (parsed) {
+    tags.push(`character:${parsed.characterName}`);
+    if (parsed.expression) tags.push(`expression:${parsed.expression}`);
+    if (!tags.includes(`type:${parsed.type}`)) tags.push(`type:${parsed.type}`);
+    // Override the upload type so expression images are auto-typed correctly.
+    input.type = parsed.type;
+  }
+
   const asset = AssetSchema.parse({
     id,
     type: input.type,
@@ -78,11 +160,26 @@ export function saveUploadedAsset(input: SaveAssetInput): Asset {
     filename: sanitizeDisplayName(input.originalFilename) || storedName,
     mimeType: input.mimeType,
     altText: input.altText ?? '',
-    tags: input.tags ?? [],
+    tags,
     metadata: { bytes: input.buffer.byteLength },
     createdAt: Date.now(),
   });
   return assetsRepo.insert(asset);
+}
+
+/** Upload multiple assets in one call. Each file may be auto-tagged via
+ *  {@link parseAssetFilename}. Returns all saved assets. */
+export function saveBatchAssets(
+  files: Array<{ buffer: Buffer; originalFilename: string; mimeType: string }>,
+): Asset[] {
+  return files.map((f) =>
+    saveUploadedAsset({
+      buffer: f.buffer,
+      originalFilename: f.originalFilename,
+      mimeType: f.mimeType,
+      type: 'other', // will be overridden by parseAssetFilename if matched
+    }),
+  );
 }
 
 export function listAssets(): Asset[] {
