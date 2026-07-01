@@ -24,9 +24,10 @@ describe('turnRapportDelta', () => {
     expect(Math.abs(turnRapportDelta(-2))).toBeGreaterThan(turnRapportDelta(2));
   });
 
-  it('a neutral, forgettable turn still cools the date (you cannot coast)', () => {
-    expect(turnRapportDelta(0)).toBeLessThan(0);
-    // …and a guarded person cools faster on a wasted turn.
+  it('an empty turn builds nothing: steady for an open character, a slight cool for a guarded one', () => {
+    expect(turnRapportDelta(0)).toBe(0); // open: a forgettable turn holds the line — no free coasting UP
+    expect(turnRapportDelta(0, { guardedness: 80 })).toBeLessThan(0); // guarded: extends less goodwill → slips
+    // …and a guarded person cools faster on a wasted turn than an open one.
     expect(turnRapportDelta(0, { guardedness: 80 })).toBeLessThan(turnRapportDelta(0, { guardedness: 0 }));
   });
 

@@ -342,111 +342,244 @@
 .date-chip .ico { font-size: 0.92rem; }
 .date-chip-place { color: var(--text); border-color: var(--border); }
 
-/* SIGNATURE: the live date "trajectory" — a center-anchored diverging gauge across
-   the top of the stage. Neutral in the middle; a glowing fill grows RIGHT as the
-   date warms, LEFT as it cools, with a per-turn +N/−N flourish. No numbers shown. */
+/* SIGNATURE: the live date "trajectory" — a diverging almanac gauge across the top of
+   the stage, framed with HUD corner ticks. A serif caption names the vibe; the seam (a
+   brass diamond) marks where THIS date opened; a lamplit fill flows RIGHT toward the
+   warm pole as the night warms, or LEFT toward the ember pole as it sinks to the leave
+   floor — each half scaled to its real room. A per-turn +N/−N flourish rises from the
+   seam. No numbers shown — only the glow and a qualitative caption. */
 .date-trajectory {
+  --dt-mood: var(--halo-1);
   position: relative;
-  padding: 11px 18px 9px;
+  padding: 13px 24px 12px;
+  isolation: isolate;
   background:
-    radial-gradient(420px 120px at 50% -60%, rgba(230, 177, 94, 0.1), transparent 70%),
-    linear-gradient(180deg, var(--panel), var(--ink-2));
-  border-bottom: 1px solid var(--border-soft);
+    radial-gradient(64% 92% at 50% 46%, color-mix(in oklab, var(--dt-mood) 66%, transparent), transparent 76%),
+    radial-gradient(480px 150px at 50% -42%, var(--halo-1), transparent 72%),
+    linear-gradient(180deg, var(--panel-2), var(--ink-2));
 }
+/* the whole gauge glows warmer as the night goes well, embery as it sours */
+.date-trajectory.tone-good { --dt-mood: rgba(230, 177, 94, 0.2); }
+.date-trajectory.tone-bad { --dt-mood: rgba(224, 122, 130, 0.16); }
+/* a hairline rim-light along the top edge + a brass rule closing off the reel below */
+.date-trajectory::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(243, 236, 221, 0.12), transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent 6%, color-mix(in oklab, var(--brass) 48%, var(--border)) 50%, transparent 94%) bottom / 100% 1px no-repeat;
+}
+/* HUD corner ticks — a brass instrument frame on all four corners */
+.date-trajectory::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  opacity: 0.5;
+  z-index: 2;
+  --bw: 2px;
+  --bl: 13px;
+  background:
+    linear-gradient(var(--brass), var(--brass)) left top / var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--brass), var(--brass)) left top / var(--bw) var(--bl) no-repeat,
+    linear-gradient(var(--brass), var(--brass)) right top / var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--brass), var(--brass)) right top / var(--bw) var(--bl) no-repeat,
+    linear-gradient(var(--brass), var(--brass)) left bottom / var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--brass), var(--brass)) left bottom / var(--bw) var(--bl) no-repeat,
+    linear-gradient(var(--brass), var(--brass)) right bottom / var(--bl) var(--bw) no-repeat,
+    linear-gradient(var(--brass), var(--brass)) right bottom / var(--bw) var(--bl) no-repeat;
+}
+/* The serif caption naming the vibe — the prominent read. */
+.dt-caption {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin-bottom: 14px;
+}
+.dt-vibe {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-style: italic;
+  font-size: 1.08rem;
+  letter-spacing: 0.01em;
+  color: var(--text-dim);
+  transition: color 0.5s ease, text-shadow 0.5s ease;
+}
+.date-trajectory.tone-good .dt-vibe { color: var(--brass); text-shadow: 0 0 20px color-mix(in oklab, var(--brass) 42%, transparent); }
+.date-trajectory.tone-bad .dt-vibe { color: var(--ember); text-shadow: 0 0 20px color-mix(in oklab, var(--ember) 36%, transparent); }
+/* The gauge row: ember pole ◆ — track — brass pole ◆ */
+.dt-gauge {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.dt-pole {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 1;
+  transition: color 0.5s ease, text-shadow 0.5s ease, transform 0.5s ease;
+}
+.dt-pole-cool { color: color-mix(in oklab, var(--ember) 50%, var(--text-mute)); }
+.dt-pole-warm { color: color-mix(in oklab, var(--brass) 50%, var(--text-mute)); }
+/* the pole you're heading toward lights up */
+.date-trajectory.tone-bad .dt-pole-cool { color: var(--ember); text-shadow: 0 0 10px rgba(224, 122, 130, 0.7); transform: scale(1.2); }
+.date-trajectory.tone-good .dt-pole-warm { color: var(--brass); text-shadow: 0 0 10px rgba(230, 177, 94, 0.75); transform: scale(1.2); }
+/* the +N / −N flourish, rising from the seam just above the track (reuses delta-rise) */
+.dt-pulse-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 3px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 4;
+}
+.dt-pulse {
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 0.82rem;
+  animation: delta-rise 1.7s ease-out forwards;
+}
+.dt-pulse.up { color: var(--sage); }
+.dt-pulse.down { color: var(--ember); }
 .dt-track {
   position: relative;
-  height: 10px;
-  border-radius: 3px;
-  background: var(--ink-2);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.55);
-  /* measured tick marks every 10% — the same instrument feel as the stat bars */
-  background-image: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(243, 236, 221, 0.06) calc(10% - 1px) 10%);
+  flex: 1 1 auto;
+  height: 13px;
+  border-radius: 7px;
+  /* a machined well: measured tick graduations over a sunken, rim-lit slot */
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), rgba(243, 236, 221, 0.05) calc(10% - 1px) 10%),
+    linear-gradient(180deg, #0c0f1e, var(--ink-2));
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(243, 236, 221, 0.05),
+    0 1px 0 rgba(243, 236, 221, 0.04);
 }
-/* The neutral seam — where every date begins. */
+/* The opening seam — where THIS date began (a guarded character starts cool of neutral). */
 .dt-center {
   position: absolute;
   left: 50%;
-  top: -3px;
-  bottom: -3px;
-  width: 2px;
+  top: -4px;
+  bottom: -4px;
+  width: 1px;
   transform: translateX(-50%);
-  background: rgba(243, 236, 221, 0.4);
-  border-radius: 2px;
-  z-index: 2;
+  background: linear-gradient(180deg, transparent, rgba(243, 236, 221, 0.5) 28%, rgba(243, 236, 221, 0.5) 72%, transparent);
+  z-index: 3;
+}
+/* a brass diamond notch crowning the seam — echoes the poles, marks the opening */
+.dt-center::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translateX(-50%) rotate(45deg);
+  border-radius: 1px;
+  background: var(--brass);
+  box-shadow: 0 0 7px rgba(230, 177, 94, 0.65);
 }
 .dt-fill {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-radius: 3px;
+  z-index: 1;
+  background-size: 220% 100%;
   transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  /* a slow lamplight drift + breath — the "subtle color shift" */
+  animation: dt-flow 8s linear infinite, dt-breathe 5s ease-in-out infinite;
 }
-/* Warming — grows rightward from the center, rose into lamplight. */
+/* a glassy top sheen across the fill */
+.dt-fill::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 55%);
+  pointer-events: none;
+}
+/* the glowing "read head" riding the leading edge */
+.dt-fill::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(247, 241, 227, 0.92);
+}
+/* Warming — flows rightward from the seam in the romance accent (rose → lamplight),
+   so a re-tinted accent carries through; danger stays ember and is never themed. */
 .dt-fill.warm {
   left: 50%;
-  background: linear-gradient(90deg, var(--rose), var(--brass));
-  box-shadow: 0 0 14px rgba(230, 177, 94, 0.35);
+  border-radius: 2px 6px 6px 2px;
+  background-image: linear-gradient(
+    90deg,
+    var(--accent),
+    var(--accent-2) 30%,
+    color-mix(in oklab, var(--accent-2) 55%, white 30%) 50%,
+    var(--accent-2) 70%,
+    var(--accent)
+  );
+  box-shadow: 0 0 16px color-mix(in oklab, var(--accent-2) 42%, transparent);
 }
-/* Cooling — grows leftward from the center, ember. */
+.dt-fill.warm::after {
+  right: 0;
+  box-shadow: 0 0 9px 2px color-mix(in oklab, var(--accent-2) 70%, transparent);
+}
+/* Cooling — flows leftward from the seam, ember. */
 .dt-fill.cool {
   right: 50%;
-  background: linear-gradient(270deg, #d98e6a, var(--ember));
-  box-shadow: 0 0 14px rgba(224, 122, 130, 0.32);
+  border-radius: 6px 2px 2px 6px;
+  background-image: linear-gradient(
+    90deg,
+    var(--ember),
+    #d98e6a 30%,
+    color-mix(in oklab, #d98e6a 60%, white 26%) 50%,
+    #d98e6a 70%,
+    var(--ember)
+  );
+  box-shadow: 0 0 16px rgba(224, 122, 130, 0.34);
+}
+.dt-fill.cool::after {
+  left: 0;
+  box-shadow: 0 0 9px 2px rgba(224, 122, 130, 0.6);
+}
+@keyframes dt-flow {
+  from { background-position: 0% 50%; }
+  to { background-position: 220% 50%; }
+}
+@keyframes dt-breathe {
+  0%, 100% { filter: saturate(1) brightness(1); }
+  50% { filter: saturate(1.14) brightness(1.09); }
 }
 .dt-foot {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 7px;
+  margin-top: 8px;
+  padding: 0 2px;
 }
 .dt-end {
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-dim);
-  opacity: 0.55;
+  opacity: 0.5;
 }
-.dt-now {
-  font-family: var(--font-mono);
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: lowercase;
-  color: var(--text-dim);
-  transition: color 0.5s ease;
-  /* on the narrow two-col stage the center label can collide with the end labels;
-     let it shrink and ellipsize instead of pushing them apart */
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.date-trajectory.tone-good .dt-now { color: var(--brass); }
-.date-trajectory.tone-bad .dt-now { color: var(--ember); }
-/* The +N / −N flourish that rises from the seam each turn (reuses delta-rise). */
-.dt-pulse-wrap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-.dt-pulse {
-  font-family: var(--font-mono);
-  font-weight: 800;
-  font-size: 0.78rem;
-  animation: delta-rise 1.7s ease-out forwards;
-}
-.dt-pulse.up { color: var(--sage); }
-.dt-pulse.down { color: var(--ember); }
 @media (prefers-reduced-motion: reduce) {
-  .dt-fill { transition: none; }
+  .dt-fill { transition: none; animation: none; }
   .dt-pulse { animation: none; }
 }
 

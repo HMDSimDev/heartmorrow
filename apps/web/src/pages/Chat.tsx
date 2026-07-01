@@ -15,6 +15,8 @@ import {
   venueTierMeta,
   availableIntents,
   isGiftableItem,
+  startingRapport,
+  RAPPORT_LEAVE_FLOOR,
   INTENT_ICONS,
   type Intent,
   type InventoryItem,
@@ -43,41 +45,60 @@ import { Banner, Empty, Field, Spinner } from '../components/ui';
 import './date.page.css';
 
 /**
- * The live date "trajectory" — a center-anchored diverging bar. Neutral sits in
- * the middle; a glowing fill grows RIGHT (rose→brass) as the date warms, or LEFT
- * (ember) as it sours, with a per-turn +N / −N flourish. Numbers are never shown;
- * only the fill and a qualitative caption. The 0..100 value is internal.
+ * The live date "trajectory" — a diverging bar whose center seam is where THIS date
+ * began (`anchor`; a guarded character opens BELOW the neutral midpoint). The fill
+ * grows RIGHT (rose→brass) as rapport climbs from the seam toward 100, or LEFT (ember)
+ * as it sinks toward the leave floor. Each half is scaled to that side's REAL room, so
+ * the bar reaches hard-left exactly as the date bottoms out (the character is about to
+ * walk) — never while there's still life in it — and hard-right only at a perfect night.
+ * A per-turn +N / −N flourish rides on top; anchoring at the start keeps the fill in step
+ * with it, so an opening +3 always reads as rightward progress even for a guarded
+ * character. Numbers are never shown; only the fill and a qualitative caption. Values 0..100.
  */
 function DateTrajectory({
   value,
+  anchor,
   label,
   pulse,
 }: {
-  value: number;
+  value: number | null;
+  anchor: number;
   label: string;
   pulse: { delta: number; key: number } | null;
 }) {
   const { t } = useTranslation(['pages', 'common']);
-  const tone = value >= 60 ? 'good' : value < 40 ? 'bad' : 'mid';
-  const mag = Math.max(0, Math.min(50, Math.abs(value - 50))); // 0..50 → 0..50% of the track
-  const side = value >= 50 ? 'warm' : 'cool';
+  const v = value ?? anchor; // no read yet → sit exactly on the opening seam (empty fill)
+  // The label word still reads absolute warmth, so its color stays keyed to the raw value.
+  const tone = v >= 60 ? 'good' : v < 40 ? 'bad' : 'mid';
+  const warming = v >= anchor;
+  // Fill each half over its own available range so it can't underfill: warming spans
+  // seam→100, cooling spans seam→leave-floor (below which the character leaves anyway).
+  const room = warming ? Math.max(1, 100 - anchor) : Math.max(1, anchor - RAPPORT_LEAVE_FLOOR);
+  const mag = Math.max(0, Math.min(50, (Math.abs(v - anchor) / room) * 50));
+  const side = warming ? 'warm' : 'cool';
   return (
     <div className={`date-trajectory tone-${tone}`} role="img" aria-label={t('chat.trajectoryAria', { label })}>
-      {pulse && pulse.delta !== 0 && (
-        <div className="dt-pulse-wrap" key={pulse.key} aria-hidden="true">
-          <span className={`dt-pulse ${pulse.delta > 0 ? 'up' : 'down'}`}>
-            {pulse.delta > 0 ? '+' : ''}
-            {pulse.delta}
-          </span>
+      <div className="dt-caption">
+        <span className="dt-vibe">{label}</span>
+      </div>
+      <div className="dt-gauge">
+        {pulse && pulse.delta !== 0 && (
+          <div className="dt-pulse-wrap" key={pulse.key} aria-hidden="true">
+            <span className={`dt-pulse ${pulse.delta > 0 ? 'up' : 'down'}`}>
+              {pulse.delta > 0 ? '+' : ''}
+              {pulse.delta}
+            </span>
+          </div>
+        )}
+        <span className="dt-pole dt-pole-cool" aria-hidden="true">◆</span>
+        <div className="dt-track">
+          <span className="dt-center" aria-hidden="true" />
+          <span className={`dt-fill ${side}`} style={{ width: `${mag}%` }} />
         </div>
-      )}
-      <div className="dt-track">
-        <span className="dt-center" aria-hidden="true" />
-        <span className={`dt-fill ${side}`} style={{ width: `${mag}%` }} />
+        <span className="dt-pole dt-pole-warm" aria-hidden="true">◆</span>
       </div>
       <div className="dt-foot">
         <span className="dt-end">{t('chat.cooling')}</span>
-        <span className="dt-now">{label}</span>
         <span className="dt-end">{t('chat.warming')}</span>
       </div>
     </div>
@@ -1438,7 +1459,12 @@ export function Chat() {
             )}
           </div>
           {!locked && (
-            <DateTrajectory value={rapport ?? 50} label={vibe ?? t('chat.settlingIn')} pulse={rapportPulse} />
+            <DateTrajectory
+              value={rapport}
+              anchor={startingRapport(character.guardedness)}
+              label={vibe ?? t('chat.settlingIn')}
+              pulse={rapportPulse}
+            />
           )}
           <div className="messages date-reel">
             {messages.length === 0 && !streaming.active && (

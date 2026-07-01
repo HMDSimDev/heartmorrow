@@ -70,11 +70,13 @@ export const GUARDEDNESS = {
    *  very guarded character still climbs on genuinely good play — just markedly slower
    *  (hard, not impossible): a +3 turn is worth ~8 to them vs ~15 to an open character. */
   GAIN_DAMP: 0.6,
-  /** A neutral/forgettable turn cools by this much (you can't coast), plus… */
-  IDLE_DRIFT_BASE: 2,
-  /** …up to this much MORE for a fully-guarded character (so a guarded date gives a
-   *  handful of flat turns of runway before they bail, not an instant funnel). */
-  IDLE_DRIFT_GUARD: 3,
+  /** A purely forgettable turn (engagement 0) no longer cools an open character — a
+   *  pleasant-but-empty line HOLDS the line; you just can't BUILD warmth without a real
+   *  +1. (Genuine letdowns still score −1/−2/−3 and cool as before.) */
+  IDLE_DRIFT_BASE: 0,
+  /** …but a guarded character still slips a little on empty turns — they extend less
+   *  goodwill, so coasting with them slowly cools (up to this much for fully guarded). */
+  IDLE_DRIFT_GUARD: 2,
   /** Asymmetric per-turn step: a good beat is worth less than a bad one costs. */
   POS_STEP: 5,
   NEG_STEP: 8,
@@ -90,7 +92,9 @@ export function startingRapport(guardedness = 0): number {
  * How much a single turn moves the live rapport, given the per-turn judge's
  * engagement (−3..+3) and the character's guardedness. Three deliberate biases:
  *  - ASYMMETRIC: warmth is harder to build than to lose (POS_STEP < NEG_STEP).
- *  - NO COASTING: a purely neutral/forgettable turn (engagement 0) cools the date.
+ *  - NO FREE WARMTH: an empty turn (engagement 0) doesn't BUILD rapport — it holds
+ *    steady for an open character and cools a guarded one slightly; you climb only on
+ *    genuine +1/+2 turns. (Real letdowns score negative and cool everyone.)
  *  - GUARDED = SLOW TO WARM: only the upside is dampened by guardedness; a guarded
  *    person still cools at full speed, so they're easy to lose and hard to win.
  */

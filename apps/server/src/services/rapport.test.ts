@@ -66,12 +66,14 @@ describe('per-turn rapport judge', () => {
     expect(readout!.label).toBe(rapportLabel(expected));
   });
 
-  it('a neutral, forgettable turn still cools the date (no coasting)', async () => {
+  it('a forgettable turn builds nothing (a guarded default character slips slightly)', async () => {
     const { session } = startDate();
     setAdapterOverride(reply({ engagement: 0, expression: 'neutral', note: 'pure filler' }));
 
     const readout = await judgeTurn(session.id);
-    expect(readout!.delta).toBeLessThan(0); // engagement 0 → a small negative drift
+    // Default guardedness is >0, so an empty turn costs a small idle drift; an OPEN
+    // character (guardedness 0) would hold steady instead (see date-dynamics).
+    expect(readout!.delta).toBeLessThan(0);
     expect(readout!.rapport).toBeLessThan(START);
   });
 
