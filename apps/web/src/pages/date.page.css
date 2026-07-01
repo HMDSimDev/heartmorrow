@@ -724,6 +724,15 @@
   border-radius: 10px;
 }
 
+/* Inline roleplay styling inside a character bubble: physical actions / narration
+   the model wraps in *asterisks* read as quiet italic stage-direction (the same
+   italic + muted voice as venue-flavor), so spoken words keep the normal reading
+   color and stand out. Purely presentational — see components/RichText.tsx. */
+.date-msg.character .date-rt-action {
+  font-style: italic;
+  color: var(--text-mute);
+}
+
 .date-cursor::after {
   content: '▍';
   animation: date-blink 1s steps(2) infinite;
@@ -928,6 +937,91 @@
 .date-moment-ending .date-moment-title {
   font-size: 1.28rem;
   color: var(--brass);
+}
+
+/* Date recap — the almanac record of how the evening went. Shares the keepsake
+   vellum shell but lays out a header (kicker + mood chip), the summary as the
+   hero line in almanac script, and a ruled ledger footer for memories kept. */
+.date-recap {
+  gap: 0;
+}
+.date-recap-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-top: 10px; /* clear the seal */
+}
+.date-recap-head .date-moment-kicker {
+  margin-top: 0;
+}
+.date-recap-mood {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.84rem;
+  color: var(--brass);
+  background: rgba(230, 177, 94, 0.1);
+  border: 1px solid rgba(230, 177, 94, 0.28);
+}
+.date-recap-mood::before {
+  content: '♥';
+  font-style: normal;
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+.date-recap-summary {
+  margin: 11px 0 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.02rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+.date-recap-ledger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(230, 177, 94, 0.16);
+}
+.date-recap-keepsake {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--text-mute);
+}
+.date-recap-keepsake svg {
+  flex-shrink: 0;
+  color: var(--brass);
+}
+/* Failed eval: a quiet, unrecorded note — muted ember, no celebratory glow. */
+.date-recap-failed {
+  background: linear-gradient(180deg, rgba(224, 122, 130, 0.05), var(--panel));
+  border-color: rgba(224, 122, 130, 0.28);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(224, 122, 130, 0.1);
+}
+.date-recap-failed .date-moment-kicker {
+  color: var(--ember);
+}
+.date-recap-failed .date-recap-summary {
+  color: var(--text-dim);
+  font-style: normal;
+  font-size: 0.9rem;
+}
+.date-recap-failed .date-moment-seal {
+  background: radial-gradient(circle at 36% 32%, #ffdde0, var(--ember) 48%, #8c1a24 100%);
+  box-shadow: 0 2px 8px rgba(224, 122, 130, 0.45), inset -2px -2px 5px rgba(90, 14, 20, 0.5);
 }
 
 /* Breakup-intent confirm card — a tense, ember-edged prompt. */

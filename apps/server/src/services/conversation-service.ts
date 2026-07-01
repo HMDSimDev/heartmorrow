@@ -650,7 +650,7 @@ export async function openConversation(sessionId: string): Promise<Message | nul
           `the atmosphere of the place, and the weather and time of day (use the scene and world details above). ` +
           `Describe ${character.name} from the OUTSIDE, by name (e.g. "${character.name} is waiting at a corner table, ..."). ` +
           `This is stage-setting prose for the player to read — NOT a spoken line: do not write any dialogue, do not speak in ` +
-          `${character.name}'s voice, no greeting, and no quotation marks. Just the scene.`,
+          `${character.name}'s voice, no greeting, and no quotation marks or *asterisks* — write it as plain third-person prose. Just the scene.`,
       });
     }
     const adapter = getAdapter(settings);
@@ -1411,6 +1411,12 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   }
 
   const evaluation = result.data;
+  // The evaluator is asked for a short mood word, but models sometimes hand back a
+  // whole sentence (or a word with a trailing period). Strip any trailing
+  // sentence-ending punctuation so it slots cleanly into the templates that append
+  // their own — the "Mood: {mood}." banner, the "A date — {mood}" moment, and the
+  // afterglow prompt ("...was {mood}.") — instead of producing a stray double period.
+  evaluation.mood = evaluation.mood.replace(/[\s.!?…]+$/u, '');
   const actor = getCharacter(session.characterId);
   const chronDay = actor.worldId ? ensureWorldState(actor.worldId).day : 0;
   const event = recordEvent('session_eval', {

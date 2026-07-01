@@ -166,7 +166,8 @@ const FR = {
   'date.stayInVoice':
     `=== STAY IN VOICE ===\n` +
     `Speak as {{characterName}}{{voiceClause}}{{quirksClause}}. ` +
-    `React with your own opinions and feelings; never slip into a neutral, helpful, or summarizing tone.`,
+    `React with your own opinions and feelings; never slip into a neutral, helpful, or summarizing tone. ` +
+    `Put any physical actions in *asterisks* and say your dialogue plainly, with no quotation marks around it.`,
 
   // -- relationship STYLE phrasing (shared by date prompt + phone character brief) --
   'style.monogamous':

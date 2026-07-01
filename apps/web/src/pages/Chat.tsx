@@ -42,6 +42,7 @@ import { intentLabel, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayL
 import { Portrait } from '../components/Portrait';
 import { Icon } from '../components/Icon';
 import { RelationshipBars } from '../components/StatBars';
+import { RichLine } from '../components/RichText';
 import { Banner, Empty, Field, Spinner } from '../components/ui';
 import './date.page.css';
 
@@ -1247,15 +1248,26 @@ export function Chat() {
   const evalBanner = evalResult
     ? evalResult.evaluated
       ? (
-        <Banner kind="ok">
-          <strong>{t('chat.evalTitle')}</strong>{' '}
-          {t('chat.evalDetail', { mood: evalResult.mood, summary: evalResult.summaryLine, count: evalResult.memoriesWritten })}
-        </Banner>
+        <div className="date-moment date-recap">
+          <div className="date-moment-seal" aria-hidden="true">❧</div>
+          <div className="date-recap-head">
+            <div className="date-moment-kicker">{t('chat.recapKicker')}</div>
+            {evalResult.mood && <span className="date-recap-mood">{evalResult.mood}</span>}
+          </div>
+          {evalResult.summaryLine && <p className="date-recap-summary">{evalResult.summaryLine}</p>}
+          <div className="date-recap-ledger">
+            <span className="date-recap-keepsake">
+              <Icon name="chronicle" size={13} /> {t('chat.recapMemories', { count: evalResult.memoriesWritten })}
+            </span>
+          </div>
+        </div>
       )
       : (
-        <Banner kind="error">
-          <strong>{t('chat.evalFailedTitle')}</strong>{t('chat.evalFailedBody', { error: evalResult.evalError })}
-        </Banner>
+        <div className="date-moment date-recap date-recap-failed">
+          <div className="date-moment-seal" aria-hidden="true">⚠</div>
+          <div className="date-moment-kicker">{t('chat.evalFailedTitle')}</div>
+          <p className="date-recap-summary">{t('chat.recapFailedBody', { error: evalResult.evalError })}</p>
+        </div>
       )
     : null;
 
@@ -1522,7 +1534,7 @@ export function Chat() {
                 key={m.id}
                 className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
               >
-                {m.text}
+                {m.role === 'character' ? <RichLine text={m.text} /> : m.text}
                 {m.id === regenId && (
                   <button
                     className="date-regen-btn"
@@ -1539,7 +1551,7 @@ export function Chat() {
               <div className="date-msg character">
                 {streaming.text.trim() ? (
                   <>
-                    {streaming.text.trimStart()}
+                    <RichLine text={streaming.text.trimStart()} open />
                     <span className="date-cursor" />
                   </>
                 ) : (
