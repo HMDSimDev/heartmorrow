@@ -5,10 +5,12 @@
    =========================================================================== */
 
 /* --- Signature: the framed hero centerpiece ----------------------------- */
+/* Full-bleed like the almanac-status strip below it — a narrower hero read as
+   a misaligned box, not a design choice. The greeting line keeps its own
+   max-width so the text measure stays comfortable. */
 .dash-hero {
   --cut: 22px;
   overflow: hidden;
-  max-width: 900px;
 }
 /* The hero fill gets the lamplit bloom + a faint paper grain on top of the
    framed panel's own background. ::before is the framed fill; we layer onto it. */
@@ -142,6 +144,8 @@
 .dash-plate-name {
   font-family: var(--font-display); font-weight: 560; font-size: 0.84rem;
   color: var(--text); min-width: 0;
+  /* User-entered names in a 102px plate: ellipsize instead of overflowing. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .dash-plate-add {
   flex: 0 0 auto; width: 102px; scroll-snap-align: start;
@@ -166,9 +170,8 @@
 
 @media (min-width: 1900px) {
   .dash-menu { grid-template-columns: repeat(4, minmax(236px, 1fr)); }
-  /* On ultrawide the 900px cap strands the hero flush-left while everything
-     below goes full-bleed — widen it to roughly match the content column. */
-  .dash-hero { max-width: 1200px; }
+  /* No hero width cap here: it must always match the almanac-status strip
+     below it (the base rule has no max-width for the same reason). */
 }
 .dash-tile {
   position: relative; overflow: hidden;

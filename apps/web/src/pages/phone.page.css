@@ -319,6 +319,22 @@
 .ph-homebtn:focus-visible { outline: none; }
 .ph-homebtn:focus-visible::before { border-color: var(--brass); box-shadow: 0 0 0 2px rgba(230, 177, 94, 0.45); }
 
+/* Very short viewports (landscape phones): the device gets ~150-250px of height,
+   so slim every fixed-height piece of phone chrome — otherwise the dock and home
+   button alone outsize the device and clip. The greeting is decorative; give its
+   space to the app grid. */
+@media (max-height: 480px) {
+  .ph-greeting { display: none; }
+  .phone-home { padding: 10px 14px; }
+  .ph-hint { display: none; }
+  .ph-dock { margin: 6px 10px 0; padding: 5px; }
+  .ph-dock .ph-app-icon { width: 32px; height: 32px; }
+  .ph-dock .ph-app-tile { font-size: 1rem; border-radius: 9px; }
+  .ph-dock .ph-app-label { display: none; }
+  .ph-homebtn { height: 28px; }
+  .ph-homebtn::before { width: 20px; height: 20px; border-radius: 7px; }
+}
+
 /* ===========================================================================
    Cheap, on-theme entrance motion. All additive and behind a reduced-motion
    guard at the bottom. The phone "wakes up": the header settles, the icons

@@ -88,6 +88,39 @@
   gap: var(--gap);
   grid-template-columns: repeat(auto-fill, minmax(min(244px, 100%), 1fr));
 }
+/* Phones: the 244px floor meant ONE full-width card per row — go two-up with
+   the card innards tightened to match, and slim the merchant masthead. */
+@media (max-width: 540px) {
+  .shop-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .shop-counter { gap: 12px; }
+  .shop-counter-lamp { width: 38px; height: 38px; font-size: 1.1rem; }
+  .shop-counter-text h1 { font-size: 1.45rem; }
+  .shop-counter-text p { font-size: 0.84rem; }
+  /* The purse reads inline under the blurb instead of a right-hand column. */
+  .shop-counter-side { align-items: flex-start; }
+  .shop-purse { padding: 6px 12px; }
+  .shop-purse-coin { font-size: 0.95rem; }
+  .shop-item-body { padding: 10px 10px 0; gap: 8px; }
+  .shop-item-icon { width: 30px; height: 30px; font-size: 1rem; }
+  /* Half-width cards can't fit icon + name + rarity tag on one line — the
+     name's break-anywhere guard shattered it into a letter column. Stack:
+     icon + tag on the first row, the name block full-width beneath. */
+  .shop-item-top { flex-wrap: wrap; }
+  .shop-item-top .flex-fill { flex: 1 1 100%; order: 2; }
+  .shop-item-name { font-size: 0.94rem; }
+  .shop-item-desc {
+    font-size: 0.78rem;
+    line-height: 1.45;
+    /* Clamp wordy descriptions so one chatty item can't stretch its row. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+  .shop-item-stats { padding: 8px 10px; }
+  .shop-price { font-size: 0.92rem; }
+  .shop-item-actions { padding: 0 10px 10px; }
+}
 @media (min-width: 1900px) {
   /* Add columns on ultrawide instead of stretching a fixed 5 — cap card width at 320px. */
   .shop-grid { grid-template-columns: repeat(auto-fill, minmax(244px, 320px)); }

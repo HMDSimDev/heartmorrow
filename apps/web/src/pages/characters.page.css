@@ -37,6 +37,34 @@
   grid-template-columns: repeat(auto-fill, minmax(min(236px, 100%), 300px));
   justify-content: start;
 }
+/* Phones: the 236px floor forced ONE plate per row, blowing each portrait up
+   to most of the screen. Two smaller plates per row instead, with the frame
+   chrome, nameplate and copy scaled down to match. */
+@media (max-width: 540px) {
+  /* minmax(0,1fr): plain 1fr floors at content min-width, so a plate with a
+     wide button row steals width and the halves come out lopsided. */
+  .ppl-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .ppl-frame { --cut: 12px; }
+  .ppl-portrait-link { padding: 3px; }
+  .ppl-portrait-link::before { top: 8px; left: 8px; width: 12px; height: 12px; }
+  .ppl-portrait-link::after { bottom: 8px; right: 8px; width: 12px; height: 12px; }
+  .ppl-nameplate { margin: -14px 8px 0; padding: 8px 10px 9px; }
+  .ppl-name { font-size: 0.94rem; }
+  .ppl-meta { font-size: 0.64rem; }
+  .ppl-desc {
+    margin: 7px 8px 0;
+    font-size: 0.76rem;
+    line-height: 1.45;
+    min-height: 0;
+    /* Clamp the blurb so a wordy description can't stretch its whole row. */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+  .ppl-actions { gap: 6px; padding: 10px 2px 2px; }
+  .ppl-actions .ppl-creator-row { gap: 6px; }
+}
 
 /* --- Portrait plate (the bold signature element) -------------------------- */
 .ppl-plate {

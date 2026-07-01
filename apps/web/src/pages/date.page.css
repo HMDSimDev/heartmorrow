@@ -21,6 +21,12 @@
   grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
   gap: 12px;
 }
+/* Phones: a 118px floor means two chunky cards per row — drop the floor so
+   three smaller portraits fit and the picker stops dominating the screen. */
+@media (max-width: 540px) {
+  .date-pick-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; }
+  .date-pick-name { font-size: 0.84rem; }
+}
 .date-pick-card {
   position: relative;
   display: flex;
@@ -91,7 +97,10 @@
 /* --- Location picker — photo tiles instead of a bare dropdown ----------- */
 .date-loc-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  /* min(150px, 50%-gap): a bare 150px floor collapsed to ONE giant full-width
+     tile per row on phones once the container dipped under ~312px — always
+     keep at least two location tiles side by side. */
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, calc(50% - 6px)), 1fr));
   gap: 12px;
 }
 .date-loc-card {
@@ -251,8 +260,6 @@
   padding: 0;
   overflow-x: hidden;
   overflow-y: visible;
-  max-width: 1400px;
-  margin-inline: auto;
 }
 @media (max-width: 859px) {
   .date-stage { min-height: 0; max-height: none; order: -1; }
@@ -595,10 +602,9 @@
      subtraction, so the composer never gets pushed below the fold. */
   flex: 1;
   min-height: 0;
-  /* keep the conversation readable even when the stage is very wide */
+  /* Full stage width — bubbles cap themselves (max-width: 84%), and a capped
+     centered column read as "squeezed" on wide monitors. */
   width: 100%;
-  max-width: 940px;
-  margin-inline: auto;
 }
 @media (max-width: 859px) {
   /* Stage is no longer viewport-bounded here (it stacks above the sidebar), so cap
@@ -808,8 +814,6 @@
   flex-direction: column;
   gap: 8px;
   width: 100%;
-  max-width: 940px;
-  margin-inline: auto;
   overflow: visible;
 }
 .date-foot .banner:last-child { margin-bottom: 0; }
@@ -1266,8 +1270,7 @@
   display: grid;
   gap: 16px;
   grid-template-columns: 1fr;
-  max-width: 1400px;
-  margin-inline: auto;
+  /* No width cap: tracks the app's content column (--maxw) like Home/People. */
 }
 /* Two-column only once there's room for a usable stage beside the 300px dossier.
    Switching at 860px (where the sidebar also appears) squeezed the stage to ~212px. */

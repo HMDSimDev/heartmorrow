@@ -33,6 +33,8 @@ export function Dashboard() {
   const cal = worldState ? deriveCalendar(worldState.day) : null;
   const name = player?.name?.trim();
   const greeting = phase ? t(`dashboard.greeting.${phase}` as 'dashboard.greeting.morning') : t('dashboard.welcome');
+  // Punctuation lives with the copy: "Still up, Hunter?" asks; the others state.
+  const greetingMark = phase ? t(`dashboard.greetingMark.${phase}` as 'dashboard.greetingMark.morning') : '.';
   const line = phase ? t(`dashboard.line.${phase}` as 'dashboard.line.morning') : t('dashboard.fallbackLine');
   // Only the active world's cast appears in this world. The strip below is a capped
   // preview (newest first, then `.slice(0, PEOPLE_PREVIEW_CAP)`) — the server returns
@@ -59,7 +61,7 @@ export function Dashboard() {
             ) : (
               ''
             )}
-            .
+            {greetingMark}
           </h1>
           <p className="dash-hero-line">{line}</p>
         </div>

@@ -39,6 +39,20 @@
 @media (min-width: 2400px) {
   .mga-grid { grid-template-columns: repeat(4, 1fr); }
 }
+/* Phones: two slimmer cabinets per row instead of one full-width card. */
+@media (max-width: 540px) {
+  .mga-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .mga-cabinet { padding: 11px; gap: 9px; }
+  .mga-title { font-size: 0.94rem; }
+  .mga-desc {
+    font-size: 0.78rem;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+}
 
 /* A single game "cabinet" — bold, layered, with a brass marquee top. */
 .mga-cabinet {

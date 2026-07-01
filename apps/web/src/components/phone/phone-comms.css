@@ -39,6 +39,10 @@
   font-size: 1.02rem;
   line-height: 1.1;
   max-width: 200px;
+  /* User-entered contact names: ellipsize at the cap instead of overflowing the bar. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pcom-iconbtn {
   flex-shrink: 0;
@@ -169,6 +173,9 @@
 }
 .pcom-unread .pcom-when { color: var(--brass); }
 .pcom-preview {
+  /* It's a <span>: without display:block the overflow/ellipsis pair below is
+     ignored (inline boxes can't clip), and long previews ran hard off-screen. */
+  display: block;
   margin-top: 2px;
   font-size: 0.81rem;
   color: var(--text-mute);

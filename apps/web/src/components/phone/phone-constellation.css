@@ -256,6 +256,18 @@
   letter-spacing: 0.01em;
 }
 
+/* Narrow phones: the map is ~284px across, so a 92px label centered on a rim
+   star can still poke past the screen edge — trim the cap (ellipsis handles
+   the rest). The hint line collides with the bottommost star's label on such
+   a short stage; it's decorative, so drop it. */
+@media (max-width: 400px) {
+  .cst-star-name { max-width: 64px; font-size: 0.62rem; }
+  .cst-hint { display: none; }
+}
+@media (max-height: 480px) {
+  .cst-hint { display: none; }
+}
+
 .cst-hint {
   position: absolute;
   left: 0;

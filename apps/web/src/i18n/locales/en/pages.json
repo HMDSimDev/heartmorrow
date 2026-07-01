@@ -257,6 +257,7 @@
     "memoriesCollapsed": "{count, plural, one {# memory kept — tap <0>Show</0> to read them.} other {# memories kept — tap <0>Show</0> to read them.}}",
     "importanceTitle": "importance {n}/5",
     "importanceAria": "importance {n} of 5",
+    "weight": "Weight",
     "fromDate": "from a date",
     "addedManually": "added manually",
     "deleteMemory": "Delete memory",
@@ -419,6 +420,12 @@
       "afternoon": "Good afternoon",
       "evening": "Good evening",
       "night": "Still up"
+    },
+    "greetingMark": {
+      "morning": ".",
+      "afternoon": ".",
+      "evening": ".",
+      "night": "?"
     },
     "line": {
       "morning": "A fresh day is open. Who will you spend it with?",

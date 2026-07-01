@@ -1,8 +1,8 @@
-/* Help / Field Guide — the lamplit manual. A capped, two-pane reading surface:
+/* Help / Field Guide — the lamplit manual. A two-pane reading surface:
    a sticky topic rail on the left, the open topic's sections on the right.
-   Content-sparse, so the whole page caps + centers rather than stretching thin. */
+   Tracks the full content column (--maxw) like Home/People. */
 
-.help-page { gap: 22px; max-width: 1180px; margin-inline: auto; }
+.help-page { gap: 22px; }
 
 .help-layout {
   display: grid;

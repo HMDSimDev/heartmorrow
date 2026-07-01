@@ -13,8 +13,7 @@
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 1320px;
-  margin-inline: auto;
+  /* No width cap: tracks the app's content column (--maxw) like Home/People. */
 }
 
 /* --- Masthead: framed workbench header (matches the editor) --------------- */
@@ -294,7 +293,39 @@
 }
 .prof-buff.down { color: var(--ember); border-color: rgba(224, 122, 130, 0.4); background: rgba(224, 122, 130, 0.08); }
 .prof-buff .left { color: var(--text-mute); font-weight: 500; }
-.prof-flag { color: var(--text-dim); }
+/* --- "Your story" — the chronicle ledger. Each flag is a kept line in the
+   almanac: a lit brass tick, a mono small-caps key, and the value in the
+   serif voice (plain numbers read as brass ledger figures instead). --- */
+.prof-meta-story { grid-column: 1 / -1; }
+.prof-story { display: flex; flex-direction: column; }
+.prof-story-entry {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 8px 2px;
+}
+.prof-story-entry + .prof-story-entry { border-top: 1px solid var(--border-soft); }
+.prof-story-tick {
+  flex: 0 0 auto; width: 7px; height: 7px; margin-top: 7px;
+  border-radius: 2px; transform: rotate(45deg);
+  background: radial-gradient(circle at 35% 30%, #ffe7a8, var(--brass));
+  box-shadow: 0 0 6px rgba(230, 177, 94, 0.45);
+}
+.prof-story-body { min-width: 0; }
+.prof-story-key {
+  font-family: var(--font-mono); font-size: 0.62rem; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute);
+  margin-right: 9px;
+}
+.prof-story-text {
+  font-family: var(--font-display); font-style: italic;
+  font-variation-settings: 'SOFT' 40, 'opsz' 16;
+  font-size: 0.96rem; line-height: 1.55; color: var(--text-dim);
+  overflow-wrap: anywhere;
+}
+.prof-story-text.is-num {
+  font-family: var(--font-mono); font-style: normal; font-weight: 700;
+  font-size: 0.84rem; color: var(--brass);
+  font-variation-settings: normal;
+}
 
 /* --- About: personality prose + likes/dislikes/goals --------------------- */
 .prof-personality {
@@ -367,26 +398,152 @@
    at 1200–1320px viewport, so a fixed 3-up left memories ~53px for text. Let the
    column width decide the count (1-up narrow, 2-up at the column's real width). */
 @media (min-width: 860px) { .prof-mem-list { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); } }
+/* A kept memory is a pressed keepsake: a chamfered ticket whose lamplight
+   scales with how much it weighs on them. `--w` (0.2–1.0, importance/5, set
+   inline) grades the frame, the vellum wash and the seal glow, so the grid
+   reads by weight at a glance. Same two-layer clip technique as `.framed`. */
 .prof-mem {
+  --cut: 13px;
   position: relative;
   display: flex;
-  gap: 13px;
-  align-items: flex-start;
-  padding: 13px 13px 13px 15px;
-  /* a faint vellum wash so a kept memory reads as a keepsake, not a table row */
-  background: linear-gradient(180deg, rgba(255, 245, 222, 0.035), var(--panel-2));
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--brass);
+  flex-direction: column;
+  padding: 12px 14px 13px;
+  /* the brass frame, warmer the heavier the memory — kept low and dark; the
+     weight should read as embers in the rim, not a bright plate */
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--brass) calc(8% + var(--w, 0.5) * 22%), var(--border-soft)),
+    var(--border)
+  );
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
 }
-/* Importance as brass diamond pips — matches the energy gauge vocabulary. */
-.prof-mem-pips { display: inline-flex; gap: 4px; flex-shrink: 0; padding-top: 5px; align-self: flex-start; }
-.prof-pip { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); background: var(--ink-2); border: 1px solid var(--border); }
-.prof-pip.on { background: radial-gradient(circle at 35% 30%, #ffe7a8, var(--brass)); border-color: transparent; box-shadow: 0 0 6px rgba(230, 177, 94, 0.6); }
+.prof-mem::before {
+  content: '';
+  position: absolute; inset: 1px; z-index: 0;
+  /* Inset, not raised: the pocket is DARKER than the panel it sits in, so the
+     keepsakes read as pressed into the page. Weight lives in the rim and the
+     seal, never in surface lightness — any lightening here made the cards pop
+     out of the night-dark dossier like bright plates. The one place the
+     player's accent shows is the bloom: an incredibly faint corner halo of
+     --accent-2, echoing the app's ambient blooms. */
+  background:
+    radial-gradient(
+      120% 90% at 86% -10%,
+      color-mix(in oklab, var(--accent-2) calc(3% + var(--w, 0.5) * 4%), transparent),
+      transparent 62%
+    ),
+    var(--ink-2);
+  clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+}
+.prof-mem > * { position: relative; z-index: 1; }
+
+/* --- Head: the weight seal, source, and a quiet delete ------------------- */
+.prof-mem-head { display: flex; align-items: flex-start; gap: 10px; }
+/* The seal: label over pips, set straight on the vellum — no boxed plaque
+   (a dark box read as a hole punched in the warm card). */
+.prof-mem-seal {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 2px;
+}
+.prof-mem-seal-label {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.prof-mem-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  /* the seal itself glows with the memory's weight */
+  filter: drop-shadow(0 0 calc(var(--w, 0.5) * 4px) rgba(230, 177, 94, 0.28));
+}
+/* Empty sockets are translucent, not ink — they must sit quietly on the wash. */
+.prof-pip { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); background: color-mix(in oklab, var(--ink) 40%, transparent); border: 1px solid var(--border); }
+.prof-pip.on { background: radial-gradient(circle at 35% 30%, #ffe7a8, var(--brass)); border-color: transparent; }
+.prof-mem-seal-n {
+  margin-left: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+/* hairline between the seal and the source badge, like a section-head trail */
+.prof-mem-trail {
+  flex: 1;
+  height: 1px;
+  margin-top: 12px;
+  background: linear-gradient(90deg, var(--border-soft), transparent);
+}
+.prof-mem-src {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.03em;
+  color: var(--text-mute);
+  margin-top: 6px;
+  white-space: nowrap;
+}
 .prof-mem-src svg { vertical-align: -1px; }
-.prof-mem-text { color: var(--text); line-height: 1.55; font-family: var(--font-display); font-style: italic; font-size: 1.02rem; }
-.prof-mem-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 6px; }
-.prof-mem-src { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.03em; color: var(--text-mute); }
 .prof-mem-src.date { color: var(--rose); }
+/* Delete stays reachable but silent until intended. */
+.prof-mem-del {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.prof-mem-del:hover,
+.prof-mem-del:focus-visible {
+  color: var(--ember);
+  border-color: color-mix(in oklab, var(--ember) 45%, transparent);
+  background: color-mix(in oklab, var(--ember) 10%, transparent);
+}
+
+/* --- The memory itself, set like a kept quotation ------------------------- */
+.prof-mem-text {
+  margin: 10px 2px 0;
+  color: var(--text);
+  line-height: 1.55;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.02rem;
+  overflow-wrap: anywhere;
+}
+.prof-mem-text::before {
+  content: '\201C';
+  margin-right: 1px;
+  color: color-mix(in oklab, var(--brass) 75%, var(--text-mute));
+}
+.prof-mem-text::after { content: '\201D'; margin-left: 1px; color: color-mix(in oklab, var(--brass) 75%, var(--text-mute)); }
+
+/* --- Foot: when it was kept + its tags ------------------------------------ */
+.prof-mem-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border-soft);
+}
+.prof-mem-when { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.03em; color: var(--text-mute); }
 .prof-mem-tag { font-size: 0.7rem; padding: 2px 9px; }
-.prof-mem-del { flex-shrink: 0; }
+
+@media (max-width: 540px) {
+  .prof-mem { padding: 10px 12px 11px; }
+  .prof-mem-text { font-size: 0.96rem; }
+}

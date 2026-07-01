@@ -550,7 +550,9 @@
 
 .bench-charts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* min(320px,100%): a bare 320px floor overflows a 320px viewport once page
+     padding is subtracted. */
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
   gap: 14px;
 }
 .bench-chart h3 {

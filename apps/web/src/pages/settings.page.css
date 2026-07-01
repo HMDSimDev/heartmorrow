@@ -10,10 +10,9 @@
    =========================================================================== */
 
 /* --- Main page: section scaffolding -------------------------------------- */
-.set-page { gap: 30px; max-width: 860px; margin-inline: auto; }
-/* On very large monitors give the technical settings (form rows + console)
-   a touch more room; kept modest so line length stays readable. */
-@media (min-width: 1900px) { .set-page { max-width: 1040px; } }
+/* Full content-column width, same as Home/People — a narrower centered column
+   here read as the page failing to use the screen. */
+.set-page { gap: 30px; }
 
 /* Group dividers — cluster the framed sections under mono brass headers so the
    page reads as a few labelled groups rather than one undifferentiated stack. */
@@ -80,6 +79,8 @@
 .set-tabs {
   display: flex; gap: 4px; margin-bottom: 18px;
   border-bottom: 1px solid var(--border);
+  /* Localized tab labels can outgrow a 320px phone — wrap rather than clip. */
+  flex-wrap: wrap;
 }
 .set-tab {
   position: relative; appearance: none; background: none; border: none; cursor: pointer;

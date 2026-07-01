@@ -78,40 +78,58 @@ export function DayHud() {
           ))}
         </select>
       ) : (
-        activeName && <div className="hud-worldname">{activeName}</div>
+        activeName && (
+          <div className="hud-masthead" title={activeName}>
+            {activeName}
+          </div>
+        )
       )}
 
-      <div className="hud-clock" title={t('hud.clockTitle', { phase: phaseTxt, weekday: weekdayTxt, season: seasonTxt })}>
-        <span className="hud-phase">{PHASE_ICONS[worldState.phase]}</span>
-        <div className="hud-when">
-          <span className="hud-day">{t('hud.dayPhase', { day: worldState.day, phase: phaseTxt })}</span>
-          <span className="hud-cal">
-            {SEASON_ICONS[cal.season]} {weekdayTxt}
-            {cal.isWeekend ? t('hud.weekendSuffix') : ''}
-          </span>
+      {/* Grouped so the mobile topbar can lay the instruments out as one strip;
+          the sidebar renders this wrapper as display:contents (no layout change). */}
+      <div className="hud-instruments">
+        <div className="hud-clock" title={t('hud.clockTitle', { phase: phaseTxt, weekday: weekdayTxt, season: seasonTxt })}>
+          {/* The lamp bezel — its glow is tinted by <html data-phase>. */}
+          <span className="hud-bezel" aria-hidden="true">{PHASE_ICONS[worldState.phase]}</span>
+          <div className="hud-when">
+            <span className="hud-day">{t('hud.dayNum', { day: worldState.day })}</span>
+            <span className="hud-cal">
+              {phaseTxt} · {weekdayTxt}
+              {cal.isWeekend ? t('hud.weekendSuffix') : ''}
+              <span className="hud-season" aria-hidden="true"> {SEASON_ICONS[cal.season]}</span>
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="hud-energy" title={t('hud.energyTitle', { stamina: worldState.stamina, max: worldState.staminaMax })} aria-label={t('hud.energyAria', { stamina: worldState.stamina, max: worldState.staminaMax })}>
-        <span className="hud-energy-label">{t('hud.energy')}</span>
-        <EnergyPips value={worldState.stamina} max={worldState.staminaMax} />
-        <span className="hud-energy-count">
-          {worldState.stamina}/{worldState.staminaMax}
-        </span>
-      </div>
+        <div className="hud-ledger">
+          <div className="hud-seg hud-energy" title={t('hud.energyTitle', { stamina: worldState.stamina, max: worldState.staminaMax })} aria-label={t('hud.energyAria', { stamina: worldState.stamina, max: worldState.staminaMax })}>
+            <span className="hud-seg-label">{t('hud.energy')}</span>
+            <span className="hud-seg-value">
+              <EnergyPips value={worldState.stamina} max={worldState.staminaMax} />
+              <span className="hud-energy-count">
+                {worldState.stamina}/{worldState.staminaMax}
+              </span>
+            </span>
+          </div>
+          <div className="hud-seg" title={t('hud.cashOnHand')}>
+            <span className="hud-seg-label">{t('hud.purse')}</span>
+            <span className="hud-seg-value hud-money">
+              <Icon name="coin" size={14} /> {player?.money ?? 0}
+            </span>
+          </div>
+          {wealth && wealth.total > wealth.cash && (
+            <div
+              className="hud-seg hud-networth"
+              title={t('hud.netWorth', { cash: wealth.cash, property: wealth.property, stocks: wealth.stocks })}
+            >
+              <span className="hud-seg-label">{t('hud.worth')}</span>
+              <span className="hud-seg-value hud-money">
+                <Icon name="wealth" size={13} /> {wealth.total}
+              </span>
+            </div>
+          )}
+        </div>
 
-      <div className="hud-foot">
-        <span className="hud-money" title={t('hud.cashOnHand')}>
-          <Icon name="coin" size={15} /> {player?.money ?? 0}
-        </span>
-        {wealth && wealth.total > wealth.cash && (
-          <span
-            className="hud-money hud-networth"
-            title={t('hud.netWorth', { cash: wealth.cash, property: wealth.property, stocks: wealth.stocks })}
-          >
-            <Icon name="wealth" size={14} /> {wealth.total}
-          </span>
-        )}
         <button
           className="btn sm primary hud-end"
           onClick={doSleep}

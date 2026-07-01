@@ -198,15 +198,16 @@
 .ce-canvas {
   display: grid;
   /* Let the portrait rail give back a little width in the tight 860–1099px band
-     instead of forcing a hard 200px track and crushing the form column. */
-  grid-template-columns: minmax(160px, 200px) 1fr;
+     instead of forcing a hard 200px track and crushing the form column.
+     minmax(0,1fr) so oversized content (e.g. an unconstrained portrait image)
+     can never inflate the track's min-content past the viewport. */
+  grid-template-columns: minmax(160px, 200px) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
 @media (max-width: 800px) {
-  .ce-canvas { grid-template-columns: 1fr; }
+  .ce-canvas { grid-template-columns: minmax(0, 1fr); }
   .ce-rail { display: block; position: static; }
-  .ce-portrait-img { width: 64px; height: 64px; }
   .ce-portrait-bars { display: none; }
 }
 
@@ -241,10 +242,20 @@
   text-align: center;
 }
 
-.ce-portrait-img {
+/* Double-class selector on purpose: the shared `.portrait { width:100%;
+   aspect-ratio:3/4 }` base (styles.css) outranks a bare `.ce-portrait-img` by
+   cascade order — with only the height winning here, the image stretched to
+   the full rail width and its min-content blew the editor out past narrow
+   viewports (421px wide at 320px). */
+.portrait.ce-portrait-img {
   width: 120px;
   height: 120px;
   font-size: 2rem;
+}
+/* Mobile single-column layout: compact chip. Placed AFTER the base rule —
+   a media query adds no specificity, so put it earlier and the base wins. */
+@media (max-width: 800px) {
+  .portrait.ce-portrait-img { width: 64px; height: 64px; }
 }
 
 .ce-portrait-name {

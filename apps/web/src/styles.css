@@ -105,8 +105,12 @@
 html, body, #root { height: 100%; margin: 0; }
 /* Authoritative page-level horizontal-scroll guard: the shell-less /worlds
    routes render outside .app (no .app-main overflow-x), and the atmosphere
-   ::after (62vw) can poke past the viewport — clip both here. */
-html, body { overflow-x: hidden; }
+   ::after (62vw) can poke past the viewport — clip both here.
+   `clip` (with `hidden` as the fallback) also forbids PROGRAMMATIC scrolling:
+   with plain `hidden`, any focus()/scrollIntoView into overflowing content
+   scrolls the whole shell sideways and it sticks there (seen with the phone
+   Calendar app on 320px screens). */
+html, body { overflow-x: hidden; overflow-x: clip; }
 body {
   background:
     /* The accent ambient bloom — a soft pool of the user's chosen tint that
@@ -255,7 +259,13 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
 .topbar {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px;
+  /* Wraps into the deliberate two-row HUD layout (see .topbar .hud below):
+     brand + world name on the first line, the instrument strip on its own
+     full-width second line. */
+  flex-wrap: wrap;
+  row-gap: 7px;
+  column-gap: 12px;
+  padding: 10px 16px 11px;
   background: rgba(11, 13, 26, 0.82);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-soft);
@@ -474,6 +484,14 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
 }
 .page-head h1 { position: relative; }
 .page-head p { margin: 6px 0 0; max-width: 64ch; }
+/* Phones: the 2rem display titles and roomy page heads read oversized on a
+   ~375px screen — tighten them so content starts higher. */
+@media (max-width: 540px) {
+  h1 { font-size: 1.55rem; }
+  .page-head { margin-bottom: 16px; padding-bottom: 10px; }
+  .page-head p { font-size: 0.88rem; }
+  .hero-card h1 { font-size: 1.7rem; }
+}
 @media (min-width: 720px) { .grid.cols-2 { grid-template-columns: 1fr 1fr; } }
 
 /* Dashboard hero — the lamp on the desk. */
@@ -737,6 +755,13 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 /* --- PortraitPicker — the shared "who?" chooser (never a <select>) -------- */
 .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
 .pp-grid.pp-compact { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+/* Phones: drop the floors so three smaller portraits fit per row instead of
+   two chunky ones — the picker is a control, not the page's centerpiece. */
+@media (max-width: 540px) {
+  .pp-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 10px; }
+  .pp-grid.pp-compact { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+  .pp-name { font-size: 0.84rem; }
+}
 .pp-card {
   position: relative; display: flex; flex-direction: column; gap: 8px; padding: 8px;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
@@ -983,10 +1008,12 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 @media (min-width: 2000px) {
   .phone-device { max-width: 880px; height: min(90vh, 1180px); height: min(90dvh, 1180px); }
 }
-/* Thin / small screens: drop the device frame entirely — no bezel, border, rounded
-   corners, centered island or vh height cap — so the phone goes full-bleed and the
-   content (plus the status bar and home button) uses every pixel down to the nav. */
-@media (max-width: 540px) {
+/* Whole bottom-nav band (<860px): the phone route must fit the viewport like every
+   other route — the fixed min(86dvh,880px) device height ignored the topbar + in-flow
+   bottom nav, so their sum overflowed the viewport and pushed the nav below the fold
+   (tablet portrait ~768×1024 clipped the nav labels; landscape phones lost it fully).
+   Same flex chain as the ≤540px full-bleed treatment, but keeping the bezel island. */
+@media (max-width: 859.98px) {
   /* A definite viewport height (not just min-height) so the flex chain below has a
      concrete height to fill — otherwise app-main/phone-wrap size to content and
      leave dead space above the bottom nav. */
@@ -994,12 +1021,7 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
     height: 100vh;
     height: 100dvh;
   }
-  /* No padding-bottom reserve: the bottom nav is in normal flow (.app > .bottomnav is
-     position: relative), so it already takes its own space below app-main. Reserving
-     the nav's height here just left a dead 56px strip that exposed the route's
-     atmosphere grid between the phone and the nav. */
   .app[data-route='phone'] .app-main {
-    padding: 0;
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -1007,18 +1029,33 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
   .app[data-route='phone'] .phone-wrap {
     flex: 1;
     min-height: 0;
-    padding: 0;
     /* Column so the device grows along the main axis to fill the wrap — relying on
        cross-axis stretch left the device at content height, exposing the route's
        atmosphere grid in the gap above the bottom nav. */
     flex-direction: column;
+    align-items: center;
   }
   .app[data-route='phone'] .phone-device {
-    max-width: none;
-    width: 100%;
     flex: 1;
     height: auto;
     min-height: 0;
+    max-height: 880px; /* keep the island from towering on tall tablet screens */
+  }
+}
+/* Thin / small screens: drop the device frame entirely — no bezel, border, rounded
+   corners, centered island or height cap — so the phone goes full-bleed and the
+   content (plus the status bar and home button) uses every pixel down to the nav. */
+@media (max-width: 540px) {
+  /* No padding-bottom reserve: the bottom nav is in normal flow (.app > .bottomnav is
+     position: relative), so it already takes its own space below app-main. Reserving
+     the nav's height here just left a dead 56px strip that exposed the route's
+     atmosphere grid between the phone and the nav. */
+  .app[data-route='phone'] .app-main { padding: 0; }
+  .app[data-route='phone'] .phone-wrap { padding: 0; }
+  .app[data-route='phone'] .phone-device {
+    max-width: none;
+    max-height: none;
+    width: 100%;
     border: none;
     border-radius: 0;
     box-shadow: none;
@@ -1439,64 +1476,121 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
    =========================================================================== */
 .hud {
   position: relative;
-  display: flex; flex-direction: column; gap: 11px;
+  display: flex; flex-direction: column; gap: 10px;
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
   border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 13px; box-shadow: var(--shadow-sm), var(--rim);
+  padding: 12px 13px 13px; box-shadow: var(--shadow-sm), var(--rim);
 }
+/* Grouping wrapper for clock + ledger + button: invisible to the sidebar's
+   column layout; the mobile topbar restyles it into one instrument strip. */
+.hud-instruments { display: contents; }
 .hud::before {
   content: ''; position: absolute; left: 13px; right: 13px; top: 0; height: 1px; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.55), transparent);
 }
 .hud-world { width: 100%; font-family: var(--font-mono); font-size: 0.8rem; }
-.hud-worldname {
-  font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; color: var(--text);
-  display: flex; align-items: center; gap: 7px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;
+/* The volume title: which world this almanac records, set like a running head. */
+.hud-masthead {
+  font-family: var(--font-mono); font-size: 0.6rem; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-mute);
+  padding-bottom: 8px; border-bottom: 1px solid var(--border-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.hud-worldname::before { content: '◷'; color: var(--brass); font-size: 0.9em; }
-.hud-clock { display: flex; align-items: center; gap: 11px; }
-.hud-phase { font-size: 1.7rem; line-height: 1; filter: drop-shadow(0 0 8px rgba(230, 177, 94, 0.45)); }
-.hud-when { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-/* Short, bounded text ("Day N · Morning") — let it wrap rather than ellipsize;
-   the phase emoji + gap can otherwise starve this column in the ~256px sidebar. */
-.hud-day { font-family: var(--font-mono); font-weight: 700; font-size: 1.02rem; color: var(--text); letter-spacing: 0.02em; }
-.hud-cal { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-mute); text-transform: capitalize; }
-.hud-energy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.hud-energy-label {
-  font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--brass);
+.hud-masthead::before { content: '◷  '; color: var(--brass); letter-spacing: 0; }
+
+/* — The lamp bezel: phase glyph in a lit socket, tinted by the in-world hour
+     (via <html data-phase>, the same signal that tints the atmosphere). ——— */
+.hud-bezel {
+  --lamp: var(--brass);
+  flex: 0 0 auto;
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.02rem; line-height: 1;
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--lamp) 30%, transparent), transparent 74%),
+    var(--ink-2);
+  border: 1px solid color-mix(in oklab, var(--lamp) 42%, var(--border));
+  box-shadow:
+    inset 0 0 12px color-mix(in oklab, var(--lamp) 22%, transparent),
+    0 0 16px -6px var(--lamp),
+    var(--rim);
 }
-.hud .epip { width: 12px; height: 12px; }
+:root[data-phase='morning'] .hud-bezel { --lamp: #f6c68b; }
+:root[data-phase='afternoon'] .hud-bezel { --lamp: #cdd9ee; }
+:root[data-phase='night'] .hud-bezel { --lamp: var(--moon); }
+
+.hud-clock { display: flex; align-items: center; gap: 10px; }
+.hud-when { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+/* The day numeral — the almanac's page number, in the display serif. */
+.hud-day {
+  font-family: var(--font-display); font-weight: 600; font-size: 1.32rem;
+  line-height: 1; color: var(--text); letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+.hud-cal {
+  font-family: var(--font-mono); font-size: 0.58rem; font-weight: 600;
+  letter-spacing: 0.11em; text-transform: uppercase; color: var(--text-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hud-season { letter-spacing: 0; }
+
+/* — The ledger strip: energy / purse / worth as labeled meters with hairline
+     column rules between them. A fixed two-column grid (not wrapping flex) so
+     a third meter lands in a deliberate second row, never as an indented
+     orphan with a floating divider. ————————————————————————————————— */
+.hud-ledger { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); row-gap: 9px; }
+.hud-seg { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.hud-seg:nth-child(2n) { border-left: 1px solid var(--border-soft); padding-left: 12px; }
+.hud-seg-label {
+  font-family: var(--font-mono); font-size: 0.52rem; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-mute);
+}
+.hud-seg-value {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 0.82rem; color: var(--text);
+  white-space: nowrap;
+}
+.hud .epip { width: 11px; height: 11px; }
 .hud-energy-count { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text); }
+.hud-money { font-weight: 700; color: var(--brass); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hud-err { color: var(--ember); }
-/* wrap so money + net-worth + End-day fall to a second line rather than
-   over-ellipsizing in the 256px sidebar with 5–6 digit totals. */
-.hud-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-.hud-money {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-family: var(--font-mono); font-weight: 700; font-size: 1rem; color: var(--brass);
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
 /* Never shrink the primary End-day button — it must stay fully reachable. */
 .hud-end { flex: 0 0 auto; }
-/* Compact horizontal HUD for the mobile top bar. */
-.topbar .hud {
-  flex-direction: row; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px 10px;
-  padding: 6px 10px; background: transparent; border: none; box-shadow: none;
-}
+
+/* Compact HUD for the mobile top bar — the same instruments laid flat:
+     row 1  brand (left) ··· world masthead (right)
+     row 2  (lamp) Day 12 / EVENING · WED ··· ⚡2/3 │ ◉147 · [End day]
+   The day + time-of-day is NEVER truncated or hidden; when row 2 can't fit
+   (320px-class), the meters + button wrap to their own right-aligned line.
+   `display: contents` lifts the HUD's children up into the topbar's own
+   wrapping flex row so the rows above are real lines. */
+.topbar .hud { display: contents; }
 .topbar .hud::before { content: none; }
-.topbar .hud-world, .topbar .hud-cal, .topbar .hud-energy-label, .topbar .hud-energy .epips { display: none; }
-.topbar .hud-networth { display: none; }
-.topbar .hud-clock { gap: 7px; }
-.topbar .hud-phase { font-size: 1.3rem; }
-.topbar .hud-energy::before { content: '⚡'; color: var(--brass); }
-.topbar .hud-day { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 11ch; }
-.topbar .hud-foot { flex: 1; min-width: 0; gap: 8px; }
-.topbar .hud-money { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 400px) {
-  .topbar .hud-day { display: none; }
+.topbar .hud-world { display: none; }
+.topbar .hud-masthead { min-width: 0; max-width: 62%; padding: 0; border: none; }
+.topbar .hud-instruments {
+  flex: 1 1 100%;
+  display: flex; align-items: center; flex-wrap: wrap;
+  column-gap: 12px; row-gap: 6px;
 }
+.topbar .hud-bezel { width: 31px; height: 31px; font-size: 0.88rem; }
+.topbar .hud-clock { gap: 8px; }
+.topbar .hud-when { gap: 2px; }
+.topbar .hud-day { font-size: 1.06rem; }
+/* Meters: values only — the strip must stay pocket-sized. They cluster with
+   the clock on the left; the End-day button alone claims the right edge, so
+   whichever piece wraps on a narrow screen still lands somewhere deliberate. */
+.topbar .hud-ledger { display: flex; flex-wrap: nowrap; }
+.topbar .hud-seg { flex-direction: row; align-items: center; }
+.topbar .hud-seg:nth-child(2n) { border-left: none; padding-left: 0; }
+.topbar .hud-seg + .hud-seg { margin-left: 9px; padding-left: 9px; border-left: 1px solid var(--border-soft); }
+.topbar .hud-end { margin-left: auto; }
+.topbar .hud-seg-label { display: none; }
+.topbar .hud-networth { display: none; }
+.topbar .hud-energy .epips { display: none; }
+.topbar .hud-energy .hud-seg-value::before { content: '⚡'; color: var(--brass); }
+/* Status lines (on-a-date note, errors) read as their own quiet full row. */
+.topbar .hud-note, .topbar .hud-err { flex: 1 1 100%; text-align: right; }
 
 /* ===========================================================================
    WIDER SCREENS — let big displays breathe and show more at once.

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   effectiveDatingStats,
   isInternalFlagKey,
-  humanizeStoryFlag,
+  storyFlagParts,
   relationshipStage,
   currentStatus,
   isBrokenUp,
@@ -120,8 +120,8 @@ export function CharacterProfile() {
         const buffs = listActiveBuffs(relationship.flags);
         const storyFlags = Object.entries(relationship.flags)
           .filter(([k]) => !isInternalFlagKey(k))
-          .map(([k, v]) => [k, humanizeStoryFlag(k, v)] as const)
-          .filter((entry): entry is readonly [string, string] => entry[1] !== null);
+          .map(([k, v]) => [k, storyFlagParts(k, v)] as const)
+          .filter((entry): entry is readonly [string, { label: string; value: string | null }] => entry[1] !== null);
         const convoCount = (sessions.data ?? []).filter((s: ConversationSession) => s.characterId === id).length;
         const status = currentStatus(relationship);
 
@@ -352,13 +352,21 @@ export function CharacterProfile() {
                           </div>
                         )}
                         {storyFlags.length > 0 && (
-                          <div>
+                          <div className="prof-meta-story">
                             <div className="prof-subhead">{t('profile.yourStory')}</div>
-                            <div className="tags">
-                              {storyFlags.map(([k, label]) => (
-                                <span className="tag prof-flag" key={k}>
-                                  {label}
-                                </span>
+                            <div className="prof-story">
+                              {storyFlags.map(([k, flag]) => (
+                                <div className="prof-story-entry" key={k}>
+                                  <span className="prof-story-tick" aria-hidden="true" />
+                                  <div className="prof-story-body">
+                                    <span className="prof-story-key">{flag.label}</span>
+                                    {flag.value !== null && (
+                                      <span className={`prof-story-text${/^\d+$/.test(flag.value) ? ' is-num' : ''}`}>
+                                        {flag.value}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -723,37 +731,56 @@ function MemoryList({
   onDelete: (id: string) => void;
 }) {
   const { t } = useTranslation(['pages', 'common']);
+  // Pruning what someone holds onto is an author's tool, not a player's move.
+  const { creatorMode } = useAppData();
   return (
     <div className="prof-mem-list">
       {memories.map((m) => (
-        <div className="prof-mem" key={m.id}>
-          <span className="prof-mem-pips" title={t('profile.importanceTitle', { n: m.importance })} aria-label={t('profile.importanceAria', { n: m.importance })}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <span key={i} className={`prof-pip${i < m.importance ? ' on' : ''}`} />
+        // --w (0.2–1.0) grades the card's lamplight: heavier memories carry a
+        // warmer frame, wash and seal glow, so the grid reads by importance.
+        <article
+          className="prof-mem"
+          key={m.id}
+          style={{ '--w': m.importance / 5 } as CSSProperties}
+        >
+          <header className="prof-mem-head">
+            <span
+              className="prof-mem-seal"
+              title={t('profile.importanceTitle', { n: m.importance })}
+              aria-label={t('profile.importanceAria', { n: m.importance })}
+            >
+              <span className="prof-mem-seal-label" aria-hidden="true">{t('profile.weight')}</span>
+              <span className="prof-mem-pips" aria-hidden="true">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <span key={i} className={`prof-pip${i < m.importance ? ' on' : ''}`} />
+                ))}
+                <span className="prof-mem-seal-n">{m.importance}/5</span>
+              </span>
+            </span>
+            <span className="prof-mem-trail" aria-hidden="true" />
+            <small className={`prof-mem-src${m.sourceEventId ? ' date' : ''}`}>
+              {m.sourceEventId ? (
+                <><Icon name="date" size={12} /> {t('profile.fromDate')}</>
+              ) : (
+                <><Icon name="edit" size={12} /> {t('profile.addedManually')}</>
+              )}
+            </small>
+            {creatorMode && (
+              <button className="prof-mem-del" onClick={() => onDelete(m.id)} aria-label={t('profile.deleteMemory')}>
+                <Icon name="close" size={14} />
+              </button>
+            )}
+          </header>
+          <blockquote className="prof-mem-text">{m.text}</blockquote>
+          <footer className="prof-mem-meta">
+            <small className="prof-mem-when">{relativeTime(m.createdAt)}</small>
+            {m.tags.map((tag) => (
+              <span className="tag prof-mem-tag" key={tag}>
+                {tag}
+              </span>
             ))}
-          </span>
-          <div className="flex-fill">
-            <div className="prof-mem-text">{m.text}</div>
-            <div className="prof-mem-meta">
-              <small className={`prof-mem-src${m.sourceEventId ? ' date' : ''}`}>
-                {m.sourceEventId ? (
-                  <><Icon name="date" size={12} /> {t('profile.fromDate')}</>
-                ) : (
-                  <><Icon name="edit" size={12} /> {t('profile.addedManually')}</>
-                )}
-              </small>
-              <small className="prof-mem-src">· {relativeTime(m.createdAt)}</small>
-              {m.tags.map((tag) => (
-                <span className="tag prof-mem-tag" key={tag}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-          <button className="btn sm danger ghost prof-mem-del" onClick={() => onDelete(m.id)} aria-label={t('profile.deleteMemory')}>
-            <Icon name="close" size={15} />
-          </button>
-        </div>
+          </footer>
+        </article>
       ))}
     </div>
   );

@@ -996,12 +996,13 @@ export function isStoryFlag(value: unknown): value is StoryFlag {
 }
 
 /**
- * Turn a player-facing story flag into a human-readable phrase, or null if it
- * carries no meaning worth showing (so callers can hide it rather than dump a
- * raw `key:value`). Never shows internal bookkeeping (filter with
- * {@link isInternalFlagKey} first).
+ * Split a player-facing story flag into its display parts — a short label and
+ * an optional value — or null if it carries no meaning worth showing (so
+ * callers can hide it rather than dump a raw `key:value`). Boolean-true flags
+ * are standalone facts (`value: null`). Never shows internal bookkeeping
+ * (filter with {@link isInternalFlagKey} first).
  */
-export function humanizeStoryFlag(key: string, value: unknown): string | null {
+export function storyFlagParts(key: string, value: unknown): { label: string; value: string | null } | null {
   if (value === false || value === null || value === undefined || value === '') return null;
   const label =
     STORY_FLAG_LABELS[key] ??
@@ -1009,8 +1010,16 @@ export function humanizeStoryFlag(key: string, value: unknown): string | null {
       .replace(/[:_]/g, ' ')
       .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
       .replace(/^\w/, (c) => c.toUpperCase());
-  // Boolean-true flags read as a standalone fact; valued flags append the value.
-  if (value === true) return label;
-  if (typeof value === 'number' || typeof value === 'string') return `${label}: ${value}`;
-  return label;
+  if (typeof value === 'number' || typeof value === 'string') return { label, value: String(value) };
+  return { label, value: null };
+}
+
+/**
+ * Turn a player-facing story flag into a single human-readable phrase (see
+ * {@link storyFlagParts} for the structured form).
+ */
+export function humanizeStoryFlag(key: string, value: unknown): string | null {
+  const parts = storyFlagParts(key, value);
+  if (!parts) return null;
+  return parts.value === null ? parts.label : `${parts.label}: ${parts.value}`;
 }

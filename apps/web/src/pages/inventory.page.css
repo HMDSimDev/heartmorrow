@@ -24,6 +24,25 @@
 /* Keep auto-fill at every width: a 320px cap stops cards ballooning to ~770px
    on ultrawide instead of hard-locking to 5 columns. */
 .inv-grid { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fill, minmax(min(232px, 100%), 320px)); }
+/* Phones: two pockets per row instead of one full-width card, satchel
+   masthead slimmed to match. */
+@media (max-width: 540px) {
+  .inv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .inv-satchel-mark { width: 38px; height: 38px; font-size: 1.2rem; }
+  .inv-satchel-titles h1 { font-size: 1.35rem; }
+  .inv-satchel-titles p { font-size: 0.82rem; }
+  .inv-pocket { padding: 10px; gap: 8px; }
+  .inv-pocket-name { font-size: 0.94rem; }
+  .inv-qty { padding: 3px 8px; }
+  .inv-desc {
+    font-size: 0.78rem;
+    line-height: 1.45;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+  }
+}
 
 /* Each item is a chamfered pocket with a rarity rim-light at top-left. */
 .inv-pocket {
