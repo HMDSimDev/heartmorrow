@@ -68,7 +68,7 @@ if errorlevel 1 (
 
 REM --- .env (optional) --------------------------------------------------------
 if not exist "%ROOT%.env" (
-  echo [^^!] No .env file ^(optional^). Defaults will be used.
+  echo [^^!] No .env file ^(optional^). Defaults, or whatever was entered in settings, will be used.
   echo     LLM features need a provider - copy .env.example to .env and set LLM_BASE_URL/LLM_MODEL.
   echo     Example local provider: LM Studio / Ollama at http://localhost:1234/v1
 ) else (

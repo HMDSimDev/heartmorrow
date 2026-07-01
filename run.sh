@@ -95,7 +95,7 @@ fi
 
 # --- .env (optional) --------------------------------------------------------
 if [ ! -f "$ROOT/.env" ]; then
-  warn "No .env file (optional). Defaults will be used."
+  warn "No .env file (optional). Defaults, or whatever was entered in settings, will be used."
   hint "LLM features need a provider - copy .env.example to .env and set LLM_BASE_URL/LLM_MODEL."
   hint "Example local provider: LM Studio / Ollama at http://localhost:1234/v1"
 else
