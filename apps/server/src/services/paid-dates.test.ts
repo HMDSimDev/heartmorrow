@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { venueCost } from '@dsim/shared';
+import { venueCost, LocationSchema } from '@dsim/shared';
 import { resetDb, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { createWorld } from './world-service';
 import { createCharacter } from './character-service';
-import { createSession, addPlayerMessage, endSession } from './conversation-service';
+import { createSession, addPlayerMessage, endSession, pickAnywhereVenue } from './conversation-service';
 import { advanceDay } from './world-clock-service';
 import { getOrCreatePlayer, addMoney, spendMoney } from './player-service';
 import { playerIdForWorld } from '../lib/ids';
@@ -118,10 +118,28 @@ describe('paid dates — charging', () => {
 });
 
 describe('"Anywhere" auto-picks a venue', () => {
-  it('resolves to the first FREE public venue when one exists', () => {
+  const loc = (id: string, priceTier: number) => LocationSchema.parse({ id, name: id, priceTier });
+
+  it('resolves to a FREE public venue when one exists', () => {
     const { character } = worldWithVenues();
     const sess = createSession({ characterId: character.id, mode: 'date', locationId: 'anywhere' });
     expect(sess.locationId).toBe('loc_free'); // not the literal string "anywhere"
+  });
+
+  it('picks a RANDOM free venue so "Anywhere" varies (not always the first)', () => {
+    const locations = [loc('free_a', 0), loc('free_b', 0), loc('free_c', 0), loc('paid', 2)];
+    // rng indexes into the free-only sublist [free_a, free_b, free_c].
+    expect(pickAnywhereVenue(locations, 0, () => 0)).toBe('free_a');
+    expect(pickAnywhereVenue(locations, 0, () => 0.5)).toBe('free_b');
+    expect(pickAnywhereVenue(locations, 0, () => 0.99)).toBe('free_c');
+    // An rng that returns 1 (some injected generators can) must not index past the end.
+    expect(pickAnywhereVenue([loc('f1', 0), loc('f2', 0)], 0, () => 1)).toBe('f2');
+  });
+
+  it('never picks a paid venue when a free one exists, even with money to spare', () => {
+    const locations = [loc('paid_a', 3), loc('free', 0), loc('paid_b', 2)];
+    expect(pickAnywhereVenue(locations, 1000, () => 0)).toBe('free');
+    expect(pickAnywhereVenue(locations, 1000, () => 0.999999)).toBe('free');
   });
 
   it('falls back to the cheapest affordable venue when nothing is free', () => {

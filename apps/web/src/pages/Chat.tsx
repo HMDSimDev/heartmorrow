@@ -76,6 +76,12 @@ function DateTrajectory({
   const room = warming ? Math.max(1, 100 - anchor) : Math.max(1, anchor - RAPPORT_LEAVE_FLOOR);
   const mag = Math.max(0, Math.min(50, (Math.abs(v - anchor) / room) * 50));
   const side = warming ? 'warm' : 'cool';
+  // Anchor the fill from the LEFT for both directions (warming grows right of the 50%
+  // seam; cooling occupies the mag% just left of it) and transition `left` too — so as
+  // rapport crosses the seam the fill sweeps continuously THROUGH it instead of the one
+  // element snapping its anchor from right-of-seam to left-of-seam mid-transition (the
+  // old left:50% ↔ right:50% class flip, which made the bar visibly jump across zero).
+  const fillLeft = warming ? 50 : 50 - mag;
   return (
     <div className={`date-trajectory tone-${tone}`} role="img" aria-label={t('chat.trajectoryAria', { label })}>
       <div className="dt-caption">
@@ -93,7 +99,7 @@ function DateTrajectory({
         <span className="dt-pole dt-pole-cool" aria-hidden="true">◆</span>
         <div className="dt-track">
           <span className="dt-center" aria-hidden="true" />
-          <span className={`dt-fill ${side}`} style={{ width: `${mag}%` }} />
+          <span className={`dt-fill ${side}`} style={{ left: `${fillLeft}%`, width: `${mag}%` }} />
         </div>
         <span className="dt-pole dt-pole-warm" aria-hidden="true">◆</span>
       </div>

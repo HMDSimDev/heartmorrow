@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { sessionsRepo } from '../db/repositories';
+import { createCharacter } from './character-service';
 import { createSession, addPlayerMessage, endSession } from './conversation-service';
 import { getRelationship } from './relationship-service';
 
@@ -45,5 +46,43 @@ describe('session end concurrency guard', () => {
     // The evaluation delta landed exactly ONCE.
     expect(getRelationship(character.id).affection).toBe(before + 4);
     expect(sessionsRepo.get(session.id)?.ended).toBe(true);
+  });
+});
+
+describe('one live date per world', () => {
+  it('refuses a second date while one is already open (same character)', () => {
+    const { character } = seedWorldAndCharacter();
+    createSession({ characterId: character.id, mode: 'date', locationId: null });
+    expect(() => createSession({ characterId: character.id, mode: 'date', locationId: null })).toThrow(
+      /already on a date/i,
+    );
+  });
+
+  it('refuses a second date with a DIFFERENT character in the same world', () => {
+    const { world, character } = seedWorldAndCharacter();
+    const other = createCharacter({
+      worldId: world.id,
+      name: 'Second Character',
+      age: 26,
+      datingStats: { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 },
+    });
+    createSession({ characterId: character.id, mode: 'date', locationId: null });
+    expect(() => createSession({ characterId: other.id, mode: 'date', locationId: null })).toThrow(
+      /already on a date/i,
+    );
+  });
+
+  it('allows a new date once the open one has ended', async () => {
+    const { character } = seedWorldAndCharacter();
+    const first = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    // An unspoken date is discarded by endSession (no player turn), clearing the world.
+    await endSession(first.id);
+    expect(() => createSession({ characterId: character.id, mode: 'date', locationId: null })).not.toThrow();
+  });
+
+  it('never blocks a plain chat, even with a date open', () => {
+    const { character } = seedWorldAndCharacter();
+    createSession({ characterId: character.id, mode: 'date', locationId: null });
+    expect(() => createSession({ characterId: character.id, mode: 'chat', locationId: null })).not.toThrow();
   });
 });

@@ -112,16 +112,31 @@ import { ThinkStripper, stripThink } from '../lib/think-filter';
 // --- session CRUD -----------------------------------------------------------
 
 /**
- * Resolve the date-setup "Anywhere" choice to a concrete venue: the first FREE public
- * location, or — when the world has none free — the cheapest one the player can
- * currently afford. Throws if every venue costs more than the wallet holds (and none
- * are free), so "Anywhere" can't silently start a date you can't pay for. Returns null
- * only when the world has no venues at all (a locationless date is the fallback then).
+ * Resolve the date-setup "Anywhere" choice to a concrete venue. "Anywhere" means
+ * "surprise me", so among the FREE public venues we pick a RANDOM one for variety —
+ * not always the first in the list, which made every "Anywhere" date land at the same
+ * spot. Free venues take precedence so "Anywhere" never silently charges you when a
+ * free option exists; only when the world has NONE free do we fall back to the
+ * cheapest venue the player can currently afford (a predictable minimum spend, rather
+ * than randomly picking a pricier place and surprise-charging for it). Throws if every
+ * venue costs more than the wallet holds (and none are free), so "Anywhere" can't
+ * silently start a date you can't pay for. Returns null only when the world has no
+ * venues at all (a locationless date is the fallback then). `rng` is injectable so
+ * tests can pin the random choice.
  */
-function pickAnywhereVenue(locations: readonly Location[], money: number): string | null {
+export function pickAnywhereVenue(
+  locations: readonly Location[],
+  money: number,
+  rng: () => number = Math.random,
+): string | null {
   if (locations.length === 0) return null;
-  const free = locations.find((l) => venueCost(l.priceTier) === 0);
-  if (free) return free.id;
+  // Prefer free venues — pick a random one so "Anywhere" surprises you with a
+  // different spot each time instead of always the first free entry.
+  const free = locations.filter((l) => venueCost(l.priceTier) === 0);
+  if (free.length > 0) {
+    const idx = Math.min(free.length - 1, Math.max(0, Math.floor(rng() * free.length)));
+    return free[idx]!.id;
+  }
   // No free venue exists — fall back to the cheapest one you can afford.
   const cheapestFirst = [...locations].sort((a, b) => venueCost(a.priceTier) - venueCost(b.priceTier));
   const affordable = cheapestFirst.find((l) => venueCost(l.priceTier) <= money);
@@ -145,6 +160,18 @@ export function createSession(input: ConversationCreate): ConversationSession {
   // Real meetings (anything but a free-form chat) cost a daily action and require
   // the character to be available today (world-bound only). 'chat' is exempt.
   if (input.mode !== 'chat' && character.worldId) {
+    // One live date per world. The client guards against starting a second date
+    // (Chat.tsx `if (activeDate) return`), but that's best-effort UI state — a
+    // double-submit, a second tab, or a stale/failed active-date fetch can slip a
+    // second POST through. Enforce it authoritatively here so dates can't "stack":
+    // without this, two open sessions coexist and ending one silently resurfaces the
+    // other (getActiveDateForWorld returns them one at a time).
+    const openDate = getActiveDateForWorld(character.worldId);
+    if (openDate) {
+      throw badRequest(
+        `You're already on a date with ${openDate.characterName} — wrap that up before starting another.`,
+      );
+    }
     const day = ensureWorldState(character.worldId).day;
     // A character who just broke up with you needs space before they'll meet
     // again — keep texting them to thaw things; the date reopens after a cooldown.
