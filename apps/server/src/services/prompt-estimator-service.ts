@@ -267,6 +267,7 @@ export async function estimatePrompts(req: PromptEstimateRequest): Promise<Promp
         chronicle: dateCtx.chronicle,
         memories: dateCtx.memories,
         acquaintances: dateCtx.acquaintances,
+        timeOfDay: dateCtx.timeOfDay,
       }),
       maxResponseTokens: reserve,
     },
@@ -284,6 +285,7 @@ export async function estimatePrompts(req: PromptEstimateRequest): Promise<Promp
         recentTexts: dateCtx.recentTexts,
         chronicle: dateCtx.chronicle,
         memories: dateCtx.memories,
+        deliveryPhase: 'evening', // representative — real generation always passes one
       }),
       maxResponseTokens: reserve,
     },

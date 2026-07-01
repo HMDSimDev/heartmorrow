@@ -235,9 +235,11 @@ export async function deliverCrisisTextsForDay(worldId: string, day: number, pla
     // 1. The character's own distress text (a queued beat, bypasses cadence).
     const pending = rel.flags['harm:pending'];
     if ((pending === 'withdrawn' || pending === 'crisis') && hasDated(character.id)) {
+      // Distress texts land in the evening — decided here, told to the model.
+      const deliveryPhase = 'evening' as const;
       const result = await callStructuredLlm(
         CrisisTextSchema,
-        buildDespairTextMessages({ character, relationship: rel, stage: pending, playerName }),
+        buildDespairTextMessages({ character, relationship: rel, stage: pending, playerName, deliveryPhase }),
         { settings, task: `Write ${character.name}'s ${pending} text.`, schemaName: 'CrisisText' },
       );
       // Re-check after the await; clear only on success so a failure retries.
@@ -252,7 +254,7 @@ export async function deliverCrisisTextsForDay(worldId: string, day: number, pla
             body: result.data.body,
             status: 'queued',
             dayNumber: day,
-            scheduledPhase: 'evening',
+            scheduledPhase: deliveryPhase,
             attachment: null,
             deliveredAt: null,
             createdAt: Date.now(),
@@ -269,9 +271,11 @@ export async function deliverCrisisTextsForDay(worldId: string, day: number, pla
       if (friend) {
         const link = linkTo(friend.links, character.id) ?? linkTo(character.links, friend.id);
         const linkKind = link ? CHARACTER_LINK_LABELS[link.kind].toLowerCase() : 'friend';
+        // The friend's check-in lands in the evening — decided here, told to the model.
+        const deliveryPhase = 'evening' as const;
         const result = await callStructuredLlm(
           CrisisTextSchema,
-          buildFriendConcernMessages({ friend, subjectName: character.name, linkKind, playerName }),
+          buildFriendConcernMessages({ friend, subjectName: character.name, linkKind, playerName, deliveryPhase }),
           { settings, task: `Write ${friend.name}'s worried check-in.`, schemaName: 'CrisisText' },
         );
         if (result.ok && getRelationship(character.id).flags['harm:friendNotifiedSince'] !== crisisSince) {
@@ -285,7 +289,7 @@ export async function deliverCrisisTextsForDay(worldId: string, day: number, pla
               body: result.data.body,
               status: 'queued',
               dayNumber: day,
-              scheduledPhase: 'evening',
+              scheduledPhase: deliveryPhase,
               attachment: null,
               deliveredAt: null,
               createdAt: Date.now(),

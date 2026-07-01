@@ -69,6 +69,8 @@ export async function generateGossipForDay(
       .some((ev) => ev.type === 'gossip_text' && (ev.payload as Record<string, unknown>).sourceEventId === event.id);
     if (dup) continue;
 
+    // "Heard about your day" lands in the evening — decided here, told to the model.
+    const deliveryPhase = 'evening' as const;
     const result = await callStructuredLlm(
       GossipTextSchema,
       buildGossipTextMessages({
@@ -77,6 +79,7 @@ export async function generateGossipForDay(
         linkKind: CHARACTER_LINK_LABELS[link.kind].toLowerCase(),
         news: GOSSIP_NEWS[event.type]!,
         playerName,
+        deliveryPhase,
       }),
       { settings, task: `Write ${gossiper.name}'s gossip text.`, schemaName: 'GossipText' },
     );
@@ -95,7 +98,7 @@ export async function generateGossipForDay(
         body: result.data.body,
         status: 'queued',
         dayNumber: day,
-        scheduledPhase: 'evening', // "heard about your day" lands in the evening
+        scheduledPhase: deliveryPhase,
         attachment: null,
         deliveredAt: null,
         createdAt: now,
@@ -154,6 +157,8 @@ export async function generateKnowledgeGossipForDay(
     const pick = pickGossipKnowledge(gossiper.id, worldId);
     if (!pick || seen(gossiper.id, pick.knowledgeId)) continue; // nothing new to pass along
 
+    // Neighborhood chatter lands in the afternoon — decided here, told to the model.
+    const deliveryPhase = 'afternoon' as const;
     const result = await callStructuredLlm(
       GossipTextSchema,
       buildKnowledgeGossipMessages({
@@ -162,6 +167,7 @@ export async function generateKnowledgeGossipForDay(
         claim: pick.claim,
         confident: pick.fidelity >= 80,
         playerName,
+        deliveryPhase,
       }),
       { settings, task: `Write ${gossiper.name}'s neighborhood-gossip text.`, schemaName: 'GossipText' },
     );
@@ -180,7 +186,7 @@ export async function generateKnowledgeGossipForDay(
         body: result.data.body,
         status: 'queued',
         dayNumber: day,
-        scheduledPhase: 'afternoon',
+        scheduledPhase: deliveryPhase,
         attachment: null,
         deliveredAt: null,
         createdAt: Date.now(),

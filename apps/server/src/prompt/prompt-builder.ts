@@ -580,11 +580,14 @@ export function buildSystemPrompt(ctx: PromptContext, guardrails: string): strin
   // Time of day now lives in the "RIGHT NOW" block above (with its consistency rule).
   if (ctx.location) sceneLines.push(`Current location/activity: ${ctx.location.name} — ${ctx.location.description}`);
   // The cost of the outing — let them notice (and react in character to) the spend.
+  // On a stranger first-meeting the SCENE just said they haven't introduced
+  // themselves, so this line must not turn around and name them.
   if (ctx.venueTier && ctx.venueTier >= 2) {
+    const who = strangerMeeting ? 'Your date' : ctx.player.name;
     sceneLines.push(
       ctx.venueTier >= 3
-        ? `${ctx.player.name} brought you somewhere lavish and clearly spent on it — react however fits your character (touched, impressed, or wary of the splurge).`
-        : `${ctx.player.name} took you somewhere nice for this date — they put real thought (and money) into it.`,
+        ? `${who} brought you somewhere lavish and clearly spent on it — react however fits your character (touched, impressed, or wary of the splurge).`
+        : `${who} took you somewhere nice for this date — they put real thought (and money) into it.`,
     );
   }
   parts.push(`=== SCENE ===\n${sceneLines.join('\n')}`);
@@ -868,6 +871,23 @@ function joinNames(names: string[]): string {
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
+/** "in the morning" / "at night" — a phase key or label as it reads inside a sentence. */
+function atPhase(phase: string): string {
+  const p = phase.trim().toLowerCase();
+  return p === 'night' ? 'at night' : `in the ${p}`;
+}
+
+/**
+ * The delivery-time anchor for a QUEUED phone text: these are written at day start
+ * but land at a server-scheduled phase, so without this the model can bake in a
+ * time of day the text won't be read at (the "good morning" that arrives at night).
+ * Empty when no phase is known (world-less play).
+ */
+function deliveryTimeLine(phase: string | null | undefined): string {
+  if (!phase || !phase.trim()) return '';
+  return ` This text will reach them ${atPhase(phase)} — write it to fit that time of day, or keep it time-neutral; never assume a different one.`;
+}
+
 /**
  * The "you're partnered with someone now" clause for the phone surfaces, mirroring
  * the date prompt's WHERE-THINGS-STAND block so a character the world has coupled off
@@ -914,6 +934,9 @@ export function buildTextReplyMessages(args: {
   npcPartnerNames?: string[];
   /** When the player attached a photo, a `data:` URL of it (vision model reads it). */
   imageDataUrl?: string | null;
+  /** Current time-of-day phase (a live reply happens NOW), so the text can't say
+   *  "good morning" at night. Null/omitted for world-less play (no clock). */
+  timeOfDay?: string | null;
 }): ChatMessage[] {
   const {
     character: c,
@@ -927,6 +950,7 @@ export function buildTextReplyMessages(args: {
     acquaintances = [],
     npcPartnerNames = [],
     imageDataUrl,
+    timeOfDay = null,
   } = args;
   const stage = relationshipStage(relationship);
   const status = currentStatus(relationship);
@@ -957,6 +981,11 @@ export function buildTextReplyMessages(args: {
   const feelingLine = relationshipStateNote(relationship.flags, playerName, 'text');
   const partnerClause = npcPartnerClause(c, npcPartnerNames, playerName);
   const attraction = attractionGuardClause(c, playerGender, playerName);
+  // The live clock, mirroring the date prompt's RIGHT NOW facts: a reply happens
+  // NOW, so any time-of-day wording in it must match the actual phase.
+  const timeLine = timeOfDay && timeOfDay.trim()
+    ? ` Right now it is ${timeOfDay.trim().toLowerCase()} for you both — if your text touches the time of day at all, it must match that (no "good morning" in the evening, no "tonight" in the morning).`
+    : '';
   const photoLine = imageDataUrl
     ? `${playerName} just sent you a PHOTO (shown below). Look closely and take in the specific details — who or what is in it, the setting, expressions, colors, little things in the background — then react naturally, like a real person reacting to a pic a date texted you. Mention the specific things you actually notice (the more precise, the more it feels like you really looked), not a generic "nice pic." `
     : '';
@@ -966,7 +995,7 @@ export function buildTextReplyMessages(args: {
       role: 'system',
       content:
         `${resolvePrompt('SMS_GUARDRAILS')}\n\nYou are ${characterBrief(c)}\n` +
-        `Relationship stage with ${playerName}: ${stage.label}. ${stage.guidance}${statusLine}${traits}${feelingLine}${partnerClause}${attraction}${knownBlock}`,
+        `Relationship stage with ${playerName}: ${stage.label}. ${stage.guidance}${statusLine}${timeLine}${traits}${feelingLine}${partnerClause}${attraction}${knownBlock}`,
     },
     {
       role: 'user',
@@ -1066,6 +1095,9 @@ export function buildDailyTextPlanMessages(args: {
   /** NPC(s) this character has paired off with (npc_edges 'together') — so a coupled-off
    *  character's proactive texts stay honest/platonic instead of breezily flirty. */
   npcPartnerNames?: string[];
+  /** The server-scheduled phase this text will be DELIVERED at (it is written at day
+   *  start), so the wording can't assume a different time of day. Null = unknown. */
+  deliveryPhase?: string | null;
 }): ChatMessage[] {
   const {
     character: c,
@@ -1080,6 +1112,7 @@ export function buildDailyTextPlanMessages(args: {
     memories = [],
     worldDay = null,
     npcPartnerNames = [],
+    deliveryPhase = null,
   } = args;
   const stage = relationshipStage(relationship);
   const gifts = giftable.length ? giftable.map((g) => `${g.id} ("${g.name}")`).join('; ') : 'none available';
@@ -1101,12 +1134,12 @@ export function buildDailyTextPlanMessages(args: {
     {
       role: 'user',
       content:
-        `Write today's single text to ${playerName}.\n` +
+        `Write today's single text to ${playerName}.${deliveryTimeLine(deliveryPhase)}\n` +
         `CURRENT RELATIONSHIP STAGE: ${stage.label}. ${stage.guidance}\n` +
         `(${relationshipStatLine(relationship)})\n` +
         `Days since you last saw ${playerName}: ${daysSinceSeen}.${milestoneLine}${afterglowBlock}${memoryBlock}${historyBlock}${threadBlock}\n` +
         `Allowed gift item ids (suggest at most one, or null): ${gifts}.\n` +
-        `Write ONE short, casual text, matching the relationship stage. (The "phase" field is ignored — the game schedules it.)`,
+        `Write ONE short, casual text, matching the relationship stage. (The "phase" field is ignored — the delivery time is already decided.)`,
     },
   ];
 }
@@ -1123,8 +1156,10 @@ export function buildRelationshipBeatMessages(args: {
   chronicle?: { chronicle: string; recentLines: Array<{ day: number; line: string }> } | null;
   /** A few top memories so the beat can reference shared history. */
   memories?: CharacterMemory[];
+  /** The server-scheduled phase this text will be DELIVERED at. Null = unknown. */
+  deliveryPhase?: string | null;
 }): ChatMessage[] {
-  const { character: c, relationship, playerName, beat, playerGender = 'unspecified', chronicle = null, memories = [] } = args;
+  const { character: c, relationship, playerName, beat, playerGender = 'unspecified', chronicle = null, memories = [], deliveryPhase = null } = args;
   const stage = relationshipStage(relationship);
   const memoryBlock = memories.length ? `\nTHINGS YOU REMEMBER about ${playerName}:\n${bullet(memories.map((m) => m.text))}` : '';
 
@@ -1139,7 +1174,7 @@ export function buildRelationshipBeatMessages(args: {
         content:
           `Write ONE short, kind text to ${playerName}. You've realized they may be hoping for something romantic — but you are ${word}, and you're simply not into them that way. ` +
           `Gently and clearly tell them the truth: you're ${word}, you genuinely value them, and you'd love to stay friends — but it can't be romantic. Warm, honest, a little vulnerable; never cold, apologetic, or leading them on.${memoryBlock}\n` +
-          `Write ONE short text for this reveal only.`,
+          `Write ONE short text for this reveal only.${deliveryTimeLine(deliveryPhase)}`,
       },
     ];
   }
@@ -1163,7 +1198,7 @@ export function buildRelationshipBeatMessages(args: {
         `Write your "${beat}" text to ${playerName}.\n` +
         `How close you have been: ${stage.label}.${wasLine}\n` +
         `(${relationshipStatLine(relationship)})${memoryBlock}${historyBlock}\n` +
-        `Write ONE short text for the "${beat}" beat only.${groundLine}`,
+        `Write ONE short text for the "${beat}" beat only.${groundLine}${deliveryTimeLine(deliveryPhase)}`,
     },
   ];
 }
@@ -1712,8 +1747,10 @@ export function buildDespairTextMessages(args: {
   stage: 'withdrawn' | 'crisis';
   playerName: string;
   memories?: CharacterMemory[];
+  /** The server-scheduled phase this text will be DELIVERED at. Null = unknown. */
+  deliveryPhase?: string | null;
 }): ChatMessage[] {
-  const { character: c, relationship, stage, playerName, memories = [] } = args;
+  const { character: c, relationship, stage, playerName, memories = [], deliveryPhase = null } = args;
   const memoryBlock = memories.length ? `\nThings you remember about ${playerName}:\n${bullet(memories.map((m) => m.text))}` : '';
   return [
     { role: 'system', content: `${resolvePrompt('DESPAIR_TEXT_GUARDRAILS')}\n\nYou are ${characterBrief(c)}` },
@@ -1722,7 +1759,7 @@ export function buildDespairTextMessages(args: {
       content:
         `You're texting ${playerName}, who you grew very close to and who has hurt you badly and repeatedly. ` +
         `(${relationshipStatLine(relationship)})${memoryBlock}\n` +
-        `Write ONE short "${stage}" text — emotional pain only, and never anything about self-harm.`,
+        `Write ONE short "${stage}" text — emotional pain only, and never anything about self-harm.${deliveryTimeLine(deliveryPhase)}`,
     },
   ];
 }
@@ -1733,15 +1770,17 @@ export function buildFriendConcernMessages(args: {
   subjectName: string;
   linkKind: string;
   playerName: string;
+  /** The server-scheduled phase this text will be DELIVERED at. Null = unknown. */
+  deliveryPhase?: string | null;
 }): ChatMessage[] {
-  const { friend, subjectName, linkKind, playerName } = args;
+  const { friend, subjectName, linkKind, playerName, deliveryPhase = null } = args;
   return [
     { role: 'system', content: `${resolvePrompt('FRIEND_CONCERN_GUARDRAILS')}\n\nYou are ${characterBrief(friend)}\nYour relationship to ${subjectName}: ${linkKind}.` },
     {
       role: 'user',
       content:
         `You've noticed ${subjectName} (your ${linkKind}) has been in a really dark place lately, and you know ${playerName} has been part of why. ` +
-        `Text ${playerName} as ${friend.name} — worried about ${subjectName}, gently urging ${playerName} to be kind / check in / give them space.`,
+        `Text ${playerName} as ${friend.name} — worried about ${subjectName}, gently urging ${playerName} to be kind / check in / give them space.${deliveryTimeLine(deliveryPhase)}`,
     },
   ];
 }
@@ -1753,8 +1792,10 @@ export function buildGossipTextMessages(args: {
   linkKind: string;
   news: string;
   playerName: string;
+  /** The server-scheduled phase this text will be DELIVERED at. Null = unknown. */
+  deliveryPhase?: string | null;
 }): ChatMessage[] {
-  const { gossiper, subjectName, linkKind, news, playerName } = args;
+  const { gossiper, subjectName, linkKind, news, playerName, deliveryPhase = null } = args;
   return [
     {
       role: 'system',
@@ -1764,7 +1805,7 @@ export function buildGossipTextMessages(args: {
       role: 'user',
       content:
         `You heard that ${playerName} and ${subjectName} ${news}. ` +
-        `Text ${playerName} about it as ${gossiper.name}, with the sentiment your relationship to ${subjectName} (${linkKind}) implies.`,
+        `Text ${playerName} about it as ${gossiper.name}, with the sentiment your relationship to ${subjectName} (${linkKind}) implies.${deliveryTimeLine(deliveryPhase)}`,
     },
   ];
 }
@@ -1776,8 +1817,10 @@ export function buildKnowledgeGossipMessages(args: {
   claim: string;
   confident: boolean;
   playerName: string;
+  /** The server-scheduled phase this text will be DELIVERED at. Null = unknown. */
+  deliveryPhase?: string | null;
 }): ChatMessage[] {
-  const { gossiper, subjectName, claim, confident, playerName } = args;
+  const { gossiper, subjectName, claim, confident, playerName, deliveryPhase = null } = args;
   return [
     { role: 'system', content: `${resolvePrompt('KNOWLEDGE_GOSSIP_GUARDRAILS')}\n\nYou are ${characterBrief(gossiper)}` },
     {
@@ -1785,7 +1828,7 @@ export function buildKnowledgeGossipMessages(args: {
       content:
         `Text ${playerName} a quick bit of gossip you picked up about ${subjectName}: "${claim}". ` +
         `${confident ? 'You heard this pretty reliably.' : "You only half-heard it, so hedge — you might have it wrong."} ` +
-        `Keep it to a casual sentence or two, in your own voice.`,
+        `Keep it to a casual sentence or two, in your own voice.${deliveryTimeLine(deliveryPhase)}`,
     },
   ];
 }

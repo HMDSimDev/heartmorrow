@@ -74,6 +74,58 @@ describe('text reply mirrors the date prompt emotional state (#1)', () => {
   });
 });
 
+describe("time-of-day anchors: a text can't assume a different time than it's read at", () => {
+  beforeEach(() => resetDb());
+
+  it('a live reply is anchored to the current phase', () => {
+    const { character } = seedWorldAndCharacter();
+    const msgs = buildTextReplyMessages({
+      character,
+      relationship: getRelationship(character.id),
+      recentTexts: [],
+      playerName: 'Alex',
+      timeOfDay: 'evening',
+    });
+    expect(systemTextOf(msgs)).toContain('right now it is evening');
+  });
+
+  it('a reply with no clock (world-less play) adds no time anchor', () => {
+    const { character } = seedWorldAndCharacter();
+    const msgs = buildTextReplyMessages({
+      character,
+      relationship: getRelationship(character.id),
+      recentTexts: [],
+      playerName: 'Alex',
+    });
+    expect(systemTextOf(msgs)).not.toContain('right now it is');
+  });
+
+  it('a proactive daily text is told the phase it will be delivered at', () => {
+    const { character } = seedWorldAndCharacter();
+    const msgs = buildDailyTextPlanMessages({
+      character,
+      relationship: getRelationship(character.id),
+      daysSinceSeen: 1,
+      giftable: [],
+      playerName: 'Alex',
+      deliveryPhase: 'night',
+    });
+    expect(allTextOf(msgs)).toContain('will reach them at night');
+  });
+
+  it('a daily text with no known phase adds no delivery anchor', () => {
+    const { character } = seedWorldAndCharacter();
+    const msgs = buildDailyTextPlanMessages({
+      character,
+      relationship: getRelationship(character.id),
+      daysSinceSeen: 1,
+      giftable: [],
+      playerName: 'Alex',
+    });
+    expect(allTextOf(msgs)).not.toContain('will reach them');
+  });
+});
+
 describe("date afterglow: a recent date's mood briefly colors texts, then fades", () => {
   beforeEach(() => resetDb());
   afterEach(() => setAdapterOverride(null));

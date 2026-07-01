@@ -399,6 +399,9 @@ async function generateTextReply(
       acquaintances: listAcquaintances(character),
       npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
       imageDataUrl,
+      // A reply happens NOW — anchor it to the live clock so it can't say
+      // "good morning" at night. Null for world-less characters (no clock).
+      timeOfDay: character.worldId ? ensureWorldState(character.worldId).phase : null,
     }),
     { settings: effectiveSettings, task: 'Reply to the player’s text in character (short).', schemaName: 'TextReply' },
   );
@@ -606,6 +609,7 @@ export async function regenerateTextReply(
         acquaintances: listAcquaintances(character),
         npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
         imageDataUrl,
+        timeOfDay: character.worldId ? ensureWorldState(character.worldId).phase : null,
       }),
       { settings: effectiveSettings, task: 'Rewrite the character’s last text reply in character (short).', schemaName: 'TextReply' },
     );

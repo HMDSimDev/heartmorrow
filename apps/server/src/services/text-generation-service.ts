@@ -59,6 +59,9 @@ async function deliverRelationshipBeat(
   playerName: string,
   rng: SeededRandom,
 ): Promise<void> {
+  // Decide the delivery phase BEFORE the model writes, and tell it — so the beat
+  // can't say "good morning" and then land at night.
+  const phase = pickTextPhase(`beatphase|${worldId}|${day}|${character.id}`, rng);
   const result = await callStructuredLlm(
     RelationshipBeatTextSchema,
     buildRelationshipBeatMessages({
@@ -69,6 +72,7 @@ async function deliverRelationshipBeat(
       playerGender: getOrCreatePlayer(playerIdForWorldOrDefault(worldId)).gender,
       chronicle: chronicleForPrompt(character.id),
       memories: topMemoriesFor(character.id),
+      deliveryPhase: phase,
     }),
     { settings, task: `Write ${character.name}'s ${beat} text.`, schemaName: 'RelationshipBeatText' },
   );
@@ -90,7 +94,7 @@ async function deliverRelationshipBeat(
       body: result.data.body,
       status: 'queued',
       dayNumber: day,
-      scheduledPhase: pickTextPhase(`beatphase|${worldId}|${day}|${character.id}`, rng),
+      scheduledPhase: phase,
       attachment: null,
       deliveredAt: null,
       createdAt: now,
@@ -209,6 +213,7 @@ export async function generateDailyTextsForDay(
         memories: topMemoriesFor(character.id),
         worldDay: day,
         npcPartnerNames: currentNpcPartners(character).map((p) => p.name),
+        deliveryPhase: phase,
       }),
       { settings, task: `Write ${character.name}'s text for the day.`, schemaName: 'DailyTextPlan' },
     );

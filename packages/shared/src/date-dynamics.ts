@@ -20,9 +20,13 @@ export const DATE_NEEDS: DateNeed[] = [
     behavior: 'You want to feel truly listened to — you bring up something on your mind and hope they actually engage with it rather than steering back to themselves.',
     judge: 'Reward attentive listening, genuine follow-up questions, and remembering/responding to what the character actually said. Penalize self-absorption, ignoring their cues, and yanking the conversation back to the player.',
   },
+  // NOTE: behavior strings land in the SAME prompt as the independently-rolled
+  // mood-of-the-day ("Today you're feeling cheerful"), so they must state only the
+  // WANT — never assert a backstory or state ("you've had a heavy week", "you're
+  // restless") that can flatly contradict the mood beside them.
   {
     key: 'levity',
-    behavior: "You've had a heavy week and want lightness — easy banter, fun, a little flirtatious teasing, not an interrogation.",
+    behavior: 'You want lightness from this date — easy banter, fun, a little flirtatious teasing, not an interrogation.',
     judge: 'Reward playfulness, humor, warmth, and lightness. Penalize heaviness, relentless deep questions, moping, or negativity.',
   },
   {
@@ -37,12 +41,12 @@ export const DATE_NEEDS: DateNeed[] = [
   },
   {
     key: 'spontaneity',
-    behavior: "You're restless and want spontaneity — for them to take a little initiative, suggest something, surprise you.",
+    behavior: 'You want spontaneity from this date — for them to take a little initiative, suggest something, surprise you.',
     judge: 'Reward initiative, ideas, playfulness, and spontaneity. Penalize passivity, one-word answers, and putting every decision back on the character.',
   },
   {
     key: 'guarded',
-    behavior: "You're a little guarded — something's on your mind and they have to earn it before you fully warm up. Don't be hostile, just slower to open.",
+    behavior: "You're keeping this date a little guarded — they have to earn it before you fully warm up. Don't be hostile, just slower to open.",
     judge: 'Reward patience, respect, warmth, and not pushing. Penalize presumption, pushiness, crossing boundaries, or rushing intimacy.',
   },
 ];
