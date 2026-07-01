@@ -280,19 +280,33 @@ export function exportBundlePack(input: {
   }
   const entries: ZipEntryInput[] = [];
   const items: PackManifest['items'] = [];
-  let assetTotal = 0;
+  // Collect the referenced asset ids across every nested pack so the manifest can
+  // report a real (deduped) image count. Mirrors the collection each child exporter
+  // does; without this `counts.assets` was hard-coded to 0 and the pre-import preview
+  // reported no images even for packs full of portraits.
+  const assetIds = new Set<string>();
 
   worldIds.forEach((wid, i) => {
     const world = getWorld(wid);
     const file = `worlds/${i}.hmwrld`;
     entries.push({ name: file, data: exportWorldPack(wid, { includeCharacters }), store: true });
     items.push({ kind: 'world', file, title: world.name });
+    const worldChars = includeCharacters ? charactersRepo.listByWorld(wid) : [];
+    for (const id of collectCharacterAssetIds(worldChars)) assetIds.add(id);
+    for (const loc of world.locations) if (loc.imageAssetId) assetIds.add(loc.imageAssetId);
+    for (const p of propertiesRepo.listByWorld(wid)) if (p.assetId) assetIds.add(p.assetId);
+    for (const c of companiesRepo.listByWorld(wid)) if (c.assetId) assetIds.add(c.assetId);
   });
   if (characterIds.length > 0) {
     const file = 'characters/0.hmchr';
     entries.push({ name: file, data: exportCharacterPack(characterIds), store: true });
     items.push({ kind: 'character', file, title: `${characterIds.length} characters` });
+    for (const id of collectCharacterAssetIds(characterIds.map((id) => getCharacter(id)))) assetIds.add(id);
   }
+
+  // Count only assets that actually resolve to stored bytes (what gets shipped),
+  // deduped across the whole bundle.
+  const assetTotal = gatherAssets(assetIds).portable.length;
 
   const manifest = makeManifest('pack', {
     title: input.title?.trim() || 'Heartmorrow bundle',

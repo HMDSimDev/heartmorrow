@@ -26,6 +26,7 @@ import { attemptDtr } from '../services/dtr-service';
 import { giveGiftOnDate } from '../services/gift-service';
 import { docSchema } from '../lib/openapi-schema';
 import { withKeyedLock } from '../lib/keyed-lock';
+import { badRequest } from '../lib/errors';
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'Create a conversation session', body: ConversationCreateSchema }) }, async (req, reply) => {
@@ -51,17 +52,25 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations/:id/messages', { schema: docSchema({ tags: ['conversations'], summary: 'Send a message and get a full reply', body: SendMessageSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { text, intent } = parseInput(SendMessageSchema, req.body);
-    const playerMessage = addPlayerMessage(id, text, intent);
-    const reply = await generateReply(id);
-    void maybeAutoSummarize(id);
-    return { playerMessage, reply };
+    // Serialize per session under the SAME key as the streaming/retry/regenerate paths
+    // so two concurrent sends can't interleave (add player turn -> await LLM -> insert
+    // reply) and stack duplicated/interleaved turns.
+    return withKeyedLock(`conv-reply:${id}`, async () => {
+      // Re-check inside the lock (parity with /stream + /retry-stream): a send queued
+      // behind a concurrent end/reply must not append to an already-ended session.
+      const { session } = getSessionWithMessages(id);
+      if (session.ended) throw badRequest('This date has already ended.');
+      const playerMessage = addPlayerMessage(id, text, intent);
+      const reply = await generateReply(id);
+      void maybeAutoSummarize(id);
+      return { playerMessage, reply };
+    });
   });
 
   // Streaming send via Server-Sent Events.
   app.post('/conversations/:id/stream', { schema: docSchema({ tags: ['conversations'], summary: 'Send a message, stream reply via SSE', body: SendMessageSchema }) }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const { text, intent } = parseInput(SendMessageSchema, req.body);
-    const playerMessage = addPlayerMessage(id, text, intent);
 
     reply.hijack();
     const raw = reply.raw;
@@ -75,8 +84,6 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
-    send('player', playerMessage);
-
     // Cancel the upstream LLM call only if the CLIENT actually disconnects.
     // We listen on the RESPONSE socket (reply.raw), not req.raw — req.raw's
     // 'close' fires as soon as the request body is consumed (i.e. immediately),
@@ -87,120 +94,132 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       if (!finished) ac.abort();
     };
     raw.on('close', onClose);
-
-    // The character may end the date themselves over egregious behavior (rare).
-    try {
-      const walkout = await attemptWalkout(id, text, ac.signal);
-      if (walkout) {
-        send('walkout', { message: walkout.message, reason: walkout.reason });
-        finished = true;
-        raw.off('close', onClose);
-        raw.end();
-        return;
-      }
-    } catch {
-      /* walkout check is best-effort; fall through to a normal reply */
-    }
-
-    // The player may be trying to break up. If so, surface the character's
-    // reaction and ask the client to confirm — do NOT end the relationship yet.
-    try {
-      const intent = await attemptPlayerBreakupIntent(id, text, ac.signal);
-      if (intent) {
-        send('breakup_intent', { message: intent.message, reaction: intent.reaction });
-        finished = true;
-        raw.off('close', onClose);
-        raw.end();
-        return;
-      }
-    } catch {
-      /* breakup-intent check is best-effort; fall through to a normal reply */
-    }
-
-    // The player may be winding the date down to a natural close ("I should get
-    // going"). If so, voice the character's goodbye and tell the client to run the
-    // normal end-and-evaluate flow — the date is scored in full, exactly as if the
-    // player had clicked "End & evaluate". Best-effort: falls through on any miss.
-    try {
-      const farewell = await attemptPlayerFarewell(id, text, ac.signal);
-      if (farewell) {
-        send('farewell', { message: farewell.message, expression: farewell.expression });
-        finished = true;
-        raw.off('close', onClose);
-        raw.end();
-        return;
-      }
-    } catch {
-      /* farewell check is best-effort; fall through to a normal reply */
-    }
-
-    // Judge how the player's LATEST message landed BEFORE writing the reply, so the
-    // character's tone can honestly reflect it (no more "judge says dismissive while
-    // the character gushes"). The live 'rapport' read is emitted up front — the
-    // trajectory bar + portrait react during the typing indicator, then the reply
-    // lands in that register. Best-effort: a failed/skipped read = no verdict this turn.
-    let turnRead: Awaited<ReturnType<typeof judgeTurn>> = null;
-    try {
-      turnRead = await judgeTurn(id, ac.signal);
-      if (turnRead) {
-        send('rapport', {
-          label: turnRead.label,
-          expression: turnRead.expression,
-          rapport: turnRead.rapport,
-          delta: turnRead.delta,
-        });
-      }
-    } catch {
-      /* rapport judging is best-effort; never block the turn */
-    }
-
-    // If rapport has cratered (now INCLUDING this turn), the character loses interest
-    // and ends the evening early (a soft exit, NOT a walkout) rather than replying —
-    // so a final-straw message makes them leave instead of gamely replying. Real cost.
-    try {
-      const left = await maybeLeaveForLostInterest(id, ac.signal);
-      if (left) {
-        send('left', { message: left.message, reason: left.reason });
-        finished = true;
-        raw.off('close', onClose);
-        raw.end();
-        return;
-      }
-    } catch {
-      /* lost-interest check is best-effort; fall through to a normal reply */
-    }
+    const finish = () => {
+      finished = true;
+      raw.off('close', onClose);
+      raw.end();
+    };
 
     try {
-      const { content, finishReason } = await streamReply(
-        id,
-        (delta) => send('delta', { text: delta }),
-        ac.signal,
-        turnRead,
-      );
-      if (!content.trim()) {
-        send('error', {
-          message:
-            finishReason === 'length'
-              ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
-              : 'The model returned an empty reply.',
-        });
-      } else {
-        const message = persistStreamedReply(id, content);
-        if (finishReason === 'length') {
-          send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
+      // Serialize the whole mutating turn per session under the SAME key as the
+      // retry/regenerate handlers, so two concurrent sends (a double-fire, a second
+      // tab, a server-truth resume) can't interleave "add player turn -> await LLM ->
+      // persist reply" and thereby double-judge rapport, double-apply the walkout
+      // penalty, or stack duplicated/interleaved turns. The player message is added
+      // INSIDE the lock so a queued second request sees the first turn's committed
+      // state (matching the retry-stream re-check pattern).
+      await withKeyedLock(`conv-reply:${id}`, async () => {
+        const { session } = getSessionWithMessages(id);
+        if (session.ended) {
+          send('error', { message: 'This date has already ended.' });
+          return;
         }
-        send('done', { message });
-        void maybeAutoSummarize(id);
-        // The live rapport read was already emitted up front (before the reply), so the
-        // turn's vibe + verdict shaped the reply itself — nothing more to judge here.
-      }
+        // The client may have disconnected while queued for the lock — don't strand a
+        // player turn no one is listening for.
+        if (ac.signal.aborted) return;
+
+        const playerMessage = addPlayerMessage(id, text, intent);
+        send('player', playerMessage);
+
+        // The character may end the date themselves over egregious behavior (rare).
+        try {
+          const walkout = await attemptWalkout(id, text, ac.signal);
+          if (walkout) {
+            send('walkout', { message: walkout.message, reason: walkout.reason });
+            return;
+          }
+        } catch {
+          /* walkout check is best-effort; fall through to a normal reply */
+        }
+
+        // The player may be trying to break up. If so, surface the character's
+        // reaction and ask the client to confirm — do NOT end the relationship yet.
+        try {
+          const breakupIntent = await attemptPlayerBreakupIntent(id, text, ac.signal);
+          if (breakupIntent) {
+            send('breakup_intent', { message: breakupIntent.message, reaction: breakupIntent.reaction });
+            return;
+          }
+        } catch {
+          /* breakup-intent check is best-effort; fall through to a normal reply */
+        }
+
+        // The player may be winding the date down to a natural close ("I should get
+        // going"). If so, voice the character's goodbye and tell the client to run the
+        // normal end-and-evaluate flow — the date is scored in full, exactly as if the
+        // player had clicked "End & evaluate". Best-effort: falls through on any miss.
+        try {
+          const farewell = await attemptPlayerFarewell(id, text, ac.signal);
+          if (farewell) {
+            send('farewell', { message: farewell.message, expression: farewell.expression });
+            return;
+          }
+        } catch {
+          /* farewell check is best-effort; fall through to a normal reply */
+        }
+
+        // Judge how the player's LATEST message landed BEFORE writing the reply, so the
+        // character's tone can honestly reflect it (no more "judge says dismissive while
+        // the character gushes"). The live 'rapport' read is emitted up front — the
+        // trajectory bar + portrait react during the typing indicator, then the reply
+        // lands in that register. Best-effort: a failed/skipped read = no verdict this turn.
+        let turnRead: Awaited<ReturnType<typeof judgeTurn>> = null;
+        try {
+          turnRead = await judgeTurn(id, ac.signal);
+          if (turnRead) {
+            send('rapport', {
+              label: turnRead.label,
+              expression: turnRead.expression,
+              rapport: turnRead.rapport,
+              delta: turnRead.delta,
+            });
+          }
+        } catch {
+          /* rapport judging is best-effort; never block the turn */
+        }
+
+        // If rapport has cratered (now INCLUDING this turn), the character loses interest
+        // and ends the evening early (a soft exit, NOT a walkout) rather than replying —
+        // so a final-straw message makes them leave instead of gamely replying. Real cost.
+        try {
+          const left = await maybeLeaveForLostInterest(id, ac.signal);
+          if (left) {
+            send('left', { message: left.message, reason: left.reason });
+            return;
+          }
+        } catch {
+          /* lost-interest check is best-effort; fall through to a normal reply */
+        }
+
+        const { content, finishReason } = await streamReply(
+          id,
+          (delta) => send('delta', { text: delta }),
+          ac.signal,
+          turnRead,
+        );
+        if (!content.trim()) {
+          send('error', {
+            message:
+              finishReason === 'length'
+                ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
+                : 'The model returned an empty reply.',
+          });
+        } else {
+          const message = persistStreamedReply(id, content);
+          if (finishReason === 'length') {
+            send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
+          }
+          send('done', { message });
+          void maybeAutoSummarize(id);
+          // The live rapport read was already emitted up front (before the reply), so the
+          // turn's vibe + verdict shaped the reply itself — nothing more to judge here.
+        }
+      });
     } catch (err) {
       // Don't surface an error that was caused by the client disconnecting.
       if (!ac.signal.aborted) send('error', { message: (err as Error).message || 'The reply failed unexpectedly — tap retry.' });
     } finally {
-      finished = true;
-      raw.off('close', onClose);
-      raw.end();
+      finish();
     }
   });
 

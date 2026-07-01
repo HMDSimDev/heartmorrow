@@ -86,7 +86,7 @@ interface AppData {
   setActiveWorld: (id: string) => void;
   reloadWorlds: () => Promise<void>;
   refreshWorldState: () => Promise<void>;
-  sleep: () => Promise<SleepResponse | null>;
+  sleep: (expectedDay?: number) => Promise<SleepResponse | null>;
   // Mode + theme (client-side)
   creatorMode: boolean;
   setCreatorMode: (on: boolean) => void;
@@ -244,9 +244,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     void refreshActiveDate();
   }, [refreshActiveDate]);
 
-  const sleep = useCallback(async (): Promise<SleepResponse | null> => {
+  const sleep = useCallback(async (expectedDay?: number): Promise<SleepResponse | null> => {
     if (!activeWorldId) return null;
-    const res = await api.sleep(activeWorldId);
+    const res = await api.sleep(activeWorldId, expectedDay);
     setWorldState(res.state);
     setDayTick((t) => t + 1); // signal day-derived tabs to refetch
     await reloadPlayer();

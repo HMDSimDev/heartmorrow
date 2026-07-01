@@ -499,23 +499,6 @@ export const sessionsRepo = {
     );
     return s;
   },
-  /**
-   * Atomically mark a session ended, but ONLY if it wasn't already. Returns true
-   * iff THIS call flipped it (so the caller may apply its one-time end effects —
-   * stamina/money spend, evaluation deltas, walkout penalty), false if it was
-   * already ended/gone. The single conditional UPDATE is the concurrency guard for
-   * endSession / attemptWalkout / maybeLeaveForLostInterest racing across an LLM
-   * await (two end-requests, a walkout racing a manual end, etc.).
-   */
-  claimEnd(id: string): boolean {
-    return (
-      getDb().run(
-        'UPDATE conversation_sessions SET ended = 1, updated_at = ? WHERE id = ? AND ended = 0',
-        Date.now(),
-        id,
-      ).changes === 1
-    );
-  },
   delete(id: string): void {
     getDb().run('DELETE FROM conversation_sessions WHERE id = ?', id);
   },

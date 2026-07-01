@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   VENUE_TIERS,
@@ -81,6 +81,14 @@ export function WorldEditor() {
     void loadWorlds();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Track the live selection so an async op (e.g. location generation) can tell if the
+  // user switched worlds mid-flight and drop a now-stale result instead of writing it
+  // into the wrong world.
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -213,13 +221,19 @@ export function WorldEditor() {
   // the creator reviews/edits them and clicks "Save world" to keep them.
   const generateLocations = async () => {
     if (!world) return;
+    const wid = world.id; // the world we're generating FOR — guard the seconds-long await
     setGenerating(true);
     setError(undefined);
     setSavedNote(undefined);
     try {
-      const res = await api.generateLocations(world.id, { count: genCount, prompt: genPrompt });
+      const res = await api.generateLocations(wid, { count: genCount, prompt: genPrompt });
+      // The user may have switched worlds during the await. If so, DROP the result
+      // rather than merging world A's (stale-closure) locations into world B.
+      if (selectedIdRef.current !== wid) return;
       if (res.ok) {
-        setField('locations', [...(world.locations ?? []), ...res.data]);
+        // Merge into the CURRENT world state via the functional updater (never the
+        // stale `world` closure), and only if it's still the world we generated for.
+        setWorld((w) => (w && w.id === wid ? { ...w, locations: [...(w.locations ?? []), ...res.data] } : w));
         setSavedNote(t('pages:worldEditor.generatedAdded', { count: res.data.length }));
       } else {
         setError(t('pages:worldEditor.locGenFailed', { error: res.error }));

@@ -108,6 +108,7 @@ import { callStructuredLlm } from '../llm/structured';
 import { getAdapter } from '../llm/provider';
 import type { ChatMessage } from '../llm/types';
 import { ThinkStripper, stripThink } from '../lib/think-filter';
+import { withKeyedLock } from '../lib/keyed-lock';
 
 // --- session CRUD -----------------------------------------------------------
 
@@ -195,8 +196,8 @@ export function createSession(input: ConversationCreate): ConversationSession {
     // `prop:` location you have no claim to rather than silently degrading to a
     // locationless date.
     const world = worldsRepo.get(character.worldId) ?? null;
-    // "Anywhere": auto-pick the first free public venue, else the cheapest the player
-    // can currently afford — refusing the date outright when nothing is affordable.
+    // "Anywhere": auto-pick a RANDOM free public venue (for variety), else the cheapest
+    // the player can currently afford — refusing the date outright when nothing is affordable.
     if (resolvedLocationId === 'anywhere') {
       resolvedLocationId = pickAnywhereVenue(world?.locations ?? [], getOrCreatePlayer(playerIdForWorld(character.worldId)).money);
     }
@@ -1203,11 +1204,24 @@ export async function maybeAutoSummarize(sessionId: string): Promise<void> {
 // --- end + evaluate (structured) --------------------------------------------
 
 /**
- * End a session and run the STRUCTURED evaluator. Stat/memory mutations happen
- * only if the structured result validates. On failure, no game state is
- * mutated by the evaluation (the session is still marked ended).
+ * End a session and run the STRUCTURED evaluator. The evaluator is REQUIRED to
+ * conclude a plain manual "End & evaluate": if it fails (e.g. the model is offline),
+ * the date is NOT ended — nothing is mutated and the session stays open so the player
+ * can retry once the model is back. A NARRATIVE exit (walkout / lost-interest leave /
+ * spoken farewell) has already played out in-fiction, so it still finalizes even if
+ * the eval fails — it just carries no evaluator deltas/memories. Stat/memory mutations
+ * from the evaluation happen only when the structured result validates.
  */
 export async function endSession(sessionId: string): Promise<EndSessionResponse> {
+  // Serialize the end per session under the SAME key as send/retry/regenerate, so two
+  // concurrent ends can't both evaluate + spend, an end can't interleave with a send,
+  // and the session.ended re-check inside runs against committed state. This replaces
+  // the old claimEnd flip — which had to mark the session ended BEFORE the evaluator
+  // await, the very reason a failed eval used to finalize the date anyway.
+  return withKeyedLock(`conv-reply:${sessionId}`, () => endSessionInner(sessionId));
+}
+
+async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   const session = getSession(sessionId);
   const messages = messagesRepo.listBySession(sessionId);
 
@@ -1286,16 +1300,15 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
     };
   }
 
-  // A real date occurred: stamp "last seen" and spend a daily action (once,
-  // before the session is marked ended). World-bound dates/events only.
+  // A real date occurred.
   const endActor = getCharacter(session.characterId);
 
-  // Read-only affordability gate FIRST (no mutation, no claim): funds were checked
-  // at createSession; re-check here in case the wallet was drained mid-date. A
-  // property you own or lease is FREE (the lease rent / purchase covers it); any
-  // other venue charges its full tier price. Refusing here — BEFORE we claim/end
-  // the session — keeps it OPEN and re-endable once funds return, rather than
-  // ending it then bouncing the charge.
+  // Read-only affordability gate FIRST (no mutation): funds were checked at
+  // createSession; re-check here in case the wallet was drained mid-date. A property
+  // you own or lease is FREE (the lease rent / purchase covers it); any other venue
+  // charges its full tier price. Refusing here — BEFORE we spend/end anything — keeps
+  // the date OPEN and re-endable once funds return, rather than ending it then
+  // bouncing the charge.
   let pendingCharge: { worldId: string; cost: number; pid: string } | null = null;
   if (endActor.worldId && (session.mode === 'date' || session.mode === 'event')) {
     const venue = resolveSessionLocation(session.locationId, endActor, worldsRepo.get(endActor.worldId) ?? null);
@@ -1310,56 +1323,29 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
     pendingCharge = { worldId: endActor.worldId, cost, pid };
   }
 
-  // Atomically claim the session BEFORE the (multi-second) evaluator await below.
-  // Without this, two concurrent end requests (double-click, retry on a slow eval,
-  // or an auto-end racing a manual end) would BOTH pass the `session.ended` guard
-  // above, BOTH spend money/stamina, and BOTH apply the evaluation. claimEnd flips
-  // ended 0->1 in one statement; a request that loses the claim bails here.
-  if (!sessionsRepo.claimEnd(session.id)) {
-    clearRapport(sessionId);
-    return {
-      session: { ...session, ended: true },
-      evaluated: false,
-      relationship: null,
-      mood: null,
-      expression: null,
-      summaryLine: null,
-      memoriesWritten: 0,
-      evalError: 'This date has already ended.',
-      jealousy: null,
-      milestone: null,
-      breakup: null,
-      onTheRocks: false,
-      reconciled: false,
-      ending: null,
-    };
-  }
-
-  // Claimed: commit the one-time end costs (runs exactly once per session).
-  if (endActor.worldId) {
-    stampLastDate(session.characterId, ensureWorldState(endActor.worldId).day);
-    if (pendingCharge) {
-      spendStamina(pendingCharge.worldId);
-      if (pendingCharge.cost > 0) spendMoney(pendingCharge.cost, pendingCharge.pid);
-    }
-  }
-
-  // Emotional state carried INTO this date should be resolved by having had it
-  // out here — but jealousy freshly discovered just below must persist to color
-  // the NEXT date, so capture the pre-roll state first.
+  // Emotional state carried INTO this date should be resolved by having had it out
+  // here — captured (read-only) before any mutation. Jealousy freshly discovered
+  // below must persist to color the NEXT date, so record the pre-roll state now.
   const incomingFlags = getRelationship(session.characterId).flags;
   const incomingJealous = incomingFlags['state:jealous'] === true;
   const incomingOffended = incomingFlags['state:offended'] === true;
   // A date that ENDED in a walkout (the character stormed out this very session)
   // shouldn't have that fresh offense "aired out" by the same eval — they carry it
-  // INTO the next date. Detect it from the walkout farewell's metadata so the
-  // grievance attemptWalkout just set survives, and so a cruel night doesn't also
-  // heal the despair spiral like a normal evening together would.
+  // INTO the next date. Detect it from the walkout message's metadata so the grievance
+  // attemptWalkout just set survives, and so a cruel night doesn't also heal the
+  // despair spiral like a normal evening together would.
   const endedInWalkout = messages.some((m) => m.role === 'character' && m.metadata?.['walkout'] === true);
+  // A NARRATIVE exit (walkout / lost-interest leave / spoken farewell) has already
+  // played out in-fiction — the character is gone, so the date CANNOT resume and must
+  // finalize even if the evaluator fails (it just carries no eval deltas). A plain
+  // manual "End & evaluate" has no such marker; for it the evaluator is REQUIRED.
+  const forcedEnd =
+    endedInWalkout ||
+    messages.some((m) => m.role === 'character' && (m.metadata?.['farewell'] === true || m.metadata?.['left'] === true));
 
-  // A monogamous character may "find out" about other people you've seen lately.
-  const jealousy = maybeRollJealousy(getCharacter(session.characterId));
-
+  // --- The evaluator concludes the date. Run it FIRST and, for a manual end, finalize
+  //     NOTHING until it succeeds — so a model outage leaves the date OPEN and
+  //     re-endable rather than silently ending it un-evaluated. ---
   const settings = getLlmSettings();
   const evalMessages = messages.slice(-50);
   const ctx = buildPromptContextForSession(session, evalMessages);
@@ -1375,15 +1361,52 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
     minMaxTokens: 3000,
   });
 
-  // This real session is ending → decay temporary buffs by one session NOW that the
-  // evaluator (which ran with them still active) is done. Done once, on BOTH the
-  // success and failure paths, so the README contract ("buffs decay when a session
-  // ends") holds even when the eval call fails.
+  if (!result.ok) recordEvent('session_eval_failed', { sessionId, error: result.error, attempts: result.attempts });
+
+  // Manual end + the required evaluator failed → DO NOT end the date. Nothing is
+  // mutated (no ended flag, no stamina/money spent, no jealousy, no buff decay, rapport
+  // preserved); the session stays open so the player can end again once the model is back.
+  if (!result.ok && !forcedEnd) {
+    return {
+      session,
+      evaluated: false,
+      relationship: null,
+      mood: null,
+      expression: null,
+      summaryLine: null,
+      memoriesWritten: 0,
+      evalError: result.error,
+      jealousy: null,
+      milestone: null,
+      breakup: null,
+      onTheRocks: false,
+      reconciled: false,
+      ending: null,
+    };
+  }
+
+  // The date is now truly ending (the eval succeeded, or a narrative exit forces it).
+  // Commit the one-time costs + rolls exactly once — the per-session lock in
+  // endSession() prevents a concurrent double-end.
+  if (endActor.worldId) {
+    stampLastDate(session.characterId, ensureWorldState(endActor.worldId).day);
+    if (pendingCharge) {
+      spendStamina(pendingCharge.worldId);
+      if (pendingCharge.cost > 0) spendMoney(pendingCharge.cost, pendingCharge.pid);
+    }
+  }
+
+  // A monogamous character may "find out" about other people you've seen lately.
+  // Rolled only now that the date is truly ending — never on a manual failed eval.
+  const jealousy = maybeRollJealousy(getCharacter(session.characterId));
+
+  // The session is ending → decay temporary buffs by one session now that the
+  // evaluator (which ran with them still active) is done. Only on a real end, so a
+  // manual failed-eval retry doesn't decay buffs twice.
   decayRelationshipBuffs(session.characterId);
 
   if (!result.ok) {
-    // FAIL SAFE: do not mutate relationship/memories.
-    recordEvent('session_eval_failed', { sessionId, error: result.error, attempts: result.attempts });
+    // Narrative exit whose evaluator failed: end best-effort, WITHOUT eval deltas.
     return endBase(false, result.error, { jealousy });
   }
 

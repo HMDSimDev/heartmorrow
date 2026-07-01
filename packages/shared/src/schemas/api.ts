@@ -1006,6 +1006,13 @@ export const SleepResponseSchema = z.object({
   worldSim: WorldSimResultSchema.nullable().default(null),
   /** Passive money credited to this world's wallet for the new day. */
   income: z.number().default(0),
+  /**
+   * Whether this request actually advanced the day. False when a concurrent /
+   * duplicate Sleep (a second tab, a retry) sent a stale `expectedDay` and the day
+   * had already rolled over — the server no-ops instead of burning a second day. The
+   * client should skip the recap popup for a no-op.
+   */
+  advanced: z.boolean().default(true),
 });
 export type SleepResponse = z.infer<typeof SleepResponseSchema>;
 

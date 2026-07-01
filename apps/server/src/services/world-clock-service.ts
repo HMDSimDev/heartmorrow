@@ -137,11 +137,37 @@ export interface SleepResult {
   worldSim: WorldSimResult | null;
   /** Passive money credited to this world's wallet for the new day. */
   income: number;
+  /** False when a stale `expectedDay` made this a no-op (the day already advanced). */
+  advanced: boolean;
 }
 
-/** Advance to the next day: recap the day that ended, apply neglect decay, reset stamina. */
-export async function advanceDay(worldId: string): Promise<SleepResult> {
+/**
+ * Advance to the next day: recap the day that ended, apply neglect decay, reset stamina.
+ *
+ * `expectedDay` is optimistic-concurrency protection against a DOUBLE day-advance:
+ * the client passes the day it currently believes it's on, and if the world has
+ * already moved past it (a second tab / a retry / a double-fire that beat the client
+ * button-disable), we NO-OP instead of burning another day + charging another round
+ * of rent/dividends. The caller (the route) also serializes this whole function
+ * under a per-world lock so the read-check-commit below can't interleave.
+ */
+export async function advanceDay(worldId: string, expectedDay?: number): Promise<SleepResult> {
   const state = ensureWorldState(worldId);
+  // Stale intent: the day already rolled over — return the current state untouched.
+  if (expectedDay != null && state.day !== expectedDay) {
+    return {
+      state,
+      recap: null,
+      recapError: null,
+      decayed: [],
+      calendar: null,
+      weather: null,
+      holiday: null,
+      worldSim: null,
+      income: 0,
+      advanced: false,
+    };
+  }
   const simDay = state.day; // the day that is ENDING — what we simulate + recap
 
   // 1. Capture THIS WORLD's events for the ending day BEFORE anything new is
@@ -233,6 +259,7 @@ export async function advanceDay(worldId: string): Promise<SleepResult> {
     holiday: cal.holiday ? { name: cal.holiday.name, blurb: cal.holiday.blurb } : null,
     worldSim,
     income,
+    advanced: true,
   };
 }
 

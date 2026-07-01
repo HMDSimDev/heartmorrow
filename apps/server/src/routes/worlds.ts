@@ -31,6 +31,11 @@ import { getWorldAvailability } from '../services/availability-service';
 import { getWorldWeather } from '../services/ambiance-service';
 import { getWorldCalendar } from '../services/day-record-service';
 import { docSchema } from '../lib/openapi-schema';
+import { withKeyedLock } from '../lib/keyed-lock';
+
+// Optional optimistic-concurrency token for Sleep: the day the client believes it's
+// on. Lets the server no-op a stale/duplicate Sleep instead of double-advancing.
+const SleepInputSchema = z.object({ expectedDay: z.number().int().optional() });
 
 export async function worldRoutes(app: FastifyInstance): Promise<void> {
   app.get('/worlds', { schema: docSchema({ tags: ['worlds'], summary: 'List all worlds' }) }, async () => listWorlds());
@@ -99,11 +104,19 @@ export async function worldRoutes(app: FastifyInstance): Promise<void> {
     return getWorldState(id);
   });
 
-  app.post('/worlds/:id/sleep', { schema: docSchema({ tags: ['worlds'], summary: 'Sleep to advance the day' }) }, async (req) => {
-    const { id } = req.params as { id: string };
-    getWorld(id);
-    return advanceDay(id);
-  });
+  app.post(
+    '/worlds/:id/sleep',
+    { schema: docSchema({ tags: ['worlds'], summary: 'Sleep to advance the day', body: SleepInputSchema }) },
+    async (req) => {
+      const { id } = req.params as { id: string };
+      getWorld(id);
+      const { expectedDay } = parseInput(SleepInputSchema, req.body ?? {});
+      // Serialize the day rollover per world so two concurrent Sleep requests can't
+      // both read pre-advance state and each advance a day; `expectedDay` then makes a
+      // stale/duplicate request (a second tab, a retry) a no-op instead of a 2nd day.
+      return withKeyedLock(`world-clock:${id}`, () => advanceDay(id, expectedDay));
+    },
+  );
 
   app.get('/worlds/:id/availability', { schema: docSchema({ tags: ['worlds'], summary: 'Get character availability for today' }) }, async (req) => {
     const { id } = req.params as { id: string };

@@ -280,6 +280,11 @@ const PROGRESS_TABLES = [
   'message_threads',
   'emails',
   'character_chronicles',
+  // Reached endings are playthrough progress: keep them here (as CLEAR_ORDER and
+  // deleteWorld already do) so a reset lets endings be re-earned. Without this the
+  // "once only" guard in maybeReachEnding permanently blocks the ending after a reset
+  // and the gallery shows a playthrough that no longer exists.
+  'character_endings',
   'day_records',
   'feed_reactions',
   'feed_comments',

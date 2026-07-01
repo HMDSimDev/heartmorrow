@@ -457,7 +457,8 @@ export const api = {
     patch<WorldNote>(`/world-notes/${noteId}`, patchInput),
   deleteWorldNote: (noteId: string) => del<{ ok: true }>(`/world-notes/${noteId}`),
   getWorldState: (worldId: string) => get<WorldState>(`/worlds/${worldId}/state`),
-  sleep: (worldId: string) => post<SleepResponse>(`/worlds/${worldId}/sleep`),
+  sleep: (worldId: string, expectedDay?: number) =>
+    post<SleepResponse>(`/worlds/${worldId}/sleep`, expectedDay != null ? { expectedDay } : undefined),
   worldAvailability: (worldId: string) =>
     get<Array<{ characterId: string; available: boolean; reason: string | null }>>(`/worlds/${worldId}/availability`),
   /** The world's single in-progress date (for auto-resume + locking actions), or null. */

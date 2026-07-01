@@ -348,6 +348,7 @@
 /* "Regenerate this reply" — a small, quiet control under the character's last text.
    Rewrites the prose without changing the relationship. */
 .pcom-regen-btn {
+  position: relative;
   margin-top: 3px;
   display: inline-flex;
   align-items: center;
@@ -362,6 +363,13 @@
   cursor: pointer;
   opacity: 0.6;
   transition: opacity 0.15s ease, color 0.15s ease, transform 0.2s ease;
+}
+/* Invisible hit-slop so the effective touch target clears the ~44px floor without
+   inflating the visible 22px circle (mirrors .pbar-iconbtn::after). */
+.pcom-regen-btn::after {
+  content: '';
+  position: absolute;
+  inset: -11px;
 }
 .pcom-regen-btn:hover,
 .pcom-regen-btn:focus-visible {

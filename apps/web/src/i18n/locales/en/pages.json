@@ -11,6 +11,7 @@
     "sendFailed": "Your message didn't send.",
     "replyFailed": "They didn't reply — something went wrong.",
     "replyDropped": "The reply didn't come through.",
+    "evalFailed": "Couldn't evaluate the date — the model may be unavailable. Your date is still open; try ending it again.",
     "tonightsPlan": "Tonight's plan",
     "onADateTitle": "You're on a date",
     "onADateBody": "Your date with {name} is still going — your progress is safe.",

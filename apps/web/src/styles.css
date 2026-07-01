@@ -316,6 +316,27 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
   .bottomnav a { padding-left: 4px; padding-right: 4px; font-size: 0.55rem; }
 }
 
+/* Mobile shell: keep the bottom nav ALWAYS on-screen. Make .app a viewport-tall flex
+   column and let .app-main own the vertical scroll instead of the document — the in-flow
+   nav is then the last flex item, pinned at the bottom of the viewport, so it can never
+   scroll below the fold on a content-tall page (Home/People/Settings/Bag…). Previously
+   .app grew with content and the relative nav sat at the very end of a long scrolling
+   document, unreachable without scrolling to the bottom. The phone route has its own
+   full-height handling (see the max-width:540px block), so it's excluded here. */
+@media (max-width: 859.98px) {
+  .app:not([data-route='phone']) {
+    height: 100vh; /* fallback for browsers without dvh */
+    height: 100dvh;
+  }
+  .app:not([data-route='phone']) .app-main {
+    min-height: 0;
+    overflow-y: auto;
+    /* The nav is a sibling below in normal flow — no fixed-nav reserve needed, so the
+       old 100px bottom padding (meant for a fixed nav) becomes a normal breathing gap. */
+    padding-bottom: 24px;
+  }
+}
+
 @media (min-width: 860px) {
   .app { flex-direction: row; }
   .topbar { display: none; }

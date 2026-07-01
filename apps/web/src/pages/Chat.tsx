@@ -7,6 +7,7 @@ import {
   isBrokenUp,
   isOnTheRocks,
   nextDtrRung,
+  DTR_COOLDOWN_DAYS,
   warmthBand,
   bandIndex,
   deriveCalendar,
@@ -505,6 +506,10 @@ export function Chat() {
     setError(undefined);
     setNotice(undefined);
     setFailed(null);
+    // A new turn supersedes a transient DTR read: clear a lingering "not yet" (deflect)
+    // banner so it can't stay pinned all date or shadow the end-of-date evaluation. An
+    // accepted DTR is a milestone we keep as the primary outcome.
+    if (dtrOutcome && dtrOutcome.decision !== 'accept') setDtrOutcome(null);
     setStreaming({ active: true, text: '' });
     const controller = new AbortController();
     abortRef.current = controller;
@@ -885,6 +890,14 @@ export function Chat() {
     try {
       const result = await api.endSession(sid);
       if (sessionIdRef.current !== sid) return; // player abandoned this date mid-eval
+      // The evaluator is required to conclude a manual end. If it failed, the server
+      // keeps the date OPEN (session.ended stays false, evaluated=false) — surface a
+      // retryable error and do NOT conclude/lock the date, so the player can try again
+      // once the model is back. (A walkout/farewell still ends: session.ended is true.)
+      if (!result.session.ended && !result.evaluated) {
+        setError(result.evalError || t('chat.evalFailed'));
+        return;
+      }
       setEvalResult(result);
       setSession(result.session);
       if (result.relationship) {
@@ -1180,7 +1193,13 @@ export function Chat() {
   const status = relationship ? currentStatus(relationship) : 'none';
   const rung = relationship ? nextDtrRung(relationship) : null;
   const spokeThisSession = messages.some((m) => m.role === 'player');
-  const dtrReady = !!rung && rung.warmthMet && spokeThisSession;
+  // The server enforces a same-day cooldown after any DTR attempt (a deflect sets
+  // `dtr:lastAttemptDay`). Mirror it here so the commit button hides instead of staying
+  // active and only surfacing a "give it time" error when re-clicked.
+  const dtrLastAttempt = relationship?.flags['dtr:lastAttemptDay'];
+  const dtrOnCooldown =
+    scene != null && typeof dtrLastAttempt === 'number' && scene.day - dtrLastAttempt < DTR_COOLDOWN_DAYS;
+  const dtrReady = !!rung && rung.warmthMet && spokeThisSession && !dtrOnCooldown;
   // The date is over (evaluated or any terminal path) → no more composing, and the
   // actions collapse to "New date". Mirrors dateConcluded so the lock clears in step.
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
@@ -1337,7 +1356,9 @@ export function Chat() {
           </div>
         );
       }
-      return <Banner kind="info">{t('chat.dtrNotYet')}</Banner>;
+      // A non-terminal 'deflect' is only transient feedback — show it while the date is
+      // live, but never let it shadow the end-of-date evaluation (returned just below).
+      if (!evalResult) return <Banner kind="info">{t('chat.dtrNotYet')}</Banner>;
     }
     if (evalResult) return evalBanner;
     return null;

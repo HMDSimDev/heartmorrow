@@ -122,6 +122,14 @@ export function finishMinigame(input: MinigameFinish): MinigameFinishResponse {
     throw badRequest('Submission does not match the started minigame.');
   }
 
+  // A minigame play costs one daily action (world-bound). startMinigame gates on
+  // assertCanAct but reserves NO stamina, so re-check the budget HERE before granting
+  // any reward — otherwise a player could stockpile starts (each reserves nothing) and
+  // cash them all in after energy runs out, farming rewards past the daily action cap.
+  // finishMinigame is fully synchronous (no await), so this check-then-spend can't
+  // interleave with a concurrent finish; the spendStamina below closes the loop.
+  if (run.worldId) assertCanAct(run.worldId);
+
   const module = getMinigameModule(run.minigameId);
   const resolved = module.resolve(input.submission.submission, run.state);
   const reward = boundReward(resolved.reward);

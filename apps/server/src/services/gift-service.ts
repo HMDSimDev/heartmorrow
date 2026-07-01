@@ -102,25 +102,6 @@ export async function reactToGift(args: {
   }
   const reaction = result.data;
 
-  // Anti-grind: scale POSITIVE warmth for repeat gifts the same day. Inventory
-  // scarcity (gifts cost money) is the primary limiter; this is the backstop.
-  const giftsToday =
-    relationship.flags['gift:day'] === day && typeof relationship.flags['gift:count'] === 'number'
-      ? (relationship.flags['gift:count'] as number)
-      : 0;
-  const positiveScale = giftsToday <= 0 ? 1 : giftsToday === 1 ? 0.5 : 0;
-
-  const applied: Partial<Record<RelationshipStatKey, number>> = {};
-  for (const key of RELATIONSHIP_STAT_KEYS) {
-    const raw = reaction.relationshipDeltas[key];
-    if (typeof raw !== 'number' || raw === 0) continue;
-    let v = Math.max(-GIFT_MAX_DELTA, Math.min(GIFT_MAX_DELTA, raw));
-    // Tension is not "warmth" — a positive tension delta is a BAD thing, so it's
-    // never softened by the anti-grind scale; only genuine warmth gains are.
-    if (key !== 'tension' && v > 0) v = Math.round(v * positiveScale);
-    if (v !== 0) applied[key] = v;
-  }
-
   // Commit atomically, consuming the item FIRST. Consuming up front means a
   // concurrent gift of the same last unit — or any later failure in this block —
   // rolls back ALL deltas instead of crediting warmth + a keepsake for an item that
@@ -132,7 +113,32 @@ export async function reactToGift(args: {
     // transaction back) if the unit is already gone — the double-spend guard.
     const inventoryItem = consumeInventoryItem(inventoryItemId, playerId);
 
-    let relAfter = relationship;
+    // Anti-grind: scale POSITIVE warmth for repeat gifts the same day. The count is
+    // read + written INSIDE the transaction (re-fetching the relationship), NOT from
+    // the pre-LLM-await snapshot — otherwise two concurrent gifts would both read the
+    // same stale count, each compute scale=1, and stack full warmth. node:sqlite runs
+    // the transaction body serially, so a second concurrent gift sees the first's
+    // committed gift:count. Inventory scarcity (gifts cost money) is the primary
+    // limiter; this is the backstop.
+    const relBefore = getRelationship(characterId);
+    const giftsToday =
+      relBefore.flags['gift:day'] === day && typeof relBefore.flags['gift:count'] === 'number'
+        ? (relBefore.flags['gift:count'] as number)
+        : 0;
+    const positiveScale = giftsToday <= 0 ? 1 : giftsToday === 1 ? 0.5 : 0;
+
+    const applied: Partial<Record<RelationshipStatKey, number>> = {};
+    for (const key of RELATIONSHIP_STAT_KEYS) {
+      const raw = reaction.relationshipDeltas[key];
+      if (typeof raw !== 'number' || raw === 0) continue;
+      let v = Math.max(-GIFT_MAX_DELTA, Math.min(GIFT_MAX_DELTA, raw));
+      // Tension is not "warmth" — a positive tension delta is a BAD thing, so it's
+      // never softened by the anti-grind scale; only genuine warmth gains are.
+      if (key !== 'tension' && v > 0) v = Math.round(v * positiveScale);
+      if (v !== 0) applied[key] = v;
+    }
+
+    let relAfter = relBefore;
     if (Object.keys(applied).length > 0) {
       relAfter = applyRelationshipChange(characterId, applied, { source: 'gift', detail: { itemId: item.id, scene } });
     }

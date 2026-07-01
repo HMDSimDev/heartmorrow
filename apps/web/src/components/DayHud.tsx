@@ -43,8 +43,11 @@ export function DayHud() {
     setSleeping(true);
     setError(undefined);
     try {
-      const res = await sleep();
-      if (res) setRecap(res);
+      // Pass the day we currently believe we're on so a stale/duplicate Sleep (e.g. a
+      // second tab) no-ops server-side instead of burning a second day; skip the recap
+      // popup when it did (res.advanced === false).
+      const res = await sleep(worldState.day);
+      if (res && res.advanced !== false) setRecap(res);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
