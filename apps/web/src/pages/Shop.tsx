@@ -12,6 +12,7 @@ import { useAsync, errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { itemCategoryLabel, itemRarityLabel } from '../i18n/labels';
 import { Banner, Empty, Field, Loader, ConfirmDialog } from '../components/ui';
+import { ResultCard, type ResultTone } from '../components/ResultCard';
 import { Icon, type IconName } from '../components/Icon';
 import './shop.page.css';
 
@@ -35,7 +36,7 @@ export function Shop() {
   const { t } = useTranslation(['pages', 'common']);
   const { player, reloadPlayer, creatorMode, activeWorld, activeWorldId } = useAppData();
   const state = useAsync(() => api.listShopItems());
-  const [note, setNote] = useState<string>();
+  const [note, setNote] = useState<{ tone: ResultTone; seal: string; kicker: string; text: string }>();
   const [error, setError] = useState<string>();
   const [pendingDelete, setPendingDelete] = useState<ShopItem | null>(null);
   const [buyingId, setBuyingId] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export function Shop() {
       await api.purchase(item.id, 1, activeWorldId ?? undefined);
       await reloadPlayer();
       state.reload();
-      setNote(t('shop.purchased', { name: item.name }));
+      setNote({ tone: 'brass', seal: '✦', kicker: t('shop.resultAcquired'), text: t('shop.purchased', { name: item.name }) });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -132,7 +133,7 @@ export function Shop() {
     try {
       const kept = drafts.filter((d) => d.keep).map((d) => d.item);
       for (const item of kept) await api.createShopItem(item);
-      setNote(t('shop.saved', { count: kept.length }));
+      setNote({ tone: 'brass', seal: '❧', kicker: t('shop.resultStocked'), text: t('shop.saved', { count: kept.length }) });
       setGenOpen(false);
       setDrafts([]);
       state.reload();
@@ -171,7 +172,7 @@ export function Shop() {
           )}
         </div>
       </div>
-      {note && <Banner kind="ok">{note}</Banner>}
+      {note && <ResultCard tone={note.tone} seal={note.seal} kicker={note.kicker} summary={note.text} />}
       {error && <Banner kind="error">{error}</Banner>}
 
       {creatorMode && genOpen && (

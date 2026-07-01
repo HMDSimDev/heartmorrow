@@ -8,32 +8,38 @@ import { useAppData } from '../../state/app-context';
 import { relationshipStatLabel } from '../../i18n/labels';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PortraitPicker } from '../PortraitPicker';
+import { ResultCard, type ResultTone } from '../ResultCard';
 import { Banner } from '../ui';
 import './phone-life.css';
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
 
-/** Player-facing copy + banner tone for how an outing landed. */
-function togetherNote(res: TogetherResult, name: string, t: TFn): { kind: 'ok' | 'info' | 'error'; text: string } {
+type TogetherNote = { tone: ResultTone; seal: string; summary: string };
+
+/** How an outing landed, as a keepsake card: a tone + seal + the descriptive line.
+ *  Warmth (spark/warm) reads rose; a flat/crowded afternoon reads moonlit; a
+ *  misfire reads ember. */
+function togetherNote(res: TogetherResult, name: string, t: TFn): TogetherNote {
   const stat = relationshipStatLabel(res.stat).toLowerCase();
   const tension = res.tensionDelta > 0 ? t('together.tensionSuffix', { n: res.tensionDelta }) : '';
   switch (res.outcome) {
     case 'spark':
-      return { kind: 'ok', text: t('together.note.spark', { name, stat }) };
+      return { tone: 'rose', seal: '♥', summary: t('together.note.spark', { name, stat }) };
     case 'warm':
       return {
-        kind: 'ok',
-        text:
+        tone: 'rose',
+        seal: '♥',
+        summary:
           res.tensionDelta > 0
             ? t('together.note.warmTension', { name, stat, delta: res.statDelta, tension })
             : t('together.note.warm', { name, stat, delta: res.statDelta }),
       };
     case 'flat':
-      return { kind: 'info', text: t('together.note.flat', { name }) };
+      return { tone: 'moon', seal: '☾', summary: t('together.note.flat', { name }) };
     case 'crowded':
-      return { kind: 'info', text: t('together.note.crowded', { name, tension }) };
+      return { tone: 'moon', seal: '☾', summary: t('together.note.crowded', { name, tension }) };
     case 'misfire':
-      return { kind: 'error', text: t('together.note.misfire', { name, tension }) };
+      return { tone: 'ember', seal: '✖', summary: t('together.note.misfire', { name, tension }) };
   }
 }
 
@@ -50,7 +56,7 @@ export function TogetherApp() {
   const [allCharacters, setAllCharacters] = useState<Character[]>([]);
   const [target, setTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<{ kind: 'ok' | 'info' | 'error'; text: string }>();
+  const [note, setNote] = useState<TogetherNote>();
   const [error, setError] = useState<string>();
 
   const noEnergy = (worldState?.stamina ?? 0) <= 0;
@@ -110,7 +116,9 @@ export function TogetherApp() {
       <div className="phone-embed pl-work-embed">
         {(note || error) && (
           <div className="pl-work-banner">
-            {note && <Banner kind={note.kind}>{note.text}</Banner>}
+            {note && (
+              <ResultCard tone={note.tone} seal={note.seal} kicker={t('together.resultKicker')} summary={note.summary} />
+            )}
             {error && <Banner kind="error">{error}</Banner>}
           </div>
         )}

@@ -13,11 +13,24 @@ import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
 import { careerSkillLabel, phaseLabel } from '../../i18n/labels';
-import { Icon } from '../Icon';
+import { Icon, type IconName } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
+import { ResultCard, ResultPill, type ResultTone } from '../ResultCard';
 import { Banner } from '../ui';
 import { GameView, type ActiveGame } from '../minigames/GameView';
 import './phone-life.css';
+
+/** A resolved work outcome, rendered as a keepsake ResultCard. Activities set a
+ *  title/summary; a finished shift sets a grade pill + a score/earnings ledger. */
+type WorkNote = {
+  tone: ResultTone;
+  seal: string;
+  kicker: string;
+  title?: string;
+  summary?: string;
+  pill?: string;
+  ledger?: Array<{ icon?: IconName; text: string; tone?: 'up' | 'down' }>;
+};
 
 export function WorkApp() {
   const { t } = useTranslation(['phone', 'common']);
@@ -26,7 +39,7 @@ export function WorkApp() {
   const [jobGames, setJobGames] = useState<MinigameInfo[]>([]);
   const [active, setActive] = useState<ActiveGame | null>(null);
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string>();
+  const [note, setNote] = useState<WorkNote | null>(null);
   const [error, setError] = useState<string>();
   // A skill-work shift can only be finished once even if the game fires twice.
   const finishingRef = useRef(false);
@@ -70,16 +83,20 @@ export function WorkApp() {
       return;
     }
     setBusy(true);
-    setNote(undefined);
+    setNote(null);
     setError(undefined);
     try {
       const res = await api.performActivity({ activityId: a.id, worldId: activeWorldId, characterId: null });
       await Promise.all([reloadPlayer(), refreshWorldState()]);
-      const lifted =
-        res.skillLeveledUp && isCareerSkill(res.skill)
-          ? t('work.leveledUp', { skill: careerSkillLabel(res.skill), level: res.skillLevel })
-          : '';
-      setNote(t('work.earned', { lifted, money: res.money, day: res.state.day, phase: phaseLabel(res.state.phase) }));
+      // Narrow the skill here (not via a boolean) so careerSkillLabel keeps its type.
+      const leveledSkill = res.skillLeveledUp && isCareerSkill(res.skill) ? res.skill : null;
+      setNote({
+        tone: leveledSkill ? 'sage' : 'brass',
+        seal: leveledSkill ? '✦' : '◈',
+        kicker: leveledSkill ? t('work.levelKicker') : t('work.doneKicker'),
+        title: leveledSkill ? t('work.leveledTitle', { skill: careerSkillLabel(leveledSkill), level: res.skillLevel }) : undefined,
+        summary: t('work.earned', { lifted: '', money: res.money, day: res.state.day, phase: phaseLabel(res.state.phase) }),
+      });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -97,7 +114,7 @@ export function WorkApp() {
       return;
     }
     setBusy(true);
-    setNote(undefined);
+    setNote(null);
     setError(undefined);
     try {
       // Skill work is impersonal — never tied to a character.
@@ -120,8 +137,21 @@ export function WorkApp() {
       setActive(null);
       await Promise.all([reloadPlayer(), refreshWorldState()]);
       const r = res.result;
-      const earned = r.reward.money > 0 ? t('work.earnedShort', { money: r.reward.money }) : t('work.noPay');
-      setNote(t('work.shiftResult', { title, grade: r.grade, score: r.score, earned }));
+      // Tone the keepsake by grade: A/B glows sage, C is neutral brass, D–F reads ember.
+      const tone: ResultTone = r.grade === 'A' || r.grade === 'B' ? 'sage' : r.grade === 'C' ? 'brass' : 'ember';
+      setNote({
+        tone,
+        seal: tone === 'ember' ? '⚠' : '✦',
+        kicker: t('work.shiftKicker'),
+        title,
+        pill: t('work.gradePill', { grade: r.grade }),
+        ledger: [
+          { text: t('work.scoreChip', { score: r.score }) },
+          r.reward.money > 0
+            ? { icon: 'coin', text: `◈${r.reward.money}`, tone: 'up' }
+            : { text: t('work.noPay') },
+        ],
+      });
     } catch (e) {
       setError(errorMessage(e));
       setActive(null);
@@ -157,7 +187,25 @@ export function WorkApp() {
       <div className="phone-embed pl-work-embed">
         {(note || error) && (
           <div className="pl-work-banner">
-            {note && <Banner kind="ok">{note}</Banner>}
+            {note && (
+              <ResultCard
+                tone={note.tone}
+                seal={note.seal}
+                kicker={note.kicker}
+                title={note.title}
+                summary={note.summary}
+                aside={note.pill ? <ResultPill>{note.pill}</ResultPill> : undefined}
+                ledger={
+                  note.ledger?.length
+                    ? note.ledger.map((c, i) => (
+                        <span key={i} className={`result-stat${c.tone ? ` ${c.tone}` : ''}`}>
+                          {c.icon && <Icon name={c.icon} size={12} />} {c.text}
+                        </span>
+                      ))
+                    : undefined
+                }
+              />
+            )}
             {error && <Banner kind="error">{error}</Banner>}
           </div>
         )}

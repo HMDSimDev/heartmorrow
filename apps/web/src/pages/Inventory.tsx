@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { Banner, Empty, Spinner } from '../components/ui';
+import { ResultCard, type ResultTone } from '../components/ResultCard';
 import { Icon } from '../components/Icon';
 import './inventory.page.css';
 
@@ -18,7 +19,7 @@ export function Inventory() {
   const { reloadPlayer, activeWorldId, dayTick } = useAppData();
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [note, setNote] = useState<string>();
+  const [note, setNote] = useState<{ tone: ResultTone; seal: string; kicker: string; text: string }>();
   const [error, setError] = useState<string>();
   const [usingId, setUsingId] = useState<string | null>(null);
   // Monotonic ticket: only the latest load() may commit, so a world switch
@@ -56,7 +57,7 @@ export function Inventory() {
       await api.useItem(entry.inventoryItem.id, null, activeWorldId ?? undefined);
       await reloadPlayer();
       await load();
-      setNote(t('inventory.used', { name: entry.item.name }));
+      setNote({ tone: 'brass', seal: '✦', kicker: t('inventory.resultUsed'), text: t('inventory.used', { name: entry.item.name }) });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -86,7 +87,7 @@ export function Inventory() {
         </div>
       </div>
 
-      {note && <Banner kind="ok">{note}</Banner>}
+      {note && <ResultCard tone={note.tone} seal={note.seal} kicker={note.kicker} summary={note.text} />}
       {error && <Banner kind="error">{error}</Banner>}
 
       {entries.length === 0 ? (

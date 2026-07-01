@@ -13,6 +13,7 @@ import { useAsync, errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
 import { stockSectorLabel } from '../../i18n/labels';
 import { Banner, Empty, Field, Loader, ConfirmDialog } from '../ui';
+import { ResultCard, type ResultTone } from '../ResultCard';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import './phone-market.css';
@@ -247,7 +248,7 @@ export function MarketApp() {
   const { player, reloadPlayer, creatorMode, activeWorld, activeWorldId, dayTick } = useAppData();
 
   const [tab, setTab] = useState<Tab>('market');
-  const [note, setNote] = useState<string>();
+  const [note, setNote] = useState<{ tone: ResultTone; seal: string; kicker: string; text: string }>();
   const [error, setError] = useState<string>();
 
   // Trade state
@@ -320,7 +321,12 @@ export function MarketApp() {
       await reloadPlayer();
       marketState.reload();
       portfolioState.reload();
-      setNote(t(action === 'buy' ? 'market.toast.bought' : 'market.toast.sold', { count: shares, price: res.price }));
+      setNote({
+        tone: action === 'buy' ? 'brass' : 'sage',
+        seal: '◈',
+        kicker: t('market.resultTrade'),
+        text: t(action === 'buy' ? 'market.toast.bought' : 'market.toast.sold', { count: shares, price: res.price }),
+      });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -383,7 +389,7 @@ export function MarketApp() {
     try {
       const kept = drafts.filter((d) => d.keep).map((d) => d.company);
       for (const c of kept) await api.createCompany({ ...c, worldId: activeWorldId });
-      setNote(t('market.toast.savedDrafts', { count: kept.length }));
+      setNote({ tone: 'brass', seal: '❧', kicker: t('market.resultSaved'), text: t('market.toast.savedDrafts', { count: kept.length }) });
       setGenOpen(false);
       setDrafts([]);
       marketState.reload();
@@ -401,7 +407,7 @@ export function MarketApp() {
     setError(undefined);
     try {
       await api.createCompany({ ...newForm, worldId: activeWorldId });
-      setNote(t('market.toast.created', { ticker: newForm.ticker }));
+      setNote({ tone: 'brass', seal: '✦', kicker: t('market.resultListed'), text: t('market.toast.created', { ticker: newForm.ticker }) });
       setNewForm({ name: '', ticker: '', sector: 'tech', basePrice: 100, volatility: 0.04, dividendPerShare: 0, description: '', linkedCharacterId: null, assetId: null });
       marketState.reload();
     } catch (e) {
@@ -425,7 +431,7 @@ export function MarketApp() {
         </div>
 
         {/* ── Notifications ───────────────────────────────────────────── */}
-        {note && <Banner kind="ok">{note}</Banner>}
+        {note && <ResultCard tone={note.tone} seal={note.seal} kicker={note.kicker} summary={note.text} />}
         {error && <Banner kind="error">{error}</Banner>}
 
         {/* ── Tab bar ─────────────────────────────────────────────────── */}

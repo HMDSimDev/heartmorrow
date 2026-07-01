@@ -1024,6 +1024,21 @@
   box-shadow: 0 2px 8px rgba(224, 122, 130, 0.45), inset -2px -2px 5px rgba(90, 14, 20, 0.5);
 }
 
+/* DTR "not yet" — a soft, moonlit deferral. Still a live moment (not terminal), so
+   it reads gentler than the ember backfire card, but sits in the same family. */
+.date-moment-deflect {
+  background:
+    radial-gradient(280px 160px at 80% -30%, rgba(157, 184, 222, 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(255, 245, 222, 0.04), var(--panel));
+  border-color: rgba(157, 184, 222, 0.28);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(157, 184, 222, 0.1), inset 0 1px 0 rgba(157, 184, 222, 0.12);
+}
+.date-moment-deflect .date-moment-kicker { color: var(--moon); }
+.date-moment-deflect .date-moment-seal {
+  background: radial-gradient(circle at 36% 32%, #e8f0fb, var(--moon) 48%, #47618c 100%);
+  box-shadow: 0 2px 8px rgba(157, 184, 222, 0.45), inset -2px -2px 5px rgba(30, 44, 74, 0.5);
+}
+
 /* Breakup-intent confirm card — a tense, ember-edged prompt. */
 .date-breakup {
   padding: 14px 15px;

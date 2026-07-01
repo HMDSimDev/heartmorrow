@@ -79,6 +79,7 @@
     "dtrBackfireTitle": "It didn't go as you hoped.",
     "dtrEnded": "The date ended.",
     "dtrNotYet": "Not yet — give it a little more time.",
+    "dtrNotYetKicker": "Not just yet",
     "yourCompanion": "Your companion",
     "brokenUp": "Broken up",
     "onTheRocks": "On the rocks",
@@ -347,6 +348,8 @@
     "purse": "Purse",
     "generateItems": "Generate items",
     "purchased": "Purchased {name}!",
+    "resultAcquired": "Acquired",
+    "resultStocked": "Items stocked",
     "genFailed": "Item generation failed: {error}",
     "saved": "{count, plural, one {Saved # item to the shop.} other {Saved # items to the shop.}}",
     "workshop": "Creator Workshop",
@@ -404,7 +407,8 @@
     "using": "Using…",
     "use": "Use",
     "giveHint": "Give on a date or by text",
-    "used": "Used {name}."
+    "used": "Used {name}.",
+    "resultUsed": "Used"
   },
   "dashboard": {
     "eyebrow": "A lamplit almanac of the heart",
@@ -747,6 +751,8 @@
     "export": "Export…",
     "exportDirtyHint": "Save your changes first — export ships the saved world, so unsaved edits won't be included.",
     "worldSaved": "World saved!",
+    "savedKicker": "Saved",
+    "genKicker": "Generated",
     "noun": "world",
     "untitledWorld": "Untitled world",
     "worldsHeader": "Worlds",
@@ -949,6 +955,8 @@
     "profileGenerated": "Profile generated — review and Save.",
     "profileGenFailed": "Profile generation failed: {error}",
     "characterGenerated": "Character generated — review every tab and Save.",
+    "savedKicker": "Saved",
+    "genKicker": "Generated",
     "characterGenFailed": "Generation failed: {error}",
     "untitledCharacter": "Untitled character"
   },

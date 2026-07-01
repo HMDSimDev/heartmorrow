@@ -1370,7 +1370,15 @@ export function Chat() {
       }
       // A non-terminal 'deflect' is only transient feedback — show it while the date is
       // live, but never let it shadow the end-of-date evaluation (returned just below).
-      if (!evalResult) return <Banner kind="info">{t('chat.dtrNotYet')}</Banner>;
+      // A soft, moonlit "not yet" card (sibling to the accept/backfire moments above).
+      if (!evalResult)
+        return (
+          <div className="date-moment date-moment-deflect">
+            <div className="date-moment-seal" aria-hidden="true">☾</div>
+            <div className="date-moment-kicker">{t('chat.dtrNotYetKicker')}</div>
+            <p className="date-moment-body">{t('chat.dtrNotYet')}</p>
+          </div>
+        );
     }
     if (evalResult) return evalBanner;
     return null;

@@ -1,0 +1,182 @@
+/* Shared "keepsake" outcome card — see components/ResultCard.tsx. A vellum surface
+   in the same family as the date page's .date-moment cards, but app-wide so any
+   surface (Work, Together, trades, purchases) can resolve a result in the Nocturne
+   voice instead of a flat banner. Tones recolor the seal / kicker / border / glow. */
+.result-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 15px 17px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(260px 150px at 82% -30%, rgba(230, 177, 94, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(255, 245, 222, 0.06), var(--panel));
+  box-shadow: var(--shadow-sm), var(--rim), inset 0 1px 0 rgba(230, 177, 94, 0.18);
+  animation: result-card-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes result-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The wax-seal flourish — top-center, matching .date-moment-seal. */
+.result-card-seal {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, #fff5de, var(--brass) 48%, #8c5c14 100%);
+  box-shadow: 0 2px 8px rgba(230, 177, 94, 0.5), inset -2px -2px 5px rgba(60, 28, 4, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: rgba(42, 22, 34, 0.7);
+  z-index: 2;
+}
+
+.result-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 7px 10px;
+  margin-top: 9px; /* clear the seal */
+}
+.result-card-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.result-card-title {
+  margin-top: 6px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.06rem;
+  line-height: 1.25;
+  color: var(--text);
+}
+/* If there is no header, the title/summary is the first child and must clear the seal. */
+.result-card > .result-card-title:first-of-type,
+.result-card > .result-card-summary:first-of-type {
+  margin-top: 12px;
+}
+.result-card-summary {
+  margin: 9px 0 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.97rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+.result-card-ledger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 14px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(230, 177, 94, 0.16);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--text-mute);
+}
+.result-card-ledger svg {
+  color: var(--brass);
+  flex-shrink: 0;
+  vertical-align: -2px;
+}
+/* Ledger delta chip — sign-colored (a gain in sage, a cost/loss in ember). */
+.result-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.result-stat.up { color: var(--sage); }
+.result-stat.down { color: var(--ember); }
+
+/* Right-aligned header pill (grade / fit / stat), mirroring the date-recap mood pill. */
+.result-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--brass);
+  background: rgba(230, 177, 94, 0.1);
+  border: 1px solid rgba(230, 177, 94, 0.28);
+}
+
+/* ── Tones ─────────────────────────────────────────────────────────────────
+   Each recolors the seal, kicker, border, and glow; brass is the default above. */
+.result-card.tone-rose {
+  background:
+    radial-gradient(260px 150px at 82% -30%, rgba(232, 138, 166, 0.18), transparent 70%),
+    linear-gradient(180deg, rgba(255, 245, 222, 0.05), var(--panel));
+  border-color: rgba(232, 138, 166, 0.3);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(232, 138, 166, 0.14), inset 0 1px 0 rgba(232, 138, 166, 0.16);
+}
+.result-card.tone-rose .result-card-kicker { color: var(--rose); }
+.result-card.tone-rose .result-pill {
+  color: var(--rose);
+  background: rgba(232, 138, 166, 0.1);
+  border-color: rgba(232, 138, 166, 0.3);
+}
+.result-card.tone-rose .result-card-seal {
+  background: radial-gradient(circle at 36% 32%, #ffe4ef, var(--rose) 48%, #ac4070 100%);
+  box-shadow: 0 2px 8px rgba(232, 138, 166, 0.5), inset -2px -2px 5px rgba(90, 20, 50, 0.45);
+}
+
+.result-card.tone-sage {
+  background:
+    radial-gradient(260px 150px at 82% -30%, rgba(143, 207, 159, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(255, 245, 222, 0.04), var(--panel));
+  border-color: rgba(143, 207, 159, 0.3);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(143, 207, 159, 0.12), inset 0 1px 0 rgba(143, 207, 159, 0.14);
+}
+.result-card.tone-sage .result-card-kicker { color: var(--sage); }
+.result-card.tone-sage .result-card-seal {
+  background: radial-gradient(circle at 36% 32%, #e6f6e9, var(--sage) 48%, #3f7a4f 100%);
+  box-shadow: 0 2px 8px rgba(143, 207, 159, 0.45), inset -2px -2px 5px rgba(24, 60, 34, 0.45);
+}
+
+.result-card.tone-ember {
+  background:
+    radial-gradient(260px 150px at 82% -30%, rgba(224, 122, 130, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(60, 18, 24, 0.05), var(--panel));
+  border-color: rgba(224, 122, 130, 0.32);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(224, 122, 130, 0.12), inset 0 1px 0 rgba(224, 122, 130, 0.12);
+}
+.result-card.tone-ember .result-card-kicker { color: var(--ember); }
+.result-card.tone-ember .result-card-seal {
+  background: radial-gradient(circle at 36% 32%, #ffdde0, var(--ember) 48%, #8c1a24 100%);
+  box-shadow: 0 2px 8px rgba(224, 122, 130, 0.5), inset -2px -2px 5px rgba(90, 14, 20, 0.5);
+}
+
+.result-card.tone-moon {
+  background:
+    radial-gradient(260px 150px at 82% -30%, rgba(157, 184, 222, 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(255, 245, 222, 0.03), var(--panel));
+  border-color: rgba(157, 184, 222, 0.28);
+  box-shadow: var(--shadow-sm), 0 0 0 1px rgba(157, 184, 222, 0.1), inset 0 1px 0 rgba(157, 184, 222, 0.12);
+}
+.result-card.tone-moon .result-card-kicker { color: var(--moon); }
+.result-card.tone-moon .result-card-seal {
+  background: radial-gradient(circle at 36% 32%, #e8f0fb, var(--moon) 48%, #47618c 100%);
+  box-shadow: 0 2px 8px rgba(157, 184, 222, 0.45), inset -2px -2px 5px rgba(30, 44, 74, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-card { animation: none; }
+}

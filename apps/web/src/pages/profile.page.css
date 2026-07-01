@@ -373,7 +373,8 @@
   gap: 13px;
   align-items: flex-start;
   padding: 13px 13px 13px 15px;
-  background: var(--panel-2);
+  /* a faint vellum wash so a kept memory reads as a keepsake, not a table row */
+  background: linear-gradient(180deg, rgba(255, 245, 222, 0.035), var(--panel-2));
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   border-left: 3px solid var(--brass);
@@ -383,7 +384,7 @@
 .prof-pip { width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); background: var(--ink-2); border: 1px solid var(--border); }
 .prof-pip.on { background: radial-gradient(circle at 35% 30%, #ffe7a8, var(--brass)); border-color: transparent; box-shadow: 0 0 6px rgba(230, 177, 94, 0.6); }
 .prof-mem-src svg { vertical-align: -1px; }
-.prof-mem-text { color: var(--text); line-height: 1.5; }
+.prof-mem-text { color: var(--text); line-height: 1.55; font-family: var(--font-display); font-style: italic; font-size: 1.02rem; }
 .prof-mem-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin-top: 6px; }
 .prof-mem-src { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.03em; color: var(--text-mute); }
 .prof-mem-src.date { color: var(--rose); }

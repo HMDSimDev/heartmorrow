@@ -14,6 +14,7 @@ import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { venueTierLabel, worldNoteScopeLabel } from '../i18n/labels';
 import { Banner, ConfirmDialog, Empty, Field, Spinner, TagInput } from '../components/ui';
+import { ResultCard, type ResultTone } from '../components/ResultCard';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
 import { useDraft } from '../lib/useDraft';
 import { draftKey, listDrafts } from '../lib/drafts';
@@ -54,7 +55,7 @@ export function WorldEditor() {
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [savedNote, setSavedNote] = useState<string>();
+  const [savedNote, setSavedNote] = useState<{ tone: ResultTone; seal: string; kicker: string; text: string }>();
   const [genPrompt, setGenPrompt] = useState('');
   const [genCount, setGenCount] = useState(4);
   const [generating, setGenerating] = useState(false);
@@ -180,7 +181,7 @@ export function WorldEditor() {
       setBaseline(updated); // saved → the world is clean again
       draft.clear();
       await loadWorlds();
-      setSavedNote(t('pages:worldEditor.worldSaved'));
+      setSavedNote({ tone: 'brass', seal: '❧', kicker: t('pages:worldEditor.savedKicker'), text: t('pages:worldEditor.worldSaved') });
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -234,7 +235,7 @@ export function WorldEditor() {
         // Merge into the CURRENT world state via the functional updater (never the
         // stale `world` closure), and only if it's still the world we generated for.
         setWorld((w) => (w && w.id === wid ? { ...w, locations: [...(w.locations ?? []), ...res.data] } : w));
-        setSavedNote(t('pages:worldEditor.generatedAdded', { count: res.data.length }));
+        setSavedNote({ tone: 'brass', seal: '✦', kicker: t('pages:worldEditor.genKicker'), text: t('pages:worldEditor.generatedAdded', { count: res.data.length }) });
       } else {
         setError(t('pages:worldEditor.locGenFailed', { error: res.error }));
       }
@@ -292,7 +293,7 @@ export function WorldEditor() {
       </div>
 
       {error && <Banner kind="error">{error}</Banner>}
-      {savedNote && <Banner kind="ok">{savedNote}</Banner>}
+      {savedNote && <ResultCard tone={savedNote.tone} seal={savedNote.seal} kicker={savedNote.kicker} summary={savedNote.text} />}
 
       {draft.found && (
         <DraftRestoreBar

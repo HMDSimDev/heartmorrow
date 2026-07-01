@@ -20,6 +20,7 @@ import {
   relationshipStatLabel,
 } from '../../i18n/labels';
 import { Banner, Empty, Field, Loader, ConfirmDialog } from '../ui';
+import { ResultCard, type ResultTone } from '../ResultCard';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import './phone-property.css';
@@ -55,7 +56,7 @@ export function PropertyApp() {
     // after End day, like every other day-derived surface.
     [activeWorldId, dayTick],
   );
-  const [note, setNote] = useState<string>();
+  const [note, setNote] = useState<{ tone: ResultTone; seal: string; kicker: string; text: string }>();
   const [error, setError] = useState<string>();
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -105,32 +106,32 @@ export function PropertyApp() {
   const buy = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.buyProperty(activeWorldId!, pv.property.id);
-      setNote(t('property.toast.bought', { name: pv.property.name }));
+      setNote({ tone: 'sage', seal: '✦', kicker: t('property.resultOwned'), text: t('property.toast.bought', { name: pv.property.name }) });
     });
 
   const sell = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.sellProperty(activeWorldId!, pv.property.id);
-      setNote(t('property.toast.sold', { name: pv.property.name, price: pv.property.buyPrice }));
+      setNote({ tone: 'sage', seal: '◈', kicker: t('property.resultSold'), text: t('property.toast.sold', { name: pv.property.name, price: pv.property.buyPrice }) });
     });
 
   const startLease = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.leaseProperty(activeWorldId!, pv.property.id);
-      setNote(t('property.toast.leasing', { name: pv.property.name }));
+      setNote({ tone: 'moon', seal: '☾', kicker: t('property.resultLease'), text: t('property.toast.leasing', { name: pv.property.name }) });
     });
 
   const payRent = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
       await api.payRent(activeWorldId!, pv.property.id);
-      setNote(t('property.toast.rentPaid', { name: pv.property.name }));
+      setNote({ tone: 'moon', seal: '◈', kicker: t('property.resultRent'), text: t('property.toast.rentPaid', { name: pv.property.name }) });
     });
 
   const doEndLease = async (pv: PropertyView) => {
     setPendingEndLease(null);
     await withBusy(pv.property.id, async () => {
       await api.endLease(activeWorldId!, pv.property.id);
-      setNote(t('property.toast.movedOut', { name: pv.property.name }));
+      setNote({ tone: 'ember', seal: '✖', kicker: t('property.resultMovedOut'), text: t('property.toast.movedOut', { name: pv.property.name }) });
     });
   };
 
@@ -197,7 +198,7 @@ export function PropertyApp() {
     try {
       const kept = drafts.filter((d) => d.keep).map((d) => d.item);
       for (const item of kept) await api.createProperty({ ...item, worldId: activeWorldId });
-      setNote(t('property.toast.savedDrafts', { count: kept.length }));
+      setNote({ tone: 'brass', seal: '❧', kicker: t('property.resultSaved'), text: t('property.toast.savedDrafts', { count: kept.length }) });
       setGenOpen(false);
       setDrafts([]);
       state.reload();
@@ -220,7 +221,7 @@ export function PropertyApp() {
     setError(undefined);
     try {
       await api.createProperty({ ...createForm, worldId: activeWorldId });
-      setNote(t('property.toast.created', { name: createForm.name }));
+      setNote({ tone: 'brass', seal: '✦', kicker: t('property.resultListed'), text: t('property.toast.created', { name: createForm.name }) });
       setCreateForm(EMPTY_CREATE);
       setCreateOpen(false);
       state.reload();
@@ -260,7 +261,7 @@ export function PropertyApp() {
       />
 
       <div className="phone-embed prop-embed stack">
-        {note && <Banner kind="ok">{note}</Banner>}
+        {note && <ResultCard tone={note.tone} seal={note.seal} kicker={note.kicker} summary={note.text} />}
         {error && <Banner kind="error">{error}</Banner>}
 
         {/* ——— Creator: generate panel ——————————————————————— */}

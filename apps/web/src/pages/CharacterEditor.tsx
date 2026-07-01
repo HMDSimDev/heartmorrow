@@ -43,6 +43,7 @@ import {
   guardednessDescriptorLabel,
 } from '../i18n/labels';
 import { Banner, Field, Modal, TagInput } from '../components/ui';
+import { ResultCard, type ResultTone } from '../components/ResultCard';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
 import { useDraft } from '../lib/useDraft';
 import { draftKey, NEW_CHAR_SCOPE } from '../lib/drafts';
@@ -170,7 +171,7 @@ export function CharacterEditor() {
   const [relationship, setRelationship] = useState<Relationship | null>(null);
   const [error, setError] = useState<string>();
   const [saving, setSaving] = useState(false);
-  const [savedNote, setSavedNote] = useState<string>();
+  const [savedNote, setSavedNote] = useState<{ tone: ResultTone; seal: string; kicker: string; text: string }>();
   const [preview, setPreview] = useState<string>();
   const [previewOpen, setPreviewOpen] = useState(false);
   const [expressionsOpen, setExpressionsOpen] = useState(false);
@@ -377,7 +378,7 @@ export function CharacterEditor() {
         await api.updateCharacter(id!, payload);
         setBaseline(form); // saved → the form is clean again
         draft.clear();
-        setSavedNote(t('pages:characterEditor.saved'));
+        setSavedNote({ tone: 'brass', seal: '❧', kicker: t('pages:characterEditor.savedKicker'), text: t('pages:characterEditor.saved') });
       }
     } catch (e) {
       setError(errorMessage(e));
@@ -417,7 +418,7 @@ export function CharacterEditor() {
       });
       if (res.ok) {
         set('datingStats', res.data);
-        setSavedNote(t('pages:characterEditor.statsGenerated'));
+        setSavedNote({ tone: 'brass', seal: '✦', kicker: t('pages:characterEditor.genKicker'), text: t('pages:characterEditor.statsGenerated') });
         draft.dismissFound(); // generated content supersedes any stale restore offer
       } else {
         setError(t('pages:characterEditor.statGenFailed', { error: res.error }));
@@ -458,7 +459,7 @@ export function CharacterEditor() {
           insecurities: res.data.insecurities,
           quirks: res.data.quirks,
         }));
-        setSavedNote(t('pages:characterEditor.profileGenerated'));
+        setSavedNote({ tone: 'brass', seal: '✦', kicker: t('pages:characterEditor.genKicker'), text: t('pages:characterEditor.profileGenerated') });
         draft.dismissFound();
       } else {
         setError(t('pages:characterEditor.profileGenFailed', { error: res.error }));
@@ -540,7 +541,7 @@ export function CharacterEditor() {
           datingStats: d.datingStats,
         }));
         setActiveTab('identity');
-        setSavedNote(t('pages:characterEditor.characterGenerated'));
+        setSavedNote({ tone: 'brass', seal: '✦', kicker: t('pages:characterEditor.genKicker'), text: t('pages:characterEditor.characterGenerated') });
         draft.dismissFound();
         setGenOpen(false);
       } else {
@@ -623,7 +624,7 @@ export function CharacterEditor() {
       </div>
 
       {error && <Banner kind="error">{error}</Banner>}
-      {savedNote && <Banner kind="ok">{savedNote}</Banner>}
+      {savedNote && <ResultCard tone={savedNote.tone} seal={savedNote.seal} kicker={savedNote.kicker} summary={savedNote.text} />}
 
       {draft.found && (
         <DraftRestoreBar

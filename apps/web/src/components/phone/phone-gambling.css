@@ -352,30 +352,42 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 14px;
+  gap: 6px;
+  padding: 12px 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-soft);
-  background: var(--ink-2);
+  /* a faint lamplit halo bleeds from the top edge, so the outcome feels lit, not boxed */
+  background:
+    radial-gradient(200px 90px at 50% -20%, rgba(230, 177, 94, 0.1), transparent 70%),
+    var(--ink-2);
+  box-shadow: var(--rim);
   animation: gmb-pop 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.gmb-result.win { border-color: rgba(168, 200, 154, 0.5); box-shadow: inset 0 0 22px rgba(122, 168, 122, 0.14); }
+.gmb-result.win { border-color: rgba(168, 200, 154, 0.5); box-shadow: inset 0 0 22px rgba(122, 168, 122, 0.14), var(--rim); }
 .gmb-result.lose { border-color: rgba(199, 122, 122, 0.4); }
 .gmb-result.push { border-color: var(--border-bright); }
 .gmb-result-head {
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 1.05rem;
+  font-weight: 600;
+  font-size: 1.14rem;
+  letter-spacing: 0.01em;
 }
 .gmb-result.win .gmb-result-head { color: var(--sage); text-shadow: 0 0 16px rgba(168, 200, 154, 0.4); }
 .gmb-result.lose .gmb-result-head { color: var(--ember); }
 .gmb-result.push .gmb-result-head { color: var(--moon); }
+/* the payout reads as a ruled ledger line beneath the call */
 .gmb-result-sub {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
   color: var(--text-dim);
+  min-width: 96px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(230, 177, 94, 0.14);
+  text-align: center;
 }
-.gmb-result-sub b { color: var(--brass); }
+.gmb-result-sub b { color: var(--brass); font-size: 1.04em; }
 @keyframes gmb-pop {
   from { opacity: 0; transform: translateY(8px) scale(0.96); }
   to { opacity: 1; transform: none; }
