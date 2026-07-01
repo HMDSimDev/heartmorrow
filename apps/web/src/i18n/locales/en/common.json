@@ -13,7 +13,8 @@
     "noPortrait": "No portrait",
     "none": "None",
     "uploading": "Uploading…",
-    "uploadImage": "Upload image"
+    "uploadImage": "Upload image",
+    "batchUpload": "Batch upload"
   },
   "draft": {
     "notSavedTitle": "Couldn't auto-save this draft (storage full). Press Save to keep your work.",
