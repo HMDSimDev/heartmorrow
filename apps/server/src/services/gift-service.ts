@@ -26,6 +26,7 @@ import { recordEvent } from './event-service';
 import { getLlmSettings } from './settings-service';
 import { ensureWorldState } from './world-clock-service';
 import { consumeInventoryItem, getShopItem } from './shop-service';
+import { setLastExpression } from './rapport-service';
 import { callStructuredLlm } from '../llm/structured';
 import { buildGiftReactionMessages } from '../prompt/prompt-builder';
 
@@ -232,6 +233,10 @@ export async function giveGiftOnDate(
       createdAt: now + 1,
     }),
   );
+
+  // The reaction is now the character's live mood on screen — persist it so a resume
+  // right after a gift restores the same portrait + chip (not the last judged mood).
+  setLastExpression(sessionId, r.reaction.expression);
 
   return {
     narratorMessage,

@@ -366,7 +366,16 @@ export function Chat() {
     setIntent(null);
     setFailed(null);
     try {
-      const [c, sm] = await Promise.all([api.getCharacter(ad.characterId), api.getConversation(ad.sessionId)]);
+      // Pull the character, transcript, and FRESH date state together. The `ad`
+      // snapshot handed to us can be stale — the context's activeDate is only
+      // refetched when a date starts/ends (and on world change), so mid-date its
+      // rapport/vibe/mood still read the start-of-date null; trusting it would empty
+      // the bar and drop the mood on a leave-and-return. Fetch server truth here.
+      const [c, sm, fresh] = await Promise.all([
+        api.getCharacter(ad.characterId),
+        api.getConversation(ad.sessionId),
+        refreshActiveDate(),
+      ]);
       // The context can briefly point at a session that just ended elsewhere — never
       // reopen a finished date. Reconcile (await, so the lock clears) and fall back
       // to setup; the resumeFailed flag is a harmless no-op once activeDate is null.
@@ -384,9 +393,12 @@ export function Chat() {
       const lastMsg = sm.messages[sm.messages.length - 1];
       if (lastMsg && lastMsg.role === 'player') setFailed({ kind: 'reply' });
       setRelationship(await api.getRelationship(c.id));
-      setExpression(null);
-      setVibe(ad.vibe);
-      setRapport(ad.rapport);
+      // Restore the live trajectory + mood from the fresh read fetched above (matched
+      // by session id), falling back to the `ad` snapshot only if it drifted.
+      const live = fresh && fresh.sessionId === ad.sessionId ? fresh : ad;
+      setExpression(live.expression);
+      setVibe(live.vibe);
+      setRapport(live.rapport);
       if (c.worldId) {
         const [ws, ww] = await Promise.all([api.getWorldState(c.worldId), api.worldWeather(c.worldId)]);
         const m = ww.characters.find((x) => x.id === c.id);

@@ -25,6 +25,9 @@ import { sessionRapportRepo } from '../db/repositories';
  */
 
 const sessionRapport = new Map<string, number>();
+// The character's last live expression (portrait mood), same write-through pattern
+// as rapport so a resumed date restores the mood, not just the trajectory bar.
+const sessionExpression = new Map<string, string>();
 
 /** Read the cache, falling back to the durable row (and warming the cache from it). */
 function lookup(sessionId: string): number | undefined {
@@ -48,7 +51,31 @@ function setRapport(sessionId: string, value: number): number {
 
 export function clearRapport(sessionId: string): void {
   sessionRapport.delete(sessionId);
-  sessionRapportRepo.delete(sessionId);
+  sessionExpression.delete(sessionId);
+  sessionRapportRepo.delete(sessionId); // one row holds both; the delete drops the mood too
+}
+
+/** Remember the character's latest expression (portrait mood) for this date, so a
+ *  resume can restore it. Write-through to the durable row (which the first judged
+ *  turn has already seeded). Blank reads are ignored — they'd erase a real mood. */
+export function setLastExpression(sessionId: string, expression: string): void {
+  const e = expression.trim();
+  if (!e) return;
+  sessionExpression.set(sessionId, e);
+  sessionRapportRepo.setExpression(sessionId, e, Date.now());
+}
+
+/** The character's last live expression IF one has been read, else null — mirrors
+ *  {@link peekRapport} so a resumed date restores the mood chip + portrait. */
+export function peekExpression(sessionId: string): string | null {
+  const cached = sessionExpression.get(sessionId);
+  if (cached !== undefined) return cached;
+  const stored = sessionRapportRepo.getExpression(sessionId);
+  if (stored !== undefined) {
+    sessionExpression.set(sessionId, stored);
+    return stored;
+  }
+  return null;
 }
 
 /**

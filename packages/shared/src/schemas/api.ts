@@ -263,6 +263,9 @@ export const ActiveDateSchema = z.object({
   rapport: z.number().nullable(),
   /** Qualitative vibe label for `rapport` (null whenever `rapport` is null). */
   vibe: z.string().nullable(),
+  /** The character's last live expression (portrait mood) if the server still holds
+   *  it, so a resumed date restores the mood chip + portrait; null when not yet read. */
+  expression: z.string().nullable(),
   updatedAt: z.number(),
 });
 export type ActiveDate = z.infer<typeof ActiveDateSchema>;

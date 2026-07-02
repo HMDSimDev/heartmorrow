@@ -80,6 +80,8 @@ import {
   dateNeedFor,
   getRapport,
   peekRapport,
+  peekExpression,
+  setLastExpression,
   applyTurnEngagement,
   ensureRapportSeeded,
   rapportLabel,
@@ -268,6 +270,7 @@ export function getActiveDateForWorld(worldId: string): ActiveDate | null {
       hasPlayerTurn: messagesRepo.hasRole(s.id, 'player'),
       rapport,
       vibe: rapport != null ? rapportLabel(rapport) : null,
+      expression: peekExpression(s.id),
       updatedAt: s.updatedAt,
     };
   }
@@ -864,6 +867,8 @@ export async function judgeTurn(sessionId: string, signal?: AbortSignal): Promis
   if (!result.ok) return null; // fail-safe — no rapport change
 
   const { rapport, delta } = applyTurnEngagement(sessionId, result.data.engagement, character.guardedness);
+  // Persist the mood next to rapport so a resumed date restores the portrait + chip.
+  setLastExpression(sessionId, result.data.expression);
   return {
     label: rapportLabel(rapport),
     expression: result.data.expression.trim(),

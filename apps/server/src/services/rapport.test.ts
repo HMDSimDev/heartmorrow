@@ -10,6 +10,7 @@ import {
   addPlayerMessage,
   createSession,
   endSession,
+  getActiveDateForWorld,
   judgeTurn,
   maybeLeaveForLostInterest,
 } from './conversation-service';
@@ -108,6 +109,31 @@ describe('per-turn rapport judge', () => {
     const readout = await judgeTurn(session.id);
     expect(readout).not.toBeNull();
     expect(getRapport(session.id)).toBe(START + turnRapportDelta(2, { guardedness: G }));
+  });
+});
+
+describe('resume: getActiveDateForWorld carries the live rapport + mood', () => {
+  it('returns the judged rapport, vibe, and expression so a resumed date restores them', async () => {
+    const { world, session } = startDate();
+    setAdapterOverride(reply({ engagement: 3, expression: 'smiling', note: 'really landed' }));
+    await judgeTurn(session.id);
+
+    const active = getActiveDateForWorld(world.id);
+    expect(active).not.toBeNull();
+    expect(active!.sessionId).toBe(session.id);
+    const expected = START + turnRapportDelta(3, { guardedness: G });
+    expect(active!.rapport).toBe(expected); // the bar survives (not the empty seam)
+    expect(active!.vibe).toBe(rapportLabel(expected));
+    expect(active!.expression).toBe('smiling'); // the mood survives — restored on resume
+  });
+
+  it('before any judged turn there is no live read (empty bar + no mood is honest)', () => {
+    const { world } = startDate();
+    const active = getActiveDateForWorld(world.id);
+    expect(active).not.toBeNull();
+    expect(active!.rapport).toBeNull();
+    expect(active!.vibe).toBeNull();
+    expect(active!.expression).toBeNull();
   });
 });
 

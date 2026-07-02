@@ -2051,6 +2051,19 @@ export const sessionRapportRepo = {
       sessionId, rapport, updatedAt,
     );
   },
+  /** The last live expression (portrait mood) held for this session, or undefined. */
+  getExpression(sessionId: string): string | undefined {
+    const r = getDb().get<Row>('SELECT expression FROM session_rapport WHERE session_id = ?', sessionId);
+    return r && r.expression != null ? String(r.expression) : undefined;
+  },
+  /** Update the stored expression. The rapport row is seeded before the first judged
+   *  turn, so an UPDATE always lands; if it somehow hasn't, this is a harmless no-op. */
+  setExpression(sessionId: string, expression: string, updatedAt: number): void {
+    getDb().run(
+      'UPDATE session_rapport SET expression = ?, updated_at = ? WHERE session_id = ?',
+      expression, updatedAt, sessionId,
+    );
+  },
   delete(sessionId: string): void {
     getDb().run('DELETE FROM session_rapport WHERE session_id = ?', sessionId);
   },

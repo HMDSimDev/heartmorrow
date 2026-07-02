@@ -1132,6 +1132,8 @@ function mock(): void {
     // clearly thawed over this conversation — the laptop just came around — without
     // overshooting into "really into it". This persists via session_rapport.
     sessionRapportRepo.upsert(activeDate.id, 70, NOW);
+    // …and the matching live mood, so the resumed date shows a warm portrait + chip.
+    sessionRapportRepo.setExpression(activeDate.id, 'smiling', NOW);
   }
 
   // --- In-world emails (companies / strangers, never characters) ------------

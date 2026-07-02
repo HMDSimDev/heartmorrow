@@ -516,6 +516,7 @@ CREATE INDEX IF NOT EXISTS idx_gambling_rounds_active ON gambling_rounds(world_i
 CREATE TABLE IF NOT EXISTS session_rapport (
   session_id TEXT PRIMARY KEY REFERENCES conversation_sessions(id) ON DELETE CASCADE,
   rapport    INTEGER NOT NULL,
+  expression TEXT,
   updated_at INTEGER NOT NULL
 );
 
@@ -791,5 +792,13 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
     table: 'worlds',
     column: 'gambling_config',
     ddl: `ALTER TABLE worlds ADD COLUMN gambling_config TEXT NOT NULL DEFAULT '{}'`,
+  },
+  {
+    // Persist the character's last live expression (the portrait mood) alongside
+    // rapport, so a RESUMED date restores the mood chip + portrait instead of a
+    // neutral face. Nullable: a seeded/unjudged date simply has no mood read yet.
+    table: 'session_rapport',
+    column: 'expression',
+    ddl: `ALTER TABLE session_rapport ADD COLUMN expression TEXT`,
   },
 ];
