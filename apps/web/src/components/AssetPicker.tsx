@@ -22,11 +22,14 @@ function exprTag(name: string): string {
 }
 
 /**
- * Check whether an asset's tags include a given value. Tags are simple strings
- * like `"character:Nicky"`, `"expression:happy"`, `"type:portrait"`.
+ * Check whether an asset's tags include a given value (case-insensitive).
+ * Tags are simple strings like `"character:Nicky"`, `"expression:happy"`,
+ * `"type:portrait"`. Comparisons are lowered so filename casing mismatches
+ * (e.g. `adachi rei happy.png` vs character `Adachi Rei`) don't block
+ * matching.
  */
 function hasTag(asset: Asset, tag: string): boolean {
-  return asset.tags.includes(tag);
+  return asset.tags.some((t) => t.toLowerCase() === tag.toLowerCase());
 }
 
 /** Pick an uploaded image asset (or none), with batch upload and optional
@@ -47,6 +50,7 @@ export function AssetPicker({
   filterType,
   characterName,
   expressionName,
+  onBatchUpload,
 }: {
   value: string | null;
   onChange: (id: string | null) => void;
@@ -58,32 +62,43 @@ export function AssetPicker({
   /** When set (together with characterName), filter to assets tagged with
    *  this expression name. Ignored when characterName is not set. */
   expressionName?: string;
+  /** Fires after a successful batch upload with the newly created assets.
+   *  Parent components can use this to auto-assign portrait/expression slots
+   *  based on the uploaded assets' tags. */
+  onBatchUpload?: (assets: Asset[]) => void;
 }) {
   const { t } = useTranslation();
   const { assets: allAssets, reloadAssets } = useAppData();
 
-  // Build a filtered view: only assets whose tags match the character +
-  // expression context. Keep the currently-selected asset visible at all
-  // times so it doesn't vanish when switching filters.
+  const [filterByCharName, setFilterByCharName] = useState(true);
+  const [filterByCategory, setFilterByCategory] = useState(true);
+
+  // Two coordinated filter toggles:
+  //   - "Filter by character name" — narrows by the current character's tag
+  //   - "Filter by category" — narrows by type (portrait) or expression
+  // Each is independent, so you can show all images of a character regardless
+  // of category, or all images of a category from any character, or both, or
+  // neither. The currently-selected asset always stays visible.
   const filtered = useMemo(() => {
     let list = allAssets;
 
-    if (characterName) {
+    if (characterName && filterByCharName) {
       const cTag = charTag(characterName);
       list = list.filter((a) => hasTag(a, cTag) || a.id === value);
+    }
 
+    if (filterByCategory) {
       if (expressionName) {
         const eTag = exprTag(expressionName);
         list = list.filter((a) => hasTag(a, eTag) || a.id === value);
       }
-    }
-
-    if (filterType) {
-      list = list.filter((a) => a.type === filterType || a.id === value);
+      if (filterType) {
+        list = list.filter((a) => a.type === filterType || a.id === value);
+      }
     }
 
     return list;
-  }, [allAssets, characterName, expressionName, filterType, value]);
+  }, [allAssets, characterName, expressionName, filterType, value, filterByCharName, filterByCategory]);
 
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string>();
@@ -101,8 +116,9 @@ export function AssetPicker({
     }
     setUploading(true);
     try {
-      await api.uploadAssetsBatch(valid);
+      const uploaded = await api.uploadAssetsBatch(valid);
       await reloadAssets();
+      onBatchUpload?.(uploaded);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -150,7 +166,7 @@ export function AssetPicker({
       <div className="ap-upload-row">
         <label className="btn sm ap-upload-label">
           <Icon name="upload" size={14} />
-          {uploading ? t('asset.uploading') : t('asset.batchUpload')}
+          {uploading ? t('asset.uploading') : t('asset.uploadImages')}
           <input
             ref={inputRef}
             type="file"
@@ -163,7 +179,28 @@ export function AssetPicker({
             }}
           />
         </label>
+        {characterName && (
+          <label className="ap-filter-toggle">
+            <input
+              type="checkbox"
+              checked={filterByCharName}
+              onChange={(e) => setFilterByCharName(e.target.checked)}
+            />
+            {t('asset.filterByCharName')}
+          </label>
+        )}
+        {(expressionName || filterType) && (
+          <label className="ap-filter-toggle">
+            <input
+              type="checkbox"
+              checked={filterByCategory}
+              onChange={(e) => setFilterByCategory(e.target.checked)}
+            />
+            {t('asset.filterByCategory')}
+          </label>
+        )}
       </div>
+      <p className="creator-note">{t('asset.batchUploadHint')}</p>
 
       {error && <small className="ap-error">{error}</small>}
     </div>

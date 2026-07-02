@@ -14,6 +14,7 @@ import {
   DAYS_OF_WEEK,
   WEATHER_KINDS,
   WEATHER_ICONS,
+  type Asset,
   type Character,
   type CharacterLink,
   type CharacterLinkKind,
@@ -154,7 +155,7 @@ export function CharacterEditor() {
   const isNew = !id;
   const nav = useNavigate();
   const location = useLocation();
-  const { reloadAssets, activeWorldId } = useAppData();
+  const { assets, reloadAssets, activeWorldId } = useAppData();
 
   const [form, setForm] = useState<Form>(emptyForm);
   // The saved/initial snapshot the live form is diffed against for draft
@@ -188,6 +189,44 @@ export function CharacterEditor() {
   const [activeTab, setActiveTab] = useState<TabId>('identity');
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
+
+  /** After a batch upload, auto-assign images to portrait/expression slots
+   *  based on the server-parsed tags. Never overwrites an already-filled slot.
+   *  Builds the complete update in one pass so multiple expression assignments
+   *  don't clobber each other. */
+  const handleBatchUpload = (uploaded: Asset[]) => {
+    const cTag = `character:${form.name}`.toLowerCase();
+    let newPortrait = form.portraitAssetId;
+    const newRows = form.expressionRows.map((r) => ({ ...r }));
+
+    for (const asset of uploaded) {
+      if (!asset.tags.some((t) => t.toLowerCase() === cTag)) continue;
+
+      if (asset.tags.includes('type:portrait') && !newPortrait) {
+        newPortrait = asset.id;
+      }
+      const exprTag = asset.tags.find((t) => t.startsWith('expression:'));
+      if (exprTag) {
+        const exprName = exprTag.slice('expression:'.length);
+        const idx = newRows.findIndex((r) => r.name === exprName);
+        if (idx !== -1 && !newRows[idx]!.assetId) {
+          newRows[idx] = { ...newRows[idx]!, assetId: asset.id };
+        }
+      }
+    }
+
+    // Fallback: if no portrait was uploaded, use the smiling expression as the
+    // default portrait image.
+    if (!newPortrait) {
+      const smilingIdx = newRows.findIndex((r) => r.name === 'smiling');
+      if (smilingIdx !== -1 && newRows[smilingIdx]!.assetId) {
+        newPortrait = newRows[smilingIdx]!.assetId;
+      }
+    }
+
+    if (newPortrait !== form.portraitAssetId) set('portraitAssetId', newPortrait);
+    set('expressionRows', newRows);
+  };
 
   const DEFAULT_JOB: Employment = { title: '', place: '', workdays: [0, 1, 2, 3, 4], shiftPhase: 'morning' };
   const patchEmp = (patch: Partial<Employment>) =>
@@ -566,6 +605,17 @@ export function CharacterEditor() {
 
   // Synthetic character object fed to <Portrait> — mirrors the API shape without
   // needing an actual saved character record.
+  // Whether the current character has any portrait-tagged assets. When true,
+  // the portrait picker is filtered to show only portrait images; when false,
+  // it shows all expression images so the user can pick one as portrait.
+  const hasPortraitAsset = useMemo(() => {
+    if (!form.name) return false;
+    const cTag = `character:${form.name}`.toLowerCase();
+    return assets.some(
+      (a) => a.type === 'portrait' && a.tags.some((t) => t.toLowerCase() === cTag),
+    );
+  }, [assets, form.name]);
+
   const previewCharacter = useMemo(
     () => ({
       name: form.name || t('pages:characterEditor.unnamed'),
@@ -759,7 +809,13 @@ export function CharacterEditor() {
                   <h2>{t('pages:characterEditor.secPortrait')}</h2>
                   <span className="trail" />
                 </div>
-                <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} characterName={form.name} />
+                <AssetPicker
+                  value={form.portraitAssetId}
+                  onChange={(v) => set('portraitAssetId', v)}
+                  characterName={form.name}
+                  filterType={hasPortraitAsset ? 'portrait' : undefined}
+                  onBatchUpload={handleBatchUpload}
+                />
                 <div className="ce-image-gen">
                   <button className="btn sm primary" onClick={() => setGenOpen(true)}>
                     <Icon name="generate" size={13} />
@@ -818,6 +874,7 @@ export function CharacterEditor() {
                       value={row.assetId}
                       characterName={form.name}
                       expressionName={row.name}
+                      onBatchUpload={handleBatchUpload}
                       onChange={(v) => {
                         const rows = [...form.expressionRows];
                         rows[i] = { ...rows[i]!, assetId: v };

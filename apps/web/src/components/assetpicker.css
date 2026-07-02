@@ -98,6 +98,21 @@
   cursor: pointer;
 }
 
+/* Filter-by-name toggle */
+.ap-filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-mute);
+  cursor: pointer;
+  user-select: none;
+  margin-left: auto;
+}
+.ap-filter-toggle input[type="checkbox"] {
+  accent-color: var(--brass);
+}
+
 /* Error below upload */
 .ap-error {
   display: block;

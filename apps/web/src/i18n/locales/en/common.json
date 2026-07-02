@@ -14,7 +14,10 @@
     "none": "None",
     "uploading": "Uploading…",
     "uploadImage": "Upload image",
-    "batchUpload": "Batch upload"
+    "uploadImages": "Upload Image(s)",
+    "filterByCharName": "Filter by character name",
+    "filterByCategory": "Filter by category",
+    "batchUploadHint": "Name your files like CharacterName - happy.png or portrait CharacterName.jpg. The server auto-detects expressions (happy, sad, angry…) and portraits from the filename, so images appear in the right slots automatically. If no portrait image is uploaded, the smiling expression is used as the default portrait."
   },
   "draft": {
     "notSavedTitle": "Couldn't auto-save this draft (storage full). Press Save to keep your work.",
