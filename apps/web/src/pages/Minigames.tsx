@@ -33,9 +33,15 @@ export function Minigames() {
   const finishingRef = useRef(false);
 
   useEffect(() => {
+    // Latest-wins: on a world switch A→B, A's slower response must never seed
+    // `characters`/`characterId` — a stale A-character id sent with B's worldId
+    // used to land the run's stamina/money in world A (the server now also
+    // rejects the mismatch, but the roster itself would still be wrong).
+    let live = true;
     void (async () => {
       try {
         const [g, c] = await Promise.all([api.listMinigames(), api.listCharacters(activeWorldId ?? undefined)]);
+        if (!live) return;
         // Job games (paid skill work) live in the Work app, not the dating arcade.
         setGames(g.filter((x) => x.mode !== 'job'));
         setCharacters(c);
@@ -44,11 +50,14 @@ export function Minigames() {
         const inWorld = c.filter((x) => !activeWorldId || x.worldId === activeWorldId);
         setCharacterId((cur) => (cur && inWorld.some((x) => x.id === cur) ? cur : inWorld[0]?.id ?? null));
       } catch (e) {
-        setError(errorMessage(e));
+        if (live) setError(errorMessage(e));
       } finally {
-        setLoading(false);
+        if (live) setLoading(false);
       }
     })();
+    return () => {
+      live = false;
+    };
   }, [activeWorldId, dayTick]);
 
   // A world switch must not leave a previous world's run on screen — its reward

@@ -45,6 +45,7 @@ import {
   type Character,
   type ConversationCreate,
   type ConversationSession,
+  EndSessionResponseSchema,
   type EndSessionResponse,
   type Intent,
   type JealousyOutcome,
@@ -55,9 +56,10 @@ import {
   type RelationshipStatus,
   type SessionWithMessages,
 } from '@dsim/shared';
-import { charactersRepo, chroniclesRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
+import { charactersRepo, chroniclesRepo, dateResultsRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
 import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
+import { isWorldAdvancing } from '../lib/world-transition';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { getRelationship } from './relationship-service';
 import { getOrCreatePlayer, spendMoney } from './player-service';
@@ -163,6 +165,12 @@ export function createSession(input: ConversationCreate): ConversationSession {
   // Real meetings (anything but a free-form chat) cost a daily action and require
   // the character to be available today (world-bound only). 'chat' is exempt.
   if (input.mode !== 'chat' && character.worldId) {
+    // Make the Sleep/date exclusion reciprocal. Sleep claims this guard before
+    // checking active sessions, so a date cannot begin during a partially committed
+    // multi-step day rollover from another tab.
+    if (isWorldAdvancing(character.worldId)) {
+      throw badRequest('The day is turning over — give it a moment before starting a date.');
+    }
     // One live date per world. The client guards against starting a second date
     // (Chat.tsx `if (activeDate) return`), but that's best-effort UI state — a
     // double-submit, a second tab, or a stale/failed active-date fetch can slip a
@@ -275,6 +283,21 @@ export function getActiveDateForWorld(worldId: string): ActiveDate | null {
     };
   }
   return null;
+}
+
+/**
+ * Throw if this world has a live date underway. Day-spending actions (Sleep, work
+ * shifts, minigames) are locked while a date is open: running the clock or the
+ * energy budget mid-date would misfile the date's events, reset stamina under it,
+ * or neglect-decay the very character you're out with. The client disables those
+ * buttons, but only off its own per-tab `activeDate` state — a second tab that
+ * loaded before the date began can still send the request, so enforce it here.
+ */
+export function assertNoActiveDate(worldId: string): void {
+  const openDate = getActiveDateForWorld(worldId);
+  if (openDate) {
+    throw badRequest(`You're on a date with ${openDate.characterName} — wrap that up first.`);
+  }
 }
 
 function touchSession(session: ConversationSession): ConversationSession {
@@ -599,6 +622,13 @@ export function dropReplyForRegen(sessionId: string): void {
   if (md.walkout || md.left || md.farewell || md.breakupIntent) {
     throw badRequest('That line ended the date, so it can’t be regenerated.');
   }
+  // Gift reactions and DTR answers carry applied consequences AND load-bearing
+  // metadata: regenerating one replaces it with a plain reply whose metadata is
+  // empty — un-hiding the gift from the end-of-date evaluator's `!metadata.gift`
+  // filter (double-counting the gift), or orphaning an applied status change.
+  if (md.gift || md.dtr) {
+    throw badRequest('That reaction already landed, so it can’t be regenerated.');
+  }
   messagesRepo.delete(last.id);
   touchSession(session);
 }
@@ -898,6 +928,19 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
   const session = getSession(sessionId);
   if (session.ended || session.mode === 'chat') return null;
   if (!hasLostInterest(sessionId)) return null;
+  // The character already made an exit this session (the line is in the transcript,
+  // but the client may have missed the SSE event to a refresh/disconnect). Rapport is
+  // deliberately left cratered for endSession to score, so without this check the
+  // NEXT message after a resume would re-apply the leave penalty and stamp a second
+  // goodbye. Same for a walkout/farewell exit: they're gone; don't leave twice.
+  const priorExit = messagesRepo
+    .listBySession(sessionId)
+    .some(
+      (m) =>
+        m.role === 'character' &&
+        (m.metadata?.['left'] === true || m.metadata?.['walkout'] === true || m.metadata?.['farewell'] === true),
+    );
+  if (priorExit) return null;
 
   const character = getCharacter(session.characterId);
   const settings = getLlmSettings();
@@ -999,7 +1042,12 @@ export async function attemptPlayerBreakupIntent(
   // Not genuine (joking/hypothetical/opposite) or a failed call → normal reply.
   if (!result.ok || !result.data.genuine) return null;
 
-  const message = addCharacterMessage(sessionId, result.data.line.trim(), { breakupIntent: true });
+  // The reaction rides in the metadata so a resume can re-derive the confirm prompt
+  // (the SSE event carrying it is lost if the tab closes before it arrives).
+  const message = addCharacterMessage(sessionId, result.data.line.trim(), {
+    breakupIntent: true,
+    breakupReaction: result.data.reaction,
+  });
   return { message, reaction: result.data.reaction };
 }
 
@@ -1060,6 +1108,36 @@ export async function attemptPlayerFarewell(
 }
 
 /**
+ * The one-time costs + housekeeping EVERY concluding date/event owes, no matter
+ * which path ends it: the venue charge, the day action, the last-seen/date
+ * stamp, one session of buff decay, and the live-rapport cleanup.
+ * endSessionInner applies this same set inline (staged around its required
+ * evaluator); this helper exists for the paths that end a date WITHOUT the
+ * evaluator — a confirmed player breakup, a DTR backfire — which previously
+ * flipped `ended` directly and escaped every cost: free venue, free day action,
+ * a stale session_rapport row, and a neglect clock that never stamped.
+ *
+ * These ends are FORCED (the exit already happened in-fiction, the session row
+ * is already ended), so the venue charge clamps to the wallet instead of
+ * throwing — a drained wallet must not block the conclusion.
+ */
+export function settleForcedDateEnd(session: ConversationSession): void {
+  clearRapport(session.id);
+  if (session.mode !== 'date' && session.mode !== 'event') return;
+  const character = getCharacter(session.characterId);
+  if (!character.worldId) return;
+  const venue = resolveSessionLocation(session.locationId, character, worldsRepo.get(character.worldId) ?? null);
+  const propVenue = propertyVenueInfo(session.locationId, character.worldId);
+  const cost = propVenue ? 0 : venueCost(venue?.priceTier);
+  const pid = playerIdForWorld(character.worldId);
+  const charge = Math.min(cost, getOrCreatePlayer(pid).money);
+  if (charge > 0) spendMoney(charge, pid);
+  spendStamina(character.worldId);
+  stampLastDate(session.characterId, ensureWorldState(character.worldId).day);
+  decayRelationshipBuffs(session.characterId);
+}
+
+/**
  * Confirm a player-initiated breakup: apply it (server-owned, scarred like any
  * breakup) and end the date. Texting stays open afterward so the player can
  * still try to win them back later. Face-to-face, so NO breakup text is queued.
@@ -1079,6 +1157,10 @@ export function confirmPlayerBreakup(sessionId: string): PlayerBreakupResponse {
 
   applyBreakup(character.id, { day, fromStatus, initiator: 'player' });
   const ended = sessionsRepo.update(ConversationSessionSchema.parse({ ...session, ended: true, updatedAt: Date.now() }));
+  // Ending by breakup still CONCLUDES a real date — settle the one-time costs the
+  // normal end path charges. Without this, "I think we should break up" + confirm
+  // was a free exit from any date: no venue charge, no day action spent.
+  settleForcedDateEnd(ended);
 
   const relationship: Relationship = getRelationship(character.id);
   return { relationship, fromStatus, ended: ended.ended };
@@ -1172,6 +1254,15 @@ export function maybeRollJealousy(character: Character, rng: () => number = Math
 // --- summary (structured) ---------------------------------------------------
 
 export async function summarizeSession(sessionId: string): Promise<ConversationSession> {
+  // Serialized with send/retry/end under the session's turn lock: the summary write
+  // below rebuilds the session row from a pre-await snapshot, so racing a concurrent
+  // reply or end would silently drop its ended/updatedAt write. Safe for the
+  // fire-and-forget maybeAutoSummarize call inside a locked turn — it isn't awaited
+  // there, so it just queues behind the turn that spawned it.
+  return withKeyedLock(`conv-reply:${sessionId}`, () => summarizeSessionInner(sessionId));
+}
+
+async function summarizeSessionInner(sessionId: string): Promise<ConversationSession> {
   const session = getSession(sessionId);
   const messages = messagesRepo.listBySession(sessionId);
   if (messages.length === 0) return session;
@@ -1217,6 +1308,57 @@ export async function maybeAutoSummarize(sessionId: string): Promise<void> {
  * the eval fails — it just carries no evaluator deltas/memories. Stat/memory mutations
  * from the evaluation happen only when the structured result validates.
  */
+/**
+ * Persist a concluded date's report card (best-effort). World-bound dates/events
+ * only — a worldless chat has no Date tab to replay on, and nothing at stake.
+ */
+function persistDateResult(response: EndSessionResponse): void {
+  const s = response.session;
+  if (s.mode !== 'date' && s.mode !== 'event') return;
+  try {
+    const worldId = charactersRepo.get(s.characterId)?.worldId;
+    if (!worldId) return;
+    dateResultsRepo.put(s.id, worldId, JSON.stringify(response), Date.now());
+  } catch {
+    /* the report card is best-effort; never block ending a date */
+  }
+}
+
+/** Read and validate a durable report by session, regardless of seen state. */
+function getPersistedDateResult(sessionId: string): EndSessionResponse | null {
+  const row = dateResultsRepo.get(sessionId);
+  if (!row) return null;
+  try {
+    return EndSessionResponseSchema.parse(JSON.parse(row.payload));
+  } catch {
+    // A malformed/outdated payload should not be returned on retries or replayed.
+    dateResultsRepo.markSeen(sessionId);
+    return null;
+  }
+}
+
+/**
+ * The world's newest end-of-date report the client hasn't acknowledged, if any —
+ * the replay source for a report whose HTTP response died with a closed tab.
+ *
+ * DELIVER-ONCE: a successful read retires the report. The replay exists to recover
+ * a LOST response; without self-acknowledging here, a report whose ack never fired
+ * (the player left the recap via nav, a dropped ack request) would replay on every
+ * Date-tab visit for the rest of the save.
+ */
+export function getPendingDateResult(worldId: string): EndSessionResponse | null {
+  const row = dateResultsRepo.latestUnseenByWorld(worldId);
+  if (!row) return null;
+  const result = getPersistedDateResult(row.sessionId);
+  if (result) dateResultsRepo.markSeen(row.sessionId);
+  return result;
+}
+
+/** Acknowledge a session's end-of-date report (shown live, or replayed). */
+export function markDateResultSeen(sessionId: string): void {
+  dateResultsRepo.markSeen(sessionId);
+}
+
 export async function endSession(sessionId: string): Promise<EndSessionResponse> {
   // Serialize the end per session under the SAME key as send/retry/regenerate, so two
   // concurrent ends can't both evaluate + spend, an end can't interleave with a send,
@@ -1234,6 +1376,11 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // Do NOT re-run the evaluator/jealousy — that would double-apply deltas.
   if (session.ended) {
     clearRapport(sessionId);
+    // Give duplicate/retried end requests the winning request's full durable result.
+    // Otherwise the client can acknowledge a synthetic "already ended" response and
+    // permanently hide the real evaluation without displaying it.
+    const persisted = getPersistedDateResult(sessionId);
+    if (persisted) return persisted;
     return {
       session,
       evaluated: false,
@@ -1260,7 +1407,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
     const ended = sessionsRepo.update(
       ConversationSessionSchema.parse({ ...session, ended: true, updatedAt: Date.now() }),
     );
-    return {
+    const response: EndSessionResponse = {
       session: ended,
       evaluated,
       relationship: null,
@@ -1277,6 +1424,11 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       ending: null,
       ...extra,
     };
+    // Persist the report so a client that lost this HTTP response (tab closed or
+    // refreshed during the evaluator) can replay it on its next visit — the costs
+    // and consequences above are already committed either way.
+    persistDateResult(response);
+    return response;
   };
 
   // Starting a date but never actually speaking is NOT a real date. Don't let it
@@ -1393,12 +1545,18 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // The date is now truly ending (the eval succeeded, or a narrative exit forces it).
   // Commit the one-time costs + rolls exactly once — the per-session lock in
   // endSession() prevents a concurrent double-end.
-  if (endActor.worldId) {
-    stampLastDate(session.characterId, ensureWorldState(endActor.worldId).day);
-    if (pendingCharge) {
-      spendStamina(pendingCharge.worldId);
-      if (pendingCharge.cost > 0) spendMoney(pendingCharge.cost, pendingCharge.pid);
-    }
+  if (pendingCharge) {
+    // Money FIRST: spendMoney is the only call in this block that can throw (the
+    // wallet may have been drained from another tab during the evaluator await,
+    // after the read-only gate above). If it throws, nothing here has committed —
+    // the date stays open and cleanly re-endable, instead of stamina being spent
+    // now and spent AGAIN when the player settles up and re-ends.
+    if (pendingCharge.cost > 0) spendMoney(pendingCharge.cost, pendingCharge.pid);
+    spendStamina(pendingCharge.worldId);
+    // Inside the date/event-only guard (pendingCharge is set exactly for those):
+    // a plain chat costs nothing, so it must not reset the neglect clock or the
+    // "it's been a while" date-greeting clock for free either.
+    stampLastDate(session.characterId, ensureWorldState(pendingCharge.worldId).day);
   }
 
   // A monogamous character may "find out" about other people you've seen lately.

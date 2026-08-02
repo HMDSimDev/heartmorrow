@@ -176,6 +176,25 @@ describe('leasing: recurring rent, overdue warnings, eviction', () => {
     expect(paid.lease.graceUntilDay).toBeNull();
   });
 
+  it('an overdue manual payment keeps the SCHEDULE anchor (regression: rent-cadence slip)', () => {
+    // Anchoring to `today` let a payment made late-but-within-grace slip the whole
+    // schedule forward by the days spent overdue — a compounding rent discount.
+    const world = richWorld(250);
+    const playerId = playerIdForWorld(world.id);
+    const prop = createProperty({ worldId: world.id, name: 'Loft', buyPrice: 9000, rentAmount: 70, rentCadence: 'weekly' });
+    leaseProperty(world.id, prop.id); // day 1 → nextDueDay 8
+    spendMoney(150, playerId); // can't afford day 8's charge
+    runDailyWealth(world.id, 8, []); // → overdue, nextDueDay still 8
+
+    // Two in-world days pass inside the grace window before the player pays up.
+    worldStatesRepo.update({ ...ensureWorldState(world.id), day: 10, updatedAt: Date.now() });
+    addMoney(200, playerId);
+    const paid = payRent(world.id, prop.id);
+
+    expect(paid.lease.status).toBe('active');
+    expect(paid.lease.nextDueDay).toBe(8 + 7); // 15 — anchored to the schedule, not max(8,10)+7=17
+  });
+
   it('ending a lease (move out) removes the ability to date there', () => {
     const world = richWorld(5_000);
     const prop = createProperty({ worldId: world.id, name: 'Loft', buyPrice: 9000, rentAmount: 70, rentCadence: 'weekly' });

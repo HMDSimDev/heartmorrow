@@ -45,15 +45,22 @@ export function MomentsApp() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    // `live` drops a superseded world's response (mirrors the moments effect below)
+    // so a fast world switch can't paint the previous world's cast + default pick.
+    let live = true;
     void api
       .listCharacters()
       .then((cs) => {
+        if (!live) return;
         // Only this world's people have a scrapbook here.
         const inWorld = cs.filter((c) => !activeWorldId || c.worldId === activeWorldId);
         setCharacters(inWorld);
         setSelected((cur) => (cur && inWorld.some((c) => c.id === cur) ? cur : inWorld[0]?.id ?? null));
       })
       .catch(() => undefined);
+    return () => {
+      live = false;
+    };
   }, [activeWorldId, dayTick]);
 
   // The `live` flag drops an out-of-order response so switching from A to B

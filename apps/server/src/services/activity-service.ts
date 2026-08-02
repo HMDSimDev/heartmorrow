@@ -18,6 +18,7 @@ import {
 import { badRequest } from '../lib/errors';
 import { getDb } from '../db/index';
 import { assertCanAct, ensureWorldState, spendStamina } from './world-clock-service';
+import { assertNoActiveDate } from './conversation-service';
 import { getCharacterAvailability } from './availability-service';
 import { weatherForDay } from './ambiance-service';
 import { addMoney, grantCareerXp, getSkillLevel, spendMoney } from './player-service';
@@ -78,6 +79,7 @@ export function performActivity(input: PerformActivity): ActivityResult {
   }
 
   assertCanAct(worldId); // throws if out of stamina
+  assertNoActiveDate(worldId); // a live date locks day-spending actions (server-authoritative)
 
   // A heavier shift can cost more than one action; assertCanAct only guards the
   // out-of-energy (>0) case, so make sure the day can actually afford this one.

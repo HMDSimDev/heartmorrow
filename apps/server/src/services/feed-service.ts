@@ -124,9 +124,17 @@ export async function generateFeedForDay(
   const worldChars = charactersRepo.listByWorld(worldId);
 
   // --- 1. EVENT-DRIVEN posts (idempotent per (event, author)) ---------------
-  const notable = eventsRepo
-    .list(300)
-    .filter((e) => FEED_NEWS_TYPES.has(e.type) && (e.payload as Record<string, unknown>).day === yesterday);
+  // WORLD-scoped window: a global newest-300 let another world's activity evict
+  // this world's news — its milestones then silently never produced a post (the
+  // per-event idempotency key is permanent, so they were never picked up later).
+  // Accepts yesterday's events AND ones already stamped with TODAY: the rollover
+  // invoking this pass records its own neglect-driven breakups/reconciliations
+  // with the NEW day, and a strictly-yesterday filter deferred those a full extra
+  // day. The per-event idempotency key makes the overlap safe (no repost tomorrow).
+  const notable = eventsRepo.listRecentByWorld(worldId, 300).filter((e) => {
+    const d = (e.payload as Record<string, unknown>).day;
+    return FEED_NEWS_TYPES.has(e.type) && (d === yesterday || d === day);
+  });
 
   let eventPosts = 0; // bounds the day-start LLM fan-out on a busy day
   for (const event of notable) {
@@ -751,6 +759,9 @@ export function reactToPost(
   kind: ReactionKind,
   playerId: string = DEFAULT_PLAYER_ID,
 ): FeedPostView {
+  // Validate BEFORE writing: an unknown postId used to hit the reactions table's
+  // foreign key and surface as a 500 instead of this 404.
+  if (!feedPostsRepo.get(postId)) throw notFound(`Post ${postId} not found.`);
   const existing = feedReactionsRepo.getByActor(postId, playerId);
   if (existing && existing.kind === kind) {
     feedReactionsRepo.delete(postId, playerId);
@@ -779,6 +790,9 @@ export async function commentOnPost(
   playerId: string = DEFAULT_PLAYER_ID,
 ): Promise<FeedPostView> {
   const post = feedPostsRepo.get(postId);
+  // Validate BEFORE writing (mirrors reactToPost): inserting first turned an
+  // unknown postId into an FK 500 instead of a 404.
+  if (!post) throw notFound(`Post ${postId} not found.`);
   feedCommentsRepo.insert(
     FeedCommentSchema.parse({
       id: newId('fcmt'),
@@ -792,7 +806,7 @@ export async function commentOnPost(
   );
 
   // An engaged character whose post the player commented on may reply once.
-  if (post && post.authorType === 'character') {
+  if (post.authorType === 'character') {
     const author = charactersRepo.get(post.authorId);
     if (author && hasDated(author.id)) {
       const rel = getRelationship(author.id);

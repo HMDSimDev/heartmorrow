@@ -99,7 +99,7 @@
   letter-spacing: 0.02em;
   color: var(--text-mute);
 }
-/* Warm toward brass as the 500-char cap approaches. */
+/* Warm toward brass as the shared GEN_TEXT.line cap approaches. */
 .fcs-compose-count.is-near { color: var(--brass); }
 .fcs-post-btn { min-width: 70px; }
 

@@ -183,6 +183,16 @@ export function Chat() {
   // The player typed something that read as a breakup — awaiting their confirm.
   const [breakupPending, setBreakupPending] = useState<{ reaction: 'accept' | 'hurt' | 'plead' } | null>(null);
   const [brokeUp, setBrokeUp] = useState(false);
+  // A resumed transcript ended on a walkout/leave/farewell line the live SSE
+  // handlers never got to act on (tab closed mid-turn) — conclude the date as
+  // soon as the resumed session is on screen, like the live handlers would have.
+  const [autoEnd, setAutoEnd] = useState(false);
+  // The world already checked for an unacknowledged end-of-date report this mount.
+  const replayCheckedRef = useRef<string | null>(null);
+  // End-of-date reports already shown this mount. The replay check must never
+  // re-apply one the player just watched live, even while its server ack is
+  // still in flight — the ack is fire-and-forget, so a race is otherwise real.
+  const seenResultsRef = useRef<Set<string>>(new Set());
   const messagesEnd = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   // Mirrors the live session id so async handlers can detect that the player
@@ -362,6 +372,7 @@ export function Chat() {
     setLeftEarly(false);
     setBreakupPending(null);
     setBrokeUp(false);
+    setAutoEnd(false);
     setRapportPulse(null);
     setIntent(null);
     setFailed(null);
@@ -392,6 +403,27 @@ export function Chat() {
       // a transcript ending in an unanswered player turn means the reply never came.
       const lastMsg = sm.messages[sm.messages.length - 1];
       if (lastMsg && lastMsg.role === 'player') setFailed({ kind: 'reply' });
+      // Re-derive a terminal exit the SSE stream never delivered (tab closed/refreshed
+      // mid-turn): a trailing consequence-bearing character line means the scene
+      // already ended in-fiction. Restore the matching moment and conclude the date —
+      // exactly what the live handlers do — instead of letting the player chat past a
+      // walkout/goodbye they never saw. A pending breakup re-raises its confirm.
+      if (lastMsg && lastMsg.role === 'character') {
+        const md = lastMsg.metadata ?? {};
+        if (md.walkout === true) {
+          setWalkout(t('chat.walkoutDefault'));
+          setAutoEnd(true);
+        } else if (md.left === true) {
+          setLeftEarly(true);
+          setVibe(null);
+          setAutoEnd(true);
+        } else if (md.farewell === true) {
+          setAutoEnd(true);
+        } else if (md.breakupIntent === true) {
+          const r = md.breakupReaction;
+          setBreakupPending({ reaction: r === 'accept' || r === 'hurt' || r === 'plead' ? r : 'hurt' });
+        }
+      }
       setRelationship(await api.getRelationship(c.id));
       // Restore the live trajectory + mood from the fresh read fetched above (matched
       // by session id), falling back to the `ad` snapshot only if it drifted.
@@ -439,6 +471,46 @@ export function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateConcluded]);
 
+  // Replay an end-of-date report whose HTTP response was lost (the tab closed or
+  // refreshed while the evaluator ran): the server persists the report as the date
+  // concludes, so instead of silently dropping the player onto the plan-a-date
+  // screen — with the date's costs and consequences already applied — restore the
+  // concluded date and its recap card once, then acknowledge it.
+  useEffect(() => {
+    if (!activeWorldId || !activeDateLoaded || activeDate || session || starting || resuming) return;
+    if (replayCheckedRef.current === activeWorldId) return; // once per world per mount
+    replayCheckedRef.current = activeWorldId;
+    let live = true;
+    void (async () => {
+      try {
+        const { result } = await api.pendingDateResult(activeWorldId);
+        if (!live || !result || !result.session.ended) return;
+        if (seenResultsRef.current.has(result.session.id)) return; // shown live already
+        seenResultsRef.current.add(result.session.id);
+        const [c, sm, rel] = await Promise.all([
+          api.getCharacter(result.session.characterId),
+          api.getConversation(result.session.id),
+          api.getRelationship(result.session.characterId),
+        ]);
+        if (!live || sessionIdRef.current) return; // a date opened meanwhile — don't clobber it
+        setSetup((s) => ({ ...s, characterId: c.id, locationId: result.session.locationId ?? '' }));
+        setSession(result.session);
+        setCharacter(c);
+        setMessages(sm.messages);
+        setRelationship(rel);
+        setEvalResult(result);
+        setMilestone(result.milestone ?? null);
+        if (result.expression) setExpression(result.expression);
+      } catch {
+        /* replay is best-effort — the plan-a-date screen is a fine fallback */
+      }
+    })();
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorldId, activeDateLoaded, activeDate, session, starting, resuming]);
+
   const start = async () => {
     if (!setup.characterId) return;
     if (activeDate) return; // a date is already underway — resume it, never start a second
@@ -455,6 +527,7 @@ export function Chat() {
     setLeftEarly(false);
     setBreakupPending(null);
     setBrokeUp(false);
+    setAutoEnd(false);
     setResumeFailed(false);
     setScene(null);
     setIntent(null);
@@ -703,12 +776,22 @@ export function Chat() {
 
   // Rewrite the character's MOST RECENT reply (a bad/looping line) without re-judging
   // the turn. Optimistically drop the old reply — the server deletes it and streams a
-  // fresh one against the same player turn. On failure the reply is gone server-side,
-  // so we surface the standard reply-retry (which also regenerates, never re-judges).
+  // fresh one against the same player turn. On ANY failure, resync the transcript from
+  // the server: the drop itself may have been refused (the old reply still exists) or
+  // may have succeeded before generation failed (it's gone) — only the server knows
+  // which, and guessing left the on-screen thread silently diverged from the server's.
   const regenerate = async () => {
     if (!session || streaming.active || busy || locked) return;
     const last = messages[messages.length - 1];
     if (!last || last.role !== 'character') return;
+    const sid = session.id;
+    const resync = () =>
+      void api
+        .getConversation(sid)
+        .then((sm) => {
+          if (sessionIdRef.current === sid) setMessages(sm.messages);
+        })
+        .catch(() => undefined); // keep the optimistic view — the retry affordance still recovers
     setError(undefined);
     setNotice(undefined);
     setFailed(null);
@@ -719,7 +802,7 @@ export function Chat() {
     let settled = false;
     try {
       await streamRegenerate(
-        session.id,
+        sid,
         {
           onDelta: (delta) => setStreaming((s) => ({ active: true, text: s.text + delta })),
           onDone: (m) => {
@@ -732,6 +815,7 @@ export function Chat() {
             setError(msg);
             setStreaming({ active: false, text: '' });
             setFailed({ kind: 'reply' });
+            resync();
           },
           onNotice: (msg) => setNotice(msg),
         },
@@ -741,11 +825,13 @@ export function Chat() {
         setStreaming({ active: false, text: '' });
         setError(t('chat.replyDropped'));
         setFailed({ kind: 'reply' });
+        resync();
       }
     } catch (e) {
       if (!controller.signal.aborted) {
         setError(errorMessage(e));
         setFailed({ kind: 'reply' });
+        resync();
       }
       setStreaming({ active: false, text: '' });
     }
@@ -771,10 +857,16 @@ export function Chat() {
     setLeftEarly(false);
     setBreakupPending(null);
     setBrokeUp(false);
+    setAutoEnd(false);
     setScene(null);
     setIntent(null);
     setFailed(null);
   };
+
+  // The report was already acknowledged when it was shown (live in endDate) or
+  // delivered (the replay fetch retires it server-side) — leaving the recap is
+  // purely a client-state reset.
+  const dismissRecap = () => newConversation();
 
   // A world switch must not leave a different world's date streaming into view.
   // Abort the in-flight stream and reset to the setup screen when the active
@@ -913,6 +1005,12 @@ export function Chat() {
       }
       setEvalResult(result);
       setSession(result.session);
+      // The recap is on screen — acknowledge the durable report NOW, not on the
+      // dismiss click. The persisted copy exists to recover a LOST response; this
+      // one arrived, and deferring the ack to a button the player may never press
+      // made the recap replay on Date-tab visits for days afterwards.
+      seenResultsRef.current.add(sid);
+      void api.markDateResultSeen(sid).catch(() => undefined);
       if (result.relationship) {
         // Surface the date's net change as floating chips, then clear them so the
         // animation can replay on the next date.
@@ -937,6 +1035,17 @@ export function Chat() {
       setBusy(false);
     }
   };
+
+  // Conclude a date whose exit line was restored by resume(): the live SSE handlers
+  // call endDate() the moment a walkout/leave/farewell lands, but during resume()
+  // the session state isn't committed yet — so it raises the flag and the end runs
+  // here once the resumed session is on screen.
+  useEffect(() => {
+    if (!autoEnd || !session || busy) return;
+    setAutoEnd(false);
+    void endDate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoEnd, session, busy]);
 
   const summarize = async () => {
     if (!session) return;
@@ -1227,6 +1336,10 @@ export function Chat() {
     !lastMsg.metadata?.left &&
     !lastMsg.metadata?.farewell &&
     !lastMsg.metadata?.breakupIntent &&
+    // Mirrors dropReplyForRegen: gift reactions / DTR answers already applied
+    // their consequences and their metadata drives the evaluator's gift filter.
+    !lastMsg.metadata?.gift &&
+    !lastMsg.metadata?.dtr &&
     messages.some((m) => m.role === 'player') && // a reply to your turn, not the opener
     !locked &&
     !streaming.active &&
@@ -1371,11 +1484,16 @@ export function Chat() {
         );
       }
       if (dtrOutcome.decision === 'backfire') {
+        // A backfire's tension spike can push a committed relationship onto the
+        // rocks or into a full breakup (applied server-side) — surface that here,
+        // it must not vanish behind the generic backfire card.
+        const strainBreakup = dtrOutcome.strain?.kind === 'broke_up';
         return (
-          <div className="date-moment date-moment-walkout">
-            <div className="date-moment-seal" aria-hidden="true">⚠</div>
+          <div className={`date-moment ${strainBreakup ? 'date-moment-breakup' : 'date-moment-walkout'}`}>
+            <div className="date-moment-seal" aria-hidden="true">{strainBreakup ? '💔' : '⚠'}</div>
             <div className="date-moment-kicker">{t('chat.dtrBackfireKicker')}</div>
             <div className="date-moment-title">{t('chat.dtrBackfireTitle')}</div>
+            {dtrOutcome.strain?.line && <p className="date-moment-body">{dtrOutcome.strain.line}</p>}
             {dtrOutcome.ended && <p className="date-moment-note">{t('chat.dtrEnded')}</p>}
           </div>
         );
@@ -1468,7 +1586,7 @@ export function Chat() {
                 live — you finish it (End & evaluate), or back out of one you haven't
                 spoken in (Cancel date, free). Once it's over, start a new one. */}
             {locked ? (
-              <button className="btn ghost block" onClick={newConversation} disabled={busy} title={t('chat.newDateTitle')}>
+              <button className="btn ghost block" onClick={dismissRecap} disabled={busy} title={t('chat.newDateTitle')}>
                 <Icon name="recap" size={14} /> {t('chat.newDate')}
               </button>
             ) : spokeThisSession ? (
@@ -1626,7 +1744,7 @@ export function Chat() {
 
           {locked ? (
             <div className="date-restart">
-              <button className="btn" onClick={newConversation}>
+              <button className="btn" onClick={dismissRecap}>
                 <Icon name="recap" size={14} /> {t('chat.startOver')}
               </button>
             </div>

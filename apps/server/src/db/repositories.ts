@@ -733,6 +733,13 @@ export const eventsRepo = {
       )
       .map(rowToEvent);
   },
+  /** THIS world's newest events (day-start feed/gossip scans). World-scoped so a
+   *  busy second world can never evict this world's news out of the window. */
+  listRecentByWorld(worldId: string, limit = 300): GameEvent[] {
+    return getDb()
+      .all<Row>('SELECT * FROM game_events WHERE world_id = ? ORDER BY created_at DESC LIMIT ?', worldId, limit)
+      .map(rowToEvent);
+  },
   /** Events whose payload.characterId matches, newest first (for the Moments timeline). */
   listByCharacter(characterId: string, limit = 300): GameEvent[] {
     return getDb()
@@ -1468,6 +1475,20 @@ export const npcKnowledgeRepo = {
       )
       .map(rowToNpcKnowledge);
   },
+  /** Does this knower hold anything about a subject at/above a fidelity floor?
+   *  TARGETED, not windowed: scanning listByKnower's newest-50 window meant that
+   *  once a chatty character accrued 50+ newer rows, their player knowledge aged
+   *  out of the window and "word about you travels" silently stopped firing. */
+  hasAboutSubject(knowerId: string, subjectId: string, minFidelity: number): boolean {
+    return (
+      getDb().get<Row>(
+        'SELECT 1 AS hit FROM npc_knowledge WHERE knower_id = ? AND subject_id = ? AND fidelity >= ? LIMIT 1',
+        knowerId,
+        subjectId,
+        minFidelity,
+      ) != null
+    );
+  },
   /** All knowledge (every world) — used for faithful export. */
   list(): NpcKnowledge[] {
     return getDb().all<Row>('SELECT * FROM npc_knowledge ORDER BY created_at ASC, rowid ASC').map(rowToNpcKnowledge);
@@ -2034,6 +2055,33 @@ export const gamblingRoundsRepo = {
   },
   delete(id: string): void {
     getDb().run('DELETE FROM gambling_rounds WHERE id = ?', id);
+  },
+};
+
+/** Durable end-of-date reports used to replay a result when its HTTP response was lost. */
+export const dateResultsRepo = {
+  /** Persist (or refresh) a session's end-of-date report; a rewrite resets `seen`. */
+  put(sessionId: string, worldId: string, payload: string, createdAt: number): void {
+    getDb().run(
+      `INSERT INTO date_results (session_id, world_id, payload, seen, created_at) VALUES (?,?,?,0,?)
+       ON CONFLICT(session_id) DO UPDATE SET payload = excluded.payload, seen = 0, created_at = excluded.created_at`,
+      sessionId, worldId, payload, createdAt,
+    );
+  },
+  get(sessionId: string): { payload: string; seen: boolean } | undefined {
+    const r = getDb().get<Row>('SELECT payload, seen FROM date_results WHERE session_id = ?', sessionId);
+    return r ? { payload: String(r.payload), seen: Boolean(r.seen) } : undefined;
+  },
+  /** The world's newest report the client has not acknowledged, if any. */
+  latestUnseenByWorld(worldId: string): { sessionId: string; payload: string } | undefined {
+    const r = getDb().get<Row>(
+      'SELECT session_id, payload FROM date_results WHERE world_id = ? AND seen = 0 ORDER BY created_at DESC LIMIT 1',
+      worldId,
+    );
+    return r ? { sessionId: String(r.session_id), payload: String(r.payload) } : undefined;
+  },
+  markSeen(sessionId: string): void {
+    getDb().run('UPDATE date_results SET seen = 1 WHERE session_id = ?', sessionId);
   },
 };
 

@@ -125,6 +125,22 @@ function reapStaleActive(worldId: string, playerId: string, day: number): Gambli
   return active;
 }
 
+/**
+ * Fold the addressed hand when it was dealt on a PRIOR in-world day, then reject
+ * the action. Runs in its own implicit transaction (the fold must COMMIT even
+ * though the action is refused). Without this, a hand kept open across a Sleep
+ * stayed actionable — blackjack's double-down validated against the old day's
+ * wager SUM while staking today's money, bypassing today's daily cap.
+ */
+function foldIfStale(worldId: string, playerId: string, roundId: string): void {
+  const round = gamblingRoundsRepo.get(roundId);
+  if (!round || round.worldId !== worldId || round.playerId !== playerId || round.status !== 'active') return;
+  const today = currentDay(worldId);
+  if (round.day >= today) return;
+  reapStaleActive(worldId, playerId, today);
+  throw badRequest('That hand went stale overnight and was folded.');
+}
+
 function recordRound(round: GamblingRound): void {
   recordEvent('gambling_round', {
     worldId: round.worldId,
@@ -336,6 +352,12 @@ export function blackjackAction(
 ): BlackjackResponse {
   const limits = limitsFor(worldId);
   const playerId = playerIdForWorld(worldId);
+  // A hand carried across a Sleep must not stay actionable: the double-down cap
+  // check reads the round's OWN day's wager ledger while staking TODAY's money,
+  // and the settled row files under the old day — invisible to today's cap SUM.
+  // Fold it exactly like reapStaleActive does on the next deal — OUTSIDE the
+  // action transaction below, where the rejection would roll the fold back.
+  foldIfStale(worldId, playerId, roundId);
   return getDb().transaction<BlackjackResponse>(() => {
     const round = gamblingRoundsRepo.get(roundId);
     if (!round || round.worldId !== worldId || round.playerId !== playerId) throw notFound('Hand not found.');
@@ -456,6 +478,10 @@ export function videoPokerDraw(worldId: string, roundId: string, holds: boolean[
   const limits = limitsFor(worldId);
   const playerId = playerIdForWorld(worldId);
   if (holds.length !== 5) throw badRequest('Hold exactly five slots.');
+  // Same stale-day fold as blackjackAction: only a SAME-DAY hand is playable
+  // (getGamblingState already refuses to resume older ones) — a day-old draw
+  // would pay out into the new day while filing under the old day's ledger.
+  foldIfStale(worldId, playerId, roundId);
   return getDb().transaction<VideoPokerResponse>(() => {
     const round = gamblingRoundsRepo.get(roundId);
     if (!round || round.worldId !== worldId || round.playerId !== playerId) throw notFound('Hand not found.');

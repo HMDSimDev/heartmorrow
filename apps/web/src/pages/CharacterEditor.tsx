@@ -187,6 +187,13 @@ export function CharacterEditor() {
   const [genText, setGenText] = useState('');
   const [genFileName, setGenFileName] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('identity');
+  // Mirrors the URL id so a slow generate call can tell the editor moved to a
+  // DIFFERENT character while it ran (edit A → generate → open B's editor) and
+  // drop its result instead of patching A-derived content into B's form.
+  const idRef = useRef(id);
+  useEffect(() => {
+    idRef.current = id;
+  }, [id]);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -226,9 +233,14 @@ export function CharacterEditor() {
       setLoadedId(null);
       return;
     }
+    // `live` drops a superseded id's response: navigating between two edit URLs
+    // fires two bundle loads, and without the guard a slow A landing after B would
+    // show — and then SAVE — A's record under B's URL (a cross-character clobber).
+    let live = true;
     void (async () => {
       try {
         const bundle = await api.getCharacterBundle(id);
+        if (!live) return;
         const c = bundle.character;
         const loaded: Form = {
           name: c.name,
@@ -272,9 +284,12 @@ export function CharacterEditor() {
         setMemories(bundle.memories);
         setRelationship(bundle.relationship);
       } catch (e) {
-        setError(errorMessage(e));
+        if (live) setError(errorMessage(e));
       }
     })();
+    return () => {
+      live = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, reloadAssets]);
 
@@ -402,6 +417,7 @@ export function CharacterEditor() {
   };
 
   const generateStats = async () => {
+    const forId = id;
     setGeneratingStats(true);
     setError(undefined);
     try {
@@ -416,6 +432,7 @@ export function CharacterEditor() {
         goals: form.goals,
         relationshipPreferences: form.relationshipPreferences,
       });
+      if (idRef.current !== forId) return; // the editor moved to another character
       if (res.ok) {
         set('datingStats', res.data);
         setSavedNote({ tone: 'brass', seal: '✦', kicker: t('pages:characterEditor.genKicker'), text: t('pages:characterEditor.statsGenerated') });
@@ -424,13 +441,16 @@ export function CharacterEditor() {
         setError(t('pages:characterEditor.statGenFailed', { error: res.error }));
       }
     } catch (e) {
-      setError(errorMessage(e));
+      if (idRef.current === forId) setError(errorMessage(e));
     } finally {
-      setGeneratingStats(false);
+      // Guarded: a stale call (the editor moved to another character) must not
+      // clear the NEW character's spinner and re-enable a mid-flight Generate.
+      if (idRef.current === forId) setGeneratingStats(false);
     }
   };
 
   const generateProfile = async () => {
+    const forId = id;
     setGeneratingProfile(true);
     setError(undefined);
     try {
@@ -446,6 +466,7 @@ export function CharacterEditor() {
         relationshipPreferences: form.relationshipPreferences,
         appearance: form.appearance,
       });
+      if (idRef.current !== forId) return; // the editor moved to another character
       if (res.ok) {
         setForm((f) => ({
           ...f,
@@ -465,9 +486,9 @@ export function CharacterEditor() {
         setError(t('pages:characterEditor.profileGenFailed', { error: res.error }));
       }
     } catch (e) {
-      setError(errorMessage(e));
+      if (idRef.current === forId) setError(errorMessage(e));
     } finally {
-      setGeneratingProfile(false);
+      if (idRef.current === forId) setGeneratingProfile(false);
     }
   };
 
@@ -499,6 +520,7 @@ export function CharacterEditor() {
 
   const runGeneration = async () => {
     if (!canGenerate) return;
+    const forId = id;
     setGenerating(true);
     setError(undefined);
     setSavedNote(undefined);
@@ -508,6 +530,7 @@ export function CharacterEditor() {
         sourceText: genText.trim().slice(0, MAX_SOURCE_CHARS),
         worldId: form.worldId,
       });
+      if (idRef.current !== forId) return; // the editor moved to another character
       if (res.ok) {
         const d = res.data;
         // Fill the generated fields; PRESERVE the chosen portrait, expressions,
@@ -548,9 +571,9 @@ export function CharacterEditor() {
         setError(t('pages:characterEditor.characterGenFailed', { error: res.error }));
       }
     } catch (e) {
-      setError(errorMessage(e));
+      if (idRef.current === forId) setError(errorMessage(e));
     } finally {
-      setGenerating(false);
+      if (idRef.current === forId) setGenerating(false);
     }
   };
 

@@ -265,5 +265,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rl-ball { transition: transform 0.5s linear; }
+  /* !important is required to beat the global `* { transition-duration: 0.001ms
+     !important }` reduced-motion reset in styles.css (same trick as slots.css) —
+     without it this rule is dead and the ball snaps instead of settling. The
+     duration stays non-zero so `transitionend` still fires and ends the round. */
+  .rl-ball { transition: transform 0.5s linear !important; }
 }

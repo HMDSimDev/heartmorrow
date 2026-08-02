@@ -386,15 +386,23 @@ export function MarketApp() {
   const saveDrafts = async () => {
     setSaving(true);
     setError(undefined);
+    let saved = 0;
     try {
-      const kept = drafts.filter((d) => d.keep).map((d) => d.company);
-      for (const c of kept) await api.createCompany({ ...c, worldId: activeWorldId });
-      setNote({ tone: 'brass', seal: '❧', kicker: t('market.resultSaved'), text: t('market.toast.savedDrafts', { count: kept.length }) });
+      // Remove each draft as its create lands (mirrors PropertyApp/Shop): a
+      // mid-loop failure leaves only the still-unsaved drafts checked, so a
+      // retry can't re-list companies that already made it in.
+      for (const d of drafts.filter((x) => x.keep)) {
+        await api.createCompany({ ...d.company, worldId: activeWorldId });
+        saved += 1;
+        setDrafts((ds) => ds.filter((x) => x !== d));
+      }
+      setNote({ tone: 'brass', seal: '❧', kicker: t('market.resultSaved'), text: t('market.toast.savedDrafts', { count: saved }) });
       setGenOpen(false);
       setDrafts([]);
       marketState.reload();
     } catch (e) {
       setError(errorMessage(e));
+      if (saved > 0) marketState.reload(); // show the companies that DID land
     } finally {
       setSaving(false);
     }

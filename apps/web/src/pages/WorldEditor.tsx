@@ -12,6 +12,7 @@ import {
 } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import { useAppData } from '../state/app-context';
 import { venueTierLabel, worldNoteScopeLabel } from '../i18n/labels';
 import { Banner, ConfirmDialog, Empty, Field, Spinner, TagInput } from '../components/ui';
 import { ResultCard, type ResultTone } from '../components/ResultCard';
@@ -46,6 +47,12 @@ const editableWorld = (w: World): EditableWorld => ({
 
 export function WorldEditor() {
   const { t } = useTranslation(['pages', 'common']);
+  // The editor mutates worlds the rest of the app renders from — every mutation
+  // must ALSO refresh the app-wide list (like WorldSelector does), or the HUD
+  // keeps a renamed/deleted world, featureFlag toggles don't take effect until a
+  // hard reload, and deleting the ACTIVE world strands the app on a dead id
+  // (the stale-world purge in app-context is keyed on this list).
+  const { reloadWorlds: reloadAppWorlds } = useAppData();
   const [worlds, setWorlds] = useState<World[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [world, setWorld] = useState<World | null>(null);
@@ -98,16 +105,26 @@ export function WorldEditor() {
       setNotes([]);
       return;
     }
+    // `live` drops a superseded selection's response: clicking world A then B fast
+    // fires two loads, and without the guard a slow A landing after B would show —
+    // and then SAVE — A's fields under B's highlight (a cross-world clobber).
+    let live = true;
     void (async () => {
       try {
         const w = await api.getWorld(selectedId);
+        if (!live) return;
         setWorld(w);
         setBaseline(w); // the loaded world is the clean baseline for drafts
-        setNotes(await api.listWorldNotes(selectedId));
+        const notes = await api.listWorldNotes(selectedId);
+        if (!live) return;
+        setNotes(notes);
       } catch (e) {
-        setError(errorMessage(e));
+        if (live) setError(errorMessage(e));
       }
     })();
+    return () => {
+      live = false;
+    };
   }, [selectedId]);
 
   const createWorld = async () => {
@@ -116,6 +133,7 @@ export function WorldEditor() {
     try {
       const w = await api.createWorld({ name: 'New World' });
       await loadWorlds();
+      void reloadAppWorlds(); // the HUD world switcher must see it too
       setSelectedId(w.id);
     } catch (e) {
       setError(errorMessage(e));
@@ -181,6 +199,9 @@ export function WorldEditor() {
       setBaseline(updated); // saved → the world is clean again
       draft.clear();
       await loadWorlds();
+      // Push the save into app-wide state: renames reach the HUD, and toggled
+      // featureFlags (Casino/Property/Market) take effect without a hard reload.
+      void reloadAppWorlds();
       setSavedNote({ tone: 'brass', seal: '❧', kicker: t('pages:worldEditor.savedKicker'), text: t('pages:worldEditor.worldSaved') });
     } catch (e) {
       setError(errorMessage(e));
@@ -196,6 +217,10 @@ export function WorldEditor() {
       await api.deleteWorld(world.id, deleteChars);
       setSelectedId(null);
       await loadWorlds();
+      // AWAITED: if the deleted world was the ACTIVE one, the app-context purge
+      // (keyed on its own world list) must see the deletion to clear the stale
+      // active id — otherwise the whole app keeps pointing at a dead world.
+      await reloadAppWorlds();
     } catch (e) {
       setError(errorMessage(e));
     } finally {

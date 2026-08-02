@@ -199,9 +199,10 @@ grant itself a cent.
 
 ## Requirements
 
-> **Using the [self-contained installer](#quick-start)?** You can skip the Node and pnpm
-> requirements below — `install.sh` / `install.ps1` download a pinned, local Node and activate
-> the right pnpm for you. The only thing you'd still want is an LLM server to actually play.
+> **Using the [self-contained installer](#quick-start) or [Docker](#run-in-docker)?** You can
+> skip the Node and pnpm requirements below — `install.sh` / `install.ps1` download a pinned,
+> local Node and activate the right pnpm for you, and the Docker image bundles both. The only
+> thing you'd still want is an LLM server to actually play.
 
 - **Node.js 20+** (developed on Node 24). Uses Node's built-in `node:sqlite`, so installation
   never compiles a native C addon.
@@ -301,6 +302,38 @@ The API listens on **http://localhost:8787** by default (`PORT` / `HOST` in `.en
 build step is needed — everything runs straight from TypeScript source via `tsx`. Without
 the Vite dev server you won't get its `/api` and `/uploads` proxy, so call the API at its
 own origin and set `CORS_ORIGINS` to match wherever your client is served from.
+
+### Run in Docker
+
+Prefer containers? A [`Dockerfile`](Dockerfile) and [`docker-compose.yml`](docker-compose.yml)
+are included. This needs **no local Node or pnpm** — only Docker — and bundles everything
+into a single container that builds the web client and serves it **and** the API from one
+process on one port.
+
+```bash
+docker compose up --build
+```
+
+Then open **http://localhost:8787**. (In Docker the API server serves the web client itself,
+so there's just the one port — no separate `:5173` like in dev.)
+
+A few things worth knowing:
+
+- **Point it at your model.** Your LLM runs on the *host*, not inside the container, so
+  `localhost` from within the container is the container itself. `docker-compose.yml`
+  pre-wires `host.docker.internal` — just set `LLM_BASE_URL` there to your provider's port
+  (LM Studio `1234`, Ollama `11434`, etc.). You can still change every LLM setting live in
+  **Settings** afterward.
+- **Your save persists.** The SQLite DB and uploaded art live in a named `heartmorrow-data` volume
+  mounted at `/data`, so rebuilding the image keeps your game. Back up that volume (or swap
+  it for a bind mount like `./data:/data`) to back up your save.
+- **(Optional) seed sample data.** A fresh container starts with an empty database. To load
+  the sample world + characters into the volume:
+  ```bash
+  docker compose run --rm heartmorrow pnpm --filter @dsim/server run seed
+  ```
+
+> 🔒 It’s bound to localhost on purpose. Heartmorrow has no authentication — anything that can reach the API can drive your game and read its data. The compose file publishes the port on 127.0.0.1 only, while the app listens on 0.0.0.0 inside the container. That is intentional: the container bind is not the same as the host bind; the published host port is the external boundary. Do not change the mapping to 8787:8787 unless you fully trust the machine and network. On Linux, Docker-published ports can bypass normal UFW/firewalld expectations, so do not rely on the host firewall alone to protect a published unauthenticated service.
 
 ---
 

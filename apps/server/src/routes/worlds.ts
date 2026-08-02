@@ -25,13 +25,15 @@ import {
   updateWorldNote,
 } from '../services/world-service';
 import { cloneCharactersToWorld } from '../services/character-service';
-import { getActiveDateForWorld } from '../services/conversation-service';
+import { assertNoActiveDate, getActiveDateForWorld, getPendingDateResult } from '../services/conversation-service';
 import { advanceDay, getWorldState } from '../services/world-clock-service';
 import { getWorldAvailability } from '../services/availability-service';
 import { getWorldWeather } from '../services/ambiance-service';
 import { getWorldCalendar } from '../services/day-record-service';
 import { docSchema } from '../lib/openapi-schema';
 import { withKeyedLock } from '../lib/keyed-lock';
+import { badRequest } from '../lib/errors';
+import { beginWorldAdvance, endWorldAdvance } from '../lib/world-transition';
 
 // Optional optimistic-concurrency token for Sleep: the day the client believes it's
 // on. Lets the server no-op a stale/duplicate Sleep instead of double-advancing.
@@ -112,9 +114,33 @@ export async function worldRoutes(app: FastifyInstance): Promise<void> {
       getWorld(id);
       const { expectedDay } = parseInput(SleepInputSchema, req.body ?? {});
       // Serialize the day rollover per world so two concurrent Sleep requests can't
-      // both read pre-advance state and each advance a day; `expectedDay` then makes a
-      // stale/duplicate request (a second tab, a retry) a no-op instead of a 2nd day.
-      return withKeyedLock(`world-clock:${id}`, () => advanceDay(id, expectedDay));
+      // both read pre-advance state and each advance a day. A duplicate Sleep (a
+      // second tab, a retry) QUEUES here and then no-ops via `expectedDay` — it must
+      // not be rejected with an error, that's the exact case expectedDay exists for.
+      return withKeyedLock(`world-clock:${id}`, async () => {
+        // Claim before checking the date. createSession consults the same claim, so
+        // neither operation can slip between the other's check and mutation. Inside
+        // the world-clock lock the claim is uncontended — failure means a rollover
+        // leaked its claim, and proceeding would risk a double-advance.
+        if (!beginWorldAdvance(id)) {
+          throw badRequest('The day is already turning over — give it a moment.');
+        }
+        try {
+          // Short-circuit a stale/duplicate Sleep BEFORE the date gate: if a new date
+          // opened on the already-advanced day, the duplicate must still read as the
+          // no-op it is, not a spurious "you're on a date" error. advanceDay returns
+          // its `advanced:false` result untouched for a stale expectedDay.
+          if (expectedDay != null && getWorldState(id).day !== expectedDay) {
+            return await advanceDay(id, expectedDay);
+          }
+          // A date is a live scene the clock must not run past: sleeping now would reset
+          // stamina mid-date and misfile the date's events onto the new day.
+          assertNoActiveDate(id);
+          return await advanceDay(id, expectedDay);
+        } finally {
+          endWorldAdvance(id);
+        }
+      });
     },
   );
 
@@ -130,6 +156,16 @@ export async function worldRoutes(app: FastifyInstance): Promise<void> {
     const { id } = req.params as { id: string };
     getWorld(id);
     return { date: getActiveDateForWorld(id) };
+  });
+
+  // The newest END-OF-DATE report the client hasn't acknowledged — a date whose
+  // concluding HTTP response was lost to a refresh/close mid-evaluation. Delivery
+  // retires the report (deliver-once), so it can never haunt later visits; the
+  // POST /conversations/:id/result-seen ack covers the live (non-lost) path.
+  app.get('/worlds/:id/pending-date-result', { schema: docSchema({ tags: ['worlds'], summary: 'Get the unacknowledged end-of-date report, if any' }) }, async (req) => {
+    const { id } = req.params as { id: string };
+    getWorld(id);
+    return { result: getPendingDateResult(id) };
   });
 
   app.get('/worlds/:id/weather', { schema: docSchema({ tags: ['worlds'], summary: 'Get current world weather' }) }, async (req) => {

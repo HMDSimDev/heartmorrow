@@ -79,28 +79,40 @@ export function openDatabase(filePath: string): Db {
     },
     transaction<T>(fn: () => T): T {
       // Nested transactions use SAVEPOINTs so services can compose safely.
-      if (depth === 0) {
+      // `level` is the depth THIS call opened at; every exit path restores depth
+      // to exactly that. The old +=/-= bookkeeping decremented BEFORE COMMIT/
+      // RELEASE inside the try — if that exec threw (e.g. SQLITE_BUSY from a
+      // second process), the catch decremented AGAIN, driving the counter to -1
+      // and permanently wedging every later transaction on this connection
+      // (`SAVEPOINT sp_-1` is a syntax error).
+      const level = depth;
+      if (level === 0) {
         raw.exec('BEGIN');
       } else {
-        raw.exec(`SAVEPOINT sp_${depth}`);
+        raw.exec(`SAVEPOINT sp_${level}`);
       }
-      depth += 1;
+      depth = level + 1;
       try {
         const result = fn();
-        depth -= 1;
-        if (depth === 0) {
+        if (level === 0) {
           raw.exec('COMMIT');
         } else {
-          raw.exec(`RELEASE sp_${depth}`);
+          raw.exec(`RELEASE sp_${level}`);
         }
+        depth = level;
         return result;
       } catch (err) {
-        depth -= 1;
-        if (depth === 0) {
-          raw.exec('ROLLBACK');
-        } else {
-          raw.exec(`ROLLBACK TO sp_${depth}`);
-          raw.exec(`RELEASE sp_${depth}`);
+        depth = level;
+        try {
+          if (level === 0) {
+            raw.exec('ROLLBACK');
+          } else {
+            raw.exec(`ROLLBACK TO sp_${level}`);
+            raw.exec(`RELEASE sp_${level}`);
+          }
+        } catch {
+          // A failed rollback must not mask the original error; depth is already
+          // restored, so the next transaction still starts from a clean count.
         }
         throw err;
       }

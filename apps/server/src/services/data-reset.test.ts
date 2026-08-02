@@ -6,7 +6,7 @@ import { applyRelationshipChange } from './stat-service';
 import { getRelationship } from './relationship-service';
 import { ensureWorldState } from './world-clock-service';
 import { addMoney, getOrCreatePlayer } from './player-service';
-import { charactersRepo, messagesRepo, sessionsRepo, worldStatesRepo } from '../db/repositories';
+import { charactersRepo, messagesRepo, playersRepo, sessionsRepo, worldStatesRepo } from '../db/repositories';
 
 beforeEach(() => resetDb());
 
@@ -25,6 +25,17 @@ describe('total reset', () => {
     expect(ensureWorldState(world.id).stamina).toBe(ensureWorldState(world.id).staminaMax);
     expect(getOrCreatePlayer().money).toBe(DEFAULT_STARTING_MONEY);
     expect(charactersRepo.list().length).toBe(1); // authored content kept
+  });
+
+  it('wipes career progress (regression: reset kept every level-gated job unlocked)', () => {
+    seedWorldAndCharacter();
+    const player = getOrCreatePlayer();
+    playersRepo.update({ ...player, career: { craft: { xp: 10_000, level: 5 } }, updatedAt: Date.now() });
+    expect(getOrCreatePlayer().career['craft']?.level).toBe(5);
+
+    resetProgress();
+
+    expect(getOrCreatePlayer().career).toEqual({}); // job mastery is playthrough progress
   });
 });
 

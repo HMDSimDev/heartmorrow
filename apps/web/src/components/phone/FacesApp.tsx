@@ -122,8 +122,10 @@ export function FacesApp() {
               disabled={posting}
             />
             <div className="fcs-compose-foot">
-              <span className={`fcs-compose-count${draft.length > 450 ? ' is-near' : ''}`} aria-hidden="true">
-                {draft.length}/500
+              {/* Derived from the SAME constant as the textarea's maxLength — the
+                  counter once hardcoded a retired 500 cap and cried wolf at 450. */}
+              <span className={`fcs-compose-count${draft.length > GEN_TEXT.line - 50 ? ' is-near' : ''}`} aria-hidden="true">
+                {draft.length}/{GEN_TEXT.line}
               </span>
               <button
                 className="btn primary sm fcs-post-btn"

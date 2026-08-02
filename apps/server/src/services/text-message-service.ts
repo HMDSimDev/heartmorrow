@@ -267,53 +267,59 @@ export async function sendPlayerText(
   // the character's reply, so we skip the normal reply + judge flow. reactToGift is
   // fail-safe (nothing applied or consumed if the model can't read it); only then do
   // we record the player's text WITH the gift attached and the reaction as the reply.
+  // Same per-character lock as the normal send: unserialized, a gift pair could
+  // land BETWEEN a pending player text and its in-flight reply — mis-ordering the
+  // thread and letting the retry classifier read the gift reaction as the answer
+  // to a text that was never answered.
   if (giftId) {
-    const r = await reactToGift({
-      characterId,
-      inventoryItemId: giftId,
-      playerId: playerIdForWorldOrDefault(character.worldId),
-      scene: 'text',
-      playerText: text,
+    return withKeyedLock(`text-reply:${characterId}`, async () => {
+      const r = await reactToGift({
+        characterId,
+        inventoryItemId: giftId,
+        playerId: playerIdForWorldOrDefault(character.worldId),
+        scene: 'text',
+        playerText: text,
+      });
+      const giftThread = getOrCreateThread(characterId, playerId);
+      const sentAt = Date.now();
+      const giftPlayerMessage = textMessagesRepo.insert(
+        TextMessageSchema.parse({
+          id: newId('txt'),
+          threadId: giftThread.id,
+          sender: 'player',
+          body: text,
+          status: 'delivered',
+          dayNumber: day,
+          // Claimed already — it's a gift the player SENT, not one to accept.
+          attachment: { shopItemId: r.item.id, name: r.item.name, claimed: true },
+          deliveredAt: sentAt,
+          createdAt: sentAt,
+        }),
+      );
+      if (character.worldId) stampLastSeen(characterId, day ?? 1);
+      const giftReplyAt = Date.now();
+      const giftReply = textMessagesRepo.insert(
+        TextMessageSchema.parse({
+          id: newId('txt'),
+          threadId: giftThread.id,
+          sender: 'character',
+          body: r.reaction.line.trim(),
+          status: 'delivered',
+          dayNumber: day,
+          deliveredAt: giftReplyAt,
+          createdAt: giftReplyAt,
+        }),
+      );
+      threadsRepo.update({ ...giftThread, lastMessageAt: giftReplyAt, updatedAt: giftReplyAt });
+      recordEvent('text_reply', { characterId, tone: 'gift' });
+      return {
+        playerMessage: giftPlayerMessage,
+        reply: giftReply,
+        error: null,
+        relationshipDelta: r.appliedDeltas,
+        giftReaction: { line: r.reaction.line.trim(), expression: r.reaction.expression, sentiment: r.sentiment, itemName: r.item.name },
+      };
     });
-    const giftThread = getOrCreateThread(characterId, playerId);
-    const sentAt = Date.now();
-    const giftPlayerMessage = textMessagesRepo.insert(
-      TextMessageSchema.parse({
-        id: newId('txt'),
-        threadId: giftThread.id,
-        sender: 'player',
-        body: text,
-        status: 'delivered',
-        dayNumber: day,
-        // Claimed already — it's a gift the player SENT, not one to accept.
-        attachment: { shopItemId: r.item.id, name: r.item.name, claimed: true },
-        deliveredAt: sentAt,
-        createdAt: sentAt,
-      }),
-    );
-    if (character.worldId) stampLastSeen(characterId, day ?? 1);
-    const giftReplyAt = Date.now();
-    const giftReply = textMessagesRepo.insert(
-      TextMessageSchema.parse({
-        id: newId('txt'),
-        threadId: giftThread.id,
-        sender: 'character',
-        body: r.reaction.line.trim(),
-        status: 'delivered',
-        dayNumber: day,
-        deliveredAt: giftReplyAt,
-        createdAt: giftReplyAt,
-      }),
-    );
-    threadsRepo.update({ ...giftThread, lastMessageAt: giftReplyAt, updatedAt: giftReplyAt });
-    recordEvent('text_reply', { characterId, tone: 'gift' });
-    return {
-      playerMessage: giftPlayerMessage,
-      reply: giftReply,
-      error: null,
-      relationshipDelta: r.appliedDeltas,
-      giftReaction: { line: r.reaction.line.trim(), expression: r.reaction.expression, sentiment: r.sentiment, itemName: r.item.name },
-    };
   }
 
   // Load + base64 the attached photo (if any) once, for both the reply and the judge.
@@ -449,7 +455,10 @@ async function generateTextReply(
     applied = base;
     if (gain > 0) {
       const rel = getRelationship(character.id);
-      const bucket = day ?? 0;
+      // Cap bucket: the in-world day, or the real-world date for a world-less
+      // character (no clock). A constant fallback froze `usedToday` forever,
+      // silently turning the DAILY gain cap into a LIFETIME cap.
+      const bucket = day ?? `rt:${new Date().toISOString().slice(0, 10)}`;
       const usedToday =
         rel.flags['text:gainDay'] === bucket && typeof rel.flags['text:gainAmt'] === 'number'
           ? (rel.flags['text:gainAmt'] as number)
@@ -585,6 +594,13 @@ export async function regenerateTextReply(
       }
     }
 
+    // Drop the old reply BEFORE building the transcript: the prompt must end on
+    // the player's prompting text, or the model reads the old reply as the last
+    // turn and writes a FOLLOW-UP to its own line instead of a rewrite (the date
+    // path orders this the same way — drop, then stream). Restored verbatim on
+    // failure below, so a bad regenerate never destroys the line you already had.
+    textMessagesRepo.delete(last.id);
+
     // Reply-only generation. KEEP IN SYNC with generateTextReply's reply call above —
     // same prompt inputs, minus the judge (which must not re-run on a regenerate).
     const settings = getLlmSettings();
@@ -614,15 +630,16 @@ export async function regenerateTextReply(
       { settings: effectiveSettings, task: 'Rewrite the character’s last text reply in character (short).', schemaName: 'TextReply' },
     );
 
-    // Failure: keep the original reply intact (no deltas were ever in play here).
+    // Failure: restore the original reply row verbatim (same id/timestamps) —
+    // the thread reads exactly as before, and no deltas were ever in play here.
     if (!result.ok) {
+      textMessagesRepo.insert(last);
       recordEvent('text_regen_failed', { characterId: character.id, error: result.error });
       return { playerMessage: prompting, reply: last, error: result.error, relationshipDelta: {} };
     }
 
-    // Success: swap the old reply for the new one. No judge — the relationship is
-    // unchanged from before the regenerate.
-    textMessagesRepo.delete(last.id);
+    // Success: the old reply is already gone — persist the rewrite. No judge —
+    // the relationship is unchanged from before the regenerate.
     const replyAt = Date.now();
     const reply = textMessagesRepo.insert(
       TextMessageSchema.parse({

@@ -142,6 +142,50 @@ describe('generateFeedForDay — event-driven NPC posts', () => {
     expect(milestone[0]!.authorId).toBe(ex.id); // the linked onlooker, not the subject
   });
 
+  it("picks up events the rollover itself stamped with the NEW day (no one-day deferral)", async () => {
+    // Regression: neglect-driven breakups are recorded DURING the rollover with
+    // the new day's stamp; a strictly-yesterday filter deferred their post a
+    // full extra day. The per-event idempotency key keeps the overlap safe.
+    const { world, character } = seedWorldAndCharacter();
+    markDated(character.id);
+    warmUp(character.id);
+    ensureWorldState(world.id);
+    recordEvent('jealousy_triggered', { characterId: character.id, link: null, committed: false, day: 2 });
+    setAdapterOverride(new ScriptedAdapter([postReply('what a morning.')]));
+
+    await generateFeedForDay(world.id, 2); // same-day pickup
+
+    expect(feedPostsRepo.listByWorld(world.id, 50).filter((p) => p.kind === 'jealousy')).toHaveLength(1);
+  });
+
+  it('reacting or commenting on a missing post is a 404, not an FK 500', async () => {
+    seedWorldAndCharacter();
+    expect(() => reactToPost('post_missing', 'like')).toThrow(/not found/i);
+    await expect(commentOnPost('post_missing', 'hello?')).rejects.toThrow(/not found/i);
+  });
+
+  it("another world's event flood cannot evict this world's news from the scan window", async () => {
+    // Regression: the scan used a GLOBAL newest-300 window, so a busy second
+    // world pushed this world's yesterday events out — and the permanent
+    // per-event idempotency key meant the missed post never appeared later.
+    const { world, character } = seedWorldAndCharacter();
+    markDated(character.id);
+    warmUp(character.id);
+    ensureWorldState(world.id);
+    recordEvent('jealousy_triggered', { characterId: character.id, link: null, committed: false, day: 1 });
+
+    // A second world logs 300+ NEWER events before this world's day-start runs.
+    for (let i = 0; i < 320; i += 1) {
+      recordEvent('stamina_spent', { worldId: 'w_other_busy', cost: 1, remaining: 1, phase: 'morning' });
+    }
+
+    setAdapterOverride(new ScriptedAdapter([postReply('still hurts.')]));
+    await generateFeedForDay(world.id, 2);
+
+    const jealousy = feedPostsRepo.listByWorld(world.id, 50).filter((p) => p.kind === 'jealousy');
+    expect(jealousy).toHaveLength(1);
+  });
+
   it('is IDEMPOTENT — re-running the same day does not duplicate event-driven posts', async () => {
     const { world, character } = seedWorldAndCharacter();
     markDated(character.id);

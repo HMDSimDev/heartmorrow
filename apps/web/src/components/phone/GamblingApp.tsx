@@ -38,7 +38,17 @@ export function GamblingApp() {
     [activeWorldId, dayTick],
   );
 
-  // Mirror the loaded wallet locally; auto-open a hand left mid-play (once).
+  // A world switch gets its own auto-resume: the once-per-mount latch otherwise
+  // left world B's in-flight hand un-opened (the casino sat on the lobby).
+  const lastWorldRef = useRef(activeWorldId);
+  useEffect(() => {
+    if (lastWorldRef.current === activeWorldId) return;
+    lastWorldRef.current = activeWorldId;
+    resumed.current = false;
+    setView('lobby');
+  }, [activeWorldId]);
+
+  // Mirror the loaded wallet locally; auto-open a hand left mid-play (once per world).
   useEffect(() => {
     if (!state.data) return;
     setWallet(state.data.wallet);

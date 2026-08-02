@@ -9,6 +9,7 @@ import {
   type Epilogue,
 } from '@dsim/shared';
 import { parseJsonStrict } from '../lib/json';
+import { playerIdForWorldOrDefault } from '../lib/ids';
 import { charactersRepo, endingsRepo } from '../db/repositories';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
@@ -92,7 +93,11 @@ export async function maybeReachEnding(
     EpilogueSchema,
     buildEpilogueMessages({
       character,
-      playerName: getOrCreatePlayer(playerId).name,
+      // The PER-WORLD player profile carries the persona name — the raw legacy
+      // `playerId` default here minted a fresh row literally named "Player" and
+      // put that name in the once-only epilogue. (Keying the endings ROW on the
+      // default id stays correct: endings are world-isolated via the character.)
+      playerName: getOrCreatePlayer(playerIdForWorldOrDefault(character.worldId)).name,
       chronicle: getChronicle(characterId, playerId),
     }),
     {

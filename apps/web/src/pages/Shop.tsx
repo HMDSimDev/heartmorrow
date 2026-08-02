@@ -130,15 +130,23 @@ export function Shop() {
   const save = async () => {
     setSaving(true);
     setError(undefined);
+    let saved = 0;
     try {
-      const kept = drafts.filter((d) => d.keep).map((d) => d.item);
-      for (const item of kept) await api.createShopItem(item);
-      setNote({ tone: 'brass', seal: '❧', kicker: t('shop.resultStocked'), text: t('shop.saved', { count: kept.length }) });
+      // Create one at a time, REMOVING each draft as it lands: a mid-loop failure
+      // then leaves only the still-unsaved drafts checked, so retrying Save can't
+      // re-create the ones that already succeeded (duplicate catalog entries).
+      for (const d of drafts.filter((x) => x.keep)) {
+        await api.createShopItem(d.item);
+        saved += 1;
+        setDrafts((ds) => ds.filter((x) => x !== d));
+      }
+      setNote({ tone: 'brass', seal: '❧', kicker: t('shop.resultStocked'), text: t('shop.saved', { count: saved }) });
       setGenOpen(false);
       setDrafts([]);
       state.reload();
     } catch (e) {
       setError(errorMessage(e));
+      if (saved > 0) state.reload(); // show the items that DID land
     } finally {
       setSaving(false);
     }

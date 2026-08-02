@@ -65,6 +65,11 @@ export function PromptEditor() {
   const dirty = selected ? draft !== selected.currentText : false;
 
   const pick = (e: PromptCatalogEntry) => {
+    if (e.id === selectedId) return;
+    // A rail click used to overwrite `draft` unconditionally — silently discarding
+    // an unsaved override edit. Ask first (the editors use useDraft for this; a
+    // confirm is enough here since overrides are usually short, deliberate edits).
+    if (dirty && !window.confirm(t('settings.prompts.discardConfirm'))) return;
     setSelectedId(e.id);
     setDraft(e.currentText);
     setShowDefault(false);

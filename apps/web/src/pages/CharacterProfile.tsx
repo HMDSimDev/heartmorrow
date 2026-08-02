@@ -109,8 +109,18 @@ export function CharacterProfile() {
   };
 
   const deleteMemory = async (memoryId: string) => {
-    await api.deleteMemory(memoryId);
-    bundle.reload();
+    if (busy) return; // a double-click must not fire two DELETEs
+    setBusy(true);
+    try {
+      await api.deleteMemory(memoryId);
+      bundle.reload();
+    } catch (e) {
+      // Surface the failure like duplicate/remove above — silently swallowing it
+      // left the memory on screen with the click reading as a dead no-op.
+      alert(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (

@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
@@ -61,6 +63,30 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
     list: false,
   });
 
+  // Serve the built web client when it exists (single-container / production
+  // image). Guarded by existsSync so local two-process dev — where Vite serves
+  // the client on :5173 — skips this branch entirely and is unaffected.
+  const webDist = path.resolve(config.serverRoot, '../web/dist');
+  if (fs.existsSync(webDist)) {
+    await app.register(fastifyStatic, {
+      root: webDist,
+      prefix: '/',
+      // Register a route per built asset (no catch-all), so unmatched client
+      // routes fall through to the SPA fallback below. This registration
+      // decorates reply.sendFile (the uploads one above opted out).
+      wildcard: false,
+      index: 'index.html',
+    });
+    // SPA fallback: any non-API, non-upload GET that matched no asset returns
+    // index.html so client-side deep links (e.g. /games) resolve.
+    app.setNotFoundHandler((req, reply) => {
+      if (req.method === 'GET' && !req.url.startsWith('/api') && !req.url.startsWith('/uploads')) {
+        return reply.sendFile('index.html');
+      }
+      reply.code(404).send({ error: 'Not found.' });
+    });
+  }
+
   app.setErrorHandler((err: Error & { statusCode?: number }, req, reply) => {
     if (err instanceof AppError) {
       reply.code(err.statusCode).send({ error: err.message, details: err.details });
@@ -95,6 +121,17 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
         },
         servers: [{ url: `http://${config.host}:${config.port}` }],
       },
+    });
+    // Lift docSchema's DOC-ONLY body schemas into `schema.body` so the generator
+    // documents them. Runtime servers never do this: a validating body schema
+    // rejects bodiless POSTs ("must be object" for an undefined body), and
+    // parseInput() is the authoritative validator either way.
+    app.addHook('onRoute', (route) => {
+      const s = route.schema as { docBody?: unknown; body?: unknown } | undefined;
+      if (s?.docBody) {
+        s.body = s.docBody;
+        delete s.docBody;
+      }
     });
   }
 

@@ -14,6 +14,8 @@ import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
 import { evaluateRelationshipStrain } from './breakup-service';
 import { addPlayerMessage, attemptPlayerBreakupIntent, confirmPlayerBreakup, createSession } from './conversation-service';
+import { ensureWorldState } from './world-clock-service';
+import { LAST_DATE_FLAG } from '@dsim/shared';
 import { generateDailyTextsForDay } from './text-generation-service';
 import { textMessagesRepo, threadsRepo } from '../db/repositories';
 
@@ -190,6 +192,22 @@ describe('endgame: strain, on-the-rocks & breakups', () => {
     expect(isBrokenUp(rel)).toBe(true);
     expect(rel.flags['status']).toBe('none');
     expect(rel.flags['beat:pending']).toBeUndefined();
+  });
+
+  it('confirming a breakup still settles the date costs (regression: free exit)', () => {
+    // The breakup path used to flip `ended` directly, skipping the venue charge,
+    // the day action, and the lastDate stamp — a free way out of any date.
+    const { world, character } = seedWorldAndCharacter();
+    commit(character.id, 'exclusive');
+    setWarmth(character.id, 70);
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    addPlayerMessage(session.id, 'I think we should break up.');
+    const staminaBefore = ensureWorldState(world.id).stamina;
+
+    confirmPlayerBreakup(session.id);
+
+    expect(ensureWorldState(world.id).stamina).toBeLessThan(staminaBefore);
+    expect(getRelationship(character.id).flags[LAST_DATE_FLAG]).toBe(1);
   });
 
   it('player-initiated breakup: a non-genuine message (the opposite) is ignored', async () => {

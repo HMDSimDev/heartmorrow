@@ -6,6 +6,8 @@ import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
 import { listMemories } from './memory-service';
 import { addPlayerMessage, createSession } from './conversation-service';
 import { attemptDtr } from './dtr-service';
+import { ensureWorldState } from './world-clock-service';
+import { LAST_DATE_FLAG } from '@dsim/shared';
 
 /** Raise warmth to the given per-stat value (e.g. 50 → "getting close"). */
 function makeWarm(characterId: string, to: number): void {
@@ -66,6 +68,24 @@ describe('define-the-relationship', () => {
     expect(res.decision).toBe('backfire');
     expect(res.ended).toBe(true);
     expect(getRelationship(character.id).tension).toBeGreaterThan(before);
+  });
+
+  it('backfire settles the date costs (day action + lastDate stamp) like any other end', async () => {
+    // Regression: a backfired DTR used to end the date FREE — no stamina, no
+    // lastDate stamp — making it a repeatable escape from every date cost.
+    const { world, character } = seedWorldAndCharacter();
+    makeWarm(character.id, 50);
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    addPlayerMessage(session.id, 'Be mine?');
+    const staminaBefore = ensureWorldState(world.id).stamina;
+    setAdapterOverride(reply({ decision: 'backfire', line: 'Whoa, way too soon.', reason: 'pushed' }));
+
+    const res = await attemptDtr(session.id);
+    expect(res.ended).toBe(true);
+    expect(ensureWorldState(world.id).stamina).toBeLessThan(staminaBefore);
+    expect(getRelationship(character.id).flags[LAST_DATE_FLAG]).toBe(1);
+    // An uncommitted bond can't break up — strain stays internal ('none'/cooled).
+    expect(res.strain).toBeNull();
   });
 
   it('rejects an attempt when warmth has not unlocked the next rung', async () => {

@@ -120,17 +120,30 @@ function backfillWorld(worldId: string, currentDay: number): void {
   // so one world's calendar never narrates another's day).
   const events = eventsRepo.listSinceByWorld(worldId, 0);
   const byDay = new Map<number, GameEvent[]>();
+  const put = (d: number, e: GameEvent) => {
+    const arr = byDay.get(d);
+    if (arr) arr.push(e);
+    else byDay.set(d, [e]);
+  };
   let bucket: GameEvent[] = [];
   for (const e of events) {
     if (e.type === 'day_advanced') {
       const newDay = Number((e.payload as Record<string, unknown>).day);
       if (Number.isFinite(newDay) && newDay >= 2) {
         const endedDay = newDay - 1;
-        byDay.set(endedDay, (byDay.get(endedDay) ?? []).concat(bucket));
+        for (const b of bucket) put(endedDay, b);
       }
       bucket = [];
     } else {
-      bucket.push(e);
+      // Prefer the event's OWN day stamp. The rollover records wealth events for
+      // the NEW day (and world-sim events for the ENDED day) around its
+      // day_advanced marker, so pure marker-position bucketing filed them under
+      // the wrong day — a reconstructed record showed rent/dividend/market beats
+      // the live record for that day would not, and the same event could appear
+      // in two adjacent days. Position stays the fallback for day-less events.
+      const d = Number((e.payload as Record<string, unknown>).day);
+      if (Number.isFinite(d) && d >= 1) put(d, e);
+      else bucket.push(e);
     }
   }
 

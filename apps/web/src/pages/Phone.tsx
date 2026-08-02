@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { PHASE_ICONS } from '@dsim/shared';
@@ -60,6 +61,9 @@ const DOCK_IDS: Array<AppDef['id']> = ['messages', 'email', 'moments', 'settings
 const SETTINGS_APP: AppDef = { id: 'settings', icon: 'settings', labelKey: 'phone.app.settings', tint: 'moon' };
 const ALL_APPS: AppDef[] = [...APPS, SETTINGS_APP];
 
+// Every routable app id (for validating the ?app= URL param).
+const APP_IDS = new Set<string>(['home', ...ALL_APPS.map((a) => a.id)]);
+
 /** Derive a plausible battery % from the world's daily stamina consumption.
  *  Full stamina = high battery; spent stamina = draining battery.
  *  Falls back to a stable mid-value when no world state is available. */
@@ -92,19 +96,40 @@ function greetingKeyForPhase(phase: string | undefined): CommonKey {
 export function Phone() {
   const { t } = useTranslation();
   const { worldState, activeWorldId, activeWorld, dayTick, theme } = useAppData();
-  const [app, setApp] = useState<AppId>('home');
+  // The open app lives in the URL (?app=…) rather than component state, so a
+  // refresh or a browser back after a tab excursion returns to the same app
+  // instead of resetting to the home grid (and it makes apps deep-linkable).
+  const [params, setParams] = useSearchParams();
+  const rawApp = params.get('app') ?? 'home';
+  const app: AppId = APP_IDS.has(rawApp) ? (rawApp as AppId) : 'home';
+  const setApp = useCallback(
+    (next: AppId, opts?: { replace?: boolean }) => {
+      setParams(next === 'home' ? {} : { app: next }, { replace: opts?.replace ?? false });
+    },
+    [setParams],
+  );
   const [inbox, setInbox] = useState({ unreadTexts: 0, unreadEmails: 0, feedUnread: 0, landlordUnread: 0 });
 
   useEffect(() => {
-    api.phoneInbox(activeWorldId ?? undefined).then(setInbox).catch(() => undefined);
+    // `live` drops a superseded fetch so a world switch mid-flight can't paint the
+    // previous world's badge counts.
+    let live = true;
+    api
+      .phoneInbox(activeWorldId ?? undefined)
+      .then((r) => live && setInbox(r))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
   }, [app, activeWorldId, dayTick]);
 
-  // If the active world disables the wealth app you're currently in, bounce home.
+  // If the active world disables the wealth app you're currently in, bounce home
+  // (replace, so Back doesn't step through a URL the world can't render).
   useEffect(() => {
-    if (app === 'property' && !activeWorld?.featureFlags?.property) setApp('home');
-    if (app === 'market' && !activeWorld?.featureFlags?.stockMarket) setApp('home');
-    if (app === 'gambling' && !activeWorld?.featureFlags?.gambling) setApp('home');
-  }, [app, activeWorld]);
+    if (app === 'property' && !activeWorld?.featureFlags?.property) setApp('home', { replace: true });
+    if (app === 'market' && !activeWorld?.featureFlags?.stockMarket) setApp('home', { replace: true });
+    if (app === 'gambling' && !activeWorld?.featureFlags?.gambling) setApp('home', { replace: true });
+  }, [app, activeWorld, setApp]);
 
   const badgeFor = (id: AppId) =>
     id === 'messages'

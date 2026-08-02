@@ -812,6 +812,16 @@ export const DtrResponseSchema = z.object({
   relationship: RelationshipSchema,
   /** True when a backfire ended the date. */
   ended: z.boolean().default(false),
+  /** Set when the backfire's tension spike changed the relationship's standing
+   *  (already applied server-side): a warning (`on_the_rocks`) or a full breakup. */
+  strain: z
+    .object({
+      kind: z.enum(['broke_up', 'on_the_rocks']),
+      /** Player-facing summary line for the banner, when the strain pass wrote one. */
+      line: z.string().nullable().default(null),
+    })
+    .nullable()
+    .default(null),
 });
 export type DtrResponse = z.infer<typeof DtrResponseSchema>;
 

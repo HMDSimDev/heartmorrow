@@ -136,10 +136,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
   const [activeDateLoaded, setActiveDateLoaded] = useState(false);
 
+  // The world the app is CURRENTLY on, readable synchronously by async callbacks.
+  // Every world-keyed refresh below captures activeWorldId at call time and drops
+  // its response when the app has moved on — without this, switching world A→B
+  // while A's request is in flight could land A's player/date/clock in B's UI
+  // (a stale date even locks Sleep/Work/Minigames against the wrong world).
+  // Synced in the FIRST effect so it commits before the refresh effects below run.
+  const worldRef = useRef(activeWorldId);
+  useEffect(() => {
+    worldRef.current = activeWorldId;
+  }, [activeWorldId]);
+
   const reloadPlayer = useCallback(async () => {
+    const forWorld = activeWorldId;
     try {
       // The player profile (money + persona) is per-world; fetch the active world's.
-      setPlayer(await api.getPlayer(activeWorldId ?? undefined));
+      const p = await api.getPlayer(forWorld ?? undefined);
+      if (worldRef.current === forWorld) setPlayer(p);
     } catch {
       /* server may not be up yet */
     }
@@ -164,8 +177,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   const refreshInbox = useCallback(async () => {
+    const forWorld = activeWorldId;
     try {
-      setUnreadTexts((await api.phoneInbox(activeWorldId ?? undefined)).unreadTexts);
+      const inbox = await api.phoneInbox(forWorld ?? undefined);
+      if (worldRef.current === forWorld) setUnreadTexts(inbox.unreadTexts);
     } catch {
       /* server may not be up yet */
     }
@@ -174,20 +189,24 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   // action-locking. Refetched on world change; the Date page also drives explicit
   // refreshes as a date starts and ends.
   const refreshActiveDate = useCallback(async (): Promise<ActiveDate | null> => {
-    if (!activeWorldId) {
+    const forWorld = activeWorldId;
+    if (!forWorld) {
       setActiveDate(null);
       setActiveDateLoaded(true);
       return null;
     }
     try {
-      const date = (await api.activeDate(activeWorldId)).date;
+      const date = (await api.activeDate(forWorld)).date;
+      // Highest blast radius of the world races: a stale date drives the Sleep/
+      // Work/Minigames locks and the Date-tab auto-resume — drop it hard.
+      if (worldRef.current !== forWorld) return null;
       setActiveDate(date);
       return date;
     } catch {
       /* leave the last-known value on a transient error */
       return null;
     } finally {
-      setActiveDateLoaded(true);
+      if (worldRef.current === forWorld) setActiveDateLoaded(true);
     }
   }, [activeWorldId]);
 
@@ -225,14 +244,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshWorldState = useCallback(async () => {
-    if (!activeWorldId) {
+    const forWorld = activeWorldId;
+    if (!forWorld) {
       setWorldState(null);
       return;
     }
     try {
-      setWorldState(await api.getWorldState(activeWorldId));
+      const state = await api.getWorldState(forWorld);
+      if (worldRef.current === forWorld) setWorldState(state);
     } catch {
-      setWorldState(null);
+      if (worldRef.current === forWorld) setWorldState(null);
     }
   }, [activeWorldId]);
 

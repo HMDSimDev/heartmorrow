@@ -380,7 +380,7 @@ const ONBOARDING_EMPTY: OnboardingDraft = {
  *  set up your persona, import people from other worlds, then a how-to-play welcome. */
 export function WorldOnboarding() {
   const { t } = useTranslation(['pages', 'common']);
-  const { worlds, reloadWorlds, setActiveWorld, reloadPlayer } = useAppData();
+  const { worlds, reloadWorlds, setActiveWorld } = useAppData();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState<'blank' | 'clone'>('blank');
@@ -582,8 +582,10 @@ export function WorldOnboarding() {
 
   const finish = () => {
     if (!world) return;
+    // No manual reloadPlayer() here: this callback still closes over the PREVIOUS
+    // world, so calling it fired a fetch for that world racing the new one. The
+    // app-context effect keyed on activeWorldId reloads the new world's player.
     setActiveWorld(world.id);
-    void reloadPlayer();
     navigate('/');
   };
 

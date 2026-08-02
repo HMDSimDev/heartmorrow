@@ -128,11 +128,13 @@ export function PropertyApp() {
     });
 
   const doEndLease = async (pv: PropertyView) => {
-    setPendingEndLease(null);
+    // Keep the confirm dialog mounted while the request runs — clearing it FIRST
+    // unmounted the dialog instantly, so its busy state could never render.
     await withBusy(pv.property.id, async () => {
       await api.endLease(activeWorldId!, pv.property.id);
       setNote({ tone: 'ember', seal: '✖', kicker: t('property.resultMovedOut'), text: t('property.toast.movedOut', { name: pv.property.name }) });
     });
+    setPendingEndLease(null);
   };
 
   // ——— Creator: delete ——————————————————————————————————————————————————
@@ -195,15 +197,23 @@ export function PropertyApp() {
     if (!activeWorldId) return;
     setSaving(true);
     setError(undefined);
+    let saved = 0;
     try {
-      const kept = drafts.filter((d) => d.keep).map((d) => d.item);
-      for (const item of kept) await api.createProperty({ ...item, worldId: activeWorldId });
-      setNote({ tone: 'brass', seal: '❧', kicker: t('property.resultSaved'), text: t('property.toast.savedDrafts', { count: kept.length }) });
+      // Remove each draft as its create lands: a mid-loop failure then leaves
+      // only the still-unsaved drafts checked, so retrying Save can't re-create
+      // the ones that already succeeded (duplicate properties).
+      for (const d of drafts.filter((x) => x.keep)) {
+        await api.createProperty({ ...d.item, worldId: activeWorldId });
+        saved += 1;
+        setDrafts((ds) => ds.filter((x) => x !== d));
+      }
+      setNote({ tone: 'brass', seal: '❧', kicker: t('property.resultSaved'), text: t('property.toast.savedDrafts', { count: saved }) });
       setGenOpen(false);
       setDrafts([]);
       state.reload();
     } catch (e) {
       setError(errorMessage(e));
+      if (saved > 0) state.reload(); // show the properties that DID land
     } finally {
       setSaving(false);
     }

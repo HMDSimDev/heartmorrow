@@ -463,6 +463,10 @@ export const api = {
     get<Array<{ characterId: string; available: boolean; reason: string | null }>>(`/worlds/${worldId}/availability`),
   /** The world's single in-progress date (for auto-resume + locking actions), or null. */
   activeDate: (worldId: string) => get<{ date: ActiveDate | null }>(`/worlds/${worldId}/active-date`),
+  /** The newest end-of-date report the client never acknowledged (lost to a
+   *  refresh/close mid-evaluation), or null. Ack via markDateResultSeen. */
+  pendingDateResult: (worldId: string) =>
+    get<{ result: EndSessionResponse | null }>(`/worlds/${worldId}/pending-date-result`),
   worldWeather: (worldId: string) => get<WorldWeather>(`/worlds/${worldId}/weather`),
   worldCalendar: (worldId: string) => get<WorldCalendar>(`/worlds/${worldId}/calendar`),
 
@@ -521,6 +525,7 @@ export const api = {
     post<{ playerMessage: Message; reply: Message }>(`/conversations/${id}/messages`, { text }),
   summarize: (id: string) => post<ConversationSession>(`/conversations/${id}/summarize`),
   endSession: (id: string) => post<EndSessionResponse>(`/conversations/${id}/end`),
+  markDateResultSeen: (id: string) => post<{ ok: true }>(`/conversations/${id}/result-seen`),
   defineRelationship: (id: string) => post<DtrResponse>(`/conversations/${id}/dtr`),
   giftOnDate: (id: string, inventoryItemId: string) =>
     post<GiftReactionResponse>(`/conversations/${id}/gift`, { inventoryItemId }),

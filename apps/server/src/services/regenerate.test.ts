@@ -73,6 +73,41 @@ describe('date reply regeneration', () => {
     const { messages } = getSessionWithMessages(session.id);
     expect(messages[messages.length - 1]!.metadata?.walkout).toBe(true);
   });
+
+  it('refuses gift reactions and DTR answers (their metadata is load-bearing)', () => {
+    // Regression: regenerating a gift reaction replaced it with a metadata-less
+    // reply, un-hiding the gift from the evaluator's `!metadata.gift` filter —
+    // the gift moment was scored a SECOND time on top of its applied deltas.
+    const { character } = seedWorldAndCharacter();
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    addPlayerMessage(session.id, 'I got you something.');
+    messagesRepo.insert(
+      MessageSchema.parse({
+        id: 'msg_gift_reaction',
+        sessionId: session.id,
+        role: 'character',
+        text: 'You remembered! I love it.',
+        metadata: { gift: true },
+        createdAt: Date.now(),
+      }),
+    );
+    expect(() => dropReplyForRegen(session.id)).toThrow(/regenerated/i);
+
+    messagesRepo.insert(
+      MessageSchema.parse({
+        id: 'msg_dtr_answer',
+        sessionId: session.id,
+        role: 'character',
+        text: 'Yes. Let’s be a thing.',
+        metadata: { dtr: 'accept' },
+        createdAt: Date.now() + 1,
+      }),
+    );
+    expect(() => dropReplyForRegen(session.id)).toThrow(/regenerated/i);
+    // Both consequence-bearing lines survive untouched.
+    const { messages } = getSessionWithMessages(session.id);
+    expect(messages.filter((m) => m.metadata?.gift || m.metadata?.dtr)).toHaveLength(2);
+  });
 });
 
 // --- text reply regeneration (regenerateTextReply) --------------------------
@@ -124,7 +159,7 @@ describe('text reply regeneration', () => {
         JSON.stringify({ engagement: 0, hostile: false, note: 'neutral' }),
       ]),
     );
-    await sendPlayerText(character.id, 'hey there');
+    const sent = await sendPlayerText(character.id, 'hey there');
 
     // The model can't produce valid JSON → the regenerate fails; the original stays.
     setAdapterOverride(new ScriptedAdapter(['not json at all']));
@@ -135,6 +170,38 @@ describe('text reply regeneration', () => {
     const msgs = textMessagesRepo.listDeliveredByThread(thread.id);
     expect(msgs.filter((m) => m.sender === 'character').length).toBe(1);
     expect(msgs[msgs.length - 1]!.body).toBe('the original reply');
+    // Restored VERBATIM — same row id, so the thread reads exactly as before.
+    expect(msgs[msgs.length - 1]!.id).toBe(sent.reply!.id);
+  });
+
+  it('prompts WITHOUT the old reply, so the model rewrites instead of following up', async () => {
+    // Regression: the transcript was built BEFORE the old reply was deleted, so
+    // the model saw its own line as the last turn and wrote the character's NEXT
+    // message — which then replaced the (often fine) original.
+    const { character } = seedWorldAndCharacter();
+    dateOnce(character.id);
+    setAdapterOverride(
+      new ScriptedAdapter([
+        JSON.stringify({ body: 'How was your day?', tone: 'warm' }),
+        JSON.stringify({ engagement: 0, hostile: false, note: 'neutral' }),
+      ]),
+    );
+    await sendPlayerText(character.id, 'hey you');
+
+    const seen: string[] = [];
+    const capture = new (class extends ScriptedAdapter {
+      override async chat(req: Parameters<ScriptedAdapter['chat']>[0]) {
+        seen.push(JSON.stringify(req));
+        return super.chat(req);
+      }
+    })([JSON.stringify({ body: 'It was lovely, thanks for asking', tone: 'warm' })]);
+    setAdapterOverride(capture);
+
+    const res = await regenerateTextReply(character.id);
+    expect(res.reply?.body).toBe('It was lovely, thanks for asking');
+    const prompt = seen.join('\n');
+    expect(prompt).toContain('hey you'); // ends on the player's prompting text…
+    expect(prompt).not.toContain('How was your day?'); // …with the old reply gone
   });
 
   it('refuses when there is no reply to regenerate', async () => {

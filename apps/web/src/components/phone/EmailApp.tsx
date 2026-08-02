@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import './phone-comms.css';
 import type { Email } from '@dsim/shared';
@@ -31,15 +31,21 @@ export function EmailApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
 
+  // Monotonic ticket (the useAsync pattern): only the newest load commits, so a
+  // slow response from the previous world/day can't overwrite the fresh inbox
+  // after a world switch or an End-day refetch.
+  const loadTicket = useRef(0);
   const load = useCallback(async () => {
+    const ticket = ++loadTicket.current;
     setLoading(true);
     setError(undefined);
     try {
-      setEmails(await api.phoneEmails(activeWorldId ?? undefined));
+      const list = await api.phoneEmails(activeWorldId ?? undefined);
+      if (ticket === loadTicket.current) setEmails(list);
     } catch (e) {
-      setError(errorMessage(e));
+      if (ticket === loadTicket.current) setError(errorMessage(e));
     } finally {
-      setLoading(false);
+      if (ticket === loadTicket.current) setLoading(false);
     }
   }, [activeWorldId, dayTick]);
 

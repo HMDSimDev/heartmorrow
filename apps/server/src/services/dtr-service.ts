@@ -20,7 +20,8 @@ import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
 import { addMemoriesFromEvaluation } from './memory-service';
 import { appendChronicleLine } from './chronicle-service';
 import { rippleSocialVouch } from './social-ripple-service';
-import { evaluateRelationshipStrain } from './breakup-service';
+import { evaluateRelationshipStrain, type StrainOutcome } from './breakup-service';
+import { settleForcedDateEnd } from './conversation-service';
 import { recordEvent } from './event-service';
 import { getLlmSettings } from './settings-service';
 import { ensureWorldState } from './world-clock-service';
@@ -41,6 +42,17 @@ const ACCEPT_MEMORY: Record<RelationshipStatus, string> = {
  *  the commitment deltas, milestone memory, and social vouch. */
 const dtrInFlight = new Set<string>();
 
+/** Reject a DTR double-fire BEFORE the route queues on the session turn lock.
+ *  Queued behind the first attempt it would no longer overlap it — the in-flight
+ *  check inside attemptDtr would pass and a full SECOND attempt would run. For a
+ *  worldless character (whose day-based cooldown is a no-op) an accepted first
+ *  attempt raises warmth enough that the second can climb another rung. */
+export function assertNoDtrInFlight(sessionId: string): void {
+  if (dtrInFlight.has(sessionId)) {
+    throw badRequest('Hang on — that question is still landing.');
+  }
+}
+
 /**
  * Attempt to advance the relationship status (the DTR ladder). Mirrors the
  * walkout/jealousy pattern: gate (rung unlocked + cooldown) → structured judge →
@@ -50,9 +62,7 @@ const dtrInFlight = new Set<string>();
  * double-fire across the LLM await can't double-commit.
  */
 export async function attemptDtr(sessionId: string, signal?: AbortSignal): Promise<DtrResponse> {
-  if (dtrInFlight.has(sessionId)) {
-    throw badRequest('Hang on — that question is still landing.');
-  }
+  assertNoDtrInFlight(sessionId);
   dtrInFlight.add(sessionId);
   try {
     return await attemptDtrInner(sessionId, signal);
@@ -126,6 +136,7 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
     if (character.worldId) setRelationshipFlag(character.id, 'dtr:lastAttemptDay', day, { source: 'dtr' });
   };
   let ended = false;
+  let strain: StrainOutcome | null = null;
 
   if (decision === 'accept') {
     setRelationshipFlag(character.id, 'status', next.rung.status, { source: 'dtr' });
@@ -162,10 +173,12 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
     setCooldown();
     recordEvent('dtr_backfired', { characterId: character.id, day });
     // A badly-received DTR ask spikes tension — if the relationship was already
-    // committed, that can push it onto the rocks (or break it).
+    // committed, that can push it onto the rocks (or break it). Capture the
+    // outcome: a breakup applied here must reach the client, not vanish behind
+    // the backfire card.
     if (character.worldId) {
       try {
-        evaluateRelationshipStrain(character.id, { day, trigger: 'date', mode: session.mode });
+        strain = evaluateRelationshipStrain(character.id, { day, trigger: 'date', mode: session.mode });
       } catch {
         /* strain is best-effort */
       }
@@ -191,6 +204,11 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
   const savedSession = sessionsRepo.update(
     ConversationSessionSchema.parse({ ...session, ended: ended || session.ended, updatedAt: now }),
   );
+  // A backfire that blows up the date still CONCLUDES a real date — settle the
+  // one-time costs the normal end path charges (venue, day action, last-date
+  // stamp, buff decay, rapport cleanup). Without this a backfired DTR ended the
+  // date free and left its session_rapport row behind.
+  if (ended) settleForcedDateEnd(savedSession);
 
   const relAfter = getRelationship(character.id);
   return {
@@ -201,5 +219,9 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
     message,
     relationship: relAfter,
     ended: savedSession.ended,
+    strain:
+      strain && (strain.kind === 'broke_up' || strain.kind === 'on_the_rocks')
+        ? { kind: strain.kind, line: strain.line ?? null }
+        : null,
   };
 }

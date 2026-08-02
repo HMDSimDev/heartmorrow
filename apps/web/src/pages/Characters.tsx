@@ -25,7 +25,7 @@ const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // forget month-old drafts
 export function Characters() {
   const { t } = useTranslation(['pages', 'common']);
   const nav = useNavigate();
-  const { creatorMode, activeWorldId, activeWorld, worlds, worldsLoaded, dayTick } = useAppData();
+  const { creatorMode, activeWorldId, activeWorld, worlds, worldsLoaded, dayTick, reloadWorlds } = useAppData();
   const state = useAsync(() => api.listCharacters(), [activeWorldId, dayTick]);
   const memorials = useAsync(() => api.listMemorials(activeWorldId ?? undefined), [activeWorldId, dayTick]);
   const lost = new Set(memorials.data ?? []);
@@ -162,7 +162,13 @@ export function Characters() {
               <>
                 <ShareImportButton
                   targetWorldId={activeWorldId ?? null}
-                  onImported={() => state.reload()}
+                  // .hmwrld/.hmpack files can create WORLDS too — refresh the
+                  // app-wide list (like WorldSelector does) or the imported
+                  // world stays invisible to the HUD switcher until a reload.
+                  onImported={() => {
+                    state.reload();
+                    void reloadWorlds();
+                  }}
                   label={t('characters.import')}
                 />
                 <button className="btn ghost" type="button" onClick={() => setSelecting(true)}>
@@ -391,7 +397,6 @@ export function Characters() {
           );
         }}
       </Loader>
-      {state.error && <Banner kind="error">{state.error}</Banner>}
 
       {pendingDelete && (
         <ConfirmDialog

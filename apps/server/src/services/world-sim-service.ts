@@ -41,6 +41,7 @@ import { callStructuredLlm } from '../llm/structured';
 import { buildWorldSimMessages } from '../prompt/prompt-builder';
 import { hashFloat, type SeededRandom } from '../lib/seeded-random';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
+import { getDb } from '../db/index';
 
 /**
  * The deterministic NPC world-sim core. Once per world-day it decides — with NO
@@ -186,231 +187,240 @@ export async function simulateWorldDay(
   const draft: DraftBeat[] = [];
   const newLinks: Array<{ a: string; b: string }> = [];
 
-  // --- worked beats (a capped few, deterministically chosen) -----------------
-  const workedSorted = [...workers].sort(
-    (a, b) => rng(`worked|${worldId}|${simDay}|${a.id}`) - rng(`worked|${worldId}|${simDay}|${b.id}`),
-  );
-  for (const w of workedSorted.slice(0, WORLD_SIM.maxWorkedBeats)) {
-    draft.push({
-      kind: 'worked',
-      summary: `${w.name} put in a shift as a ${w.employment!.title} at ${w.employment!.place}.`,
-      fact: `${w.name} (a ${w.employment!.title}) worked a shift at ${w.employment!.place}.`,
-    });
-    recordEvent('npc_worked', { worldId, day: simDay, characterId: w.id, place: w.employment!.place });
-  }
-
-  // --- meetings: warmth, friend-promotion, info sharing ----------------------
-  const playerId = playerIdForWorldOrDefault(worldId);
-
-  // Emergent NPC romance bookkeeping. `partnerMap` is each person's current partners
-  // (authored `partner` links + world-sim couples). A new romance forms only when BOTH
-  // people are free to take each other: a single person always is; an already-partnered
-  // person only if THEY, their new partner, AND all their existing partners are
-  // polyamorous — so a poly NPC can have multiple partners (mirroring how the jealousy
-  // model already exempts poly characters) while a monogamous person is never blindsided.
-  // `newRomances` enforces the conservative per-day spark cap.
-  const partnerMap = new Map<string, Set<string>>();
-  const addPartner = (x: string, y: string) => {
-    let set = partnerMap.get(x);
-    if (!set) partnerMap.set(x, (set = new Set()));
-    set.add(y);
-  };
-  for (const e of npcEdgesRepo.listByWorld(worldId)) {
-    if (e.romanceState === 'together') {
-      addPartner(e.aId, e.bId);
-      addPartner(e.bId, e.aId);
+  // The whole day's mutations commit ATOMICALLY (mirrors runDailyWealth): a
+  // mid-loop throw used to be swallowed upstream with the first N meetings
+  // already landed — and because lastWorldSimDay never advanced while the NEXT
+  // Sleep simulates a different day, the partial remainder was lost for good.
+  // Rolled back whole, the day stays cleanly re-runnable. The window is fully
+  // synchronous by design; the LLM color pass runs READ-ONLY afterwards.
+  getDb().transaction(() => {
+    // --- worked beats (a capped few, deterministically chosen) -----------------
+    const workedSorted = [...workers].sort(
+      (a, b) => rng(`worked|${worldId}|${simDay}|${a.id}`) - rng(`worked|${worldId}|${simDay}|${b.id}`),
+    );
+    for (const w of workedSorted.slice(0, WORLD_SIM.maxWorkedBeats)) {
+      draft.push({
+        kind: 'worked',
+        summary: `${w.name} put in a shift as a ${w.employment!.title} at ${w.employment!.place}.`,
+        fact: `${w.name} (a ${w.employment!.title}) worked a shift at ${w.employment!.place}.`,
+      });
+      recordEvent('npc_worked', { worldId, day: simDay, characterId: w.id, place: w.employment!.place });
     }
-  }
-  for (const c of roster) for (const l of c.links) if (l.kind === 'partner') addPartner(c.id, l.targetId);
-  const isPoly = (id: string) => byId.get(id)?.relationshipStyle === 'polyamorous';
-  /** Can `x` and `y` form a NEW romance without putting a monogamous person in a bind? */
-  const canPair = (x: string, y: string): boolean => {
-    const free = (self: string, other: string) => {
-      const partners = partnerMap.get(self);
-      if (!partners || partners.size === 0) return true; // single — always free to pair
-      // Already partnered: only ok if self + the prospective partner + every existing
-      // partner is poly (so nobody in the resulting web is a blindsided monogamist).
-      return isPoly(self) && isPoly(other) && [...partners].every(isPoly);
+
+    // --- meetings: warmth, friend-promotion, info sharing ----------------------
+    const playerId = playerIdForWorldOrDefault(worldId);
+
+    // Emergent NPC romance bookkeeping. `partnerMap` is each person's current partners
+    // (authored `partner` links + world-sim couples). A new romance forms only when BOTH
+    // people are free to take each other: a single person always is; an already-partnered
+    // person only if THEY, their new partner, AND all their existing partners are
+    // polyamorous — so a poly NPC can have multiple partners (mirroring how the jealousy
+    // model already exempts poly characters) while a monogamous person is never blindsided.
+    // `newRomances` enforces the conservative per-day spark cap.
+    const partnerMap = new Map<string, Set<string>>();
+    const addPartner = (x: string, y: string) => {
+      let set = partnerMap.get(x);
+      if (!set) partnerMap.set(x, (set = new Set()));
+      set.add(y);
     };
-    return free(x, y) && free(y, x);
-  };
-  let newRomances = 0;
-  let newSourings = 0;
-
-  for (const { cand } of hits) {
-    const { aId, bId } = npcPairKey(cand.a.id, cand.b.id);
-    const a = byId.get(aId)!;
-    const b = byId.get(bId)!;
-    const existing = npcEdgesRepo.get(worldId, aId, bId);
-    if (existing && existing.lastDay === simDay) continue; // already counted this day
-
-    const meetCount = (existing?.meetCount ?? 0) + 1;
-    const prevRomance: RomanceState = existing?.romanceState ?? 'none';
-    const wasSoured = existing?.soured ?? false;
-
-    // Emergent FRICTION (the cooling mirror of warmth): a clashing, world-sim-formed
-    // (no authored bond) non-romance pair can have a COLD meeting that cools them instead
-    // of warming — and, once they've crossed paths enough while staying icy, fall out into
-    // rivals. Seeded roll; chance comes purely from authored affinity. Authored ties are
-    // never soured (the world-sim doesn't override hand-authored relationships).
-    const authoredTie = linkTo(a.links, b.id) ?? linkTo(b.links, a.id);
-    const canSour = prevRomance === 'none' && authoredTie == null;
-    const cold = canSour && rng(`friction|${worldId}|${simDay}|${aId}|${bId}`) < frictionChance(npcAffinity(a, b));
-    const warmth = cold
-      ? Math.max(0, (existing?.warmth ?? 0) - NPC_FRICTION.coolStep)
-      : Math.min(WORLD_SIM.warmthMax, (existing?.warmth ?? 0) + WORLD_SIM.warmthStep);
-    const wasPromoted = existing?.promoted ?? false;
-    // A cold meeting never promotes a friendship.
-    const promoted = wasPromoted || (!cold && meetCount >= WORLD_SIM.friendPromoteMeetings);
-    // A cold streak that's crossed paths enough and stayed icy falls out into a rivalry.
-    const soured =
-      wasSoured ||
-      (cold &&
-        meetCount >= NPC_FRICTION.rivalMeetings &&
-        warmth <= NPC_FRICTION.rivalFloor &&
-        newSourings < NPC_FRICTION.maxSouringPerDay);
-    const souredNow = soured && !wasSoured;
-    if (souredNow) newSourings += 1;
-
-    // Emergent romance: crush → couple, the love-side mirror of friend-promotion.
-    // A crush sparks (seeded roll, scaled by authored affinity) only between two
-    // unattached, mutually-attracted, not-player-committed people once their edge is
-    // warm enough; a sustained crush matures into a couple. All deterministic + pure.
-    let romanceState: RomanceState = prevRomance;
-    let romanceSince = existing?.romanceSince ?? 0;
-    let crushSparked = false;
-    let coupledNow = false;
-    if (
-      prevRomance === 'none' &&
-      !cold && // a cold meeting cools them — it doesn't also kindle a crush
-      newRomances < NPC_ROMANCE.maxNewPerDay &&
-      canPair(aId, bId) &&
-      warmth >= NPC_ROMANCE.crushWarmth &&
-      mutualAttraction(orient(a), orient(b)).mutual &&
-      // Dating relationships are keyed by DEFAULT_PLAYER_ID (not the per-world gossip
-      // id), so read them with getRelationship's default — a partner the player is
-      // committed to is off-limits to an emergent NPC romance.
-      !isCommitted(getRelationship(aId)) &&
-      !isCommitted(getRelationship(bId)) &&
-      rng(`romance|${worldId}|${simDay}|${aId}|${bId}`) < NPC_ROMANCE.crushBaseProb * npcAffinity(a, b)
-    ) {
-      romanceState = 'crush';
-      romanceSince = simDay;
-      crushSparked = true;
-      newRomances += 1;
-    } else if (
-      prevRomance === 'crush' &&
-      warmth >= NPC_ROMANCE.togetherWarmth &&
-      // Re-check at maturation: a person can hold crush edges with several people (sparks
-      // aren't capped across days), so canPair stops a second crush maturing into a second
-      // couple for a monogamist (while still allowing a fully-poly web). partnerMap reflects
-      // pre-existing AND in-loop couples + authored partners.
-      canPair(aId, bId) &&
-      // If the player committed to one of them after the crush formed, it freezes
-      // (stays a crush) rather than maturing — they chose the player.
-      !isCommitted(getRelationship(aId)) &&
-      !isCommitted(getRelationship(bId))
-    ) {
-      romanceState = 'together';
-      romanceSince = simDay;
-      coupledNow = true;
-      addPartner(aId, bId);
-      addPartner(bId, aId);
+    for (const e of npcEdgesRepo.listByWorld(worldId)) {
+      if (e.romanceState === 'together') {
+        addPartner(e.aId, e.bId);
+        addPartner(e.bId, e.aId);
+      }
     }
+    for (const c of roster) for (const l of c.links) if (l.kind === 'partner') addPartner(c.id, l.targetId);
+    const isPoly = (id: string) => byId.get(id)?.relationshipStyle === 'polyamorous';
+    /** Can `x` and `y` form a NEW romance without putting a monogamous person in a bind? */
+    const canPair = (x: string, y: string): boolean => {
+      const free = (self: string, other: string) => {
+        const partners = partnerMap.get(self);
+        if (!partners || partners.size === 0) return true; // single — always free to pair
+        // Already partnered: only ok if self + the prospective partner + every existing
+        // partner is poly (so nobody in the resulting web is a blindsided monogamist).
+        return isPoly(self) && isPoly(other) && [...partners].every(isPoly);
+      };
+      return free(x, y) && free(y, x);
+    };
+    let newRomances = 0;
+    let newSourings = 0;
 
-    const edge: NpcEdge = { worldId, aId, bId, warmth, meetCount, lastDay: simDay, promoted, romanceState, romanceSince, soured };
-    npcEdgesRepo.upsert(edge);
+    for (const { cand } of hits) {
+      const { aId, bId } = npcPairKey(cand.a.id, cand.b.id);
+      const a = byId.get(aId)!;
+      const b = byId.get(bId)!;
+      const existing = npcEdgesRepo.get(worldId, aId, bId);
+      if (existing && existing.lastDay === simDay) continue; // already counted this day
 
-    const place = cand.place;
-    // What did they talk about? Chosen DETERMINISTICALLY (seeded), weighted by who
-    // they are to each other and what they have going on — the server owns WHAT, the
-    // scene LLM only writes the gist. 'the-player' only surfaces if one of them is
-    // actually carrying word about the player worth bringing up.
-    const signals = topicSignals(a, b, place, playerId);
-    const topic = pickConversationTopic(signals, rng(`topic|${worldId}|${simDay}|${aId}|${bId}`));
-    const relation = relationLabel(a, b, promoted, place != null);
+      const meetCount = (existing?.meetCount ?? 0) + 1;
+      const prevRomance: RomanceState = existing?.romanceState ?? 'none';
+      const wasSoured = existing?.soured ?? false;
 
-    recordEvent('npc_meeting', { worldId, day: simDay, aId, bId, pairKey: `${aId}|${bId}`, place: place ?? null, topic });
-    // Templated linked memories (upgraded with the gist after the scene call). Each
-    // is tagged with the OTHER party so the pair's memories of this encounter link up.
-    // A COLD (frictional) meeting reads as a tense run-in, not a warm catch-up.
-    const aMem = addLifeMemory(a.id, meetingMemoryStub(b.name, place, cold), 1, b.id);
-    const bMem = addLifeMemory(b.id, meetingMemoryStub(a.name, place, cold), 1, a.id);
-    draft.push({
-      kind: 'met',
-      summary: `${a.name} ran into ${b.name}${place ? ` at ${place}` : ''}.`,
-      fact:
-        `${a.name} (${personaTag(a)}) and ${b.name} (${personaTag(b)}), ${relation}, ` +
-        `${place ? `met at ${place}` : 'crossed paths'} and ${cold ? 'it was tense — they did not really click' : CONVERSATION_TOPIC_HINTS[topic]}.`,
-      scene: { aName: a.name, bName: b.name, place, aMemId: aMem.id, bMemId: bMem.id, cold },
-    });
+      // Emergent FRICTION (the cooling mirror of warmth): a clashing, world-sim-formed
+      // (no authored bond) non-romance pair can have a COLD meeting that cools them instead
+      // of warming — and, once they've crossed paths enough while staying icy, fall out into
+      // rivals. Seeded roll; chance comes purely from authored affinity. Authored ties are
+      // never soured (the world-sim doesn't override hand-authored relationships).
+      const authoredTie = linkTo(a.links, b.id) ?? linkTo(b.links, a.id);
+      const canSour = prevRomance === 'none' && authoredTie == null;
+      const cold = canSour && rng(`friction|${worldId}|${simDay}|${aId}|${bId}`) < frictionChance(npcAffinity(a, b));
+      const warmth = cold
+        ? Math.max(0, (existing?.warmth ?? 0) - NPC_FRICTION.coolStep)
+        : Math.min(WORLD_SIM.warmthMax, (existing?.warmth ?? 0) + WORLD_SIM.warmthStep);
+      const wasPromoted = existing?.promoted ?? false;
+      // A cold meeting never promotes a friendship.
+      const promoted = wasPromoted || (!cold && meetCount >= WORLD_SIM.friendPromoteMeetings);
+      // A cold streak that's crossed paths enough and stayed icy falls out into a rivalry.
+      const soured =
+        wasSoured ||
+        (cold &&
+          meetCount >= NPC_FRICTION.rivalMeetings &&
+          warmth <= NPC_FRICTION.rivalFloor &&
+          newSourings < NPC_FRICTION.maxSouringPerDay);
+      const souredNow = soured && !wasSoured;
+      if (souredNow) newSourings += 1;
 
-    if (promoted && !wasPromoted) {
-      newLinks.push({ a: aId, b: bId });
-      recordEvent('npc_link_created', { worldId, day: simDay, aId, bId, kind: 'friend' });
+      // Emergent romance: crush → couple, the love-side mirror of friend-promotion.
+      // A crush sparks (seeded roll, scaled by authored affinity) only between two
+      // unattached, mutually-attracted, not-player-committed people once their edge is
+      // warm enough; a sustained crush matures into a couple. All deterministic + pure.
+      let romanceState: RomanceState = prevRomance;
+      let romanceSince = existing?.romanceSince ?? 0;
+      let crushSparked = false;
+      let coupledNow = false;
+      if (
+        prevRomance === 'none' &&
+        !cold && // a cold meeting cools them — it doesn't also kindle a crush
+        newRomances < NPC_ROMANCE.maxNewPerDay &&
+        canPair(aId, bId) &&
+        warmth >= NPC_ROMANCE.crushWarmth &&
+        mutualAttraction(orient(a), orient(b)).mutual &&
+        // Dating relationships are keyed by DEFAULT_PLAYER_ID (not the per-world gossip
+        // id), so read them with getRelationship's default — a partner the player is
+        // committed to is off-limits to an emergent NPC romance.
+        !isCommitted(getRelationship(aId)) &&
+        !isCommitted(getRelationship(bId)) &&
+        rng(`romance|${worldId}|${simDay}|${aId}|${bId}`) < NPC_ROMANCE.crushBaseProb * npcAffinity(a, b)
+      ) {
+        romanceState = 'crush';
+        romanceSince = simDay;
+        crushSparked = true;
+        newRomances += 1;
+      } else if (
+        prevRomance === 'crush' &&
+        warmth >= NPC_ROMANCE.togetherWarmth &&
+        // Re-check at maturation: a person can hold crush edges with several people (sparks
+        // aren't capped across days), so canPair stops a second crush maturing into a second
+        // couple for a monogamist (while still allowing a fully-poly web). partnerMap reflects
+        // pre-existing AND in-loop couples + authored partners.
+        canPair(aId, bId) &&
+        // If the player committed to one of them after the crush formed, it freezes
+        // (stays a crush) rather than maturing — they chose the player.
+        !isCommitted(getRelationship(aId)) &&
+        !isCommitted(getRelationship(bId))
+      ) {
+        romanceState = 'together';
+        romanceSince = simDay;
+        coupledNow = true;
+        addPartner(aId, bId);
+        addPartner(bId, aId);
+      }
+
+      const edge: NpcEdge = { worldId, aId, bId, warmth, meetCount, lastDay: simDay, promoted, romanceState, romanceSince, soured };
+      npcEdgesRepo.upsert(edge);
+
+      const place = cand.place;
+      // What did they talk about? Chosen DETERMINISTICALLY (seeded), weighted by who
+      // they are to each other and what they have going on — the server owns WHAT, the
+      // scene LLM only writes the gist. 'the-player' only surfaces if one of them is
+      // actually carrying word about the player worth bringing up.
+      const signals = topicSignals(a, b, place, playerId);
+      const topic = pickConversationTopic(signals, rng(`topic|${worldId}|${simDay}|${aId}|${bId}`));
+      const relation = relationLabel(a, b, promoted, place != null);
+
+      recordEvent('npc_meeting', { worldId, day: simDay, aId, bId, pairKey: `${aId}|${bId}`, place: place ?? null, topic });
+      // Templated linked memories (upgraded with the gist after the scene call). Each
+      // is tagged with the OTHER party so the pair's memories of this encounter link up.
+      // A COLD (frictional) meeting reads as a tense run-in, not a warm catch-up.
+      const aMem = addLifeMemory(a.id, meetingMemoryStub(b.name, place, cold), 1, b.id);
+      const bMem = addLifeMemory(b.id, meetingMemoryStub(a.name, place, cold), 1, a.id);
       draft.push({
-        kind: 'linked',
-        summary: `${a.name} and ${b.name} have grown close — they're friends now.`,
-        fact: `${a.name} and ${b.name} have been spending enough time together to call themselves friends now.`,
+        kind: 'met',
+        summary: `${a.name} ran into ${b.name}${place ? ` at ${place}` : ''}.`,
+        fact:
+          `${a.name} (${personaTag(a)}) and ${b.name} (${personaTag(b)}), ${relation}, ` +
+          `${place ? `met at ${place}` : 'crossed paths'} and ${cold ? 'it was tense — they did not really click' : CONVERSATION_TOPIC_HINTS[topic]}.`,
+        scene: { aName: a.name, bName: b.name, place, aMemId: aMem.id, bMemId: bMem.id, cold },
       });
-      addLifeMemory(a.id, `${b.name} has become a real friend.`, 2, b.id);
-      addLifeMemory(b.id, `${a.name} has become a real friend.`, 2, a.id);
+
+      if (promoted && !wasPromoted) {
+        newLinks.push({ a: aId, b: bId });
+        recordEvent('npc_link_created', { worldId, day: simDay, aId, bId, kind: 'friend' });
+        draft.push({
+          kind: 'linked',
+          summary: `${a.name} and ${b.name} have grown close — they're friends now.`,
+          fact: `${a.name} and ${b.name} have been spending enough time together to call themselves friends now.`,
+        });
+        addLifeMemory(a.id, `${b.name} has become a real friend.`, 2, b.id);
+        addLifeMemory(b.id, `${a.name} has become a real friend.`, 2, a.id);
+      }
+
+      // The cooling mirror: a world-sim friendship/acquaintance that's gone cold falls out
+      // into a rivalry — a recap beat + crossed life-memories (surfaces as a rival tie).
+      if (souredNow) {
+        recordEvent('npc_fell_out', { worldId, day: simDay, aId, bId });
+        addLifeMemory(a.id, `Things with ${b.name} have gone cold.`, 2, b.id);
+        addLifeMemory(b.id, `Things with ${a.name} have gone cold.`, 2, a.id);
+        draft.push({
+          kind: 'soured',
+          summary: `${a.name} and ${b.name} have had a falling-out.`,
+          fact: `${a.name} and ${b.name} have fallen out — there's friction between them now.`,
+        });
+      }
+
+      // A fresh crush stays quiet — a private life-memory, no public beat. It only
+      // becomes "news" once it grows into a couple.
+      if (crushSparked) {
+        addLifeMemory(a.id, `Catching feelings for ${b.name}.`, 2, b.id);
+        addLifeMemory(b.id, `Catching feelings for ${a.name}.`, 2, a.id);
+        recordEvent('npc_crush', { worldId, day: simDay, aId, bId });
+      }
+
+      // A new couple IS news: a recap beat + crossed life-memories. And if either is a
+      // player love-interest who's been neglected, they get poached (the hard loss).
+      if (coupledNow) {
+        recordEvent('npc_coupled', { worldId, day: simDay, aId, bId, aName: a.name, bName: b.name });
+        addLifeMemory(a.id, `${b.name} and I are seeing each other now.`, 3, b.id);
+        addLifeMemory(b.id, `${a.name} and I are seeing each other now.`, 3, a.id);
+        draft.push({
+          kind: 'linked',
+          summary: `${a.name} and ${b.name} are seeing each other now.`,
+          fact: `${a.name} and ${b.name} have quietly started seeing each other.`,
+        });
+        maybePoachPlayerInterest(worldId, simDay, a, b);
+        maybePoachPlayerInterest(worldId, simDay, b, a);
+      }
+
+      // Info sharing is deterministic: each learns the other's job, and may pass
+      // along the freshest secondhand news they picked up on an EARLIER day.
+      shareOnMeeting(worldId, simDay, a, b, draft, rng, playerId);
+      shareOnMeeting(worldId, simDay, b, a, draft, rng, playerId);
+
+      // When the sim decided they talked about the player, word about you actually
+      // travels: whoever is carrying it tells the other (decaying with each retelling),
+      // and remembers having mentioned you. This is what lets a friend later realize
+      // "wait — you're the one Mara's been seeing?".
+      if (topic === 'the-player') {
+        sharePlayerKnowledge(worldId, simDay, a, b, playerId, place);
+        sharePlayerKnowledge(worldId, simDay, b, a, playerId, place);
+      }
     }
 
-    // The cooling mirror: a world-sim friendship/acquaintance that's gone cold falls out
-    // into a rivalry — a recap beat + crossed life-memories (surfaces as a rival tie).
-    if (souredNow) {
-      recordEvent('npc_fell_out', { worldId, day: simDay, aId, bId });
-      addLifeMemory(a.id, `Things with ${b.name} have gone cold.`, 2, b.id);
-      addLifeMemory(b.id, `Things with ${a.name} have gone cold.`, 2, a.id);
-      draft.push({
-        kind: 'soured',
-        summary: `${a.name} and ${b.name} have had a falling-out.`,
-        fact: `${a.name} and ${b.name} have fallen out — there's friction between them now.`,
-      });
-    }
-
-    // A fresh crush stays quiet — a private life-memory, no public beat. It only
-    // becomes "news" once it grows into a couple.
-    if (crushSparked) {
-      addLifeMemory(a.id, `Catching feelings for ${b.name}.`, 2, b.id);
-      addLifeMemory(b.id, `Catching feelings for ${a.name}.`, 2, a.id);
-      recordEvent('npc_crush', { worldId, day: simDay, aId, bId });
-    }
-
-    // A new couple IS news: a recap beat + crossed life-memories. And if either is a
-    // player love-interest who's been neglected, they get poached (the hard loss).
-    if (coupledNow) {
-      recordEvent('npc_coupled', { worldId, day: simDay, aId, bId, aName: a.name, bName: b.name });
-      addLifeMemory(a.id, `${b.name} and I are seeing each other now.`, 3, b.id);
-      addLifeMemory(b.id, `${a.name} and I are seeing each other now.`, 3, a.id);
-      draft.push({
-        kind: 'linked',
-        summary: `${a.name} and ${b.name} are seeing each other now.`,
-        fact: `${a.name} and ${b.name} have quietly started seeing each other.`,
-      });
-      maybePoachPlayerInterest(worldId, simDay, a, b);
-      maybePoachPlayerInterest(worldId, simDay, b, a);
-    }
-
-    // Info sharing is deterministic: each learns the other's job, and may pass
-    // along the freshest secondhand news they picked up on an EARLIER day.
-    shareOnMeeting(worldId, simDay, a, b, draft, rng, playerId);
-    shareOnMeeting(worldId, simDay, b, a, draft, rng, playerId);
-
-    // When the sim decided they talked about the player, word about you actually
-    // travels: whoever is carrying it tells the other (decaying with each retelling),
-    // and remembers having mentioned you. This is what lets a friend later realize
-    // "wait — you're the one Mara's been seeing?".
-    if (topic === 'the-player') {
-      sharePlayerKnowledge(worldId, simDay, a, b, playerId, place);
-      sharePlayerKnowledge(worldId, simDay, b, a, playerId, place);
-    }
-  }
-
-  // Mutations are done + idempotency stamped BEFORE the (read-only) scene call, so
-  // a slow/failed LLM never affects the recorded world state.
-  markSimmed(worldId, simDay);
+    // Mutations are done + idempotency stamped INSIDE the same commit, BEFORE the
+    // (read-only) scene call — a slow/failed LLM never affects recorded state, and
+    // a failed day rolls back stamp-and-all.
+    markSimmed(worldId, simDay);
+  });
   const colored = await runSceneColor(simDay, draft);
   // Fold each meeting's gist into both parties' templated memories (best-effort —
   // a missing gist just leaves the "Caught up with X." template standing).
@@ -613,11 +623,11 @@ function topicSignals(a: Character, b: Character, place: string | undefined, pla
   };
 }
 
-/** True when a character is carrying word about the player still fresh enough to bring up. */
+/** True when a character is carrying word about the player still fresh enough to
+ *  bring up. Targeted query — the old newest-50 window scan went blind once a
+ *  character accrued enough newer non-player knowledge in a long save. */
 function holdsPlayerKnowledge(characterId: string, playerId: string): boolean {
-  return npcKnowledgeRepo
-    .listByKnower(characterId)
-    .some((k) => k.subjectId === playerId && k.fidelity >= PLAYER_GOSSIP.minFidelity);
+  return npcKnowledgeRepo.hasAboutSubject(characterId, playerId, PLAYER_GOSSIP.minFidelity);
 }
 
 /**

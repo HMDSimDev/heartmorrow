@@ -6,7 +6,7 @@ import type { FastifySchema } from 'fastify';
  * Build a Fastify route `schema` from the existing @dsim/shared Zod schemas so
  * `@fastify/swagger` can emit OpenAPI for the route.
  *
- * IMPORTANT: attaching `schema.body`/`querystring` makes Fastify's AJV validate
+ * IMPORTANT: attaching `schema.querystring`/`params` makes Fastify's AJV validate
  * the request at runtime. To keep this purely additive — i.e. never reject a
  * request that the in-handler `parseInput()` would have accepted — the generated
  * JSON Schema is RELAXED:
@@ -15,6 +15,11 @@ import type { FastifySchema } from 'fastify';
  *   - `format` is dropped (so Fastify's AJV never fails to compile on a format it
  *     doesn't know, e.g. `email`/`uri`/`date-time`),
  *   - the `$schema` marker is dropped.
+ * BODY schemas are DOC-ONLY, stashed under `docBody` and lifted into
+ * `schema.body` by buildApp's swagger-mode onRoute hook: a validating body
+ * schema is structurally NOT additive — `request.body` is `undefined` on a
+ * bodiless POST (no content-type), which AJV rejects with "must be object" even
+ * when every field is optional, breaking every handler that reads `req.body ?? {}`.
  * `parseInput()` remains the authoritative validator (and applies Zod
  * defaults/transforms). Response schemas are intentionally never attached so
  * fast-json-stringify never strips response fields.
@@ -87,7 +92,9 @@ export function docSchema(opts: DocSchemaOptions): FastifySchema {
   if (opts.tags) schema.tags = opts.tags;
   if (opts.summary) schema.summary = opts.summary;
   if (opts.description) schema.description = opts.description;
-  if (opts.body) schema.body = toJson(opts.body);
+  // Doc-only (see the module comment): Fastify ignores unknown schema keys, so
+  // this never validates at runtime; the swagger build lifts it into place.
+  if (opts.body) schema.docBody = toJson(opts.body);
   if (opts.querystring) schema.querystring = toJson(opts.querystring);
   if (opts.params) schema.params = toJson(opts.params);
   return schema as FastifySchema;

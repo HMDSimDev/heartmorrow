@@ -1,0 +1,21 @@
+# Dependencies + build artifacts are recreated inside the image.
+node_modules
+**/node_modules
+apps/web/dist
+**/dist
+
+# Local runtime data — NEVER bake a user's SQLite DB / uploads into the image.
+data
+**/data
+.env
+.env.*
+
+# Vendored self-contained toolchain from install.sh (huge, host-specific).
+.runtime
+
+# VCS / editor / OS noise.
+.git
+.gitignore
+*.log
+.DS_Store
+Thumbs.db

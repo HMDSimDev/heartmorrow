@@ -520,6 +520,21 @@ CREATE TABLE IF NOT EXISTS session_rapport (
   updated_at INTEGER NOT NULL
 );
 
+-- The end-of-date report card: the full EndSessionResponse (JSON), persisted the
+-- moment a date concludes. The HTTP response carrying it dies with a tab closed or
+-- refreshed during the evaluator — while the effects (stamina, money, deltas, even
+-- a breakup) have already committed — so this row lets the Date tab replay the
+-- report on its next visit. "seen" flips when the client acknowledges it (shown
+-- live, or replayed). Cascades with the session/world.
+CREATE TABLE IF NOT EXISTS date_results (
+  session_id TEXT PRIMARY KEY REFERENCES conversation_sessions(id) ON DELETE CASCADE,
+  world_id   TEXT NOT NULL REFERENCES worlds(id) ON DELETE CASCADE,
+  payload    TEXT NOT NULL,
+  seen       INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_date_results_unseen ON date_results(world_id, seen);
+
 -- Heartmorrow Bench: saved model-evaluation runs. The full BenchRunSummary lives
 -- in the data column (JSON); the top columns are denormalized for cheap list ordering.
 CREATE TABLE IF NOT EXISTS bench_runs (

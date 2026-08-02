@@ -39,8 +39,10 @@ export async function generateGossipForDay(
   playerId: string = DEFAULT_PLAYER_ID,
 ): Promise<void> {
   const yesterday = day - 1;
+  // WORLD-scoped window (mirrors generateFeedForDay): a global newest-300 let a
+  // busy second world evict this world's news, silently killing its gossip.
   const notable = eventsRepo
-    .list(300)
+    .listRecentByWorld(worldId, 300)
     .filter((e) => GOSSIP_NEWS[e.type] != null && (e.payload as Record<string, unknown>).day === yesterday);
   if (notable.length === 0) return;
 

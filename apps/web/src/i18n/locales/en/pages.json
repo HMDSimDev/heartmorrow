@@ -1273,6 +1273,7 @@
       "save": "Save override",
       "saving": "Saving…",
       "saved": "Saved. The game will use this prompt from now on.",
+      "discardConfirm": "Discard your unsaved changes to this prompt?",
       "previewInBench": "Preview in Bench",
       "reset": "Reset to default",
       "resetDone": "Reset to the shipped default.",

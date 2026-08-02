@@ -26,6 +26,7 @@ import { getRelationship } from './relationship-service';
 import { getLlmSettings } from './settings-service';
 import { applyCharacterDatingChange, applyRelationshipChange, stampLastDate } from './stat-service';
 import { assertCanAct, ensureWorldState, spendStamina } from './world-clock-service';
+import { assertNoActiveDate } from './conversation-service';
 import { addMoney, getSkillLevel, grantCareerXp } from './player-service';
 import { addMemoriesFromEvaluation } from './memory-service';
 import { appendChronicleLine } from './chronicle-service';
@@ -81,6 +82,13 @@ export async function startMinigame(input: MinigameStart): Promise<MinigameStart
 
   const character = data.characterId ? getCharacter(data.characterId) : null;
   const relationship = character ? getRelationship(character.id) : null;
+  // The client names the world it believes it's playing in. A stale roster (a
+  // world-switch race) can pair a character from ANOTHER world with the current
+  // worldId — refuse rather than silently siding with the character's world,
+  // which would land stamina/money/lastDate in a world the player isn't in.
+  if (character?.worldId && data.worldId && character.worldId !== data.worldId) {
+    throw badRequest('That character belongs to a different world — pick someone from this one.');
+  }
   const world =
     (character?.worldId ? worldsRepo.get(character.worldId) : undefined) ??
     (data.worldId ? worldsRepo.get(data.worldId) : undefined) ??
@@ -89,7 +97,13 @@ export async function startMinigame(input: MinigameStart): Promise<MinigameStart
   const settings = getLlmSettings();
 
   // Minigames cost a daily action when tied to a world; block at 0 stamina.
-  if (world) assertCanAct(world.id);
+  // A live date also locks them (server-authoritative — the client's disable is
+  // per-tab state). Only the START is gated: a game finishing after a date began
+  // mid-play should still land its earned reward.
+  if (world) {
+    assertCanAct(world.id);
+    assertNoActiveDate(world.id);
+  }
 
   // A career-gated job stays locked until the required skill is high enough.
   if (world && isCareerSkill(module.info.requiresSkill)) {

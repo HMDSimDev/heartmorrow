@@ -194,9 +194,12 @@ export function payRent(worldId: string, propertyId: string): LeaseResponse {
     const next = propertyLeasesRepo.upsert(
       PropertyLeaseSchema.parse({
         ...lease,
-        // Advance from the period boundary so a payment never discards the unused
-        // remainder of an already-paid period.
-        nextDueDay: Math.max(lease.nextDueDay, today) + days,
+        // Anchor to the SCHEDULE, exactly like the automatic path in
+        // wealth-service (recovery + catch-up both use nextDueDay + days).
+        // Anchoring to `today` here let an overdue manual payment slip the whole
+        // schedule forward by the days spent overdue — paying late inside grace
+        // every period compounded into a permanent rent discount.
+        nextDueDay: lease.nextDueDay + days,
         status: 'active',
         graceUntilDay: null,
       }),

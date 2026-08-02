@@ -7,6 +7,7 @@ import { applyRelationshipChange } from './stat-service';
 import { listMemories } from './memory-service';
 import { getChronicle } from './chronicle-service';
 import { createCharacter } from './character-service';
+import { createWorld } from './world-service';
 import { startMinigame, finishMinigame, _resetRuns } from './minigame-service';
 import { scaleReward } from '../minigames/registry';
 import { sweetAndSourModule } from '../minigames/sweet-and-sour';
@@ -212,6 +213,17 @@ describe('minigames matter', () => {
     expect(after.comfort).toBeLessThan(before.comfort);
     expect(after.tension).toBeGreaterThan(before.tension);
     expect(listMemories(character.id).some((m) => m.tags.includes('minigame'))).toBe(false);
+  });
+
+  it('rejects a start whose character belongs to a different world than the request', async () => {
+    // Regression: the server silently sided with the CHARACTER's world, so a
+    // stale client roster (a world-switch race) landed the run's stamina/money
+    // in a world the player was no longer looking at.
+    const { character } = seedWorldAndCharacter();
+    const elsewhere = createWorld({ name: 'Elsewhere' });
+    await expect(
+      startMinigame({ minigameId: 'memory_match', characterId: character.id, worldId: elsewhere.id }),
+    ).rejects.toThrow(/different world/i);
   });
 
   it('a solo play has no character reaction', async () => {

@@ -5,7 +5,7 @@ import { parseInput } from '../lib/validate';
 import { getLlmSettings, getRedactedLlmSettings, updateLlmSettings } from '../services/settings-service';
 import { runHealthCheck } from '../llm/health';
 import { getAdapter } from '../llm/provider';
-import { describeLlmError } from '../llm/errors';
+import { describeLlmError, llmFetch } from '../llm/errors';
 import { estimatePrompts } from '../services/prompt-estimator-service';
 import { docSchema } from '../lib/openapi-schema';
 
@@ -60,7 +60,9 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   // Fetch the sampler names an AUTOMATIC1111 / SD WebUI server advertises via its
   // `/sdapi/v1/samplers` listing. Shared by the test + list-samplers routes.
   const fetchSamplers = async (root: string): Promise<string[]> => {
-    const res = await fetch(`${root}/sdapi/v1/samplers`, { signal: AbortSignal.timeout(10_000) });
+    // llmFetch, not raw fetch: a down A1111 server should surface as "couldn't
+    // reach the endpoint at <url> — make sure it's running", not "fetch failed".
+    const res = await llmFetch(`${root}/sdapi/v1/samplers`, { signal: AbortSignal.timeout(10_000) }, root);
     if (!res.ok) throw new Error(`Endpoint returned ${res.status} ${res.statusText}.`);
     const body = (await res.json()) as Array<{ name?: string }>;
     return Array.isArray(body) ? body.map((s) => s?.name).filter((n): n is string => !!n) : [];

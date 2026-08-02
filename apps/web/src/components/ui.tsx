@@ -113,10 +113,18 @@ export function Loader<T>({
   state: AsyncState<T>;
   children: (data: T) => ReactNode;
 }) {
-  if (state.loading && state.data === undefined) return <Spinner />;
+  if (state.data !== undefined) {
+    // A failed RELOAD must not blank out still-valid data — surface the error
+    // above the content instead of replacing the whole view with a banner.
+    return (
+      <>
+        {state.error && <Banner kind="error">{state.error}</Banner>}
+        {children(state.data)}
+      </>
+    );
+  }
   if (state.error) return <Banner kind="error">{state.error}</Banner>;
-  if (state.data === undefined) return <Spinner />;
-  return <>{children(state.data)}</>;
+  return <Spinner />;
 }
 
 export function TagInput({

@@ -250,7 +250,12 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
   }
 
   return {
-    state: next,
+    // Re-read: `next` was snapshotted BEFORE the wealth + world-sim steps, which
+    // both update world_states (lastRent/lastStock/lastWorldSimDay). Returning
+    // the stale row reported pre-step bookkeeping to the client. Both sub-systems
+    // re-read fresh state before writing for exactly this reason — carry that
+    // discipline through to the response.
+    state: worldStatesRepo.get(worldId) ?? next,
     recap,
     recapError,
     decayed,

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { CreateFeedPostSchema, FeedCommentInputSchema, FeedReactSchema, SendTextSchema } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
 import {
@@ -28,6 +29,7 @@ import { featureEnabled } from '../services/world-feature-service';
 import { landlordNoticesRepo } from '../db/repositories';
 import { playerIdForWorld } from '../lib/ids';
 import { docSchema, WorldScopedQuerySchema } from '../lib/openapi-schema';
+import { badRequest } from '../lib/errors';
 
 export async function phoneRoutes(app: FastifyInstance): Promise<void> {
   // Badge counts for the phone home screen (scoped to the active world if given).
@@ -100,9 +102,15 @@ export async function phoneRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // --- Faces (social feed) ---
-  app.get('/phone/feed', { schema: docSchema({ tags: ['phone'], summary: 'Get the social feed', querystring: WorldScopedQuerySchema }) }, async (req) => {
+  // worldId is REQUIRED here (unlike the WorldScopedQuerySchema routes, which
+  // have a legacy-world fallback) — keep the docs honest about that.
+  app.get('/phone/feed', { schema: docSchema({ tags: ['phone'], summary: 'Get the social feed', querystring: z.object({ worldId: z.string() }) }) }, async (req) => {
     const { worldId } = req.query as { worldId?: string };
-    return getFeedView(worldId ?? '');
+    // No legacy fallback here — the old empty-string fallthrough returned a
+    // legitimately-empty feed for a dropped worldId, pointing debugging at the
+    // generator instead of the request.
+    if (!worldId) throw badRequest('worldId is required.');
+    return getFeedView(worldId);
   });
 
   app.post('/phone/feed/posts', { schema: docSchema({ tags: ['phone'], summary: 'Create a player feed post', body: CreateFeedPostSchema }) }, async (req) => {
@@ -131,7 +139,9 @@ export async function phoneRoutes(app: FastifyInstance): Promise<void> {
   // --- Dev/testing: force-generate today's texts + emails for a world ---
   app.post('/phone/dev/generate', { schema: docSchema({ tags: ['phone'], summary: 'Dev: force-generate daily phone content' }) }, async (req) => {
     const { worldId } = (req.body ?? {}) as { worldId?: string };
-    if (!worldId) return { ok: false, error: 'worldId required' };
+    // 400 like every other world-scoped route — a 200 {ok:false} reads as
+    // success to any client branching on status.
+    if (!worldId) throw badRequest('worldId is required.');
     getWorld(worldId); // 404 if the world doesn't exist (avoids a phantom clock row)
     const day = ensureWorldState(worldId).day;
     await generateDailyTextsForDay(worldId, day);

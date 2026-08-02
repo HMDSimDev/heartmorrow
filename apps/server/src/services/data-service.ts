@@ -320,7 +320,9 @@ export function resetProgress(): { reset: true } {
   // per-world wallet is reset to starting money (each world's persona is kept).
   db.transaction(() => {
     for (const table of PROGRESS_TABLES) db.exec(`DELETE FROM ${table};`);
-    db.run('UPDATE players SET money = ?, updated_at = ?', DEFAULT_STARTING_MONEY, Date.now());
+    // Career (job XP/levels) is playthrough progress too: leaving it made a
+    // "fresh" save start with every level-gated shift unlocked at mastery pay.
+    db.run('UPDATE players SET money = ?, career = ?, updated_at = ?', DEFAULT_STARTING_MONEY, '{}', Date.now());
   });
   recordEvent('progress_reset', {});
   return { reset: true };

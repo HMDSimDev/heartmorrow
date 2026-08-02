@@ -351,6 +351,21 @@ function CaseCard({
     }
   };
 
+  const clear = async () => {
+    setSavingBl(true);
+    try {
+      await onClearBaseline();
+      // Only forget the local draft once the server actually cleared it — the
+      // old fire-and-forget cleared the UI while a failed DELETE left the saved
+      // baseline in force (and an unhandled rejection in the console).
+      setDraft(null);
+    } catch {
+      /* keep the draft/baseline view — the server still holds the baseline */
+    } finally {
+      setSavingBl(false);
+    }
+  };
+
   const statusDot =
     status === 'running' ? (
       <span className="bench-dot running" title={t('bench.statusRunning')} />
@@ -435,7 +450,7 @@ function CaseCard({
                   {savingBl ? t('bench.savingBl') : baseline ? t('bench.updateBaseline') : t('bench.saveBaseline')}
                 </button>
                 {baseline ? (
-                  <button className="btn sm ghost" onClick={() => { setDraft(null); void onClearBaseline(); }} disabled={savingBl}>
+                  <button className="btn sm ghost" onClick={() => void clear()} disabled={savingBl}>
                     {t('bench.resetDefault')}
                   </button>
                 ) : (

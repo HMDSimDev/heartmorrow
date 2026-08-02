@@ -357,6 +357,15 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
     | null
   >(null);
   const [feeling, setFeeling] = useState<{ text: string; warm: boolean } | null>(null);
+  // The warmer/cooler cue's dismissal timer — replaced on each new cue (so a
+  // rapid second delta gets its full 2200ms) and cleared on unmount.
+  const feelingTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (feelingTimerRef.current != null) clearTimeout(feelingTimerRef.current);
+    },
+    [],
+  );
   const [claimingId, setClaimingId] = useState<string | null>(null);
   // A downscaled photo staged to send with the next text (uploaded already so the
   // asset exists; the vision model reads it server-side).
@@ -464,7 +473,11 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       (d.affection ?? 0) + (d.comfort ?? 0) + (d.chemistry ?? 0) + (d.trust ?? 0) + (d.respect ?? 0) - (d.tension ?? 0);
     if (net !== 0) {
       setFeeling({ text: net > 0 ? t('messages.thread.warmer') : t('messages.thread.cooler'), warm: net > 0 });
-      setTimeout(() => setFeeling(null), 2200);
+      if (feelingTimerRef.current != null) clearTimeout(feelingTimerRef.current);
+      feelingTimerRef.current = window.setTimeout(() => {
+        feelingTimerRef.current = null;
+        setFeeling(null);
+      }, 2200);
     }
   };
 

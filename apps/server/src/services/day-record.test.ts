@@ -127,6 +127,26 @@ describe('day records — backfill of pre-existing days', () => {
     expect(byDay.get(3)!.record).toBeNull();
   });
 
+  it('buckets rollover-recorded events by their OWN day stamp, not marker position', async () => {
+    // The rollover records neglect-driven breakups (and wealth events) around its
+    // own day_advanced marker, stamped with the NEW day. Positional bucketing
+    // filed those under the ENDED day, so a reconstructed calendar showed beats
+    // the live record for the same day would not.
+    const a = makeWorld('Alpha');
+    setAdapterOverride(recapAdapter());
+    getWorldState(a.world.id);
+    recordEvent('milestone_reached', { characterId: a.character.id, label: 'First kiss' }); // day-1 play, no stamp
+    recordEvent('breakup', { characterId: a.character.id, day: 2 }); // as the rollover records it: pre-marker, new-day stamp
+    await advanceDay(a.world.id); // marker → 2
+    await advanceDay(a.world.id); // marker → 3 (day 2 completed)
+
+    dropDayRecords(a.world.id);
+    const byDay = new Map(getWorldCalendar(a.world.id).entries.map((e) => [e.day, e]));
+    expect(byDay.get(1)!.record!.beats.some((b) => /broke up/i.test(b.text))).toBe(false);
+    expect(byDay.get(2)!.record!.beats.some((b) => /broke up/i.test(b.text))).toBe(true);
+    expect(byDay.get(1)!.record!.beats.some((b) => /milestone/i.test(b.text))).toBe(true); // day-less events still bucket by position
+  });
+
   it('is idempotent and leaves live records untouched', async () => {
     const a = makeWorld('Alpha');
     setAdapterOverride(recapAdapter());

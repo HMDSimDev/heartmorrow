@@ -196,6 +196,34 @@ describe('stale hands + resume', () => {
     expect(old.status).toBe('settled');
     expect(old.outcome).toBe('forfeit');
   });
+  it('an ACTION on a hand carried across a day folds it instead of playing it', () => {
+    // Regression: only the next DEAL reaped stale hands, so a hand kept open in a
+    // tab across a Sleep stayed actionable — blackjack's double-down validated
+    // against the old day's wager SUM while staking today's money (cap bypass).
+    const w = casinoWorld(10_000);
+    const stale = startVideoPoker(w.id, 10);
+    bumpDay(w.id);
+    expect(() => videoPokerDraw(w.id, stale.view.roundId, [true, true, true, true, true])).toThrow(/stale|folded/i);
+    const old = gamblingRoundsRepo.get(stale.view.roundId)!;
+    expect(old.status).toBe('settled');
+    expect(old.outcome).toBe('forfeit'); // the fold COMMITTED despite the rejected action
+  });
+
+  it('a stale blackjack double cannot stake fresh money against yesterday\'s ledger', () => {
+    const w = casinoWorld(10_000);
+    // Deal until we get an interactive (non-natural) hand, then carry it overnight.
+    let hand = startBlackjack(w.id, 10);
+    for (let i = 0; hand.view.phase !== 'player' && i < 40; i += 1) {
+      hand = startBlackjack(w.id, 10);
+    }
+    expect(hand.view.phase).toBe('player');
+    bumpDay(w.id);
+    const before = moneyOf(w.id);
+    expect(() => blackjackAction(w.id, hand.view.roundId, 'double')).toThrow(/stale|folded/i);
+    expect(moneyOf(w.id)).toBe(before); // no fresh stake left the wallet
+    expect(gamblingRoundsRepo.get(hand.view.roundId)!.outcome).toBe('forfeit');
+  });
+
   it('getGamblingState resumes an active hand from today', () => {
     const w = casinoWorld(10_000);
     const start = startVideoPoker(w.id, 10);

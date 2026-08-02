@@ -4,6 +4,9 @@ import { setAdapterOverride } from '../llm/provider';
 import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
 import { maybeReachEnding, getEnding } from './ending-service';
+import { getOrCreatePlayer } from './player-service';
+import { playersRepo } from '../db/repositories';
+import { playerIdForWorld } from '../lib/ids';
 
 /** Put a relationship at its committed peak (cohabiting + sweethearts + calm). */
 function makePeak(characterId: string): void {
@@ -46,6 +49,27 @@ describe('happy endings', () => {
     expect(await maybeReachEnding(character.id, { day: 2, mode: 'date' })).toBeNull();
     expect(adapter.calls).toBe(0);
     expect(getEnding(character.id)).toBeUndefined();
+  });
+
+  it('writes the epilogue with the PER-WORLD persona name (regression: called the player "Player")', async () => {
+    // The one legacy DEFAULT_PLAYER_ID lookup left in prompts minted a fresh
+    // profile literally named "Player" and put that name in the once-only epilogue.
+    const { world, character } = seedWorldAndCharacter();
+    makePeak(character.id);
+    const pid = playerIdForWorld(world.id);
+    playersRepo.update({ ...getOrCreatePlayer(pid), name: 'Rowan Vale', updatedAt: Date.now() });
+
+    const seen: string[] = [];
+    const capture = new (class extends ScriptedAdapter {
+      override async chat(req: Parameters<ScriptedAdapter['chat']>[0]) {
+        seen.push(JSON.stringify(req));
+        return super.chat(req);
+      }
+    })([JSON.stringify({ title: 'Us, At Last', epilogue: 'A warm, easy life together.' })]);
+    setAdapterOverride(capture);
+
+    expect(await maybeReachEnding(character.id, { day: 5, mode: 'date' })).not.toBeNull();
+    expect(seen.join('\n')).toContain('Rowan Vale');
   });
 
   it('does not fire while things are tense, even at the top of the ladder', async () => {

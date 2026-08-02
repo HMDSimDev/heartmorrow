@@ -14,6 +14,7 @@ import {
   getSessionWithMessages,
   judgeTurn,
   listSessions,
+  markDateResultSeen,
   maybeAutoSummarize,
   maybeLeaveForLostInterest,
   openConversation,
@@ -22,7 +23,7 @@ import {
   streamReply,
   summarizeSession,
 } from '../services/conversation-service';
-import { attemptDtr } from '../services/dtr-service';
+import { assertNoDtrInFlight, attemptDtr } from '../services/dtr-service';
 import { giveGiftOnDate } from '../services/gift-service';
 import { docSchema } from '../lib/openapi-schema';
 import { withKeyedLock } from '../lib/keyed-lock';
@@ -378,24 +379,44 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     return endSession(id);
   });
 
+  // Acknowledge the end-of-date report (shown live, or replayed after a refresh)
+  // so the Date tab doesn't offer it again.
+  app.post('/conversations/:id/result-seen', { schema: docSchema({ tags: ['conversations'], summary: 'Acknowledge the end-of-date report' }) }, async (req) => {
+    const { id } = req.params as { id: string };
+    markDateResultSeen(id);
+    return { ok: true };
+  });
+
   // Define-the-Relationship: try to advance the commitment status.
+  // Serialized under the session's turn lock: a DTR checks `session.ended` and then
+  // awaits its judge, so unserialized it could land its reaction (and even flip
+  // `ended` on a backfire) in the middle of a streaming turn or a concurrent end.
   app.post('/conversations/:id/dtr', { schema: docSchema({ tags: ['conversations'], summary: 'Attempt to advance the relationship status' }) }, async (req) => {
     const { id } = req.params as { id: string };
-    return attemptDtr(id);
+    // Reject a double-fire BEFORE queueing on the turn lock — queued, the second
+    // request would wait out the first and run a full second attempt instead of
+    // being rejected as an overlap (see assertNoDtrInFlight).
+    assertNoDtrInFlight(id);
+    return withKeyedLock(`conv-reply:${id}`, () => attemptDtr(id));
   });
 
   // Give a held item to your date in-session — triggers a structured gift reaction.
+  // Same turn lock: the gift's ended-check + transcript writes must not interleave
+  // with a streaming reply or an end — otherwise its reaction can land inside an
+  // ended/evaluating session, or become the trailing message a retry replays as the
+  // "answer" to a still-unanswered player turn.
   app.post('/conversations/:id/gift', { schema: docSchema({ tags: ['conversations'], summary: 'Give a held item to your date', body: GiftOnDateSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { inventoryItemId } = parseInput(GiftOnDateSchema, req.body);
-    return giveGiftOnDate(id, inventoryItemId);
+    return withKeyedLock(`conv-reply:${id}`, () => giveGiftOnDate(id, inventoryItemId));
   });
 
   // Confirm a player-initiated breakup (the client first sees the reaction via
-  // the `breakup_intent` stream event, then confirms here).
+  // the `breakup_intent` stream event, then confirms here). Locked so the ended
+  // flip can't race a concurrent turn's session update (lost update).
   app.post('/conversations/:id/breakup', { schema: docSchema({ tags: ['conversations'], summary: 'Confirm a player-initiated breakup' }) }, async (req) => {
     const { id } = req.params as { id: string };
-    return confirmPlayerBreakup(id);
+    return withKeyedLock(`conv-reply:${id}`, async () => confirmPlayerBreakup(id));
   });
 
   app.get('/conversations/:id/prompt-preview', { schema: docSchema({ tags: ['conversations'], summary: 'Preview the assembled session prompt' }) }, async (req) => {

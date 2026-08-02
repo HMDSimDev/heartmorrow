@@ -18,6 +18,15 @@ export function MemoryMatchGame({
   const [lastMatch, setLastMatch] = useState<string | null>(null);
   const startRef = useRef(Date.now());
   const doneRef = useRef(false);
+  // The mismatch flip-back timer — cleared on unmount so leaving the game inside
+  // the 750ms window can't fire a setState on an unmounted component.
+  const flipTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (flipTimerRef.current != null) clearTimeout(flipTimerRef.current);
+    },
+    [],
+  );
 
   const matchedPairs = matched.size;
 
@@ -45,7 +54,8 @@ export function MemoryMatchGame({
         setLastMatch(reveal && reveal.label !== cue.label ? `${cue.label}: ${reveal.label}` : cue.label);
       } else {
         setLock(true);
-        setTimeout(() => {
+        flipTimerRef.current = window.setTimeout(() => {
+          flipTimerRef.current = null;
           setFlipped([]);
           setLock(false);
         }, 750);
@@ -56,7 +66,11 @@ export function MemoryMatchGame({
   return (
     <MinigameShell
       title={t('minigame.memoryMatch')}
-      progress={{ current: matchedPairs, total: config.totalPairs }}
+      // The shell expects a 1-BASED current-item index (every other game passes
+      // `index + 1`): the pair being hunted, so completed pairs read as done.
+      // Passing the raw matched COUNT left the pips one behind and started the
+      // readout at "0/6" where its siblings start at "1/8".
+      progress={{ current: Math.min(matchedPairs + 1, config.totalPairs), total: config.totalPairs }}
     >
       <div className="mg-board mga-board">
         <div className="row end">

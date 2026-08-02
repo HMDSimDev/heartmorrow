@@ -34,6 +34,37 @@ function characterTexts() {
     .filter((m) => m.sender === 'character');
 }
 
+describe('npc_knowledge targeted subject lookup', () => {
+  it('finds player knowledge even when 50+ newer rows would push it out of the list window', () => {
+    // Regression: holdsPlayerKnowledge scanned listByKnower's newest-50 window,
+    // so a long save's chatty character went blind to their own player knowledge
+    // and the "the-player" conversation topic silently stopped firing.
+    const world = createWorld({ name: 'T' });
+    const bo = createCharacter({ worldId: world.id, name: 'Bo', age: 27 });
+    const playerId = `player:${world.id}`;
+    npcKnowledgeRepo.insert(
+      NpcKnowledgeSchema.parse({
+        id: 'k-player', worldId: world.id, knowerId: bo.id, subjectId: playerId,
+        topic: 'dating', claim: 'Bo has heard about the player.', fidelity: 100, hops: 0, day: 1, createdAt: 1,
+      }),
+    );
+    for (let i = 0; i < 60; i += 1) {
+      npcKnowledgeRepo.insert(
+        NpcKnowledgeSchema.parse({
+          id: `k-noise-${i}`, worldId: world.id, knowerId: bo.id, subjectId: `c-other-${i}`,
+          topic: 'job', claim: `Someone works somewhere (${i}).`, fidelity: 100, hops: 0, day: 2 + i, createdAt: 2 + i,
+        }),
+      );
+    }
+
+    // The old windowed scan misses it…
+    expect(npcKnowledgeRepo.listByKnower(bo.id).some((k) => k.subjectId === playerId)).toBe(false);
+    // …the targeted lookup does not.
+    expect(npcKnowledgeRepo.hasAboutSubject(bo.id, playerId, 1)).toBe(true);
+    expect(npcKnowledgeRepo.hasAboutSubject(bo.id, playerId, 101)).toBe(false); // fidelity floor respected
+  });
+});
+
 describe('knowledge-driven gossip (Phase 6 follow-up)', () => {
   it('a dated character texts the player neighborhood gossip from their knowledge', async () => {
     const world = createWorld({ name: 'T' });
