@@ -13,13 +13,16 @@ export type PortraitOption = {
 };
 
 /** The canonical "who?" chooser — framed portrait plates, never a <select>.
- *  Replaces native dropdowns wherever the choice is a person. */
+ *  Replaces native dropdowns wherever the choice is a person. `strip` renders a
+ *  space-saving row of avatar chips instead of the big plates — for phone apps
+ *  where the picker is chrome, not the content (Moments, Together). */
 export function PortraitPicker({
   options,
   value,
   onChange,
   none,
   compact = false,
+  strip = false,
 }: {
   options: PortraitOption[];
   value: string | null;
@@ -27,9 +30,10 @@ export function PortraitPicker({
   /** Optional "no one" tile (e.g. money-only minigame, "everyone" filter). */
   none?: { label: string; sub?: string };
   compact?: boolean;
+  strip?: boolean;
 }) {
   return (
-    <div className={`pp-grid${compact ? ' pp-compact' : ''}`}>
+    <div className={`pp-grid${compact ? ' pp-compact' : ''}${strip ? ' pp-strip' : ''}`}>
       {none && (
         <button
           type="button"

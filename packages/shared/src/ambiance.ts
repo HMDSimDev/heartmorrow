@@ -94,6 +94,11 @@ export interface CharacterWeatherReaction {
   mood: string;
   moodIcon: string;
   reaction: 'loves' | 'dislikes' | null;
+  /** The weather they love, whatever today happens to be — the Weather app shows
+   *  this so a mood reads as a taste you can plan around, not an unexplained badge. */
+  favorite: WeatherKind[];
+  /** The weather they can't stand. */
+  disliked: WeatherKind[];
 }
 
 export interface WorldWeather {

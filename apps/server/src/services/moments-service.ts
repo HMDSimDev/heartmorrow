@@ -1,5 +1,5 @@
-import type { GameEvent, Moment } from '@dsim/shared';
-import { eventsRepo, memoriesRepo } from '../db/repositories';
+import { DEFAULT_PLAYER_ID, type GameEvent, type Moment } from '@dsim/shared';
+import { endingsRepo, eventsRepo, memoriesRepo } from '../db/repositories';
 import { getCharacter } from './character-service';
 
 const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
@@ -21,6 +21,14 @@ function eventToMoment(e: GameEvent): Moment | null {
       return { id: e.id, day: num(p.day), kind: 'status', title: `You're now ${str(p.status) || 'together'}`, body: '', mood: null, importance: 5, createdAt: e.createdAt };
     case 'dtr_backfired':
       return { id: e.id, day: num(p.day), kind: 'status', title: 'A difficult conversation', body: 'The talk about where things stand went badly.', mood: null, importance: null, createdAt: e.createdAt };
+    case 'reconciled':
+      return { id: e.id, day: num(p.day), kind: 'status', title: 'You found your way back to each other', body: '', mood: null, importance: 5, createdAt: e.createdAt };
+    case 'breakup':
+      return { id: e.id, day: num(p.day), kind: 'breakup', title: str(p.initiator) === 'player' ? 'You ended things' : 'They ended things', body: '', mood: null, importance: null, createdAt: e.createdAt };
+    case 'anniversary_date': {
+      const seasons = num(p.seasons) ?? 1;
+      return { id: e.id, day: num(p.day), kind: 'anniversary', title: seasons === 1 ? 'Your first anniversary' : `${seasons} seasons together`, body: 'You spent the day together.', mood: null, importance: 5, createdAt: e.createdAt };
+    }
     default:
       return null;
   }
@@ -44,5 +52,13 @@ export function getMoments(characterId: string): Moment[] {
     .filter((m) => m.importance >= 4 && !m.tags.includes('milestone') && !m.tags.includes('jealousy'))
     .map((m) => ({ id: m.id, day: null, kind: 'memory' as const, title: 'A memory', body: m.text, mood: null, importance: m.importance, createdAt: m.createdAt }));
 
-  return [...fromEvents, ...fromMemories].sort((a, b) => b.createdAt - a.createdAt);
+  // The happy ending marks its day in the scrapbook too — sourced from the
+  // durable endings table (the event log's window can age the event out). Just
+  // the moment: the full epilogue stays in the Endings gallery, uncopied.
+  const ending = endingsRepo.getByCharacter(characterId, DEFAULT_PLAYER_ID);
+  const endingMoments: Moment[] = ending
+    ? [{ id: `ending-${characterId}`, day: ending.day, kind: 'ending' as const, title: `“${ending.title}”`, body: 'Your story reached its happy ending — the epilogue is kept in the Endings gallery.', mood: null, importance: 5, createdAt: ending.createdAt }]
+    : [];
+
+  return [...fromEvents, ...fromMemories, ...endingMoments].sort((a, b) => b.createdAt - a.createdAt);
 }

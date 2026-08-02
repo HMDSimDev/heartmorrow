@@ -78,6 +78,28 @@ describe('slots', () => {
   });
 });
 
+describe('lobby history', () => {
+  beforeEach(() => resetDb());
+  it('reports settled rounds newest-first with signed net, and only this world’s', () => {
+    const w = casinoWorld(10_000);
+    playSlots(w.id, 10, seq(0, 0.13, 0.42)); // lose
+    playSlots(w.id, 10, () => 0.95); // triple sevens → 2500
+    const other = casinoWorld(10_000);
+    playSlots(other.id, 25, seq(0, 0.13, 0.42));
+
+    const recent = getGamblingState(w.id).recent;
+    expect(recent).toHaveLength(2);
+    expect(recent[0]!.net).toBe(2490); // the win came last, so it leads
+    expect(recent[1]!.net).toBe(-10);
+    expect(recent.every((r) => r.game === 'slots' && r.day === 1)).toBe(true);
+  });
+  it('leaves an unresolved hand out of the history until it settles', () => {
+    const w = casinoWorld(10_000);
+    startBlackjack(w.id, 20, seq(0.1, 0.2, 0.3, 0.4));
+    expect(getGamblingState(w.id).recent).toEqual([]);
+  });
+});
+
 describe('wager limits', () => {
   beforeEach(() => resetDb());
   it('enforces the per-bet cap', () => {

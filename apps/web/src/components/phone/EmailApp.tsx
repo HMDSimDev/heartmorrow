@@ -72,7 +72,7 @@ export function EmailApp() {
       <div className="phone-app">
         <PhoneAppBar
           title={open.senderName}
-          kicker={t('email.reading')}
+          kicker={open.kind === 'postcard' ? t('email.postcardKicker') : t('email.reading')}
           icon="mail"
           left={
             <button className="btn sm ghost pbar-iconbtn" onClick={() => setOpen(null)} aria-label={t('email.backToInbox')} title={t('email.inboxShort')}>
@@ -90,7 +90,7 @@ export function EmailApp() {
             </span>
             {when && <span className="pcom-when pcom-reader-when">{when}</span>}
           </div>
-          <p className="pcom-reader-body">{open.body}</p>
+          <p className={`pcom-reader-body${open.kind === 'postcard' ? ' is-postcard' : ''}`}>{open.body}</p>
         </div>
       </div>
     );
@@ -126,11 +126,16 @@ export function EmailApp() {
             return (
               <button
                 key={e.id}
-                className={`ph-rise pcom-mail-row ${e.read ? '' : 'pcom-unread'}`}
+                className={`ph-rise pcom-mail-row ${e.read ? '' : 'pcom-unread'}${e.kind === 'postcard' ? ' pcom-postcard' : ''}`}
                 onClick={() => openEmail(e)}
               >
                 {!e.read && <span className="pcom-mail-dot" />}
                 <span className="pcom-mail-top">
+                  {e.kind === 'postcard' && (
+                    <span className="pcom-stamp" aria-hidden="true">
+                      📮
+                    </span>
+                  )}
                   <span className="pcom-mail-sender">{e.senderName}</span>
                   {when && <span className="pcom-when">{when}</span>}
                 </span>

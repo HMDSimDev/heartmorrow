@@ -23,6 +23,7 @@ import { Banner, Empty, Field, Loader, ConfirmDialog } from '../ui';
 import { ResultCard, type ResultTone } from '../ResultCard';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
+import { PursePill } from './PursePill';
 import './phone-property.css';
 
 const PROPERTY_CATEGORIES: PropertyCategory[] = ['residence', 'retreat', 'social', 'estate', 'land'];
@@ -69,6 +70,9 @@ export function PropertyApp() {
 
   // Creator: generate panel
   const [genOpen, setGenOpen] = useState(false);
+  // The creator workshop is a collapsed drawer at the END of the app — player
+  // content first. While it's open, manage affordances (delete) show on cards.
+  const [workshopOpen, setWorkshopOpen] = useState(false);
   const [genForm, setGenForm] = useState<{
     count: number;
     theme: string;
@@ -84,6 +88,9 @@ export function PropertyApp() {
   const [creating, setCreating] = useState(false);
 
   const money = player?.money ?? 0;
+  /** Tooltip for a price you can't meet — says how far short, not just "no". */
+  const shortTitle = (price: number) =>
+    t('property.card.shortBy', { short: Math.max(0, price - money), money });
 
   // ——— Helpers ——————————————————————————————————————————————————————————
   const withBusy = async (id: string, fn: () => Promise<void>) => {
@@ -262,21 +269,260 @@ export function PropertyApp() {
         title={t('property.title')}
         kicker={t('property.kicker')}
         icon="location"
-        right={
-          <span className="prop-purse">
-            <Icon name="coin" size={13} />
-            <span className="prop-purse-coin">◈ {money}</span>
-          </span>
-        }
+        right={<PursePill money={money} />}
       />
 
       <div className="phone-embed prop-embed stack">
         {note && <ResultCard tone={note.tone} seal={note.seal} kicker={note.kicker} summary={note.text} />}
         {error && <Banner kind="error">{error}</Banner>}
 
-        {/* ——— Creator: generate panel ——————————————————————— */}
+        {/* ——— Property list ——————————————————————————————————————— */}
+        <Loader state={state}>
+          {({ properties }) =>
+            properties.length === 0 ? (
+              <Empty icon={<Icon name="location" size={34} />} title={t('property.list.emptyTitle')}>
+                <p className="muted">
+                  {creatorMode
+                    ? t('property.list.emptyCreator')
+                    : t('property.list.emptyPlayer')}
+                </p>
+              </Empty>
+            ) : (
+              <>
+                <div className="section-head prop-list-head">
+                  <div className="titles">
+                    <div className="kicker">{t('property.list.onTheMarket')}</div>
+                    <h3 className="prop-list-count">
+                      {t('property.list.count', { count: properties.length })}
+                    </h3>
+                  </div>
+                </div>
+                <div className="prop-grid">
+                  {properties.map((pv) => {
+                    const { property, owned, lease, affordableBuy, affordableLease } = pv;
+                    const isBusy = busyId === property.id;
+                    const cadence = property.rentCadence;
+                    const isLeased = !owned && lease !== null;
+                    const isOverdue = isLeased && lease!.status === 'overdue';
+                    // Rent is only payable when it's actually owed (overdue, or this
+                    // period has come due) — otherwise paying just wastes money.
+                    const rentDue = isLeased && (isOverdue || (worldState?.day ?? 1) >= lease!.nextDueDay);
+
+                    return (
+                      <div
+                        className={`ph-rise prop-card${owned ? ' owned bracketed' : ''}${isLeased ? ' leased' : ''}`}
+                        key={property.id}
+                      >
+                        <div className="prop-card-body">
+                          <div className="prop-card-top">
+                            <div className="prop-card-icon" aria-hidden="true">
+                              <Icon name="location" size={18} />
+                            </div>
+                            <div className="flex-fill">
+                              <h4 className="prop-card-name">{property.name}</h4>
+                              <div className="prop-card-cat">
+                                {propertyCategoryLabel(property.category)}
+                                {property.indoor ? t('property.card.indoor') : t('property.card.outdoor')}
+                              </div>
+                            </div>
+                            {owned && <span className="prop-owned-badge">{t('property.card.owned')}</span>}
+                            {isLeased && !isOverdue && <span className="prop-leased-badge">{t('property.card.leased')}</span>}
+                            {isOverdue && (
+                              <span className="prop-overdue-badge">
+                                <Icon name="warn" size={11} /> {t('property.card.overdue')}
+                              </span>
+                            )}
+                          </div>
+
+                          {property.description && (
+                            <p className="prop-card-desc">{property.description}</p>
+                          )}
+
+                          {property.tags.length > 0 && (
+                            <div className="tags">
+                              {property.tags.map((t) => (
+                                <span className="tag" key={t}>
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Economics strip */}
+                        <div className="prop-card-econ">
+                          {owned ? (
+                            /* Owned: just buy-back price + buff */
+                            <div className="prop-econ-row">
+                              <span className="prop-price-label">{t('property.card.sellValue')}</span>
+                              <span className="prop-price">◈ {property.buyPrice}</span>
+                            </div>
+                          ) : isLeased ? (
+                            /* Leased: show lease status */
+                            isOverdue ? (
+                              <div className="prop-overdue-notice">
+                                <Icon name="warn" size={13} />
+                                <span>
+                                  {t('property.card.rentOverdue', {
+                                    rent: property.rentAmount,
+                                    day: (lease as PropertyLease).graceUntilDay ?? '?',
+                                  })}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="prop-econ-row">
+                                <span className="prop-price-label">
+                                  {t('property.card.rentPer', { rent: property.rentAmount, per: rentCadencePer(cadence) })}
+                                </span>
+                                <span className="prop-price secondary">
+                                  {t('property.card.nextDue', { day: (lease as PropertyLease).nextDueDay })}
+                                </span>
+                              </div>
+                            )
+                          ) : (
+                            /* Available: show both options */
+                            <>
+                              {property.rentAmount > 0 && (
+                                <div className="prop-econ-row">
+                                  <span className="prop-price-label">
+                                    {t('property.card.leasePer', { per: rentCadencePer(cadence) })}
+                                  </span>
+                                  <span className="prop-price secondary">◈ {property.rentAmount}</span>
+                                </div>
+                              )}
+                              <div className="prop-econ-row">
+                                <span className="prop-price-label">{t('property.card.buy')}</span>
+                                <span className="prop-price">◈ {property.buyPrice}</span>
+                              </div>
+                            </>
+                          )}
+
+                          {property.buffStat && property.buffAmount > 0 && (
+                            <div className="prop-econ-row prop-buff-row">
+                              <span className="prop-buff">
+                                {t('property.card.buff', {
+                                  amount: property.buffAmount,
+                                  stat: relationshipStatLabel(property.buffStat),
+                                  note: owned ? t('property.card.buffOwned') : t('property.card.buffLeased'),
+                                })}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="prop-card-actions">
+                          {owned ? (
+                            /* Owned: only sell */
+                            <button
+                              className="btn ghost flex-fill"
+                              disabled={isBusy || busyId !== null}
+                              onClick={() => sell(pv)}
+                            >
+                              {isBusy ? t('property.card.selling') : t('property.card.sell', { price: property.buyPrice })}
+                            </button>
+                          ) : isLeased ? (
+                            /* Leased: pay rent (only when due), buy, end lease */
+                            <>
+                              {rentDue && (
+                                <button
+                                  className={`btn flex-fill${isOverdue ? ' danger' : ''}${!affordableLease ? ' is-short' : ''}`}
+                                  disabled={!affordableLease || isBusy || busyId !== null}
+                                  onClick={() => payRent(pv)}
+                                  title={!affordableLease ? shortTitle(property.rentAmount) : undefined}
+                                >
+                                  {isBusy ? t('property.card.paying') : !affordableLease ? t('property.card.notEnough') : t('property.card.payRent', { rent: property.rentAmount })}
+                                </button>
+                              )}
+                              <button
+                                className={`btn primary${!affordableBuy ? ' is-short' : ''}`}
+                                disabled={!affordableBuy || isBusy || busyId !== null}
+                                onClick={() => buy(pv)}
+                                title={!affordableBuy ? shortTitle(property.buyPrice) : t('property.card.buyOutright')}
+                              >
+                                {t('property.card.buyPrice', { price: property.buyPrice })}
+                              </button>
+                              <button
+                                className="btn ghost"
+                                disabled={isBusy || busyId !== null}
+                                onClick={() => setPendingEndLease(pv)}
+                                title={t('property.card.moveOut')}
+                              >
+                                {t('property.card.endLease')}
+                              </button>
+                            </>
+                          ) : (
+                            /* Available: lease and/or buy */
+                            <>
+                              {property.rentAmount > 0 && (
+                                <button
+                                  className={`btn ghost flex-fill${!affordableLease ? ' is-short' : ''}`}
+                                  disabled={!affordableLease || busyId !== null}
+                                  onClick={() => startLease(pv)}
+                                  title={!affordableLease ? shortTitle(property.rentAmount) : undefined}
+                                >
+                                  {isBusy
+                                    ? t('property.card.leasing')
+                                    : !affordableLease
+                                    ? t('property.card.notEnough')
+                                    : t('property.card.lease')}
+                                </button>
+                              )}
+                              <button
+                                className={`btn primary flex-fill${!affordableBuy ? ' is-short' : ''}`}
+                                disabled={!affordableBuy || busyId !== null}
+                                onClick={() => buy(pv)}
+                                title={!affordableBuy ? shortTitle(property.buyPrice) : undefined}
+                              >
+                                {isBusy
+                                  ? t('property.card.buying')
+                                  : !affordableBuy
+                                  ? t('property.card.notEnough')
+                                  : t('property.card.buyPrice', { price: property.buyPrice })}
+                              </button>
+                            </>
+                          )}
+                          {creatorMode && workshopOpen && (
+                            <button
+                              className="btn danger ghost"
+                              onClick={() => setPendingDelete(property)}
+                              title={t('property.card.deleteProperty')}
+                              aria-label={t('property.card.deleteProperty')}
+                            >
+                              <Icon name="trash" size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )
+          }
+        </Loader>
+
+        {/* ——— Creator workshop: a collapsed drawer BELOW the listings, so the
+             market reads player-first; authoring and delete live in here ——— */}
         {creatorMode && (
-          <div className="prop-creator-bar">
+          <div className="framed stack ph-workshop">
+            <button
+              className="ph-workshop-toggle"
+              onClick={() => setWorkshopOpen((o) => !o)}
+              aria-expanded={workshopOpen}
+            >
+              <span className="ph-workshop-titles">
+                <span className="kicker">{t('property.creator.workshop')}</span>
+                <span className="ph-workshop-title">{t('property.creator.properties')}</span>
+              </span>
+              <span className={`ph-workshop-chevron${workshopOpen ? ' is-open' : ''}`} aria-hidden="true">
+                <Icon name="chevronDown" size={16} />
+              </span>
+            </button>
+            {workshopOpen && (
+            <>
+            <p className="hint ph-workshop-hint">{t('property.creator.manageHint')}</p>
+            <div className="prop-creator-bar">
             {!genOpen && !createOpen && (
               <>
                 <button className="btn primary sm" onClick={() => setGenOpen(true)}>
@@ -287,11 +533,10 @@ export function PropertyApp() {
                 </button>
               </>
             )}
-          </div>
-        )}
+            </div>
 
         {/* Generate panel */}
-        {creatorMode && genOpen && (
+        {genOpen && (
           <div className="framed prop-gen stack">
             <div className="prop-gen-head">
               <div>
@@ -457,7 +702,7 @@ export function PropertyApp() {
         )}
 
         {/* Manual create form */}
-        {creatorMode && createOpen && (
+        {createOpen && (
           <div className="framed prop-create-form stack">
             <div className="prop-gen-head">
               <div>
@@ -580,230 +825,11 @@ export function PropertyApp() {
             </div>
           </div>
         )}
+            </>
+            )}
+          </div>
+        )}
 
-        {/* ——— Property list ——————————————————————————————————————— */}
-        <Loader state={state}>
-          {({ properties }) =>
-            properties.length === 0 ? (
-              <Empty icon={<Icon name="location" size={34} />} title={t('property.list.emptyTitle')}>
-                <p className="muted">
-                  {creatorMode
-                    ? t('property.list.emptyCreator')
-                    : t('property.list.emptyPlayer')}
-                </p>
-              </Empty>
-            ) : (
-              <>
-                <div className="section-head prop-list-head">
-                  <div className="titles">
-                    <div className="kicker">{t('property.list.onTheMarket')}</div>
-                    <h3 className="prop-list-count">
-                      {t('property.list.count', { count: properties.length })}
-                    </h3>
-                  </div>
-                </div>
-                <div className="prop-grid">
-                  {properties.map((pv) => {
-                    const { property, owned, lease, affordableBuy, affordableLease } = pv;
-                    const isBusy = busyId === property.id;
-                    const cadence = property.rentCadence;
-                    const isLeased = !owned && lease !== null;
-                    const isOverdue = isLeased && lease!.status === 'overdue';
-                    // Rent is only payable when it's actually owed (overdue, or this
-                    // period has come due) — otherwise paying just wastes money.
-                    const rentDue = isLeased && (isOverdue || (worldState?.day ?? 1) >= lease!.nextDueDay);
-
-                    return (
-                      <div
-                        className={`ph-rise prop-card${owned ? ' owned bracketed' : ''}${isLeased ? ' leased' : ''}`}
-                        key={property.id}
-                      >
-                        <div className="prop-card-body">
-                          <div className="prop-card-top">
-                            <div className="prop-card-icon" aria-hidden="true">
-                              <Icon name="location" size={18} />
-                            </div>
-                            <div className="flex-fill">
-                              <h4 className="prop-card-name">{property.name}</h4>
-                              <div className="prop-card-cat">
-                                {propertyCategoryLabel(property.category)}
-                                {property.indoor ? t('property.card.indoor') : t('property.card.outdoor')}
-                              </div>
-                            </div>
-                            {owned && <span className="prop-owned-badge">{t('property.card.owned')}</span>}
-                            {isLeased && !isOverdue && <span className="prop-leased-badge">{t('property.card.leased')}</span>}
-                            {isOverdue && (
-                              <span className="prop-overdue-badge">
-                                <Icon name="warn" size={11} /> {t('property.card.overdue')}
-                              </span>
-                            )}
-                          </div>
-
-                          {property.description && (
-                            <p className="prop-card-desc">{property.description}</p>
-                          )}
-
-                          {property.tags.length > 0 && (
-                            <div className="tags">
-                              {property.tags.map((t) => (
-                                <span className="tag" key={t}>
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Economics strip */}
-                        <div className="prop-card-econ">
-                          {owned ? (
-                            /* Owned: just buy-back price + buff */
-                            <div className="prop-econ-row">
-                              <span className="prop-price-label">{t('property.card.sellValue')}</span>
-                              <span className="prop-price">◈ {property.buyPrice}</span>
-                            </div>
-                          ) : isLeased ? (
-                            /* Leased: show lease status */
-                            isOverdue ? (
-                              <div className="prop-overdue-notice">
-                                <Icon name="warn" size={13} />
-                                <span>
-                                  {t('property.card.rentOverdue', {
-                                    rent: property.rentAmount,
-                                    day: (lease as PropertyLease).graceUntilDay ?? '?',
-                                  })}
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="prop-econ-row">
-                                <span className="prop-price-label">
-                                  {t('property.card.rentPer', { rent: property.rentAmount, per: rentCadencePer(cadence) })}
-                                </span>
-                                <span className="prop-price secondary">
-                                  {t('property.card.nextDue', { day: (lease as PropertyLease).nextDueDay })}
-                                </span>
-                              </div>
-                            )
-                          ) : (
-                            /* Available: show both options */
-                            <>
-                              {property.rentAmount > 0 && (
-                                <div className="prop-econ-row">
-                                  <span className="prop-price-label">
-                                    {t('property.card.leasePer', { per: rentCadencePer(cadence) })}
-                                  </span>
-                                  <span className="prop-price secondary">◈ {property.rentAmount}</span>
-                                </div>
-                              )}
-                              <div className="prop-econ-row">
-                                <span className="prop-price-label">{t('property.card.buy')}</span>
-                                <span className="prop-price">◈ {property.buyPrice}</span>
-                              </div>
-                            </>
-                          )}
-
-                          {property.buffStat && property.buffAmount > 0 && (
-                            <div className="prop-econ-row prop-buff-row">
-                              <span className="prop-buff">
-                                {t('property.card.buff', {
-                                  amount: property.buffAmount,
-                                  stat: relationshipStatLabel(property.buffStat),
-                                  note: owned ? t('property.card.buffOwned') : t('property.card.buffLeased'),
-                                })}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Actions */}
-                        <div className="prop-card-actions">
-                          {owned ? (
-                            /* Owned: only sell */
-                            <button
-                              className="btn ghost flex-fill"
-                              disabled={isBusy || busyId !== null}
-                              onClick={() => sell(pv)}
-                            >
-                              {isBusy ? t('property.card.selling') : t('property.card.sell', { price: property.buyPrice })}
-                            </button>
-                          ) : isLeased ? (
-                            /* Leased: pay rent (only when due), buy, end lease */
-                            <>
-                              {rentDue && (
-                                <button
-                                  className={`btn flex-fill${isOverdue ? ' danger' : ''}`}
-                                  disabled={!affordableLease || isBusy || busyId !== null}
-                                  onClick={() => payRent(pv)}
-                                  title={!affordableLease ? t('property.card.notEnough') : undefined}
-                                >
-                                  {isBusy ? t('property.card.paying') : !affordableLease ? t('property.card.notEnough') : t('property.card.payRent', { rent: property.rentAmount })}
-                                </button>
-                              )}
-                              <button
-                                className="btn primary"
-                                disabled={!affordableBuy || isBusy || busyId !== null}
-                                onClick={() => buy(pv)}
-                                title={!affordableBuy ? t('property.card.notEnough') : t('property.card.buyOutright')}
-                              >
-                                {t('property.card.buyPrice', { price: property.buyPrice })}
-                              </button>
-                              <button
-                                className="btn ghost"
-                                disabled={isBusy || busyId !== null}
-                                onClick={() => setPendingEndLease(pv)}
-                                title={t('property.card.moveOut')}
-                              >
-                                {t('property.card.endLease')}
-                              </button>
-                            </>
-                          ) : (
-                            /* Available: lease and/or buy */
-                            <>
-                              {property.rentAmount > 0 && (
-                                <button
-                                  className="btn ghost flex-fill"
-                                  disabled={!affordableLease || busyId !== null}
-                                  onClick={() => startLease(pv)}
-                                >
-                                  {isBusy
-                                    ? t('property.card.leasing')
-                                    : !affordableLease
-                                    ? t('property.card.notEnough')
-                                    : t('property.card.lease')}
-                                </button>
-                              )}
-                              <button
-                                className="btn primary flex-fill"
-                                disabled={!affordableBuy || busyId !== null}
-                                onClick={() => buy(pv)}
-                              >
-                                {isBusy
-                                  ? t('property.card.buying')
-                                  : !affordableBuy
-                                  ? t('property.card.notEnough')
-                                  : t('property.card.buyPrice', { price: property.buyPrice })}
-                              </button>
-                            </>
-                          )}
-                          {creatorMode && (
-                            <button
-                              className="btn danger ghost"
-                              onClick={() => setPendingDelete(property)}
-                              title={t('property.card.deleteProperty')}
-                              aria-label={t('property.card.deleteProperty')}
-                            >
-                              <Icon name="trash" size={15} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            )
-          }
-        </Loader>
       </div>
 
       {pendingDelete && (

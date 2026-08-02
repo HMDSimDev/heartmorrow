@@ -188,21 +188,27 @@
   color: var(--brass);
   text-shadow: 0 0 6px rgba(230, 177, 94, 0.7);
 }
+/* What happened that day, one dot per beat. These are the grid's only content
+   signal, so they carry a glow — flat 4px dots vanished against the panel, and
+   a grey neutral dot read as a rendering speck rather than an event. */
 .pal-cell-dots {
   display: flex;
-  gap: 2px;
-  height: 4px;
-  margin-top: 1px;
+  justify-content: center;
+  gap: 3px;
+  height: 5px;
+  margin-top: 2px;
 }
 .pal-cell-dots i {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   display: block;
+  background: var(--dot, var(--moon));
+  box-shadow: 0 0 5px var(--dot, var(--moon));
 }
-.pal-cell-dots i.tone-good { background: var(--sage); }
-.pal-cell-dots i.tone-bad { background: var(--ember); }
-.pal-cell-dots i.tone-neutral { background: var(--text-mute); }
+.pal-cell-dots i.tone-good { --dot: var(--sage); }
+.pal-cell-dots i.tone-bad { --dot: var(--ember); }
+.pal-cell-dots i.tone-neutral { --dot: var(--moon); }
 
 /* Weekend days read a hair warmer. */
 .pal-cell.is-weekend { background: linear-gradient(180deg, var(--panel-2), rgba(230, 177, 94, 0.05)); }

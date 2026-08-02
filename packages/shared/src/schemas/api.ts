@@ -604,11 +604,28 @@ export const VideoPokerViewSchema = z.object({
 });
 export type VideoPokerView = z.infer<typeof VideoPokerViewSchema>;
 
+/** One settled round, for the lobby's history strip. */
+export const GamblingRoundSummarySchema = z.object({
+  id: z.string().min(1),
+  game: CasinoGameSchema,
+  bet: z.number().int().nonnegative(),
+  payout: z.number().int().nonnegative(),
+  /** payout - bet (negative = the stake was lost). */
+  net: z.number().int(),
+  /** Short result tag ('win' / 'lose' / 'push' / 'blackjack' / …). */
+  outcome: z.string(),
+  /** The in-world day it was played on. */
+  day: z.number().int().positive(),
+});
+export type GamblingRoundSummary = z.infer<typeof GamblingRoundSummarySchema>;
+
 /** The casino lobby read state, incl. any active hand to resume after a refresh. */
 export const GamblingStateViewSchema = z.object({
   wallet: GamblingWalletSchema,
   activeBlackjack: BlackjackViewSchema.nullable().default(null),
   activeVideoPoker: VideoPokerViewSchema.nullable().default(null),
+  /** Newest-first settled rounds — the lobby shows how the night has actually gone. */
+  recent: z.array(GamblingRoundSummarySchema).default([]),
 });
 export type GamblingStateView = z.infer<typeof GamblingStateViewSchema>;
 
@@ -867,7 +884,7 @@ export const MomentSchema = z.object({
   id: z.string(),
   /** In-world day, when known. */
   day: z.number().int().nullable().default(null),
-  kind: z.enum(['milestone', 'date', 'jealousy', 'walkout', 'status', 'memory']),
+  kind: z.enum(['milestone', 'date', 'jealousy', 'walkout', 'status', 'memory', 'breakup', 'anniversary', 'ending']),
   title: z.string(),
   body: z.string().default(''),
   mood: z.string().nullable().default(null),
@@ -1120,6 +1137,10 @@ export const PhoneThreadSummarySchema = z.object({
   portraitAssetId: z.string().nullable(),
   lastBody: z.string().nullable(),
   lastAt: z.number().nullable(),
+  /** The last delivered text's IN-WORLD day, so the inbox speaks the game's
+   *  clock ("Day 23") instead of leaking real-world dates. Null for world-less
+   *  threads (no clock — the wall-clock timestamp is the only honest time). */
+  lastDay: z.number().int().nullable().default(null),
   /** Whether the last delivered text was sent by the player — lets the inbox
    *  preview prefix "You:" so an outgoing-but-unanswered thread reads clearly. */
   lastFromPlayer: z.boolean().default(false),

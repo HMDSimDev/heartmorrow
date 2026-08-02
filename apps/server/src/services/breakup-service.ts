@@ -1,5 +1,6 @@
 import {
   BREAKUP_HARD_MARGIN,
+  DEFAULT_PLAYER_ID,
   LAST_SEEN_FLAG,
   RECONCILE_COOLDOWN_DAYS,
   RECONCILE_WARMTH,
@@ -16,6 +17,7 @@ import {
   type Relationship,
   type RelationshipStatus,
 } from '@dsim/shared';
+import { textMessagesRepo, threadsRepo } from '../db/repositories';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
@@ -146,6 +148,14 @@ export function applyBreakup(
   const { day, fromStatus, initiator, queueText = initiator === 'character' } = opts;
   const rel = getRelationship(characterId);
   const priorBreakups = num(rel.flags['breakup:count']);
+
+  // A breakup clears the OUTBOX: any still-queued texts were written before the
+  // split (that morning's warm daily, gossip), and delivering an affectionate
+  // line hours after the breakup would seed every later prompt with a state
+  // contradiction. The breakup BEAT text is never at risk — it is generated at
+  // the NEXT day-start, after beat:pending is set, strictly after this purge.
+  const thread = threadsRepo.getByCharacter(characterId, DEFAULT_PLAYER_ID);
+  if (thread) textMessagesRepo.deleteQueuedByThread(thread.id);
 
   setRelationshipFlag(characterId, 'status', 'none', { source: 'breakup' });
   setRelationshipFlag(characterId, 'state:onTheRocks', false, { source: 'breakup' });

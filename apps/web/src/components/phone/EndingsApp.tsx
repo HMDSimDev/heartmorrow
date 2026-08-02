@@ -43,7 +43,9 @@ export function EndingsApp() {
         ) : (
           <>
             <div className="end-plate">
-              <div className="kicker">{t('endings.kicker')}</div>
+              {/* The app bar already says "Happy Endings" — repeating it here read
+                  as a stutter. Count the collection instead; that's news. */}
+              <div className="kicker">{t('endings.plateCount', { count: endings.length })}</div>
               <h2 className="end-plate-title">{t('endings.plateTitle')}</h2>
               <div className="end-plate-rule">✦ ✦ ✦</div>
             </div>

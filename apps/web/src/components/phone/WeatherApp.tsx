@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type WorldWeather } from '@dsim/shared';
+import { WEATHER_ICONS, type WorldWeather } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { useAppData } from '../../state/app-context';
 import { weatherLabel, weekdayAbbr } from '../../i18n/labels';
@@ -93,6 +93,28 @@ export function WeatherApp() {
                 <span className="weather-mood-icon">{c.moodIcon}</span>
                 <span className="flex-fill">
                   <strong>{c.name}</strong> — {c.mood}
+                  {/* What they actually like, whatever today is. A badge alone said
+                      how they feel but never why, or what weather to plan a date for. */}
+                  {(c.favorite.length > 0 || c.disliked.length > 0) && (
+                    <span className="weather-taste">
+                      {c.favorite.length > 0 && (
+                        <span className="weather-taste-set is-loves">
+                          <b>{t('weather.tasteLikes')}</b>
+                          {c.favorite.map((k) => (
+                            <em key={k} title={weatherLabel(k)}>{WEATHER_ICONS[k]}</em>
+                          ))}
+                        </span>
+                      )}
+                      {c.disliked.length > 0 && (
+                        <span className="weather-taste-set is-dislikes">
+                          <b>{t('weather.tasteAvoids')}</b>
+                          {c.disliked.map((k) => (
+                            <em key={k} title={weatherLabel(k)}>{WEATHER_ICONS[k]}</em>
+                          ))}
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </span>
                 {c.reaction === 'loves' && <span className="badge good" title={t('weather.lovesTitle')}>{t('weather.lovesIt')}</span>}
                 {c.reaction === 'dislikes' && <span className="badge" title={t('weather.dislikesTitle')}>{t('weather.notAFan')}</span>}

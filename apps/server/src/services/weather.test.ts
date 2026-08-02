@@ -1,7 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { POSITIVE_MOODS, NEGATIVE_MOODS, resolveWeather, type Location, type WeatherKind } from '@dsim/shared';
 import { resetDb, seedWorldAndCharacter } from '../test/helpers';
-import { weatherForDay, moodForCharacter, weatherDateEffect, weatherReaction, forecastForWorld } from './ambiance-service';
+import { createCharacter } from './character-service';
+import {
+  weatherForDay,
+  moodForCharacter,
+  weatherDateEffect,
+  weatherReaction,
+  forecastForWorld,
+  getWorldWeather,
+} from './ambiance-service';
 
 const W = (kind: WeatherKind) => resolveWeather(kind);
 const loc = (indoor: boolean): Location => ({ id: 'l', name: 'Spot', description: '', tags: [], indoor, priceTier: 0, imageAssetId: null });
@@ -46,5 +54,22 @@ describe('weather engine', () => {
     expect(weatherReaction({ favoriteWeather: ['rainy'], dislikedWeather: [] }, W('rainy'))).toBe('loves');
     expect(weatherReaction({ favoriteWeather: [], dislikedWeather: ['rainy'] }, W('rainy'))).toBe('dislikes');
     expect(weatherReaction({ favoriteWeather: [], dislikedWeather: [] }, W('rainy'))).toBeNull();
+  });
+
+  it('getWorldWeather reports each character’s standing tastes, canonical kinds only', () => {
+    const { world } = seedWorldAndCharacter();
+    // Authored prefs are free-form strings; anything off-vocabulary must not reach
+    // the client, which maps each kind straight to a label + glyph.
+    const c = createCharacter({
+      worldId: world.id,
+      name: 'Taste Tester',
+      age: 30,
+      datingStats: { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 },
+      favoriteWeather: ['rainy', 'not-a-weather'],
+      dislikedWeather: ['stormy'],
+    });
+    const row = getWorldWeather(world.id).characters.find((x) => x.id === c.id)!;
+    expect(row.favorite).toEqual(['rainy']);
+    expect(row.disliked).toEqual(['stormy']);
   });
 });

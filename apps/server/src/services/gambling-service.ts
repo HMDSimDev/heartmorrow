@@ -167,6 +167,15 @@ export function getGamblingState(worldId: string): GamblingStateView {
     wallet: walletFor(worldId, limits),
     activeBlackjack: live?.game === 'blackjack' ? blackjackView(live) : null,
     activeVideoPoker: live?.game === 'videoPoker' ? videoPokerView(live) : null,
+    recent: gamblingRoundsRepo.listRecent(worldId, playerId, 8).map((r) => ({
+      id: r.id,
+      game: r.game,
+      bet: r.bet,
+      payout: r.payout,
+      net: r.payout - r.bet,
+      outcome: r.outcome,
+      day: r.day,
+    })),
   };
 }
 

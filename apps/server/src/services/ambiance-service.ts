@@ -6,9 +6,11 @@ import {
   POSITIVE_MOODS,
   NEGATIVE_MOODS,
   SEASON_WEATHER,
+  WEATHER_KINDS,
   deriveCalendar,
   resolveWeather,
   type DayWeather,
+  type WeatherKind,
   type Location,
   type Mood,
   type RelationshipStatKey,
@@ -38,6 +40,8 @@ export interface CharacterMood {
 }
 
 type WeatherPrefs = { favoriteWeather: string[]; dislikedWeather: string[] };
+
+const isWeatherKind = (s: string): s is WeatherKind => (WEATHER_KINDS as readonly string[]).includes(s);
 
 /** Mood of the day, biased toward positive/negative pools by today's weather. */
 export function moodForCharacter(
@@ -128,7 +132,17 @@ export function getWorldWeather(worldId: string, days = 5): WorldWeather {
   const today = weatherForDay(worldId, day);
   const characters = charactersRepo.listByWorld(worldId).map((c) => {
     const m = moodForCharacter(worldId, day, c);
-    return { id: c.id, name: c.name, mood: m.mood, moodIcon: m.icon, reaction: weatherReaction(c, today) };
+    return {
+      id: c.id,
+      name: c.name,
+      mood: m.mood,
+      moodIcon: m.icon,
+      reaction: weatherReaction(c, today),
+      // Authored prefs are free-form strings; keep only the canonical kinds so the
+      // client can map straight to a label + glyph.
+      favorite: c.favoriteWeather.filter(isWeatherKind),
+      disliked: c.dislikedWeather.filter(isWeatherKind),
+    };
   });
   return { day, today, forecast: forecastForWorld(worldId, day, days), characters };
 }

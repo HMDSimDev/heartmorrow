@@ -210,10 +210,13 @@
 .pcom-row-busy .pcom-ava .portrait { filter: grayscale(0.5); opacity: 0.7; }
 .pcom-row-busy .pcom-name { color: var(--text-dim); }
 /* Reason line under the name in the contact picker. */
+/* Why someone can't be reached. Italic so it never reads as a quoted message —
+   this line sits exactly where a text preview would. */
 .pcom-busy {
   display: block;
   margin-top: 2px;
   font-size: 0.78rem;
+  font-style: italic;
   color: var(--moon);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -828,4 +831,19 @@
   line-height: 1.65;
   font-size: 0.92rem;
   color: var(--text);
+}
+
+/* Postcards — the one character-sent kind of mail: a brass edge and stamp in
+   the inbox, and a hand-written voice in the reader. */
+.pcom-mail-row.pcom-postcard {
+  border-left: 2px solid var(--brass-dim);
+}
+.pcom-stamp {
+  font-size: 0.78rem;
+  margin-right: 5px;
+}
+.pcom-reader-body.is-postcard {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.98rem;
 }

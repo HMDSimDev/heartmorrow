@@ -16,6 +16,7 @@ import { Banner, Empty, Field, Loader, ConfirmDialog } from '../ui';
 import { ResultCard, type ResultTone } from '../ResultCard';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
+import { PursePill } from './PursePill';
 import './phone-market.css';
 
 const SECTORS: StockSector[] = ['tech', 'finance', 'industry', 'consumer', 'energy', 'media', 'health', 'realty'];
@@ -260,6 +261,9 @@ export function MarketApp() {
 
   // Creator: generator panel
   const [genOpen, setGenOpen] = useState(false);
+  // The creator workshop is a collapsed drawer at the END of the app — player
+  // content first. While it's open, manage affordances (delete) show on rows.
+  const [workshopOpen, setWorkshopOpen] = useState(false);
   const [genForm, setGenForm] = useState<{
     count: number;
     theme: string;
@@ -429,15 +433,14 @@ export function MarketApp() {
 
   return (
     <div className="phone-app">
-      <PhoneAppBar title={t('market.title')} kicker={t('market.kicker')} icon="coin" />
+      <PhoneAppBar
+        title={t('market.title')}
+        kicker={t('market.kicker')}
+        icon="coin"
+        right={<PursePill money={money} />}
+      />
 
       <div className="mkt-scroll">
-        {/* ── Purse strip ─────────────────────────────────────────────── */}
-        <div className="mkt-purse-bar">
-          <span className="mkt-purse-label">{t('market.cash')}</span>
-          <span className="mkt-purse-coin">◈ {money}</span>
-        </div>
-
         {/* ── Notifications ───────────────────────────────────────────── */}
         {note && <ResultCard tone={note.tone} seal={note.seal} kicker={note.kicker} summary={note.text} />}
         {error && <Banner kind="error">{error}</Banner>}
@@ -467,14 +470,84 @@ export function MarketApp() {
         ══════════════════════════════════════════════════════════════ */}
         {tab === 'market' && (
           <>
-            {/* Creator: generate + new-company forms */}
+            {/* Market board */}
+            <Loader state={marketState}>
+              {(market) =>
+                market.companies.length === 0 ? (
+                  <Empty icon={<Icon name="coin" size={34} />} title={t('market.board.emptyTitle')}>
+                    <p className="muted">
+                      {creatorMode
+                        ? t('market.board.emptyCreator')
+                        : t('market.board.emptyPlayer')}
+                    </p>
+                  </Empty>
+                ) : (
+                  <>
+                    <div className="mkt-eyebrow">
+                      <Icon name="coin" size={12} /> {t('market.board.listings', { count: market.companies.length })}
+                    </div>
+                    <div className="mkt-board">
+                      {market.companies.map((view) => (
+                        <div key={view.company.id} className="mkt-row-wrap">
+                          <CompanyRow
+                            view={view}
+                            activeWorldId={activeWorldId}
+                            tradingId={tradingId}
+                            onTrade={trade}
+                          />
+                          {creatorMode && workshopOpen && (
+                            <button
+                              className="btn danger ghost sm mkt-delete-btn"
+                              title={t('market.board.deleteCompany')}
+                              aria-label={t('market.board.deleteNamed', { name: view.company.name })}
+                              onClick={() => setPendingDelete(view.company)}
+                            >
+                              <Icon name="trash" size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* News */}
+                    {market.news.length > 0 && (
+                      <>
+                        <div className="mkt-eyebrow">
+                          <Icon name="chronicle" size={12} /> {t('market.board.recentHeadlines')}
+                        </div>
+                        <div className="mkt-news-list">
+                          {market.news.map((item) => (
+                            <NewsCard key={item.id} item={item} />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )
+              }
+            </Loader>
+
+            {/* Creator workshop — a collapsed drawer BELOW the market, so the
+                first thing a player sees is stocks, never an authoring form. */}
             {creatorMode && (
               <div className="mkt-creator framed stack">
+                <button
+                  className="ph-workshop-toggle"
+                  onClick={() => setWorkshopOpen((o) => !o)}
+                  aria-expanded={workshopOpen}
+                >
+                  <span className="ph-workshop-titles">
+                    <span className="kicker">{t('market.creator.workshop')}</span>
+                    <span className="ph-workshop-title">{t('market.creator.companies')}</span>
+                  </span>
+                  <span className={`ph-workshop-chevron${workshopOpen ? ' is-open' : ''}`} aria-hidden="true">
+                    <Icon name="chevronDown" size={16} />
+                  </span>
+                </button>
+                {workshopOpen && (
+                <>
+                <p className="hint ph-workshop-hint">{t('market.creator.manageHint')}</p>
                 <div className="mkt-creator-head">
-                  <div>
-                    <div className="kicker">{t('market.creator.workshop')}</div>
-                    <h3 style={{ margin: 0 }}>{t('market.creator.companies')}</h3>
-                  </div>
                   {!genOpen && (
                     <button className="btn sm primary" onClick={() => setGenOpen(true)}>
                       <Icon name="generate" size={14} /> {t('market.creator.generate')}
@@ -624,65 +697,11 @@ export function MarketApp() {
                     <Icon name="plus" size={15} /> {creatingNew ? t('market.creator.creating') : t('market.creator.createCompany')}
                   </button>
                 </div>
+                </>
+                )}
               </div>
             )}
 
-            {/* Market board */}
-            <Loader state={marketState}>
-              {(market) =>
-                market.companies.length === 0 ? (
-                  <Empty icon={<Icon name="coin" size={34} />} title={t('market.board.emptyTitle')}>
-                    <p className="muted">
-                      {creatorMode
-                        ? t('market.board.emptyCreator')
-                        : t('market.board.emptyPlayer')}
-                    </p>
-                  </Empty>
-                ) : (
-                  <>
-                    <div className="mkt-eyebrow">
-                      <Icon name="coin" size={12} /> {t('market.board.listings', { count: market.companies.length })}
-                    </div>
-                    <div className="mkt-board">
-                      {market.companies.map((view) => (
-                        <div key={view.company.id} className="mkt-row-wrap">
-                          <CompanyRow
-                            view={view}
-                            activeWorldId={activeWorldId}
-                            tradingId={tradingId}
-                            onTrade={trade}
-                          />
-                          {creatorMode && (
-                            <button
-                              className="btn danger ghost sm mkt-delete-btn"
-                              title={t('market.board.deleteCompany')}
-                              aria-label={t('market.board.deleteNamed', { name: view.company.name })}
-                              onClick={() => setPendingDelete(view.company)}
-                            >
-                              <Icon name="trash" size={14} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* News */}
-                    {market.news.length > 0 && (
-                      <>
-                        <div className="mkt-eyebrow">
-                          <Icon name="chronicle" size={12} /> {t('market.board.recentHeadlines')}
-                        </div>
-                        <div className="mkt-news-list">
-                          {market.news.map((item) => (
-                            <NewsCard key={item.id} item={item} />
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )
-              }
-            </Loader>
           </>
         )}
 

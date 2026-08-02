@@ -553,6 +553,12 @@ export const RelationshipBeatTextSchema = z.object({
 });
 export type RelationshipBeatText = z.infer<typeof RelationshipBeatTextSchema>;
 
+/** A short postcard home from a character who's away for a stretch. */
+export const PostcardSchema = z.object({
+  body: z.string().min(1).max(GEN_TEXT.blurb),
+});
+export type Postcard = z.infer<typeof PostcardSchema>;
+
 /**
  * A single SMS body for the (opt-in) tragic-outcome spiral — either the
  * struggling character's withdrawn/distress text or a worried friend's check-in.

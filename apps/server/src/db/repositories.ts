@@ -888,6 +888,17 @@ export const textMessagesRepo = {
       .all<Row>('SELECT * FROM text_messages WHERE thread_id = ? ORDER BY created_at ASC, rowid ASC', threadId)
       .map(rowToText);
   },
+  /** Drop a thread's still-QUEUED character texts (its outbox). Called when a
+   *  relationship breaks up or a character is memorialized: everything queued
+   *  was written BEFORE that turn (a warm daily, gossip), and delivering it
+   *  afterward would seed later prompts with a state contradiction. Delivered
+   *  history is never touched. */
+  deleteQueuedByThread(threadId: string): number {
+    return getDb().run(
+      `DELETE FROM text_messages WHERE thread_id = ? AND status = 'queued' AND sender = 'character'`,
+      threadId,
+    ).changes;
+  },
   lastDelivered(threadId: string): TextMessage | undefined {
     const r = getDb().get<Row>(
       `SELECT * FROM text_messages WHERE thread_id = ? AND status = 'delivered'
@@ -933,6 +944,7 @@ function rowToEmail(r: Row): Email {
     worldId: nStr(r.world_id),
     senderName: r.sender_name,
     senderHandle: r.sender_handle,
+    kind: r.kind ?? 'mail',
     subject: r.subject,
     body: r.body,
     status: r.status,
@@ -990,9 +1002,9 @@ export const emailsRepo = {
   },
   insert(e: Email): Email {
     getDb().run(
-      `INSERT INTO emails (id,player_id,world_id,sender_name,sender_handle,subject,body,status,read,day_number,scheduled_phase,delivered_at,created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      e.id, e.playerId, e.worldId, e.senderName, e.senderHandle, e.subject, e.body, e.status, boolToInt(e.read),
+      `INSERT INTO emails (id,player_id,world_id,sender_name,sender_handle,kind,subject,body,status,read,day_number,scheduled_phase,delivered_at,created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      e.id, e.playerId, e.worldId, e.senderName, e.senderHandle, e.kind, e.subject, e.body, e.status, boolToInt(e.read),
       e.dayNumber, e.scheduledPhase, e.deliveredAt, e.createdAt,
     );
     return e;
@@ -2027,11 +2039,13 @@ export const gamblingRoundsRepo = {
     );
     return r ? Number(r.n) : 0;
   },
-  /** Recent settled rounds for the in-app history strip. */
+  /** Recent settled rounds for the in-app history strip. Rounds played in the same
+   *  millisecond (easily done at the slots) tie on created_at, so rowid breaks it —
+   *  otherwise the strip could show two hands out of the order they were played. */
   listRecent(worldId: string, playerId: string, limit = 12): GamblingRound[] {
     return getDb()
       .all<Row>(
-        "SELECT * FROM gambling_rounds WHERE world_id = ? AND player_id = ? AND status = 'settled' ORDER BY created_at DESC LIMIT ?",
+        "SELECT * FROM gambling_rounds WHERE world_id = ? AND player_id = ? AND status = 'settled' ORDER BY created_at DESC, rowid DESC LIMIT ?",
         worldId,
         playerId,
         limit,

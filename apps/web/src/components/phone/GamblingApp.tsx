@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   CASINO_GAMES,
   type CasinoGame,
+  type GamblingRoundSummary,
   type GamblingWallet,
 } from '@dsim/shared';
 import { api } from '../../lib/api';
@@ -12,6 +13,7 @@ import { casinoGameLabel, casinoGameBlurb } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { Empty, Loader } from '../ui';
 import { PhoneAppBar } from './PhoneAppBar';
+import { PursePill } from './PursePill';
 import { SlotsGame } from './gambling/SlotsGame';
 import { BlackjackGame } from './gambling/BlackjackGame';
 import { RouletteGame } from './gambling/RouletteGame';
@@ -97,7 +99,7 @@ export function GamblingApp() {
             </button>
           ) : undefined
         }
-        right={purse ? <span className="gmb-purse"><span className="gmb-purse-coin">{formatCoin(purse.money)}</span></span> : undefined}
+        right={purse ? <PursePill money={purse.money} /> : undefined}
       />
       <div className="gmb-scroll">
         <Loader state={state}>
@@ -120,6 +122,7 @@ export function GamblingApp() {
                       </button>
                     ))}
                   </div>
+                  <RecentRounds rounds={data.recent} />
                   <div className="gmb-muted">{t('gambling.houseOdds')}</div>
                 </>
               );
@@ -137,6 +140,38 @@ export function GamblingApp() {
           }}
         </Loader>
       </div>
+    </div>
+  );
+}
+
+/** How the night has actually gone — the lobby's only memory. Without it the
+ *  casino forgot every hand the moment you backed out of the table. */
+function RecentRounds({ rounds }: { rounds: GamblingRoundSummary[] }) {
+  const { t } = useTranslation(['phone', 'common']);
+  if (rounds.length === 0) return null;
+  const net = rounds.reduce((sum, r) => sum + r.net, 0);
+  return (
+    <div className="gmb-recent">
+      <div className="gmb-recent-head">
+        <span className="gmb-recent-title">{t('gambling.recentHead')}</span>
+        <span className={`gmb-recent-net${net > 0 ? ' is-up' : net < 0 ? ' is-down' : ''}`}>
+          {net > 0 ? '+' : net < 0 ? '−' : ''}
+          {formatCoin(Math.abs(net))}
+        </span>
+      </div>
+      <ul className="gmb-recent-list">
+        {rounds.map((r) => (
+          <li key={r.id} className={`gmb-round${r.net > 0 ? ' is-up' : r.net < 0 ? ' is-down' : ''}`}>
+            <span className="gmb-round-glyph" aria-hidden="true">{GLYPH[r.game]}</span>
+            <span className="gmb-round-game">{casinoGameLabel(r.game)}</span>
+            <span className="gmb-round-day">{t('gambling.roundDay', { day: r.day })}</span>
+            <span className="gmb-round-net">
+              {r.net > 0 ? '+' : r.net < 0 ? '−' : '±'}
+              {formatCoin(Math.abs(r.net))}
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

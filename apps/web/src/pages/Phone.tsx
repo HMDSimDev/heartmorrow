@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -95,7 +95,7 @@ function greetingKeyForPhase(phase: string | undefined): CommonKey {
 
 export function Phone() {
   const { t } = useTranslation();
-  const { worldState, activeWorldId, activeWorld, dayTick, theme } = useAppData();
+  const { worldState, activeWorldId, activeWorld, worldsLoaded, dayTick, theme } = useAppData();
   // The open app lives in the URL (?app=…) rather than component state, so a
   // refresh or a browser back after a tab excursion returns to the same app
   // instead of resetting to the home grid (and it makes apps deep-linkable).
@@ -125,11 +125,15 @@ export function Phone() {
 
   // If the active world disables the wealth app you're currently in, bounce home
   // (replace, so Back doesn't step through a URL the world can't render).
+  // Only judge once the world list has actually LOADED: during the initial fetch
+  // `activeWorld` is still undefined, and bouncing then ejected every deep link
+  // and page refresh from these apps even in worlds that have them enabled.
   useEffect(() => {
+    if (!worldsLoaded) return;
     if (app === 'property' && !activeWorld?.featureFlags?.property) setApp('home', { replace: true });
     if (app === 'market' && !activeWorld?.featureFlags?.stockMarket) setApp('home', { replace: true });
     if (app === 'gambling' && !activeWorld?.featureFlags?.gambling) setApp('home', { replace: true });
-  }, [app, activeWorld, setApp]);
+  }, [app, activeWorld, worldsLoaded, setApp]);
 
   const badgeFor = (id: AppId) =>
     id === 'messages'
@@ -171,16 +175,16 @@ export function Phone() {
   const phaseIcon = worldState ? PHASE_ICONS[worldState.phase] : '🌙';
   const batteryPct = deriveBattery(worldState?.stamina, worldState?.staminaMax);
   const greeting = worldState ? t(greetingKeyForPhase(worldState.phase)) : t('phone.greeting.welcome');
-  // Footer hint reacts to what's actually waiting: unread mail/texts first, then a
-  // low-energy nudge, otherwise the ambient "letters arrive in time" line.
-  const totalUnread = inbox.unreadTexts + inbox.unreadEmails + inbox.landlordUnread + inbox.feedUnread;
+  // Footer hint reacts to what's actually waiting — named and TAPPABLE ("5 texts
+  // · 4 letters · 25 posts"), each segment opening its app — then a low-energy
+  // nudge, otherwise the ambient "letters arrive in time" line.
+  const waitingParts = [
+    { id: 'messages' as AppId, count: inbox.unreadTexts + inbox.landlordUnread, key: 'phone.waiting.texts' },
+    { id: 'email' as AppId, count: inbox.unreadEmails, key: 'phone.waiting.letters' },
+    { id: 'faces' as AppId, count: inbox.feedUnread, key: 'phone.waiting.posts' },
+  ].filter((p) => p.count > 0);
   const lowEnergy = batteryPct <= 30;
-  const homeHint =
-    totalUnread > 0
-      ? t('phone.hintWaiting', { count: totalUnread })
-      : lowEnergy
-        ? t('phone.hintLowEnergy')
-        : t('phone.hintAmbient');
+  const homeHint = lowEnergy ? t('phone.hintLowEnergy') : t('phone.hintAmbient');
 
   return (
     <div className="phone-wrap">
@@ -219,7 +223,24 @@ export function Phone() {
                   <div className="ph-grid">
                     {gridApps.map(renderAppIcon)}
                   </div>
-                  <div className="ph-hint">{homeHint}</div>
+                  {waitingParts.length > 0 ? (
+                    <div className="ph-hint ph-waiting">
+                      {waitingParts.map((p, i) => (
+                        <Fragment key={p.id}>
+                          {i > 0 && (
+                            <span className="ph-waiting-sep" aria-hidden="true">
+                              ·
+                            </span>
+                          )}
+                          <button className="ph-waiting-link" onClick={() => setApp(p.id)}>
+                            {t(p.key as ParseKeys, { count: p.count })}
+                          </button>
+                        </Fragment>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="ph-hint">{homeHint}</div>
+                  )}
                 </div>
               </div>
               <div className="ph-dock">

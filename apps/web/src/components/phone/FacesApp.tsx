@@ -51,6 +51,10 @@ export function FacesApp() {
   const [error, setError] = useState<string>();
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
+  // Compose expands on focus and stays open while a draft exists (blur with an
+  // empty box collapses it back to a single inviting line).
+  const [composing, setComposing] = useState(false);
+  const composeOpen = composing || draft.trim().length > 0;
 
   useEffect(() => {
     if (!activeWorldId) {
@@ -111,16 +115,21 @@ export function FacesApp() {
         <div className="fcs-scroll">
           {error && <Banner kind="error">{error}</Banner>}
 
-          <div className="fcs-compose">
+          {/* Collapsed to one quiet line until focused (or holding a draft) —
+              the feed is the content; the compose box is an invitation. */}
+          <div className={`fcs-compose${composeOpen ? '' : ' is-collapsed'}`}>
             <textarea
               className="fcs-compose-input"
               value={draft}
               placeholder={t('faces.composePlaceholder')}
-              rows={2}
+              rows={composeOpen ? 3 : 1}
               maxLength={GEN_TEXT.line}
               onChange={(e) => setDraft(e.target.value)}
+              onFocus={() => setComposing(true)}
+              onBlur={() => setComposing(false)}
               disabled={posting}
             />
+            {composeOpen && (
             <div className="fcs-compose-foot">
               {/* Derived from the SAME constant as the textarea's maxLength — the
                   counter once hardcoded a retired 500 cap and cried wolf at 450. */}
@@ -135,6 +144,7 @@ export function FacesApp() {
                 {posting ? t('faces.posting') : t('faces.post')}
               </button>
             </div>
+            )}
           </div>
 
           {loading ? (
@@ -255,6 +265,9 @@ function ReactionSummary({ post }: { post: FeedPostView }) {
   );
 }
 
+/** Comments beyond this many collapse behind a "view all" toggle. */
+const COMMENTS_CLAMP = 2;
+
 function CommentList({
   post,
   onUpdate,
@@ -267,6 +280,7 @@ function CommentList({
   const { t } = useTranslation(['phone', 'common']);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const submit = async () => {
     const body = text.trim();
@@ -284,9 +298,19 @@ function CommentList({
 
   if (post.comments.length === 0 && !allowComment) return null;
 
+  // Latest comments stay visible; the rest fold behind "view all" so a chatty
+  // post doesn't own the whole feed.
+  const hidden = expanded ? 0 : Math.max(0, post.comments.length - COMMENTS_CLAMP);
+  const visible = hidden > 0 ? post.comments.slice(hidden) : post.comments;
+
   return (
     <div className="fcs-comments">
-      {post.comments.map((c) => (
+      {hidden > 0 && (
+        <button className="fcs-comments-more" onClick={() => setExpanded(true)}>
+          {t('faces.viewAllComments', { count: post.comments.length })}
+        </button>
+      )}
+      {visible.map((c) => (
         <div className="fcs-comment" key={c.id}>
           <span className="fcs-comment-ava">
             <Portrait

@@ -1523,7 +1523,7 @@
           {
             "heading": "Anniversaries",
             "body": [
-              "Time together is remembered. A full season after your first date with someone — or after the commitment you share — that day becomes a remembrance day. The character is the one who remembers: they will text you about it that morning, and the Calendar app marks the day with a small heart, so you can see one coming. Taking them on a date on the day itself earns extra warmth from the evening.",
+              "Time together is remembered. A full season after your first date with someone — or after the commitment you share — that day becomes a remembrance day. The character is the one who remembers: they will text you about it that morning, and the Calendar app marks the day with a small heart, so you can see one coming. Taking them on a date on the day itself earns extra warmth from the evening, and the day is kept in that character's Moments.",
               "Anniversaries are graded by what they mark. While you are uncommitted, the first-date anniversary is a small, fond callback. Once you are dating, exclusive, or living together, the anniversary of that commitment replaces it entirely — one remembrance per season, the one that matters most — and the deeper the commitment, the more the celebration is worth. Climbing a rung moves the celebrated day to the new milestone. A breakup quiets anniversaries, and winning someone back starts the clock fresh."
             ]
           },
@@ -1571,13 +1571,13 @@
             ],
             "bullets": [
               "Messages — Text anyone you've been on a date with, any time, for free; it never costs energy. You can attach a photo or a gift to a message, and accept gifts a character sends you. If someone is unavailable that day, a small moon appears next to their name and you'll have to catch them another time.",
-              "Mail — Your in-world inbox of letters and notices from companies and strangers as the days pass. The people you date never email you — keep romance in Messages. Tap a letter to read it.",
-              "Faces — A town feed where you and the locals post short updates. You can write your own post (up to 500 characters), react six different ways, and leave comments on what other characters share.",
+              "Mail — Your in-world inbox of letters and notices from companies and strangers as the days pass. The people you date never email you — keep romance in Messages — with one exception: someone you've dated who's away for a few days may send a postcard home, marked with a little stamp. Tap a letter to read it.",
+              "Faces — A town feed where you and the locals post short updates. You can write your own post, react six different ways, and leave comments on what other characters share.",
               "Moments — A scrapbook of your story with one person: milestones, dates, and other keepsakes, each one a little snapshot. Pick a character at the top to flip through your memories together.",
-              "Constellation — A star-map of every relationship in the world, with you at the warm center and threads out to everyone you've met. Switch to the list to search and filter by the kind of connection, and tap anyone to open their full profile — their circle, their recent life, and what they've heard about you through the grapevine.",
+              "Constellation — A star-map of every relationship in the world, with you at the warm center and threads out to everyone you've met. Thread colours group the kind of tie (a key sits along the bottom of the map). Switch to the list to search and filter by the kind of connection, and tap anyone to open their full profile — their circle, their recent life, and what they've heard about you through the grapevine.",
               "Endings — A gallery of keepsake epilogues for relationships you've seen all the way through. It stays empty until you complete a character's story.",
               "Almanac — A calendar of every day you've lived, with its weather, what happened, and a recap of the day. Tap a past day to read its full story. Days you haven't reached yet are locked.",
-              "Weather — Today's sky, a week-ahead forecast, and how each character feels about the weather — some love a certain kind of day, some can't stand it."
+              "Weather — Today's sky, a week-ahead forecast, and how each character feels about it. Every row lists the weather that person likes and avoids, so you can plan a date for a day that suits them."
             ]
           },
           {
@@ -1591,7 +1591,7 @@
               "Work — Take shifts for money. Some are simple jobs (each costs a set amount of energy, shown as a minus number), and some are graded skill shifts you actually play through. Your career skills level up the more you work them, and higher levels pay more. Keep an eye on your energy readout — you can't work with none left, or while you're on a date.",
               "Market — A stock market that reacts to the world around you. Buy and sell shares, read the market news, and track your portfolio's value and your cash. Some companies pay dividends, which are the only truly hands-off income in the game.",
               "Property — Browse places to rent or buy. Renting means keeping up with the rent — if it falls overdue, you'll get landlord notices in Messages — while buying makes a place yours outright. Some places give a small relationship boost when you bring a date there.",
-              "Casino — The House of Fortune, with slots, blackjack, roulette, and video poker. You wager your real in-game money, and a daily wager limit (shown as a ribbon at the top) keeps any single day in check. The house always keeps an edge, so play for fun.",
+              "Casino — The House of Fortune, with slots, blackjack, roulette, and video poker. You wager your real in-game money, and a daily wager limit (shown as a ribbon at the top) keeps any single day in check. The house always keeps an edge, so play for fun — the lobby lists your last hands and how far ahead or behind they left you.",
               "Shop — Buy gifts and keepsakes; your money and your bag are your own in each world.",
               "Games — The arcade of mini-games you can play just for fun.",
               "Bag — Your inventory of items you're carrying, including gifts you can send.",

@@ -125,12 +125,15 @@
   border-left: 3px solid var(--brass);
   box-shadow: var(--shadow-sm);
 }
-/* kind-tinted left edge: romance rose, strain ember, memory moon, brass default */
+/* kind-tinted left edge: romance rose, strain ember, memory moon, kept-days brass */
 .mom-clip.kind-milestone,
 .mom-clip.kind-status { border-left-color: var(--rose); }
 .mom-clip.kind-jealousy,
-.mom-clip.kind-walkout { border-left-color: var(--ember); }
+.mom-clip.kind-walkout,
+.mom-clip.kind-breakup { border-left-color: var(--ember); }
 .mom-clip.kind-memory { border-left-color: var(--moon); }
+.mom-clip.kind-anniversary,
+.mom-clip.kind-ending { border-left-color: var(--brass); }
 
 /* Each card carries its own little taped polaroid — the character wearing the
    expression that fits the moment (set in MomentsApp). Alternating tilt + the

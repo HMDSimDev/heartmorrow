@@ -12,7 +12,7 @@ import {
   type CharacterLinkKind,
   type Relationship,
 } from '@dsim/shared';
-import { charactersRepo, relationshipsRepo, textMessagesRepo } from '../db/repositories';
+import { charactersRepo, relationshipsRepo, textMessagesRepo, threadsRepo } from '../db/repositories';
 import { getRelationship, ensureRelationship } from './relationship-service';
 import { setRelationshipFlag } from './stat-service';
 import { getLlmSettings } from './settings-service';
@@ -151,6 +151,11 @@ export function memorialize(characterId: string, day: number): void {
   const c = charactersRepo.get(characterId);
   if (!c) return;
   if (isMemorialized(getRelationship(characterId))) return; // idempotent — never double-memorialize
+  // Clear the OUTBOX first: a still-queued cheery text delivering after the
+  // memorial would be the cruelest state contradiction the phone can produce.
+  // Delivered history stays — those messages were really sent.
+  const thread = threadsRepo.getByCharacter(characterId, DEFAULT_PLAYER_ID);
+  if (thread) textMessagesRepo.deleteQueuedByThread(thread.id);
   setRelationshipFlag(characterId, 'harm:memorial', true, { source: 'crisis' });
   setRelationshipFlag(characterId, 'harm:memorialDay', day, { source: 'crisis' });
   setRelationshipFlag(characterId, 'status', 'none', { source: 'crisis' });

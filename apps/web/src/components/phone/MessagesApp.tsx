@@ -240,10 +240,22 @@ function ThreadList({
               <span className="pcom-body">
                 <span className="pcom-toprow">
                   <span className="pcom-name">{th.characterName}</span>
-                  {th.lastAt != null && <span className="pcom-when">{new Date(th.lastAt).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' })}</span>}
+                  {/* In-world day first (the game's clock); the wall-clock date is
+                      only honest for WORLD-LESS threads, which have no day. */}
+                  {th.lastDay != null ? (
+                    <span className="pcom-when">{t('messages.day', { day: th.lastDay })}</span>
+                  ) : (
+                    th.lastAt != null && (
+                      <span className="pcom-when">
+                        {new Date(th.lastAt).toLocaleDateString(i18n.language, { month: 'short', day: 'numeric' })}
+                      </span>
+                    )
+                  )}
                 </span>
                 {!th.available ? (
-                  <span className="pcom-preview">{th.unavailableReason ?? t('messages.isUnavailableToday')}</span>
+                  /* Status, not something they said — .pcom-busy (moonlit italic,
+                     same as the picker) instead of the message-preview style. */
+                  <span className="pcom-busy">{th.unavailableReason ?? t('messages.isUnavailableToday')}</span>
                 ) : th.lastBody ? (
                   <span className="pcom-preview">
                     {th.lastFromPlayer && <span className="pcom-preview-you">{t('messages.list.you')}</span>}

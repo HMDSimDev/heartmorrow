@@ -563,6 +563,17 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
 .btn:hover { filter: brightness(1.08); }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* A price you can't meet yet. Reads as a deliberate lock rather than broken
+   chrome — plain :disabled faded a "Not enough ◈" label to near-unreadable. */
+.btn.is-short,
+.btn.primary.is-short {
+  background: rgba(224, 122, 130, 0.1);
+  border-color: rgba(224, 122, 130, 0.42);
+  color: var(--ember);
+  font-weight: 600;
+  box-shadow: none;
+}
+.btn.is-short:disabled { opacity: 0.9; }
 .btn.primary {
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   border-color: transparent; color: var(--on-accent); font-weight: 700;
@@ -745,6 +756,25 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 }
 .pbar-name svg { color: var(--brass); }
 
+/* Purse pill — the shared cash readout for money apps, always in .pbar-right. */
+.purse {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--ink-2);
+  border: 1px solid rgba(230, 177, 94, 0.32);
+  box-shadow: inset 0 0 12px rgba(230, 177, 94, 0.08);
+  white-space: nowrap;
+}
+.purse-n {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
+  color: var(--brass);
+}
+
 /* --- EnergyPips — shared diamond stamina gauge (HUD + Dashboard) ---------- */
 .epips { display: inline-flex; gap: 4px; align-items: center; }
 .epip { width: 9px; height: 9px; border-radius: 2px; transform: rotate(45deg); background: var(--ink-2); border: 1px solid var(--border); }
@@ -755,6 +785,57 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 /* --- PortraitPicker — the shared "who?" chooser (never a <select>) -------- */
 .pp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
 .pp-grid.pp-compact { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+/* Strip variant: one scrollable row of avatar chips — for phone apps where the
+   picker is chrome above the content, not the content itself. */
+.pp-grid.pp-strip {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+.pp-strip .pp-card,
+.pp-strip .pp-card.selected {
+  flex: 0 0 auto;
+  width: 68px;
+  padding: 6px 4px;
+  gap: 5px;
+  align-items: center;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+.pp-strip .pp-portrait {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pp-strip .pp-card.selected .pp-portrait {
+  border-color: var(--brass);
+  box-shadow: 0 0 10px rgba(230, 177, 94, 0.45);
+}
+.pp-strip .pp-portrait > *,
+.pp-strip .pp-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pp-strip .pp-name {
+  max-width: 100%;
+  font-size: 0.64rem;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pp-strip .pp-sub,
+.pp-strip .pp-check {
+  display: none; /* the brass ring already marks selection */
+}
 /* Phones: drop the floors so three smaller portraits fit per row instead of
    two chunky ones — the picker is a control, not the page's centerpiece. */
 @media (max-width: 540px) {

@@ -2,6 +2,7 @@ import { registerClockHooks } from './world-clock-service';
 import { generateAnniversaryTextsForDay, generateDailyTextsForDay } from './text-generation-service';
 import { generateDailyEmails } from './email-service';
 import { generateGossipForDay, generateKnowledgeGossipForDay } from './gossip-service';
+import { generatePostcardsForDay } from './postcard-service';
 import { generateFeedForDay } from './feed-service';
 import { deliverCrisisTextsForDay } from './crisis-service';
 import { deliverDueTexts } from './text-message-service';
@@ -28,6 +29,7 @@ registerClockHooks({
       .then(() => generateDailyTextsForDay(worldId, day))
       .catch(() => undefined);
     void generateDailyEmails(worldId, day).catch(() => undefined);
+    void generatePostcardsForDay(worldId, day).catch(() => undefined);
     void generateGossipForDay(worldId, day).catch(() => undefined);
     void generateKnowledgeGossipForDay(worldId, day).catch(() => undefined);
     void generateFeedForDay(worldId, day).catch(() => undefined);

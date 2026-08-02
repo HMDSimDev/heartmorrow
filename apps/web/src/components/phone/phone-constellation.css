@@ -184,11 +184,13 @@
   max-width: 92px;
   font-size: 0.66rem;
   font-weight: 600;
-  color: var(--text-dim);
+  /* Full lamplight, not --text-dim: these sit on a twinkling star field, and the
+     double ink halo below is what actually keeps them legible over bright spots. */
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 5px var(--ink), 0 0 3px var(--ink);
+  text-shadow: 0 1px 4px var(--ink), 0 0 6px var(--ink), 0 0 2px var(--ink);
   pointer-events: none;
 }
 .cst-star:hover { transform: translate(-50%, -50%) scale(1.06); }
@@ -204,7 +206,7 @@
 .cst-star.band-sweethearts { --star: var(--rose); }
 /* People in the town's web you haven't met yourself — faint, cool. */
 .cst-star.is-distant { --star: var(--border-bright); }
-.cst-star.is-distant .cst-star-name { color: var(--text-mute); font-weight: 500; }
+.cst-star.is-distant .cst-star-name { color: var(--text-dim); font-weight: 500; }
 
 /* Focus highlight: the touched star + its neighbours brighten, the rest recede. */
 .cst-star.is-dim { opacity: 0.28; }
@@ -266,6 +268,47 @@
 }
 @media (max-height: 480px) {
   .cst-hint { display: none; }
+}
+
+/* Thread key — sits above the hint, along the bottom of the stage. Only the
+   families this town has appear, so it stays one or two quiet lines. */
+.cst-key {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 24px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 10px;
+  pointer-events: none;
+}
+.cst-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  text-shadow: 0 0 5px var(--ink), 0 0 2px var(--ink);
+}
+.cst-key-swatch {
+  width: 13px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--kc, var(--border-bright));
+  box-shadow: 0 0 6px var(--kc, var(--border-bright));
+}
+/* Your own threads use the accent, matching .cst-thread.is-player. */
+.cst-key-item.is-yours { --kc: color-mix(in oklab, var(--accent-2) 68%, var(--rose)); }
+
+/* The key needs the room the hint was using; below 400px the hint is already
+   hidden, so drop the key to where it sat. */
+@media (max-width: 400px), (max-height: 480px) {
+  .cst-key { bottom: 8px; }
 }
 
 .cst-hint {

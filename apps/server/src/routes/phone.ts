@@ -13,6 +13,7 @@ import {
   unreadTextCount,
 } from '../services/text-message-service';
 import { generateDailyEmails, listEmails, markEmailRead, unreadEmailCount } from '../services/email-service';
+import { generatePostcardsForDay } from '../services/postcard-service';
 import { generateAnniversaryTextsForDay, generateDailyTextsForDay } from '../services/text-generation-service';
 import {
   commentOnPost,
@@ -146,6 +147,7 @@ export async function phoneRoutes(app: FastifyInstance): Promise<void> {
     const day = ensureWorldState(worldId).day;
     await generateAnniversaryTextsForDay(worldId, day); // before dailies — shares the per-day slot
     await generateDailyTextsForDay(worldId, day);
+    await generatePostcardsForDay(worldId, day);
     await generateDailyEmails(worldId, day);
     await generateFeedForDay(worldId, day);
     return { ok: true, day, worldId };

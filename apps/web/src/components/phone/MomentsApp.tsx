@@ -18,6 +18,9 @@ const KIND_ICON: Record<Moment['kind'], string> = {
   walkout: '🚪',
   status: '💍',
   memory: '🧠',
+  breakup: '🥀',
+  anniversary: '🕯️',
+  ending: '📖',
 };
 
 /**
@@ -33,6 +36,9 @@ const KIND_EXPRESSION: Record<Moment['kind'], string> = {
   walkout: 'angry',
   status: 'tender',
   memory: 'thoughtful',
+  breakup: 'hurt',
+  anniversary: 'tender',
+  ending: 'happy',
 };
 
 /** A scrapbook of your story with one character — milestones, dates, and keepsakes. */
@@ -107,7 +113,7 @@ export function MomentsApp() {
             options={pickerOptions}
             value={selected}
             onChange={(id) => setSelected(id)}
-            compact
+            strip
           />
         </div>
 

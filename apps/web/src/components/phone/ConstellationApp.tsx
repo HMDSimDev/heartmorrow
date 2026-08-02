@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
   CHARACTER_LINK_ORDER,
@@ -21,6 +22,7 @@ import './phone-life.css';
 import './phone-constellation.css';
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
+type PhoneKey = ParseKeys<'phone'>;
 
 /** The hearth at the center of the sky — the player's own star. */
 const PLAYER = '__player__';
@@ -44,6 +46,39 @@ const KIND_ICON: Record<CharacterLinkKind, IconName> = {
   mentor: 'star',
   mentee: 'star',
   acquaintance: 'acquaintance',
+};
+
+/** The thirteen tie kinds share the five lights in families (see the `.kind-*`
+ *  --kc rules in phone-life.css). In the LIST view each chip carries its own icon
+ *  and name, so colour is a supporting channel; in the SKY a thread has nothing
+ *  BUT colour, so the key below names the families rather than the kinds. */
+const TIE_FAMILIES = ['romance', 'history', 'home', 'everyday', 'friction', 'passing'] as const;
+type TieFamily = (typeof TIE_FAMILIES)[number];
+
+const KIND_FAMILY: Record<CharacterLinkKind, TieFamily> = {
+  partner: 'romance',
+  crush: 'romance',
+  ex: 'history',
+  mentor: 'history',
+  mentee: 'history',
+  family: 'home',
+  roommate: 'home',
+  friend: 'everyday',
+  neighbor: 'everyday',
+  classmate: 'everyday',
+  coworker: 'everyday',
+  rival: 'friction',
+  acquaintance: 'passing',
+};
+
+/** One kind per family, so the key's swatch resolves the family's --kc. */
+const FAMILY_KIND: Record<TieFamily, CharacterLinkKind> = {
+  romance: 'partner',
+  history: 'ex',
+  home: 'family',
+  everyday: 'friend',
+  friction: 'rival',
+  passing: 'acquaintance',
 };
 
 /** How tightly a tie of each kind draws two stars together (0..1) — partners orbit
@@ -543,6 +578,13 @@ function Sky({
   const activeSet = active ? sky.neighbors.get(active) ?? new Set<string>() : null;
   const selectedName = selected ? charById.get(selected)?.name : undefined;
 
+  // Only key the families this town actually has — an unused swatch teaches nothing.
+  const families = useMemo(() => {
+    const present = new Set<TieFamily>();
+    for (const e of sky.edges) if (!e.player && e.kind) present.add(KIND_FAMILY[e.kind]);
+    return TIE_FAMILIES.filter((f) => present.has(f));
+  }, [sky.edges]);
+
   return (
     // Tapping the empty sky deselects (star taps stopPropagation so they don't bubble).
     <div className={`cst-stage${active ? ' is-focusing' : ''}`} onClick={() => setSelected(null)}>
@@ -641,6 +683,22 @@ function Sky({
           </button>
         );
       })}
+
+      {/* A thread's colour is its only label out here — say what the colours mean. */}
+      {families.length > 0 && (
+        <div className="cst-key" aria-label={t('constellation.keyLabel')}>
+          <span className="cst-key-item is-yours">
+            <i className="cst-key-swatch" />
+            {t('constellation.family.yours')}
+          </span>
+          {families.map((f) => (
+            <span key={f} className={`cst-key-item kind-${FAMILY_KIND[f]}`}>
+              <i className="cst-key-swatch" />
+              {t(`constellation.family.${f}` as PhoneKey)}
+            </span>
+          ))}
+        </div>
+      )}
 
       <p className="cst-hint">
         {selectedName ? t('constellation.mapHintOpen', { name: selectedName }) : t('constellation.mapHint')}

@@ -10,6 +10,7 @@ import {
   claimTextGift,
   deliverDueTexts,
   getOrCreateThread,
+  listThreadSummaries,
   retryPlayerTextReply,
   sendPlayerText,
 } from './text-message-service';
@@ -29,6 +30,30 @@ function dateOnce(characterId: string) {
   const session = createSession({ characterId, mode: 'date', locationId: null });
   addPlayerMessage(session.id, 'hey, nice to see you'); // a real date has >= 1 player turn
 }
+
+describe('thread summaries', () => {
+  it('carry the last text\'s IN-WORLD day (the inbox must not leak real dates)', () => {
+    const { world, character } = seedWorldAndCharacter();
+    const thread = getOrCreateThread(character.id);
+    const now = Date.now();
+    textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: 'txt_sum',
+        threadId: thread.id,
+        sender: 'character',
+        body: 'come by the pier later',
+        status: 'delivered',
+        dayNumber: 23,
+        deliveredAt: now,
+        createdAt: now,
+      }),
+    );
+
+    const row = listThreadSummaries(world.id).find((r) => r.characterId === character.id);
+    expect(row?.lastDay).toBe(23);
+    expect(row?.lastBody).toBe('come by the pier later');
+  });
+});
 
 describe('daily text generation eligibility', () => {
   it('never texts a character the player has not dated', async () => {

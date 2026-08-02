@@ -49,8 +49,10 @@ export async function generateDailyEmails(
     return;
   }
 
-  // Hard guard: an email must NEVER appear to come from a love interest — check
-  // both the display name and the handle's local-part against character names.
+  // Hard guard: a GENERATED email must never appear to come from a love interest —
+  // check both the display name and the handle's local-part against character
+  // names. (Postcards are the one sanctioned character-sent kind: they bypass
+  // this generator entirely — see postcard-service.)
   const names = charactersRepo.list().map((c) => c.name.toLowerCase());
   const fullNames = new Set(names);
   const firstNames = new Set(names.map((n) => n.split(/\s+/)[0]).filter(Boolean));

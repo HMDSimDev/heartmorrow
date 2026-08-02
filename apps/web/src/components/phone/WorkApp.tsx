@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  CAREER,
   CAREER_SKILLS,
   careerProgress,
   isCareerSkill,
@@ -214,13 +215,22 @@ export function WorkApp() {
           <p className="pl-board-note">
             {t('work.boardNote')}
           </p>
-          {noEnergy && <p className="pl-board-note">{t('work.noEnergy')}</p>}
-          {onDate && (
-            <p className="pl-board-note">
-              {t('work.onDateNote', { name: activeDate!.characterName })}
-            </p>
-          )}
         </div>
+
+        {/* Locks live outside the board so a temporary block never reads as more
+            house rules. Date first — it outranks energy as the reason. */}
+        {onDate && (
+          <div className="pl-lock">
+            <span className="pl-lock-glyph"><Icon name="date" size={15} /></span>
+            <span>{t('work.onDateNote', { name: activeDate!.characterName })}</span>
+          </div>
+        )}
+        {noEnergy && !onDate && (
+          <div className="pl-lock is-rest">
+            <span className="pl-lock-glyph"><Icon name="moon" size={15} /></span>
+            <span>{t('work.noEnergy')}</span>
+          </div>
+        )}
 
         {/* --- Career skills ------------------------------------------------ */}
         <div className="pl-eyebrow">{t('work.skillsHead')}</div>
@@ -228,7 +238,7 @@ export function WorkApp() {
           {CAREER_SKILLS.map((s) => {
             const p = careerProgress(player?.career?.[s]?.xp ?? 0);
             return (
-              <div className="pl-skill" key={s}>
+              <div className={`pl-skill${p.xp === 0 ? ' is-untouched' : ''}`} key={s}>
                 <div className="pl-skill-head">
                   <span className="pl-skill-name">{careerSkillLabel(s)}</span>
                   <span className="pl-skill-lv">
@@ -236,8 +246,21 @@ export function WorkApp() {
                     {p.atMax ? t('work.maxSuffix') : ''} · ×{masteryMult(p.level).toFixed(2)}
                   </span>
                 </div>
-                <div className="pl-skill-bar">
-                  <span style={{ width: `${Math.round(p.pct * 100)}%` }} />
+                {/* One segment per level, not one continuous bar — the ceiling is
+                    part of the information, and a single bar hid how far Lv 5 is. */}
+                <div
+                  className="pl-skill-bar"
+                  title={
+                    p.atMax
+                      ? t('work.xpMax')
+                      : t('work.xpInto', { into: p.intoLevel, span: p.span, next: p.level + 1 })
+                  }
+                >
+                  {Array.from({ length: CAREER.MAX_LEVEL }, (_, i) => (
+                    <span key={i} className={`pl-skill-seg${i < p.level ? ' is-done' : ''}`}>
+                      {i === p.level && !p.atMax && <i style={{ width: `${Math.round(p.pct * 100)}%` }} />}
+                    </span>
+                  ))}
                 </div>
               </div>
             );

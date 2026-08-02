@@ -88,6 +88,8 @@
       "generate": "Generate",
       "newProperty": "New property",
       "workshop": "Creator Workshop",
+      "properties": "Listings",
+      "manageHint": "Author new listings here. While this drawer is open, delete buttons appear on the cards above.",
       "close": "Close"
     },
     "gen": {
@@ -152,6 +154,7 @@
       "buffLeased": "half when leased, full when owned",
       "buff": "+{amount} {stat} on dates here ({note})",
       "notEnough": "Not enough ◈",
+      "shortBy": "◈ {short} short — you have ◈ {money}",
       "selling": "Selling…",
       "sell": "Sell (◈ {price})",
       "paying": "Paying…",
@@ -181,7 +184,6 @@
     "kicker": "Stock exchange",
     "noWorldTitle": "No world active",
     "noWorldBody": "Select a world to view the market.",
-    "cash": "Cash",
     "tabMarket": "Market",
     "tabPortfolio": "Portfolio",
     "resultTrade": "Trade",
@@ -220,6 +222,7 @@
     "creator": {
       "workshop": "Creator Workshop",
       "companies": "Companies",
+      "manageHint": "Author new companies here. While this drawer is open, delete buttons appear on the listings above.",
       "generate": "Generate",
       "genFromLore": "Generate from world lore",
       "count": "Count (1–8)",
@@ -267,6 +270,7 @@
     "emptyTitle": "No endings yet",
     "emptyBody": "See a relationship all the way through — move in together and stay deeply in love — to reach a happy ending. It's a celebration, not a finish: you can always keep playing.",
     "plateTitle": "Treasured Epilogues",
+    "plateCount": "{count, plural, one {# story seen through} other {# stories seen through}}",
     "someone": "Someone",
     "by": "{name} · Day {day}"
   },
@@ -286,12 +290,15 @@
     "lovesTitle": "loves today's weather",
     "notAFan": "not a fan ☔",
     "dislikesTitle": "dislikes today's weather",
+    "tasteLikes": "Likes",
+    "tasteAvoids": "Avoids",
     "creatorHint": "Set characters' favorite / disliked weather in the editor to see stronger reactions."
   },
   "email": {
     "inbox": "Inbox",
     "mail": "Mail",
     "reading": "Reading",
+    "postcardKicker": "A postcard",
     "backToInbox": "Back to inbox",
     "inboxShort": "Inbox",
     "refresh": "Refresh",
@@ -313,6 +320,7 @@
     "andMore": "{names} and {count} more",
     "addComment": "Add a comment…",
     "comment": "Comment",
+    "viewAllComments": "View all {count} comments",
     "react": {
       "like": "Like",
       "love": "Love",
@@ -351,6 +359,8 @@
     "houseOdds": "House odds are real — play for the thrill, not the rent. Limits reset each day.",
     "wagered": "Wagered",
     "daily": "Daily",
+    "recentHead": "Your last hands",
+    "roundDay": "Day {day}",
     "yourBet": "your bet",
     "lowerBet": "Lower bet",
     "raiseBet": "Raise bet",
@@ -435,6 +445,16 @@
     "you": "You",
     "mapHint": "Tap a star to trace their ties.",
     "mapHintOpen": "Tap {name} again to open their profile.",
+    "keyLabel": "What the thread colours mean",
+    "family": {
+      "yours": "Yours",
+      "romance": "Romance",
+      "history": "History",
+      "home": "Home",
+      "everyday": "Everyday",
+      "friction": "Friction",
+      "passing": "Passing"
+    },
     "dossier": {
       "kicker": "Profile",
       "loadError": "Couldn't open this profile. {error}",
@@ -477,6 +497,8 @@
     "skillsHead": "Skills · mastery pays",
     "level": "Lv {level}",
     "maxSuffix": " · max",
+    "xpInto": "{into} of {span} XP toward Lv {next}",
+    "xpMax": "Mastered — this skill is at its ceiling",
     "shiftsHead": "Shifts · earn ◈",
     "energyLeft": "{stamina} of {max} energy left today",
     "payVaries": "pay varies",

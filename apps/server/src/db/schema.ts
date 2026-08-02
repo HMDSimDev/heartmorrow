@@ -222,6 +222,7 @@ CREATE TABLE IF NOT EXISTS emails (
   player_id       TEXT NOT NULL,
   sender_name     TEXT NOT NULL,
   sender_handle   TEXT NOT NULL,
+  kind            TEXT NOT NULL DEFAULT 'mail',
   subject         TEXT NOT NULL DEFAULT '',
   body            TEXT NOT NULL DEFAULT '',
   status          TEXT NOT NULL DEFAULT 'delivered',
@@ -603,6 +604,14 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
     table: 'emails',
     column: 'world_id',
     ddl: `ALTER TABLE emails ADD COLUMN world_id TEXT`,
+  },
+  {
+    // Postcards: distinguishes a character's postcard home from ordinary mail
+    // (styling + the one sanctioned character-sender exception). Legacy rows
+    // default to plain 'mail'.
+    table: 'emails',
+    column: 'kind',
+    ddl: `ALTER TABLE emails ADD COLUMN kind TEXT NOT NULL DEFAULT 'mail'`,
   },
   // Richer character profile fields (feed prompts + "make the game feel alive").
   {

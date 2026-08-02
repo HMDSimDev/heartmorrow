@@ -80,6 +80,36 @@
   line-height: 1.4;
 }
 
+/* A state lock: why the board's buttons are dark RIGHT NOW. Deliberately not a
+   .pl-board-note — that prose explains the app and never changes, and stacking
+   the two made a standing rule and a temporary block look identical. */
+.pl-lock {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 9px 0 2px;
+  padding: 8px 11px;
+  border: 1px solid rgba(224, 122, 130, 0.32);
+  border-left: 3px solid var(--ember);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, rgba(224, 122, 130, 0.13), transparent 72%), var(--ink-2);
+  font-size: 0.79rem;
+  line-height: 1.35;
+  color: var(--text-dim);
+}
+.pl-lock-glyph {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--ember);
+}
+/* Being out of energy isn't a warning — it's the day being spent. Read it moonlit. */
+.pl-lock.is-rest {
+  border-color: rgba(157, 184, 222, 0.3);
+  border-left-color: var(--moon);
+  background: linear-gradient(90deg, rgba(157, 184, 222, 0.11), transparent 72%), var(--ink-2);
+}
+.pl-lock.is-rest .pl-lock-glyph { color: var(--moon); }
+
 /* job / training tiles */
 .pl-tile {
   display: flex;
@@ -220,19 +250,33 @@
   color: var(--text-mute);
   white-space: nowrap;
 }
+/* One notch per level (CAREER.MAX_LEVEL of them): earned levels fill solid, the
+   next one fills partially. Reading the ceiling matters as much as the progress. */
 .pl-skill-bar {
-  height: 5px;
-  border-radius: 999px;
+  display: flex;
+  gap: 3px;
+}
+.pl-skill-seg {
+  flex: 1;
+  height: 6px;
+  border-radius: 2px;
   background: var(--ink-2);
   border: 1px solid var(--border-soft);
   overflow: hidden;
 }
-.pl-skill-bar > span {
+.pl-skill-seg.is-done {
+  background: linear-gradient(90deg, var(--sage), var(--brass));
+  border-color: transparent;
+}
+.pl-skill-seg > i {
   display: block;
   height: 100%;
   background: linear-gradient(90deg, var(--sage), var(--brass));
   transition: width 0.4s ease;
 }
+/* A skill you've never worked stays quiet, so the ones you're building stand out. */
+.pl-skill.is-untouched .pl-skill-name { color: var(--text-mute); }
+.pl-skill.is-untouched .pl-skill-bar { opacity: 0.55; }
 
 /* --- On-shift play stage (job minigame inside the Work app) ------------- */
 .pl-job-stage-head {
@@ -412,6 +456,31 @@
 }
 .weather-mood strong { font-family: var(--font-display); font-weight: 600; }
 
+/* Their standing weather tastes, under the mood line — the reason behind the
+   badge, and what to plan a date around. */
+.weather-taste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  margin-top: 3px;
+}
+.weather-taste-set {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+.weather-taste-set b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.weather-taste-set em { font-style: normal; font-size: 0.82rem; }
+.weather-taste-set.is-loves b { color: var(--sage); }
+.weather-taste-set.is-dislikes b { color: var(--ember); }
+
 /* player weather preferences grid (reactions summary) */
 .pl-pref-grid {
   display: grid;
@@ -454,13 +523,22 @@
   gap: 10px;
 }
 
-/* Per-kind accent, shared by legend chips + tie groups + peers via --kc. */
-.kind-partner { --kc: var(--rose); }
-.kind-family { --kc: var(--sage); }
-.kind-friend { --kc: var(--moon); }
-.kind-ex { --kc: var(--brass); }
-.kind-rival { --kc: var(--ember); }
-.kind-acquaintance { --kc: var(--text-mute); }
+/* Per-kind accent, shared by legend chips + tie groups + peers + sky threads via
+   --kc. Thirteen kinds share the five lights in FAMILIES — seven of them used to
+   fall through to the same grey, which made most of the star map monochrome. */
+.kind-partner,
+.kind-crush { --kc: var(--rose); }        /* romance */
+.kind-ex,
+.kind-mentor,
+.kind-mentee { --kc: var(--brass); }      /* history + guidance */
+.kind-family,
+.kind-roommate { --kc: var(--sage); }     /* kin and home */
+.kind-friend,
+.kind-neighbor,
+.kind-classmate,
+.kind-coworker { --kc: var(--moon); }     /* chosen + the everyday orbit */
+.kind-rival { --kc: var(--ember); }       /* friction */
+.kind-acquaintance { --kc: var(--text-mute); } /* passing */
 
 /* Distinct from the empty state: a load failure with a retry. */
 .sw-error { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 12px; }

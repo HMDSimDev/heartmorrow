@@ -274,6 +274,35 @@
   font-size: 0.8rem;
   color: var(--text-mute);
 }
+/* The waiting breakdown: each segment is a real link into its app. */
+.ph-waiting {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+}
+.ph-waiting-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-dim);
+  cursor: pointer;
+  text-decoration: underline dotted var(--brass-dim);
+  text-underline-offset: 3px;
+}
+.ph-waiting-link:hover {
+  color: var(--brass);
+}
+.ph-waiting-link:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+.ph-waiting-sep {
+  color: var(--text-mute);
+}
 
 /* --- Dock: priority apps pinned above the home indicator --- */
 .ph-dock {
@@ -411,5 +440,53 @@
   .ph-badge,
   .ph-rise {
     animation: none;
+  }
+}
+
+/* --- Creator workshop drawer (Market / Property): player content first, the
+       authoring tools collapsed at the END of the app. -------------------- */
+.ph-workshop-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.ph-workshop-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ph-workshop-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.98rem;
+}
+.ph-workshop-chevron {
+  color: var(--text-mute);
+  transition: transform 0.18s ease;
+}
+.ph-workshop-chevron.is-open {
+  transform: rotate(180deg);
+}
+.ph-workshop-toggle:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.ph-workshop-hint {
+  margin: 0;
+  padding: 0 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ph-workshop-chevron {
+    transition: none;
   }
 }

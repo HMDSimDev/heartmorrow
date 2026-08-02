@@ -402,7 +402,11 @@
       "night": "Still awake?",
       "welcome": "Welcome back"
     },
-    "hintWaiting": "{count, plural, one {# thing is waiting for you.} other {# things are waiting for you.}}",
+    "waiting": {
+      "texts": "{count, plural, one {# text} other {# texts}}",
+      "letters": "{count, plural, one {# letter} other {# letters}}",
+      "posts": "{count, plural, one {# new post} other {# new posts}}"
+    },
     "hintLowEnergy": "The lamp runs low — end the day to rest.",
     "hintAmbient": "Texts and mail arrive as the days pass.",
     "app": {

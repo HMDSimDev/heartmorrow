@@ -211,6 +211,30 @@
   white-space: nowrap;
 }
 
+/* Collapsed compose: one quiet line, no chrome, until it's focused. */
+.fcs-compose.is-collapsed {
+  padding: 8px 12px;
+}
+.fcs-compose.is-collapsed .fcs-compose-input {
+  min-height: 0;
+  resize: none;
+}
+
+/* "View all N comments" fold — quiet, comment-sized. */
+.fcs-comments-more {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--moon);
+  cursor: pointer;
+  text-align: left;
+}
+.fcs-comments-more:hover {
+  text-decoration: underline;
+}
+
 .fcs-react-bar {
   display: flex;
   gap: 4px;
@@ -220,8 +244,8 @@
 }
 .fcs-react {
   flex: 1;
-  padding: 5px 0;
-  min-height: 44px;
+  padding: 3px 0;
+  min-height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;

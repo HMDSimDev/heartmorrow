@@ -6,6 +6,7 @@ import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
 import { relationshipStatLabel } from '../../i18n/labels';
+import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PortraitPicker } from '../PortraitPicker';
 import { ResultCard, type ResultTone } from '../ResultCard';
@@ -127,13 +128,22 @@ export function TogetherApp() {
           <p className="pl-board-note">
             {t('together.boardNote')}
           </p>
-          {noEnergy && <p className="pl-board-note">{t('together.noEnergy')}</p>}
-          {onDate && (
-            <p className="pl-board-note">
-              {t('together.onDateNote', { name: activeDate!.characterName })}
-            </p>
-          )}
         </div>
+
+        {/* Locks live outside the board so a temporary block never reads as more
+            house rules. Date first — it outranks energy as the reason. */}
+        {onDate && (
+          <div className="pl-lock">
+            <span className="pl-lock-glyph"><Icon name="date" size={15} /></span>
+            <span>{t('together.onDateNote', { name: activeDate!.characterName })}</span>
+          </div>
+        )}
+        {noEnergy && !onDate && (
+          <div className="pl-lock is-rest">
+            <span className="pl-lock-glyph"><Icon name="moon" size={15} /></span>
+            <span>{t('together.noEnergy')}</span>
+          </div>
+        )}
 
         {partnerOptions.length === 0 ? (
           <p className="pl-board-note">{t('together.noOne')}</p>
@@ -141,7 +151,7 @@ export function TogetherApp() {
           <>
             <div className="pl-partner-pick">
               <div className="pl-partner-label">{t('together.with')}</div>
-              <PortraitPicker options={partnerOptions} value={target} onChange={(id) => setTarget(id)} compact />
+              <PortraitPicker options={partnerOptions} value={target} onChange={(id) => setTarget(id)} strip />
             </div>
 
             <div className="pl-eyebrow">{t('together.ways')}</div>

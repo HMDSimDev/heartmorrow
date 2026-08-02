@@ -300,6 +300,17 @@ export const CAREER = {
 /** Per-day chance a given character is unavailable (busy) and can't be dated/texted. */
 export const UNAVAILABLE_CHANCE = 0.28;
 
+/** Postcards: a dated character who has been away (unavailable) this many
+ *  consecutive days sends ONE postcard home per absence, via the in-world mail
+ *  app — the deliberate exception to "emails never come from characters". */
+export const POSTCARD = {
+  minAbsenceDays: 2,
+  /** How far ahead to scan for their return day (the "back on Thursday" line). */
+  returnScanDays: 14,
+  /** Backstop on the backward streak walk (real absences are never this long). */
+  lookbackDays: 30,
+} as const;
+
 /** Lore-flavored reasons a character is unavailable on a given day. */
 export const AVAILABILITY_REASONS = [
   'is buried in work today',

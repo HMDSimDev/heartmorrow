@@ -802,6 +802,9 @@ export const EmailSchema = z.object({
   worldId: id.nullable().default(null),
   senderName: z.string().min(1),
   senderHandle: z.string().min(1),
+  /** 'mail' = the ordinary in-world inbox (companies/strangers); 'postcard' =
+   *  the one deliberate character-sent kind, mailed home during an absence. */
+  kind: z.enum(['mail', 'postcard']).default('mail'),
   subject: z.string().default(''),
   body: z.string().default(''),
   status: TextStatusSchema.default('delivered'),

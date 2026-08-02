@@ -16,18 +16,7 @@
 }
 
 /* ── App-bar purse + daily-limit readout ──────────────────────────────────── */
-.gmb-purse {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  font-family: var(--font-mono);
-}
-.gmb-purse-coin {
-  font-weight: 700;
-  font-size: 0.92rem;
-  color: var(--brass);
-  letter-spacing: 0.02em;
-}
+/* The purse readout is the shared .purse pill (styles.css). */
 .gmb-backbtn {
   display: inline-flex;
   align-items: center;
@@ -399,6 +388,65 @@
   font-weight: 700;
   color: var(--brass);
 }
+/* — Recent rounds: the lobby's ledger of the night ————————————————— */
+.gmb-recent {
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+.gmb-recent-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 7px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.gmb-recent-title {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.gmb-recent-net {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.gmb-recent-net.is-up { color: var(--sage); }
+.gmb-recent-net.is-down { color: var(--ember); }
+
+.gmb-recent-list { list-style: none; margin: 0; padding: 0; }
+.gmb-round {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+.gmb-round + .gmb-round { border-top: 1px solid rgba(255, 255, 255, 0.03); }
+.gmb-round-glyph { font-size: 0.86rem; line-height: 1; filter: grayscale(0.35); }
+.gmb-round-game { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gmb-round-day {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  color: var(--text-mute);
+}
+.gmb-round-net {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.76rem;
+  color: var(--text-mute);
+  font-variant-numeric: tabular-nums;
+}
+.gmb-round.is-up .gmb-round-net { color: var(--sage); }
+.gmb-round.is-down .gmb-round-net { color: var(--ember); }
+
 .gmb-muted { color: var(--text-mute); font-size: 0.72rem; font-family: var(--font-body); text-align: center; }
 
 @media (prefers-reduced-motion: reduce) {

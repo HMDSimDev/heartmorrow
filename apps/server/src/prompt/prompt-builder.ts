@@ -1242,6 +1242,36 @@ export function buildRelationshipBeatMessages(args: {
   ];
 }
 
+/** Messages for a character's postcard home while they're away for a stretch. */
+export function buildPostcardMessages(args: {
+  character: Character;
+  relationship: Relationship;
+  playerName: string;
+  /** The canonical availability reason, third-person ("is tied up with family business"). */
+  awayReason: string | null;
+  /** "on Thursday (Day 14)" — or null when the return isn't known yet. */
+  returnPhrase: string | null;
+  /** A few top memories so the card can reach for something shared. */
+  memories?: CharacterMemory[];
+}): ChatMessage[] {
+  const { character: c, relationship, playerName, awayReason, returnPhrase, memories = [] } = args;
+  const stage = relationshipStage(relationship);
+  const memoryBlock = memories.length ? `\nTHINGS YOU REMEMBER about ${playerName}:\n${bullet(memories.map((m) => m.text))}` : '';
+  const backLine = returnPhrase ? ` You expect to be back ${returnPhrase}.` : ` You're not sure yet when you'll be back.`;
+  return [
+    { role: 'system', content: `${resolvePrompt('RELATIONSHIP_BEAT_GUARDRAILS')}\n\nYou are ${characterBrief(c)}` },
+    {
+      role: 'user',
+      content:
+        `Write a short POSTCARD to ${playerName} — you've been away and out of reach for a few days. ` +
+        `The reason, as the town would put it: ${c.name} ${awayReason ?? 'is away for a stretch'}.${backLine}\n` +
+        `How close you two are: ${stage.label}.${memoryBlock}\n` +
+        `Postcard voice: two or three short sentences in your own hand — concrete, warm, a little wish-you-were-here. ` +
+        `A sign-off is optional. No time-of-day references (the card will be read whenever it arrives).`,
+    },
+  ];
+}
+
 /** Messages for generating a batch of in-world emails. */
 export function buildEmailBatchMessages(args: { world: World | null; playerName: string }): ChatMessage[] {
   const w = args.world;

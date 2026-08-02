@@ -15,8 +15,9 @@ import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
 import { evaluateRelationshipStrain } from './breakup-service';
 import { addPlayerMessage, attemptPlayerBreakupIntent, confirmPlayerBreakup, createSession } from './conversation-service';
 import { ensureWorldState } from './world-clock-service';
-import { LAST_DATE_FLAG } from '@dsim/shared';
+import { DEFAULT_PLAYER_ID, LAST_DATE_FLAG, TextMessageSchema } from '@dsim/shared';
 import { generateDailyTextsForDay } from './text-generation-service';
+import { getOrCreateThread } from './text-message-service';
 import { textMessagesRepo, threadsRepo } from '../db/repositories';
 
 /** Fresh char starts at warmth 5; set every warmth stat to `target`. */
@@ -192,6 +193,58 @@ describe('endgame: strain, on-the-rocks & breakups', () => {
     expect(isBrokenUp(rel)).toBe(true);
     expect(rel.flags['status']).toBe('none');
     expect(rel.flags['beat:pending']).toBeUndefined();
+  });
+
+  it('a breakup clears the queued OUTBOX but keeps history — and never eats the breakup beat', async () => {
+    // Regression (prompt poison): a warm daily text queued at day-start would
+    // still deliver in the evening after a noon breakup, then seed every later
+    // reply prompt with an affectionate post-breakup line.
+    const { world, character } = seedWorldAndCharacter();
+    commit(character.id, 'exclusive');
+    setWarmth(character.id, 70);
+    const thread = getOrCreateThread(character.id);
+    const now = Date.now();
+    textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: 'txt_queued_daily',
+        threadId: thread.id,
+        sender: 'character',
+        body: 'thinking of you 💛',
+        status: 'queued',
+        dayNumber: 1,
+        scheduledPhase: 'evening',
+        createdAt: now,
+      }),
+    );
+    textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: 'txt_history',
+        threadId: thread.id,
+        sender: 'character',
+        body: 'yesterday was fun',
+        status: 'delivered',
+        dayNumber: 1,
+        deliveredAt: now,
+        createdAt: now,
+      }),
+    );
+
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    addPlayerMessage(session.id, 'I think we should break up.');
+    confirmPlayerBreakup(session.id);
+
+    const texts = textMessagesRepo.listAllByThread(thread.id).filter((m) => m.sender === 'character');
+    expect(texts.map((m) => m.id)).toEqual(['txt_history']); // outbox purged, history untouched
+
+    // The purge must NOT reach the breakup beat: it is generated at the NEXT
+    // day-start, strictly after applyBreakup ran. Simulate a strain breakup's
+    // pending beat and confirm it still queues.
+    setRelationshipFlag(character.id, 'beat:pending', 'breakup', { source: 'test' });
+    setAdapterOverride(reply({ body: 'I meant what I said. It’s over.' }));
+    await generateDailyTextsForDay(world.id, 2, DEFAULT_PLAYER_ID, () => 0);
+    const queued = textMessagesRepo.listAllByThread(thread.id).filter((m) => m.sender === 'character' && m.status === 'queued');
+    expect(queued).toHaveLength(1);
+    expect(queued[0]!.body).toContain('It’s over');
   });
 
   it('confirming a breakup still settles the date costs (regression: free exit)', () => {

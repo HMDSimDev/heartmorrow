@@ -7,7 +7,9 @@ import { applyRelationshipChange, stampLastSeen } from './stat-service';
 import { listMemories } from './memory-service';
 import { updateLlmSettings } from './settings-service';
 import { createSession } from './conversation-service';
-import { sendPlayerText } from './text-message-service';
+import { getOrCreateThread, sendPlayerText } from './text-message-service';
+import { textMessagesRepo } from '../db/repositories';
+import { TextMessageSchema } from '@dsim/shared';
 import {
   adjustDespair,
   getDespair,
@@ -29,6 +31,43 @@ function makeAttached(characterId: string): void {
 
 beforeEach(() => resetDb());
 afterEach(() => setAdapterOverride(null));
+
+describe('memorial outbox purge (prompt poison)', () => {
+  it('memorializing drops still-queued texts but keeps delivered history', () => {
+    const { character } = seedWorldAndCharacter();
+    const thread = getOrCreateThread(character.id);
+    const now = Date.now();
+    textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: 'txt_queued',
+        threadId: thread.id,
+        sender: 'character',
+        body: 'see you soon!',
+        status: 'queued',
+        dayNumber: 3,
+        scheduledPhase: 'evening',
+        createdAt: now,
+      }),
+    );
+    textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: 'txt_kept',
+        threadId: thread.id,
+        sender: 'character',
+        body: 'thank you for everything',
+        status: 'delivered',
+        dayNumber: 2,
+        deliveredAt: now,
+        createdAt: now,
+      }),
+    );
+
+    memorialize(character.id, 3);
+
+    const texts = textMessagesRepo.listAllByThread(thread.id).filter((m) => m.sender === 'character');
+    expect(texts.map((m) => m.id)).toEqual(['txt_kept']); // a queued cheery text never arrives from beyond
+  });
+});
 
 describe('tragic-outcomes gating', () => {
   it('does NOTHING when the toggle is off, even under heavy abuse', () => {

@@ -1024,7 +1024,8 @@ export function isInternalFlagKey(key: string): boolean {
     key.startsWith('breakup:') ||
     key.startsWith('beat:') ||
     key.startsWith('harm:') ||
-    key.startsWith('anniv:')
+    key.startsWith('anniv:') ||
+    key.startsWith('postcard:')
   );
 }
 
