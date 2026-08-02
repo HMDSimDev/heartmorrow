@@ -85,7 +85,6 @@ if !PROBLEMS! GTR 0 (
   echo   !PROBLEMS! blocking problem^(s^) found. Fix the [X] items above, then re-run.
   echo ====================================================
   echo.
-  endlocal
   exit /b 1
 )
 
@@ -101,7 +100,6 @@ if errorlevel 1 (
   echo   Production build failed. Fix the errors above, then re-run.
   echo ====================================================
   echo.
-  endlocal
   exit /b 1
 )
 
@@ -113,7 +111,12 @@ echo ====================================================
 echo.
 
 call :openbrowser
-endlocal
+REM NO `endlocal` here (or anywhere before a pnpm call): it would restore the
+REM ORIGINAL environment, dropping the self-contained .runtime\node PATH entry
+REM and COREPACK_HOME set above — on a PC with no system Node/pnpm, that made
+REM this final `pnpm start` fail with "pnpm is not recognized" after every
+REM preflight check had passed. cmd ends the setlocal scope automatically when
+REM the script exits, so explicit endlocal is never needed in this file.
 pnpm start
 exit /b %errorlevel%
 
