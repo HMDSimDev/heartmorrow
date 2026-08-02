@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   VENUE_TIERS,
@@ -25,6 +25,20 @@ import { ShareExportDialog } from '../components/ShareTools';
 import './creator.page.css';
 
 const SCOPES: WorldNoteScope[] = ['global', 'location', 'faction', 'lore', 'rule', 'character', 'misc'];
+
+// ---------------------------------------------------------------------------
+// Tab definitions — the editor's sections in suggested authoring order
+// ---------------------------------------------------------------------------
+
+type TabId = 'setting' | 'lore' | 'features' | 'locations' | 'notes';
+
+const TABS: { id: TabId; labelKey: `worldEditor.tabs.${TabId}` }[] = [
+  { id: 'setting',   labelKey: 'worldEditor.tabs.setting' },
+  { id: 'lore',      labelKey: 'worldEditor.tabs.lore' },
+  { id: 'features',  labelKey: 'worldEditor.tabs.features' },
+  { id: 'locations', labelKey: 'worldEditor.tabs.locations' },
+  { id: 'notes',     labelKey: 'worldEditor.tabs.notes' },
+];
 
 // The user-editable slice of a World — exactly the fields save() sends. Drafts
 // diff against THIS (not the whole record) so server-managed fields like
@@ -71,6 +85,7 @@ export function WorldEditor() {
   const [deleteChars, setDeleteChars] = useState(false);
   const [deletingWorld, setDeletingWorld] = useState(false);
   const [creatingWorld, setCreatingWorld] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>('setting');
 
   const loadWorlds = async () => {
     setLoading(true);
@@ -378,161 +393,183 @@ export function WorldEditor() {
             </Empty>
           ) : (
             <>
-              <div className="grid cols-2">
-                <div className="card">
-                  <div className="creator-sec">
-                    <span className="creator-index">01</span>
-                    <h2>{t('pages:worldEditor.secSetting')}</h2>
-                    <span className="trail" />
-                  </div>
-                  <Field label={t('pages:worldEditor.name')}>
-                    <input value={world.name} onChange={(e) => setField('name', e.target.value)} />
-                  </Field>
-                  <Field label={t('pages:worldEditor.summary')}>
-                    <textarea value={world.summary} onChange={(e) => setField('summary', e.target.value)} />
-                  </Field>
-                  <Field label={t('pages:worldEditor.tone')}>
-                    <input value={world.tone} onChange={(e) => setField('tone', e.target.value)} />
-                  </Field>
-                  <Field label={t('pages:worldEditor.globalNotes')}>
-                    <textarea value={world.globalNotes} onChange={(e) => setField('globalNotes', e.target.value)} />
-                  </Field>
-                </div>
+              <div className="we-editor">
+                {/* Tab nav */}
+                <nav className="we-tabs" aria-label={t('pages:worldEditor.editorSectionsAria')}>
+                  {TABS.map((tab) => {
+                    const count =
+                      tab.id === 'locations' ? world.locations.length : tab.id === 'notes' ? notes.length : null;
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        className={`we-tab ${activeTab === tab.id ? 'we-tab-active' : ''}`}
+                        onClick={() => setActiveTab(tab.id)}
+                      >
+                        {t(`pages:${tab.labelKey}`)}
+                        {count !== null && <span className="we-tab-count">{count}</span>}
+                      </button>
+                    );
+                  })}
+                </nav>
 
+                {/* One unified panel; hidden tab panels stay MOUNTED (display:none)
+                    so field state and the notes composer survive tab switches. */}
                 <div className="card">
-                  <div className="creator-sec">
-                    <span className="creator-index">02</span>
-                    <h2>{t('pages:worldEditor.secLoreRules')}</h2>
-                    <span className="trail" />
-                  </div>
-                  <Field label={t('pages:worldEditor.lore')}>
-                    <textarea value={world.lore} onChange={(e) => setField('lore', e.target.value)} />
-                  </Field>
-                  <Field label={t('pages:worldEditor.rulesInFiction')}>
-                    <textarea value={world.rules} onChange={(e) => setField('rules', e.target.value)} />
-                  </Field>
-                  <div className="divider" />
-                  <div className="creator-sec">
-                    <h3>{t('pages:worldEditor.gameFeatures')}</h3>
-                    <span className="trail" />
-                  </div>
-                  <p className="muted" style={{ marginTop: 0 }}>{t('pages:worldEditor.featuresNote')}</p>
-                  <div className="creator-flags">
-                    <label className="creator-flag">
-                      <input
-                        type="checkbox"
-                        checked={world.featureFlags.property}
-                        onChange={(e) => setFeature('property', e.target.checked)}
-                      />
-                      {t('pages:worldEditor.featureProperty')}
-                    </label>
-                    <label className="creator-flag">
-                      <input
-                        type="checkbox"
-                        checked={world.featureFlags.stockMarket}
-                        onChange={(e) => setFeature('stockMarket', e.target.checked)}
-                      />
-                      {t('pages:worldEditor.featureStock')}
-                    </label>
-                    <label className="creator-flag">
-                      <input
-                        type="checkbox"
-                        checked={world.featureFlags.gambling}
-                        onChange={(e) => setFeature('gambling', e.target.checked)}
-                      />
-                      {t('pages:worldEditor.featureCasino')}
-                    </label>
-                  </div>
-                  {world.featureFlags.gambling && (
-                    <div className="row" style={{ gap: 12, marginTop: 10, flexWrap: 'wrap' }}>
-                      <Field label={t('pages:worldEditor.maxBet')} hint={t('pages:worldEditor.maxBetHint', { max: GAMBLING.ABSOLUTE_MAX_BET })}>
-                        <input
-                          type="number"
-                          min={GAMBLING.MIN_BET}
-                          max={GAMBLING.ABSOLUTE_MAX_BET}
-                          value={world.gamblingConfig.maxBet}
-                          onChange={(e) =>
-                            setGambling('maxBet', Math.max(GAMBLING.MIN_BET, Math.min(GAMBLING.ABSOLUTE_MAX_BET, Number(e.target.value) || GAMBLING.MIN_BET)))
-                          }
-                        />
+                  {/* Tab: Setting */}
+                  <div className={`we-tabpanel ${activeTab === 'setting' ? '' : 'we-tabpanel-hidden'}`}>
+                    <div className="grid cols-2">
+                      <Field label={t('pages:worldEditor.name')}>
+                        <input value={world.name} onChange={(e) => setField('name', e.target.value)} />
                       </Field>
-                      <Field label={t('pages:worldEditor.dailyCap')} hint={t('pages:worldEditor.dailyCapHint', { max: GAMBLING.ABSOLUTE_MAX_DAILY_WAGER })}>
-                        <input
-                          type="number"
-                          min={world.gamblingConfig.maxBet}
-                          max={GAMBLING.ABSOLUTE_MAX_DAILY_WAGER}
-                          value={world.gamblingConfig.dailyWagerLimit}
-                          onChange={(e) =>
-                            setGambling('dailyWagerLimit', Math.max(GAMBLING.MIN_BET, Math.min(GAMBLING.ABSOLUTE_MAX_DAILY_WAGER, Number(e.target.value) || GAMBLING.DEFAULT_DAILY_WAGER_LIMIT)))
-                          }
-                        />
+                      <Field label={t('pages:worldEditor.tone')}>
+                        <input value={world.tone} onChange={(e) => setField('tone', e.target.value)} />
                       </Field>
                     </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="creator-sec">
-                  <span className="creator-index">03</span>
-                  <h2>{t('pages:worldEditor.secLocations')}</h2>
-                  <span className="trail" />
-                  <button className="btn sm creator-sec-action" onClick={addLocation}>
-                    <Icon name="plus" size={13} />
-                    {t('pages:worldEditor.addLocation')}
-                  </button>
-                </div>
-
-                {/* AI generation subcard */}
-                <div className="creator-subcard" style={{ marginBottom: 12 }}>
-                  <div className="creator-sec">
-                    <h3>
-                      <Icon name="generate" size={14} />
-                      {' '}{t('pages:worldEditor.generateWithAI')}
-                    </h3>
-                    <span className="trail" />
-                  </div>
-                  <p className="muted" style={{ marginTop: 0 }}>{t('pages:worldEditor.genNote')}</p>
-                  <Field label={t('pages:worldEditor.promptLabel')}>
-                    <textarea
-                      placeholder={t('pages:worldEditor.promptPlaceholder')}
-                      value={genPrompt}
-                      onChange={(e) => setGenPrompt(e.target.value)}
-                    />
-                  </Field>
-                  <div className="we-gen-row">
-                    <Field label={t('pages:worldEditor.howMany')}>
-                      <select value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
-                        {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-                          <option key={n} value={n}>
-                            {n}
-                          </option>
-                        ))}
-                      </select>
+                    <Field label={t('pages:worldEditor.summary')}>
+                      <textarea rows={4} value={world.summary} onChange={(e) => setField('summary', e.target.value)} />
                     </Field>
-                    <button className="btn primary we-gen-btn" onClick={generateLocations} disabled={generating}>
-                      <Icon name="generate" size={14} />
-                      {generating ? t('pages:worldEditor.generating') : t('pages:worldEditor.generateLocations')}
-                    </button>
+                    <Field label={t('pages:worldEditor.globalNotes')}>
+                      <textarea rows={5} value={world.globalNotes} onChange={(e) => setField('globalNotes', e.target.value)} />
+                    </Field>
                   </div>
-                </div>
 
-                {world.locations.length === 0 && <p className="muted">{t('pages:worldEditor.noLocations')}</p>}
+                  {/* Tab: Lore & rules */}
+                  <div className={`we-tabpanel ${activeTab === 'lore' ? '' : 'we-tabpanel-hidden'}`}>
+                    <Field label={t('pages:worldEditor.lore')}>
+                      <textarea rows={8} value={world.lore} onChange={(e) => setField('lore', e.target.value)} />
+                    </Field>
+                    <Field label={t('pages:worldEditor.rulesInFiction')}>
+                      <textarea rows={6} value={world.rules} onChange={(e) => setField('rules', e.target.value)} />
+                    </Field>
+                  </div>
 
-                {/* Location list — each one is a collapsible card */}
-                <div className="we-locations">
-                  {world.locations.map((loc, i) => (
-                    <LocationCard
-                      key={loc.id}
-                      location={loc}
-                      onUpdate={(patch) => updateLocation(i, patch)}
-                      onRemove={() => setField('locations', world.locations.filter((_, j) => j !== i))}
-                    />
-                  ))}
+                  {/* Tab: Systems (feature flags + casino limits) */}
+                  <div className={`we-tabpanel ${activeTab === 'features' ? '' : 'we-tabpanel-hidden'}`}>
+                    <p className="creator-note">{t('pages:worldEditor.featuresNote')}</p>
+                    <div className="we-features">
+                      <FeatureToggle
+                        icon="property"
+                        name={t('pages:worldEditor.featurePropertyName')}
+                        desc={t('pages:worldEditor.featurePropertyDesc')}
+                        checked={world.featureFlags.property}
+                        onChange={(v) => setFeature('property', v)}
+                      />
+                      <FeatureToggle
+                        icon="stocks"
+                        name={t('pages:worldEditor.featureStockName')}
+                        desc={t('pages:worldEditor.featureStockDesc')}
+                        checked={world.featureFlags.stockMarket}
+                        onChange={(v) => setFeature('stockMarket', v)}
+                      />
+                      <FeatureToggle
+                        icon="gambling"
+                        name={t('pages:worldEditor.featureCasinoName')}
+                        desc={t('pages:worldEditor.featureCasinoDesc')}
+                        checked={world.featureFlags.gambling}
+                        onChange={(v) => setFeature('gambling', v)}
+                      />
+                      {world.featureFlags.gambling && (
+                        <div className="we-casino-config">
+                          <span className="kicker">{t('pages:worldEditor.casinoLimits')}</span>
+                          <div className="we-casino-fields">
+                            <Field label={t('pages:worldEditor.maxBet')} hint={t('pages:worldEditor.maxBetHint', { max: GAMBLING.ABSOLUTE_MAX_BET })}>
+                              <input
+                                type="number"
+                                min={GAMBLING.MIN_BET}
+                                max={GAMBLING.ABSOLUTE_MAX_BET}
+                                value={world.gamblingConfig.maxBet}
+                                onChange={(e) =>
+                                  setGambling('maxBet', Math.max(GAMBLING.MIN_BET, Math.min(GAMBLING.ABSOLUTE_MAX_BET, Number(e.target.value) || GAMBLING.MIN_BET)))
+                                }
+                              />
+                            </Field>
+                            <Field label={t('pages:worldEditor.dailyCap')} hint={t('pages:worldEditor.dailyCapHint', { max: GAMBLING.ABSOLUTE_MAX_DAILY_WAGER })}>
+                              <input
+                                type="number"
+                                min={world.gamblingConfig.maxBet}
+                                max={GAMBLING.ABSOLUTE_MAX_DAILY_WAGER}
+                                value={world.gamblingConfig.dailyWagerLimit}
+                                onChange={(e) =>
+                                  setGambling('dailyWagerLimit', Math.max(GAMBLING.MIN_BET, Math.min(GAMBLING.ABSOLUTE_MAX_DAILY_WAGER, Number(e.target.value) || GAMBLING.DEFAULT_DAILY_WAGER_LIMIT)))
+                                }
+                              />
+                            </Field>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tab: Locations */}
+                  <div className={`we-tabpanel ${activeTab === 'locations' ? '' : 'we-tabpanel-hidden'}`}>
+                    <div className="we-panel-toolbar">
+                      <span className="we-toolbar-note">
+                        {t('pages:worldEditor.locationsTag', { count: world.locations.length })}
+                      </span>
+                      <button className="btn sm" onClick={addLocation}>
+                        <Icon name="plus" size={13} />
+                        {t('pages:worldEditor.addLocation')}
+                      </button>
+                    </div>
+
+                    {/* AI generation subcard */}
+                    <div className="creator-subcard we-gen-card">
+                      <div className="creator-sec">
+                        <h3>
+                          <Icon name="generate" size={14} />
+                          {' '}{t('pages:worldEditor.generateWithAI')}
+                        </h3>
+                        <span className="trail" />
+                      </div>
+                      <p className="muted" style={{ marginTop: 0 }}>{t('pages:worldEditor.genNote')}</p>
+                      <Field label={t('pages:worldEditor.promptLabel')}>
+                        <textarea
+                          placeholder={t('pages:worldEditor.promptPlaceholder')}
+                          value={genPrompt}
+                          onChange={(e) => setGenPrompt(e.target.value)}
+                        />
+                      </Field>
+                      <div className="we-gen-row">
+                        <Field label={t('pages:worldEditor.howMany')}>
+                          <select value={genCount} onChange={(e) => setGenCount(Number(e.target.value))}>
+                            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                              <option key={n} value={n}>
+                                {n}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <button className="btn primary we-gen-btn" onClick={generateLocations} disabled={generating}>
+                          <Icon name="generate" size={14} />
+                          {generating ? t('pages:worldEditor.generating') : t('pages:worldEditor.generateLocations')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {world.locations.length === 0 && <p className="muted">{t('pages:worldEditor.noLocations')}</p>}
+
+                    {/* Location list — each one is a collapsible card */}
+                    <div className="we-locations">
+                      {world.locations.map((loc, i) => (
+                        <LocationCard
+                          key={loc.id}
+                          location={loc}
+                          onUpdate={(patch) => updateLocation(i, patch)}
+                          onRemove={() => setField('locations', world.locations.filter((_, j) => j !== i))}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tab: World notes */}
+                  <div className={`we-tabpanel ${activeTab === 'notes' ? '' : 'we-tabpanel-hidden'}`}>
+                    <WorldNotes worldId={world.id} notes={notes} onChange={setNotes} onError={setError} />
+                  </div>
                 </div>
               </div>
 
-              <div className="row end">
+              <div className="we-footer">
                 <button className="btn danger ghost" onClick={() => setConfirmDelete(true)}>
                   <Icon name="trash" size={14} />
                   {t('pages:worldEditor.deleteWorld')}
@@ -542,8 +579,6 @@ export function WorldEditor() {
                   {saving ? t('pages:worldEditor.saving') : t('pages:worldEditor.saveWorld')}
                 </button>
               </div>
-
-              <WorldNotes worldId={world.id} notes={notes} onChange={setNotes} onError={setError} />
             </>
           )}
         </div>
@@ -585,6 +620,43 @@ export function WorldEditor() {
         />
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FeatureToggle — one optional game system as a lit toggle card
+// ---------------------------------------------------------------------------
+
+function FeatureToggle({
+  icon,
+  name,
+  desc,
+  checked,
+  onChange,
+}: {
+  icon: ComponentProps<typeof Icon>['name'];
+  name: string;
+  desc: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className={`we-feature ${checked ? 'we-feature-on' : ''}`}>
+      <input
+        type="checkbox"
+        className="we-feature-input"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="we-feature-icon">
+        <Icon name={icon} size={17} />
+      </span>
+      <span className="we-feature-text">
+        <span className="we-feature-name">{name}</span>
+        <span className="we-feature-desc">{desc}</span>
+      </span>
+      <span className="we-feature-switch" aria-hidden="true" />
+    </label>
   );
 }
 
@@ -725,19 +797,14 @@ function WorldNotes({
   };
 
   return (
-    <div className="card">
-      <div className="creator-sec">
-        <span className="creator-index">04</span>
-        <h2>{t('worldEditor.secNotes')}</h2>
-        <span className="trail" />
-      </div>
+    <div className="we-notes">
       <div className="creator-callout">
         <span className="creator-callout-mark">
           <Icon name="info" size={13} />
         </span>
         <span>{t('worldEditor.notesCallout')}</span>
       </div>
-      <div className="rule" />
+      <div className="divider" />
       <div className="grid cols-2">
         <Field label={t('worldEditor.noteTitle')}>
           <input value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} />

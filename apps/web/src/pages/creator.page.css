@@ -493,15 +493,206 @@
   word-break: break-word;
 }
 
+/* --- Tabbed editor -------------------------------------------------------- */
+/* Tab strip over one .card panel — same underline idiom as .ce-tab/.prof-tab,
+   plus small mono count chips on Locations/Notes. */
+.we-editor { min-width: 0; }
+
+.we-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.we-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  letter-spacing: 0.02em;
+  transition: color 0.12s, border-color 0.12s;
+  margin-bottom: -1px;
+}
+.we-tab:hover { color: var(--text); }
+.we-tab.we-tab-active {
+  color: var(--brass);
+  border-bottom-color: var(--brass);
+}
+
+.we-tab-count {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  color: var(--text-mute);
+}
+.we-tab.we-tab-active .we-tab-count { color: var(--brass); border-color: var(--brass-dim); }
+
+@media (max-width: 640px) {
+  .we-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
+  .we-tabs::-webkit-scrollbar { display: none; }
+  .we-tab { white-space: nowrap; }
+}
+
+/* Hidden panels leave layout but stay in the DOM so form state survives. */
+.we-tabpanel { display: block; }
+.we-tabpanel.we-tabpanel-hidden { display: none; }
+
+/* Slim toolbar row at the top of a panel: mono readout left, action right. */
+.we-panel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.we-toolbar-note {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+/* --- Systems tab: feature toggle cards ----------------------------------- */
+.we-features { display: flex; flex-direction: column; gap: 10px; }
+
+.we-feature {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+.we-feature:hover { border-color: var(--border-bright); }
+.we-feature.we-feature-on {
+  border-color: rgba(230, 177, 94, 0.38);
+  background: rgba(230, 177, 94, 0.05);
+}
+/* The real checkbox is visually hidden but stays focusable for keyboards. */
+.we-feature-input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.we-feature:has(.we-feature-input:focus-visible) {
+  outline: 2px solid var(--moon);
+  outline-offset: 2px;
+}
+
+.we-feature-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--border-soft);
+  color: var(--text-mute);
+  transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.we-feature-on .we-feature-icon {
+  color: var(--brass);
+  border-color: var(--brass-dim);
+  box-shadow: 0 0 10px rgba(230, 177, 94, 0.25);
+}
+
+.we-feature-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.we-feature-name { font-weight: 600; font-size: 0.9rem; color: var(--text); }
+.we-feature-desc { font-size: 0.8rem; color: var(--text-mute); line-height: 1.45; }
+
+/* Hand-rolled switch — the checkbox's visual. */
+.we-feature-switch {
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid var(--border-bright);
+  background: var(--ink-3);
+  position: relative;
+  transition: background 0.18s, border-color 0.18s;
+}
+.we-feature-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-mute);
+  transition: transform 0.18s ease, background 0.18s;
+}
+.we-feature-on .we-feature-switch {
+  background: rgba(230, 177, 94, 0.25);
+  border-color: var(--brass);
+}
+.we-feature-on .we-feature-switch::after {
+  transform: translateX(16px);
+  background: var(--brass);
+  box-shadow: 0 0 6px rgba(230, 177, 94, 0.6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .we-feature-switch, .we-feature-switch::after { transition: none; }
+}
+
+/* Casino limits inset — indented under the lit Casino card. */
+.we-casino-config {
+  margin-left: 24px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-left: 2px solid var(--brass-dim);
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+}
+@media (max-width: 560px) {
+  .we-casino-config { margin-left: 12px; }
+}
+.we-casino-config .kicker { display: block; margin-bottom: 10px; }
+.we-casino-fields { display: flex; gap: 12px; flex-wrap: wrap; }
+.we-casino-fields .field { flex: 1 1 160px; margin-bottom: 0; }
+
+/* Footer bar under the panel: destructive left, primary right. */
+.we-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* Generate locations row */
+.we-gen-card { margin-bottom: 12px; }
 .we-gen-row {
   display: flex;
   gap: 8px;
   align-items: flex-end;
   flex-wrap: wrap;
 }
-.we-gen-row .field,
-.we-gen-row select { flex: 1; min-width: 120px; }
+.we-gen-row .field { flex: 0 1 200px; min-width: 120px; margin-bottom: 0; }
+.we-gen-row select { width: 100%; }
 .we-gen-btn { align-self: flex-end; }
 
 /* Location collapsible cards */
