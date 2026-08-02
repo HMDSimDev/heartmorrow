@@ -8,6 +8,7 @@ import { phaseLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { EnergyPips } from './EnergyPips';
 import { Icon } from './Icon';
 import { Modal } from './ui';
+import './recap-modal.css';
 
 /** Compact day / time-of-day / stamina indicator + Sleep control for the active world. */
 export function DayHud() {
@@ -151,79 +152,186 @@ export function DayHud() {
   );
 }
 
+/** One line of the morning ledger: label, dotted leader, signed amount. */
+function LedgerRow({ label, amount }: { label: string; amount: number }) {
+  const sign = amount > 0 ? '+' : amount < 0 ? '−' : '';
+  const cls = amount > 0 ? ' is-credit' : amount < 0 ? ' is-debit' : '';
+  return (
+    <div className="rcp-row">
+      <span className="rcp-row-label">{label}</span>
+      <span className="rcp-leader" aria-hidden="true" />
+      <span className={`rcp-row-value${cls}`}>
+        {sign}◈{Math.abs(amount)}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The end-of-day summary, split into tabs so each concern reads at a glance:
+ *  - The day  — the LLM-written recap of the day's STORY (plus morning context).
+ *  - Around town — the world-sim's bounded "what the NPCs did" beats.
+ *  - Ledger — the deterministic money story (work/casino/rent/dividends/market),
+ *    computed server-side and NEVER narrated: a big portfolio is a few tidy rows
+ *    here instead of a wall of LLM flavor text.
+ */
 function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void }) {
   const { t } = useTranslation();
+  const l = res.ledger;
+  const hasTown = !!res.worldSim && res.worldSim.beats.length > 0;
+  const hasLedger =
+    !!l &&
+    (l.workShifts > 0 ||
+      l.gamblingPlays > 0 ||
+      l.spent > 0 ||
+      l.dividendHoldings > 0 ||
+      l.rentPaid > 0 ||
+      l.rentOverdue.length > 0 ||
+      l.evictedFrom.length > 0 ||
+      l.movers.length > 0);
+  const [tab, setTab] = useState<'day' | 'town' | 'ledger'>('day');
+
+  const tabs: Array<{ id: 'day' | 'town' | 'ledger'; label: string }> = [
+    { id: 'day', label: t('recap.tabDay') },
+    ...(hasTown ? [{ id: 'town' as const, label: t('recap.tabTown') }] : []),
+    ...(hasLedger ? [{ id: 'ledger' as const, label: t('recap.tabLedger') }] : []),
+  ];
+
+  // The ledger's bottom line: everything the day earned minus everything it cost.
+  const net = l ? l.workEarned + l.gamblingNet - l.spent + l.dividendsTotal - l.rentPaid : 0;
+
   return (
     <Modal onClose={onClose}>
-      <>
-        {res.recap ? (
-          <>
-            <h2>{res.recap.headline}</h2>
-            <p style={{ whiteSpace: 'pre-wrap' }}>{res.recap.narrative}</p>
-            {res.recap.highlights.length > 0 && (
-              <ul style={{ paddingLeft: 18 }}>
-                {res.recap.highlights.map((h, i) => (
-                  <li key={i} className="dim">
-                    {h}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        ) : (
-          <>
-            <h2>{t('recap.newDay')}</h2>
-            <p className="muted">
-              {res.recapError ? t('recap.recapError', { error: res.recapError }) : t('recap.rested')}
-            </p>
-          </>
+      <div className="rcp">
+        {/* Masthead: the almanac turns a page. Dateline prose, not badge chips. */}
+        <header className="rcp-mast">
+          <span className="rcp-seal" aria-hidden="true">
+            ☼
+          </span>
+          <div className="rcp-eyebrow">{t('recap.mastEyebrow', { day: res.state.day })}</div>
+          <h2 className="rcp-headline">{res.recap ? res.recap.headline : t('recap.newDay')}</h2>
+          {(res.calendar || res.weather) && (
+            <div className="rcp-dateline">
+              {res.calendar && (
+                <>
+                  {weekdayLabel(res.calendar.dayOfWeek)} · {seasonLabel(res.calendar.season)}
+                  {res.calendar.isWeekend ? t('recap.weekendBadgeSuffix') : ''}
+                </>
+              )}
+              {res.calendar && res.weather && ' — '}
+              {res.weather && (
+                <>
+                  {res.weather.icon} {res.weather.label}
+                </>
+              )}
+            </div>
+          )}
+          {res.holiday && (
+            <div className="rcp-holiday">
+              ✦ <strong>{res.holiday.name}</strong> — {res.holiday.blurb}
+            </div>
+          )}
+        </header>
+
+        {tabs.length > 1 && (
+          <div className="rcp-tabs" role="tablist">
+            {tabs.map((x) => (
+              <button
+                key={x.id}
+                role="tab"
+                aria-selected={tab === x.id}
+                className={`rcp-tab${tab === x.id ? ' is-active' : ''}`}
+                onClick={() => setTab(x.id)}
+              >
+                {x.label}
+              </button>
+            ))}
+          </div>
         )}
-        {res.worldSim && res.worldSim.beats.length > 0 && (
-          <div style={{ marginTop: 10 }}>
-            <div className="kicker">{t('recap.aroundTown')}</div>
-            <ul style={{ paddingLeft: 18, marginTop: 4 }}>
-              {res.worldSim.beats.map((b, i) => (
-                <li key={i} className="dim">
-                  {b.summary}
-                </li>
+
+        {tab === 'day' && (
+          <div className="rcp-pane">
+            {res.recap ? (
+              <>
+                <p className="rcp-narrative">{res.recap.narrative}</p>
+                {res.recap.highlights.length > 0 && (
+                  <ul className="rcp-highlights">
+                    {res.recap.highlights.map((h, i) => (
+                      <li key={i}>{h}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <p className="rcp-narrative is-quiet">
+                {res.recapError ? t('recap.recapError', { error: res.recapError }) : t('recap.rested')}
+              </p>
+            )}
+            {res.decayed.length > 0 && (
+              <p className="rcp-drift">
+                {t('recap.decayed', {
+                  names: res.decayed.map((d) => t('recap.decayedItem', { name: d.name, days: d.daysSinceSeen })).join(', '),
+                })}
+              </p>
+            )}
+          </div>
+        )}
+
+        {tab === 'town' && hasTown && (
+          <div className="rcp-pane">
+            <ul className="rcp-town">
+              {res.worldSim!.beats.map((b, i) => (
+                <li key={i}>{b.summary}</li>
               ))}
             </ul>
           </div>
         )}
-        {(res.calendar || res.weather || res.income > 0) && (
-          <div className="row" style={{ gap: 6, marginTop: 4 }}>
-            {res.calendar && (
-              <span className="badge">
-                {weekdayLabel(res.calendar.dayOfWeek)} · {seasonLabel(res.calendar.season)}
-                {res.calendar.isWeekend ? t('recap.weekendBadgeSuffix') : ''}
-              </span>
+
+        {tab === 'ledger' && hasLedger && l && (
+          <div className="rcp-pane rcp-ledger">
+            {l.workShifts > 0 && <LedgerRow label={t('recap.ledgerWork', { count: l.workShifts })} amount={l.workEarned} />}
+            {l.gamblingPlays > 0 && <LedgerRow label={t('recap.ledgerCasino', { count: l.gamblingPlays })} amount={l.gamblingNet} />}
+            {l.spent > 0 && <LedgerRow label={t('recap.ledgerSpent')} amount={-l.spent} />}
+            {l.dividendHoldings > 0 && (
+              <LedgerRow label={t('recap.ledgerDividends', { count: l.dividendHoldings })} amount={l.dividendsTotal} />
             )}
-            {res.weather && (
-              <span className="badge">
-                {res.weather.icon} {res.weather.label}
+            {l.rentPaid > 0 && <LedgerRow label={t('recap.ledgerRent')} amount={-l.rentPaid} />}
+
+            <div className="rcp-net">
+              <span className="rcp-row-label">{t('recap.ledgerNet')}</span>
+              <span className="rcp-leader" aria-hidden="true" />
+              <span className={`rcp-row-value${net > 0 ? ' is-credit' : net < 0 ? ' is-debit' : ''}`}>
+                {net > 0 ? '+' : net < 0 ? '−' : ''}◈{Math.abs(net)}
               </span>
+            </div>
+
+            {l.rentOverdue.length > 0 && <p className="rcp-alert">{t('recap.ledgerOverdue', { names: l.rentOverdue.join(', ') })}</p>}
+            {l.evictedFrom.length > 0 && (
+              <p className="rcp-alert is-grave">{t('recap.ledgerEvicted', { names: l.evictedFrom.join(', ') })}</p>
             )}
-            {res.income > 0 && <span className="badge">{t('recap.income', { income: res.income })}</span>}
+
+            {l.movers.length > 0 && (
+              <div className="rcp-market">
+                <div className="rcp-market-eyebrow">{t('recap.ledgerMarket')}</div>
+                <div className="rcp-movers">
+                  {l.movers.map((m) => (
+                    <span key={m.ticker} className={`rcp-mover${m.pct >= 0 ? ' is-up' : ' is-down'}`}>
+                      {m.ticker} {m.pct >= 0 ? '▲' : '▼'}
+                      {Math.abs(Math.round(m.pct * 100))}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
-        {res.holiday && (
-          <div className="banner info" style={{ marginTop: 8, fontSize: '0.85rem' }}>
-            <strong>{res.holiday.name}</strong> — {res.holiday.blurb}
-          </div>
-        )}
-        {res.decayed.length > 0 && (
-          <p className="dim" style={{ fontSize: '0.85rem' }}>
-            {t('recap.decayed', {
-              names: res.decayed.map((d) => t('recap.decayedItem', { name: d.name, days: d.daysSinceSeen })).join(', '),
-            })}
-          </p>
-        )}
-        <div className="row end">
-          <button className="btn primary" onClick={onClose}>
+
+        <footer className="rcp-foot">
+          <button className="btn primary rcp-wake" onClick={onClose}>
             {t('recap.goodMorning', { day: res.state.day })}
           </button>
-        </div>
-      </>
+        </footer>
+      </div>
     </Modal>
   );
 }

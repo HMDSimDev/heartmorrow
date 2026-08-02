@@ -8,6 +8,7 @@ import {
   LAST_DATE_FLAG,
   LAST_SEEN_FLAG,
   NEGLECT_DAILY_DECAY,
+  anniversaryAnchorFlag,
   type Character,
   type DatingStatKey,
   type Relationship,
@@ -181,7 +182,15 @@ export function stampLastSeen(characterId: string, day: number): Relationship {
  *  who hasn't visited in person still triggers the "it's been a while" greeting. */
 export function stampLastDate(characterId: string, day: number): Relationship {
   const current = ensureRelationship(characterId);
-  const flags = { ...current.flags, [LAST_SEEN_FLAG]: day, [LAST_DATE_FLAG]: day };
+  const flags: Relationship['flags'] = { ...current.flags, [LAST_SEEN_FLAG]: day, [LAST_DATE_FLAG]: day };
+  // The FIRST concluded date anchors the "first date" anniversary (see shared
+  // anniversaryOn). Set once, never moved — later dates only bump the recency
+  // clocks. Legacy saves whose first date predates this feature never get one
+  // retro-fitted (the true day is unknowable), only fresh relationships do.
+  const firstDateFlag = anniversaryAnchorFlag('firstDate');
+  if (day > 0 && typeof current.flags[LAST_DATE_FLAG] !== 'number' && typeof current.flags[firstDateFlag] !== 'number') {
+    flags[firstDateFlag] = day;
+  }
   const next = RelationshipSchema.parse({ ...current, flags, updatedAt: Date.now() });
   return relationshipsRepo.update(next);
 }

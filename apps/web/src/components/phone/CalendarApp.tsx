@@ -208,6 +208,7 @@ export function CalendarApp() {
             const isToday = d === data.currentDay;
             const rec = entry?.record ?? null;
             const beatCount = rec?.beats.length ?? 0;
+            const anniversaries = entry?.anniversaries ?? [];
             const cls = [
               'pal-cell',
               isFuture ? 'is-future' : 'is-past',
@@ -215,6 +216,7 @@ export function CalendarApp() {
               cal.isWeekend ? 'is-weekend' : '',
               beatCount > 0 ? 'has-events' : '',
               cal.holiday ? 'is-holiday' : '',
+              anniversaries.length > 0 ? 'has-anniv' : '',
             ]
               .filter(Boolean)
               .join(' ');
@@ -225,6 +227,7 @@ export function CalendarApp() {
               weekdayLabel(cal.dayOfWeek),
               entry ? weatherLabel(entry.weather.kind) : null,
               cal.holiday ? t('calendar.holidayAria', { name: cal.holiday.name }) : null,
+              ...anniversaries.map((a) => t('calendar.annivAria', { name: a.characterName })),
               beatCount > 0 ? t('calendar.eventCount', { count: beatCount }) : null,
               isToday ? t('calendar.today') : isFuture ? t('calendar.upcoming') : null,
             ]
@@ -247,6 +250,11 @@ export function CalendarApp() {
                 {cal.holiday && (
                   <span className="pal-cell-holiday" aria-hidden="true">
                     ✦
+                  </span>
+                )}
+                {anniversaries.length > 0 && (
+                  <span className="pal-cell-anniv" aria-hidden="true">
+                    ♥
                   </span>
                 )}
                 {beatCount > 0 && (
@@ -358,6 +366,17 @@ function DayDetail({
           <div className="pal-holiday-banner">
             <strong>✦ {cal.holiday.name}</strong>
             <span>{cal.holiday.blurb}</span>
+          </div>
+        )}
+
+        {entry && entry.anniversaries.length > 0 && (
+          <div className="pal-anniv-banner">
+            <strong>♥ {t('calendar.annivBannerTitle')}</strong>
+            {entry.anniversaries.map((a) => (
+              <span key={a.characterId}>
+                {t(`calendar.anniv.${a.kind}`, { name: a.characterName, count: a.seasons })}
+              </span>
+            ))}
           </div>
         )}
 

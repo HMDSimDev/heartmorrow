@@ -1,4 +1,4 @@
-import type { DayRecordBeat, GameEvent } from '@dsim/shared';
+import { DayLedgerSchema, type DayLedger, type DayRecordBeat, type GameEvent } from '@dsim/shared';
 import { charactersRepo } from '../db/repositories';
 
 /**
@@ -32,13 +32,31 @@ export const RECAP_EVENT_TYPES = new Set([
   'relationship_on_the_rocks',
   'breakup',
   'reconciled',
+  'anniversary_date',
   'ending_reached',
   // Wealth: lease/rent beats + market moves + property milestones. (Routine
-  // successful rent_paid is intentionally NOT here — it would bury a daily lease.)
+  // successful rent_paid is intentionally NOT here — it would bury a daily lease.
+  // dividend_paid is not here either: it scales with PORTFOLIO SIZE, so it is
+  // collapsed into one beat by summarizeRepeatables instead of one-per-holding.)
   'rent_overdue',
   'property_evicted',
   'property_leased',
-  'dividend_paid',
+  'stock_market_moved',
+  'property_purchase',
+  'property_sale',
+]);
+
+/**
+ * Mechanical money/market events the RECAP NARRATOR never sees: the deterministic
+ * end-of-day Ledger reports them exactly, so feeding them to the LLM only bloated
+ * the prompt and invited invented financial flavor. The Calendar's beat chips
+ * still render them (they stay in RECAP_EVENT_TYPES above). Eviction is the
+ * deliberate exception — losing your home is a life beat, not a line item.
+ */
+export const LEDGER_ONLY_EVENT_TYPES = new Set([
+  'purchase',
+  'rent_overdue',
+  'property_leased',
   'stock_market_moved',
   'property_purchase',
   'property_sale',
@@ -83,6 +101,11 @@ export function describeEvent(e: GameEvent): string | null {
       return `You and ${nameFor(p.characterId)} broke up.`;
     case 'reconciled':
       return `You and ${nameFor(p.characterId)} got back together.`;
+    case 'anniversary_date': {
+      const n = Number(p.seasons) || 1;
+      const span = n === 1 ? 'a season' : `${n} seasons`;
+      return `Celebrated an anniversary with ${nameFor(p.characterId)} — ${span} together.`;
+    }
     case 'ending_reached':
       return `💞 You and ${nameFor(p.characterId)} reached a happy ending: "${String(p.title ?? '')}".`;
     case 'rent_overdue':
@@ -91,8 +114,6 @@ export function describeEvent(e: GameEvent): string | null {
       return `You were evicted from ${String(p.name ?? 'a property')} for unpaid rent.`;
     case 'property_leased':
       return `Signed a lease on ${String(p.name ?? 'a place')}.`;
-    case 'dividend_paid':
-      return `Earned a ${String(p.amount ?? 0)} dividend from ${String(p.ticker ?? 'a holding')}.`;
     case 'stock_market_moved': {
       const movers = Array.isArray(p.movers) ? (p.movers as Array<{ ticker?: string; pct?: number }>) : [];
       if (movers.length === 0) return null;
@@ -132,11 +153,13 @@ function joinNames(names: string[], max = 4): string {
  * also renders them. Feed this the day's FULL event list — it matches the event
  * types it cares about itself. Shared by the live recap and the Calendar record.
  */
-export function summarizeRepeatables(events: GameEvent[]): DayRecordBeat[] {
+export function summarizeRepeatables(events: GameEvent[], opts: { forPrompt?: boolean } = {}): DayRecordBeat[] {
   let shifts = 0;
   let earned = 0;
   let gambleNet = 0;
   let gamblePlays = 0;
+  let dividendTotal = 0;
+  let dividendCount = 0;
   const bondedWith = new Map<string, true>(); // characterId, insertion-ordered + de-duped
   const textedWith = new Map<string, true>();
   for (const e of events) {
@@ -153,6 +176,11 @@ export function summarizeRepeatables(events: GameEvent[]): DayRecordBeat[] {
     } else if (e.type === 'gambling_round') {
       gambleNet += Number(p.net) || 0;
       gamblePlays += 1;
+    } else if (e.type === 'dividend_paid') {
+      // Collapsed: one dividend_paid fires PER HELD COMPANY per day, so a big
+      // portfolio used to bury the day in near-identical lines.
+      dividendTotal += Number(p.amount) || 0;
+      dividendCount += 1;
     }
   }
 
@@ -180,19 +208,77 @@ export function summarizeRepeatables(events: GameEvent[]): DayRecordBeat[] {
           : 'Broke even at the casino.';
     beats.push({ icon: '🎲', text, tone });
   }
+  // Money mechanics stay OUT of the recap prompt (the Ledger reports them); the
+  // Calendar's beat chips keep the single collapsed line.
+  if (dividendCount > 0 && !opts.forPrompt) {
+    const from = dividendCount === 1 ? 'a holding' : `${dividendCount} holdings`;
+    beats.push({ icon: '💵', text: `Collected dividends from ${from} — ${dividendTotal} money.`, tone: 'good' });
+  }
   return beats.map((b) => ({ ...b, text: b.text.slice(0, 720) }));
 }
 
-/** The bullet list of the day's describable events, for the recap prompt. */
+/** The bullet list of the day's describable events, for the recap prompt. The
+ *  narrator sees STORY events only — ledger-only money/market mechanics are
+ *  excluded (see LEDGER_ONLY_EVENT_TYPES), so the LLM's job stays small and it
+ *  can't be dragged into narrating a large portfolio. */
 export function formatEventsForRecap(events: GameEvent[]): string {
   const lines: string[] = [];
   for (const e of events) {
+    if (LEDGER_ONLY_EVENT_TYPES.has(e.type)) continue;
     const line = describeEvent(e);
     if (line && line.trim()) lines.push(`- ${line}`);
   }
   // Collapsed work/bonding/texting beats — these never go through describeEvent.
-  for (const b of summarizeRepeatables(events)) lines.push(`- ${b.text}`);
+  for (const b of summarizeRepeatables(events, { forPrompt: true })) lines.push(`- ${b.text}`);
   return lines.join('\n');
+}
+
+/**
+ * The deterministic end-of-day money story (the recap modal's Ledger tab):
+ * day-time earnings/spending summed from the ended day's events, overnight
+ * rent/dividends/market taken from the wealth pass. Pure arithmetic — no LLM.
+ */
+export function buildDayLedger(
+  events: GameEvent[],
+  wealth: {
+    rentPaid: number;
+    dividends: number;
+    dividendHoldings: number;
+    movers: Array<{ ticker: string; pct: number }>;
+    rentOverdue: string[];
+    evictedFrom: string[];
+  },
+): DayLedger {
+  let workShifts = 0;
+  let workEarned = 0;
+  let gamblingPlays = 0;
+  let gamblingNet = 0;
+  let spent = 0;
+  for (const e of events) {
+    const p = e.payload as Record<string, unknown>;
+    if (e.type === 'activity' && p.kind === 'work') {
+      workShifts += 1;
+      workEarned += Number(p.money) || 0;
+    } else if (e.type === 'gambling_round') {
+      gamblingPlays += 1;
+      gamblingNet += Number(p.net) || 0;
+    } else if (e.type === 'purchase') {
+      spent += Number(p.totalCost) || 0;
+    }
+  }
+  return DayLedgerSchema.parse({
+    workShifts,
+    workEarned,
+    gamblingPlays,
+    gamblingNet,
+    spent,
+    dividendHoldings: wealth.dividendHoldings,
+    dividendsTotal: wealth.dividends,
+    rentPaid: wealth.rentPaid,
+    rentOverdue: wealth.rentOverdue,
+    evictedFrom: wealth.evictedFrom,
+    movers: wealth.movers,
+  });
 }
 
 /** Per-event presentation for the Calendar's "what happened" chips. */
@@ -204,6 +290,7 @@ const BEAT_STYLE: Record<string, { icon: string; tone: DayRecordBeat['tone'] }> 
   milestone_reached: { icon: '💞', tone: 'good' },
   dtr_accepted: { icon: '💍', tone: 'good' },
   reconciled: { icon: '🕊️', tone: 'good' },
+  anniversary_date: { icon: '🕯️', tone: 'good' },
   ending_reached: { icon: '🎉', tone: 'good' },
   dtr_backfired: { icon: '😬', tone: 'bad' },
   walkout: { icon: '🚪', tone: 'bad' },
@@ -216,7 +303,6 @@ const BEAT_STYLE: Record<string, { icon: string; tone: DayRecordBeat['tone'] }> 
   rent_overdue: { icon: '⚠️', tone: 'bad' },
   property_evicted: { icon: '🚫', tone: 'bad' },
   property_leased: { icon: '🔑', tone: 'neutral' },
-  dividend_paid: { icon: '💵', tone: 'good' },
   stock_market_moved: { icon: '📈', tone: 'neutral' },
   property_purchase: { icon: '🏡', tone: 'good' },
   property_sale: { icon: '🏠', tone: 'neutral' },

@@ -1,0 +1,318 @@
+/* ===========================================================================
+   End-of-day recap — "the almanac turns a page."
+
+   A morning entry in the Nocturne voice: a sealed masthead with a mono
+   dateline (prose, not badge chips), ledger-book index tabs, and a true
+   accountant's ledger — dotted leaders, tabular numerals, a double-ruled NET
+   line. The lamplight halo rises from behind the masthead like first light.
+   =========================================================================== */
+
+.rcp {
+  position: relative;
+}
+/* First light: a warm halo cresting behind the masthead. Kept inside the
+   card's horizontal bounds — the modal is a scroll container, and bleeding
+   past its edges would mint a horizontal scrollbar. */
+.rcp::before {
+  content: '';
+  position: absolute;
+  inset: -16px 0 auto 0;
+  height: 150px;
+  background: radial-gradient(340px 150px at 50% -30px, rgba(230, 177, 94, 0.16), transparent 72%);
+  pointer-events: none;
+}
+
+/* --- Masthead ------------------------------------------------------------- */
+.rcp-mast {
+  position: relative;
+  text-align: center;
+  padding: 2px 6px 14px;
+}
+/* The ornamental brass rule that closes the masthead — the fold of the page. */
+.rcp-mast::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brass-dim), transparent);
+}
+.rcp-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, #fff5de, var(--brass) 48%, #8c5c14 100%);
+  box-shadow: 0 2px 10px rgba(230, 177, 94, 0.45), inset -2px -2px 5px rgba(60, 28, 4, 0.45);
+  font-size: 0.82rem;
+  color: rgba(42, 22, 34, 0.75);
+}
+.rcp-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.rcp-headline {
+  margin: 7px 0 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.32rem;
+  line-height: 1.28;
+  color: var(--text);
+  text-wrap: balance;
+}
+.rcp-dateline {
+  margin-top: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--text-mute);
+}
+.rcp-holiday {
+  margin-top: 9px;
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.rcp-holiday strong {
+  color: var(--brass);
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+/* --- Index tabs (the ledger book's edge tabs) ----------------------------- */
+.rcp-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  margin: 12px 0 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.rcp-tab {
+  position: relative;
+  padding: 8px 2px 9px;
+  border: 0;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.rcp-tab:hover {
+  color: var(--text-dim);
+}
+.rcp-tab.is-active {
+  color: var(--brass);
+}
+.rcp-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--brass);
+  box-shadow: 0 0 8px rgba(230, 177, 94, 0.55);
+}
+.rcp-tab:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* --- Panes ---------------------------------------------------------------- */
+.rcp-pane {
+  min-height: 130px;
+  padding: 14px 4px 2px;
+  animation: rcp-pane-in 0.22s ease both;
+}
+@keyframes rcp-pane-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rcp-pane { animation: none; }
+}
+
+/* The day: the narrator's entry, set like handwriting in the almanac. */
+.rcp-narrative {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 0.99rem;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.rcp-narrative.is-quiet {
+  color: var(--text-dim);
+}
+.rcp-highlights {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.rcp-highlights li {
+  position: relative;
+  padding: 3px 0 3px 20px;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.rcp-highlights li::before {
+  content: '❧';
+  position: absolute;
+  left: 2px;
+  color: var(--brass-dim);
+}
+.rcp-drift {
+  margin: 14px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ember);
+}
+
+/* Around town: the neighbors' column. */
+.rcp-town {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.rcp-town li {
+  position: relative;
+  padding: 5px 0 5px 18px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.rcp-town li + li {
+  border-top: 1px dashed rgba(49, 58, 94, 0.55);
+}
+.rcp-town li::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 13px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--moon);
+  opacity: 0.7;
+}
+
+/* --- The ledger: dotted leaders, tabular numerals, a double-ruled net ----- */
+.rcp-ledger {
+  font-family: var(--font-mono);
+}
+.rcp-row,
+.rcp-net {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+}
+.rcp-row-label {
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rcp-leader {
+  flex: 1;
+  min-width: 24px;
+  border-bottom: 1px dotted var(--border-bright);
+  transform: translateY(-4px);
+  opacity: 0.8;
+}
+.rcp-row-value {
+  font-size: 0.86rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  white-space: nowrap;
+}
+.rcp-row-value.is-credit { color: var(--sage); }
+.rcp-row-value.is-debit { color: var(--ember); }
+
+/* The bottom line — an accountant's double rule above the net. */
+.rcp-net {
+  margin-top: 7px;
+  padding-top: 9px;
+  border-top: 3px double var(--brass-dim);
+}
+.rcp-net .rcp-row-label {
+  color: var(--brass);
+  font-weight: 600;
+}
+.rcp-net .rcp-row-value {
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+.rcp-alert {
+  margin: 10px 0 0;
+  padding: 8px 11px;
+  border-left: 3px solid var(--warn);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(230, 177, 94, 0.07);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.rcp-alert.is-grave {
+  border-left-color: var(--ember);
+  background: rgba(224, 122, 130, 0.08);
+  color: var(--ember);
+}
+
+.rcp-market {
+  margin-top: 14px;
+}
+.rcp-market-eyebrow {
+  font-size: 0.64rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.rcp-movers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.rcp-mover.is-up { color: var(--sage); }
+.rcp-mover.is-down { color: var(--ember); }
+
+/* --- Footer: turn the page ------------------------------------------------ */
+.rcp-foot {
+  position: relative;
+  margin-top: 16px;
+  padding-top: 14px;
+}
+.rcp-foot::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--brass-dim), transparent);
+}
+.rcp-wake {
+  width: 100%;
+}

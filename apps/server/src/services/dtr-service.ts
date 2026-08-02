@@ -4,6 +4,7 @@ import {
   MessageSchema,
   DTR_COOLDOWN_DAYS,
   RELATIONSHIP_STATUS_LABELS,
+  anniversaryAnchorFlag,
   currentStatus,
   isBrokenUp,
   nextDtrRung,
@@ -161,6 +162,11 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
       /* chronicle is best-effort */
     }
     setCooldown(); // don't climb multiple rungs in a single sitting
+    if (character.worldId) {
+      // Anchor the "we became X" anniversary (see shared anniversaryOn) —
+      // world-bound only; a world-less chat has no clock to celebrate by.
+      setRelationshipFlag(character.id, anniversaryAnchorFlag(next.rung.status), day, { source: 'dtr' });
+    }
     recordEvent('dtr_accepted', { characterId: character.id, status: next.rung.status, day });
     try {
       rippleSocialVouch(character.id); // their friends warm to you, their rivals cool

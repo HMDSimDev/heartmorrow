@@ -519,7 +519,15 @@
     "reconstructed": "✧ Reconstructed from your almanac",
     "stillUnfolding": "This day is still unfolding — end the day to write its record.",
     "quietDay": "A quiet day; nothing was written down.",
-    "whatHappened": "What happened"
+    "whatHappened": "What happened",
+    "annivAria": "anniversary with {name}",
+    "annivBannerTitle": "Remembrance day",
+    "anniv": {
+      "firstDate": "{count, plural, one {A full season} other {# seasons}} since your first date with {name}",
+      "dating": "{count, plural, one {A full season} other {# seasons}} since you and {name} made it official",
+      "exclusive": "{count, plural, one {A full season} other {# seasons}} since you and {name} chose each other",
+      "cohabiting": "{count, plural, one {A full season} other {# seasons}} since you and {name} moved in together"
+    }
   },
   "together": {
     "title": "Together",

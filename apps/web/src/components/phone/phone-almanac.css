@@ -384,6 +384,28 @@
 .pal-holiday-banner strong { color: var(--brass); font-family: var(--font-display); font-weight: 600; }
 .pal-holiday-banner span { font-size: 0.82rem; color: var(--text-dim); }
 
+/* Remembrance-day (anniversary) marker + banner — siblings of the holiday pair. */
+.pal-cell-anniv {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font-size: 0.5rem;
+  color: var(--brass);
+  text-shadow: 0 0 6px rgba(230, 177, 94, 0.7);
+}
+.pal-anniv-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(230, 177, 94, 0.4);
+  background: rgba(230, 177, 94, 0.08);
+}
+.pal-anniv-banner strong { color: var(--brass); font-family: var(--font-display); font-weight: 600; }
+.pal-anniv-banner span { font-size: 0.82rem; color: var(--text-dim); }
+
 /* The generated recap of the day */
 .pal-recap { margin-bottom: 16px; }
 .pal-recap-head {

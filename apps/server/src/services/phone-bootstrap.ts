@@ -1,5 +1,5 @@
 import { registerClockHooks } from './world-clock-service';
-import { generateDailyTextsForDay } from './text-generation-service';
+import { generateAnniversaryTextsForDay, generateDailyTextsForDay } from './text-generation-service';
 import { generateDailyEmails } from './email-service';
 import { generateGossipForDay, generateKnowledgeGossipForDay } from './gossip-service';
 import { generateFeedForDay } from './feed-service';
@@ -20,7 +20,13 @@ import { generateMarketNews } from './market-service';
 registerClockHooks({
   onWorldSim: (worldId, day) => simulateWorldDay(worldId, day),
   onDayStarted: (worldId, day) => {
-    void generateDailyTextsForDay(worldId, day).catch(() => undefined);
+    // Anniversary remembrances FIRST, then the daily cadence: both passes share
+    // the one-character-text-per-day guard, so sequencing (not racing) them is
+    // what lets a remembrance take the day's slot instead of losing a coin flip.
+    void generateAnniversaryTextsForDay(worldId, day)
+      .catch(() => undefined)
+      .then(() => generateDailyTextsForDay(worldId, day))
+      .catch(() => undefined);
     void generateDailyEmails(worldId, day).catch(() => undefined);
     void generateGossipForDay(worldId, day).catch(() => undefined);
     void generateKnowledgeGossipForDay(worldId, day).catch(() => undefined);

@@ -7,11 +7,14 @@ import {
   positiveWarmth,
   textEngagementDelta,
   TEXT_DAILY_GAIN_CAP,
+  anniversaryOn,
+  anniversaryAnchorFlag,
   pickConversationTopic,
   CONVERSATION_TOPICS,
   npcAffinity,
   type TopicSignals,
 } from './social';
+import { SEASON_LENGTH } from './time';
 
 const stats = (affection: number, rest = 5, tension = 0) => ({
   affection,
@@ -51,7 +54,57 @@ describe('isInternalFlagKey', () => {
     expect(isInternalFlagKey('lastSeenDay')).toBe(true);
     expect(isInternalFlagKey('buff:charm')).toBe(true);
     expect(isInternalFlagKey('state:jealous')).toBe(true);
+    expect(isInternalFlagKey('anniv:firstDate')).toBe(true);
     expect(isInternalFlagKey('metHerMother')).toBe(false);
+  });
+});
+
+describe('anniversaryOn (remembrance days)', () => {
+  const rel = (flags: Record<string, boolean | number | string>) => ({ flags });
+
+  it('fires every full season after the anchor, and only then', () => {
+    const r = rel({ [anniversaryAnchorFlag('firstDate')]: 3 });
+    expect(anniversaryOn(r, 3)).toBeNull(); // the day itself is not an anniversary
+    expect(anniversaryOn(r, 3 + SEASON_LENGTH - 1)).toBeNull();
+    expect(anniversaryOn(r, 3 + SEASON_LENGTH)).toEqual({ kind: 'firstDate', seasons: 1, anchorDay: 3 });
+    expect(anniversaryOn(r, 3 + SEASON_LENGTH + 1)).toBeNull();
+    expect(anniversaryOn(r, 3 + 2 * SEASON_LENGTH)).toEqual({ kind: 'firstDate', seasons: 2, anchorDay: 3 });
+  });
+
+  it('GRADED: a commitment fully REPLACES the first-date anniversary (its own day included)', () => {
+    const r = rel({
+      status: 'exclusive',
+      [anniversaryAnchorFlag('firstDate')]: 2,
+      [anniversaryAnchorFlag('exclusive')]: 9,
+    });
+    // The commitment's day is the one celebrated…
+    expect(anniversaryOn(r, 9 + SEASON_LENGTH)?.kind).toBe('exclusive');
+    // …and the first-date day goes quiet — one remembrance per season, the big one.
+    expect(anniversaryOn(r, 2 + SEASON_LENGTH)).toBeNull();
+  });
+
+  it('climbing a rung moves the celebrated day to the NEW milestone', () => {
+    const r = rel({
+      status: 'cohabiting',
+      [anniversaryAnchorFlag('dating')]: 5,
+      [anniversaryAnchorFlag('cohabiting')]: 12,
+    });
+    expect(anniversaryOn(r, 5 + SEASON_LENGTH)).toBeNull(); // the old rung's day is superseded
+    expect(anniversaryOn(r, 12 + SEASON_LENGTH)?.kind).toBe('cohabiting');
+  });
+
+  it('falls back to the first date when the current status has no anchor (legacy save)', () => {
+    const r = rel({ status: 'exclusive', [anniversaryAnchorFlag('firstDate')]: 2 });
+    expect(anniversaryOn(r, 2 + SEASON_LENGTH)?.kind).toBe('firstDate');
+  });
+
+  it('a broken-up bond celebrates nothing', () => {
+    const r = rel({ 'state:brokenUp': true, [anniversaryAnchorFlag('firstDate')]: 2 });
+    expect(anniversaryOn(r, 2 + SEASON_LENGTH)).toBeNull();
+  });
+
+  it('no anchors (a save predating the feature) → no anniversaries', () => {
+    expect(anniversaryOn(rel({}), SEASON_LENGTH + 1)).toBeNull();
   });
 });
 

@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { stockDailyStep, propertyDateBuff, PROPERTY_GEN, maxDividendForPrice } from '@dsim/shared';
-import { resetDb } from '../test/helpers';
+import { resetDb, ScriptedAdapter } from '../test/helpers';
+import { setAdapterOverride } from '../llm/provider';
+import { advanceDay } from './world-clock-service';
 import { createWorld, updateWorld } from '../services/world-service';
 import { ensureWorldState } from '../services/world-clock-service';
 import { worldStatesRepo, propertyLeasesRepo, landlordNoticesRepo } from '../db/repositories';
@@ -38,6 +40,8 @@ function richWorld(money = 200_000) {
 }
 
 const moneyOf = (worldId: string) => getOrCreatePlayer(playerIdForWorld(worldId)).money;
+
+afterEach(() => setAdapterOverride(null));
 
 describe('property ownership', () => {
   beforeEach(() => resetDb());
@@ -318,6 +322,26 @@ describe('stock market', () => {
     // Held across a full day → the dividend pays.
     expect(runDailyWealth(world.id, 3, []).dividends).toBe(50);
     expect(moneyOf(world.id)).toBe(after + 50);
+  });
+
+  it('advanceDay carries the money story in the deterministic LEDGER (never recap flavor)', async () => {
+    // A failing "model" (fails fast, offline) proves the ledger needs no LLM.
+    setAdapterOverride(new ScriptedAdapter(['not json at all']));
+    const world = richWorld(100_000);
+    const co = createCompany({ worldId: world.id, name: 'Div Co', ticker: 'DIV', basePrice: 1000, volatility: 0.05, dividendPerShare: 5 });
+    buyStock(world.id, co.id, 10); // acquired day 1
+
+    const first = await advanceDay(world.id); // night 1 → 2: too fresh to earn
+    expect(first.ledger).toBeTruthy();
+    expect(first.ledger!.dividendsTotal).toBe(0);
+    expect(first.ledger!.movers.length).toBeGreaterThan(0); // the market still moved
+    expect(first.ledger!.movers.length).toBeLessThanOrEqual(3);
+
+    const second = await advanceDay(world.id); // night 2 → 3: held a full day
+    expect(second.ledger!.dividendsTotal).toBe(50);
+    expect(second.ledger!.dividendHoldings).toBe(1);
+    expect(second.income).toBe(50); // the badge and the ledger agree
+    setAdapterOverride(null);
   });
 
   it('generation caps the dividend to a small yield of base price', () => {

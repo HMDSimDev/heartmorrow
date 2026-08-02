@@ -9,8 +9,10 @@ import {
   DAILY_TEXT_CHANCE,
   FORLORN_TEXT_CHANCE,
   DAILY_TEXT_PHASES,
+  anniversaryOn,
   giftChance,
   isBrokenUp,
+  type AnniversaryKind,
   type Character,
   type CharacterMemory,
   type LlmSettings,
@@ -20,6 +22,7 @@ import { charactersRepo, chroniclesRepo, shopItemsRepo, textMessagesRepo } from 
 import { ensureRelationship, getRelationship } from './relationship-service';
 import { setRelationshipFlag } from './stat-service';
 import { getOrCreateThread, getRecentTexts, hasDated } from './text-message-service';
+import { romanticCompatFor } from './compatibility-service';
 import { currentNpcPartners } from './character-service';
 import { getWorldAvailability } from './availability-service';
 import { listMemories } from './memory-service';
@@ -116,6 +119,104 @@ function topMemoriesFor(characterId: string, limit = 5): CharacterMemory[] {
 function chronicleForPrompt(characterId: string) {
   const row = chroniclesRepo.getByCharacter(characterId, DEFAULT_PLAYER_ID);
   return row ? { chronicle: row.chronicle, recentLines: row.recentLines } : null;
+}
+
+/** Templated remembrance lines, so an offline model never silences an anniversary. */
+const ANNIVERSARY_FALLBACK: Record<AnniversaryKind, (span: string) => string> = {
+  firstDate: (span) => `It's been ${span} since our first date. I still think about it. 💛`,
+  dating: (span) => `It's been ${span} since we made this official. Kind of proud of us.`,
+  exclusive: (span) => `It's been ${span} since we chose just each other. No regrets.`,
+  cohabiting: (span) => `It's been ${span} since we moved in together. Still my favorite decision.`,
+};
+
+/**
+ * Queue anniversary remembrance texts for a world's day — the character is the
+ * one who remembers. Runs BEFORE generateDailyTextsForDay (phone-bootstrap
+ * chains them), so the shared one-character-text-per-day guard makes the daily
+ * pass defer to the remembrance naturally. Guaranteed (no cadence roll) but
+ * availability-gated like every text — a busy character simply doesn't text (the
+ * anniversary date bonus still applies if you take them out). A pending
+ * relationship beat (rocks/breakup/reconcile) outranks a celebration.
+ * Idempotent per (character, day); falls back to a TEMPLATED line when the model
+ * is unreachable so an offline day never loses the moment.
+ */
+export async function generateAnniversaryTextsForDay(
+  worldId: string,
+  day: number,
+  playerId: string = DEFAULT_PLAYER_ID,
+): Promise<void> {
+  const settings = getLlmSettings();
+  const player = getOrCreatePlayer(playerIdForWorldOrDefault(worldId));
+  const availableIds = new Set(
+    getWorldAvailability(worldId, day).filter((a) => a.available).map((a) => a.characterId),
+  );
+
+  for (const character of charactersRepo.listByWorld(worldId)) {
+    if (!hasDated(character.id)) continue;
+    // An orientation-incompatible pairing stays a friendly bond — a nostalgic
+    // "still my favorite night" remembrance would read romantic and ring false.
+    const compat = romanticCompatFor(character.id);
+    if (compat && !compat.mutual) continue;
+    const rel = ensureRelationship(character.id, playerId);
+    const hit = anniversaryOn(rel, day);
+    if (!hit) continue;
+    // Busy today (or memorialized — never available) → no text, no makeup text.
+    if (!availableIds.has(character.id)) continue;
+    // A queued turning point owns the day; celebrating mid-crisis rings false.
+    const beatFlag = rel.flags['beat:pending'];
+    if (typeof beatFlag === 'string' && beatFlag) continue;
+
+    const thread = getOrCreateThread(character.id, playerId);
+    const alreadyTexted = textMessagesRepo
+      .listAllByThread(thread.id)
+      .some((m) => m.sender === 'character' && m.dayNumber === day);
+    if (alreadyTexted) continue;
+
+    const phase = 'morning'; // a remembrance opens the day
+    const span = hit.seasons === 1 ? 'a whole season' : `${hit.seasons} seasons`;
+    const result = await callStructuredLlm(
+      RelationshipBeatTextSchema,
+      buildRelationshipBeatMessages({
+        character,
+        relationship: rel,
+        playerName: player.name,
+        beat: 'anniversary',
+        anniversary: { kind: hit.kind, seasons: hit.seasons },
+        playerGender: player.gender,
+        chronicle: chronicleForPrompt(character.id),
+        memories: topMemoriesFor(character.id),
+        deliveryPhase: phase,
+      }),
+      { settings, task: `Write ${character.name}'s anniversary text.`, schemaName: 'RelationshipBeatText' },
+    );
+    const body = result.ok ? result.data.body : ANNIVERSARY_FALLBACK[hit.kind](span);
+    if (!result.ok) {
+      recordEvent('anniversary_text_fallback', { characterId: character.id, day, error: result.error });
+    }
+
+    // Re-check AFTER the await (mirrors the daily generator's overlap guard).
+    const nowTexted = textMessagesRepo
+      .listAllByThread(thread.id)
+      .some((m) => m.sender === 'character' && m.dayNumber === day);
+    if (nowTexted) continue;
+
+    const now = Date.now();
+    textMessagesRepo.insert(
+      TextMessageSchema.parse({
+        id: newId('txt'),
+        threadId: thread.id,
+        sender: 'character',
+        body,
+        status: 'queued',
+        dayNumber: day,
+        scheduledPhase: phase,
+        attachment: null,
+        deliveredAt: null,
+        createdAt: now,
+      }),
+    );
+    recordEvent('anniversary_text', { characterId: character.id, day, kind: hit.kind, seasons: hit.seasons });
+  }
 }
 
 /**

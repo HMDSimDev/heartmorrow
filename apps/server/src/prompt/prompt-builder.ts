@@ -25,6 +25,7 @@ import {
   INTENT_LABELS,
   type Character,
   type CharacterLinkKind,
+  type AnniversaryKind,
   type CharacterMemory,
   type ConversationSession,
   type DatingStats,
@@ -1145,11 +1146,30 @@ export function buildDailyTextPlanMessages(args: {
 }
 
 /** Messages for a relationship turning-point text (on-the-rocks warning / breakup / reconcile). */
+/** What each anniversary anchors to, phrased for the remembrance prompt. */
+const ANNIVERSARY_PHRASE: Record<AnniversaryKind, string> = {
+  firstDate: 'your first date together',
+  dating: 'the day you two made it official',
+  exclusive: 'the day you chose to be exclusive',
+  cohabiting: 'the day you moved in together',
+};
+
+/** How much the day means — GRADED: a first-date callback stays light, while a
+ *  commitment anniversary is a real occasion (and reads bigger the deeper it is). */
+const ANNIVERSARY_WEIGHT: Record<AnniversaryKind, string> = {
+  firstDate: 'This is a small, fond callback — sweet and low-key, not a grand occasion.',
+  dating: 'This is a real anniversary — it quietly matters to you that this day comes around.',
+  exclusive: 'This is an anniversary you hold dear — choosing each other was a turning point, and you remember it.',
+  cohabiting: 'This is the big one — another season of the life you share; let it feel genuinely special.',
+};
+
 export function buildRelationshipBeatMessages(args: {
   character: Character;
   relationship: Relationship;
   playerName: string;
-  beat: 'rocks' | 'breakup' | 'reconcile' | 'orientation';
+  beat: 'rocks' | 'breakup' | 'reconcile' | 'orientation' | 'anniversary';
+  /** Required for the 'anniversary' beat: what today marks. */
+  anniversary?: { kind: AnniversaryKind; seasons: number } | null;
   /** Player's gender — gates the not-attracted guard on non-orientation beats. */
   playerGender?: PlayerProfile['gender'];
   /** Folded cross-date history, so the beat can ground its "why" concretely. */
@@ -1162,6 +1182,25 @@ export function buildRelationshipBeatMessages(args: {
   const { character: c, relationship, playerName, beat, playerGender = 'unspecified', chronicle = null, memories = [], deliveryPhase = null } = args;
   const stage = relationshipStage(relationship);
   const memoryBlock = memories.length ? `\nTHINGS YOU REMEMBER about ${playerName}:\n${bullet(memories.map((m) => m.text))}` : '';
+
+  // An anniversary is a warm remembrance, not a turning point: the character is
+  // the one who remembered, and marks the day in their own voice.
+  if (beat === 'anniversary') {
+    const a = args.anniversary ?? { kind: 'firstDate' as const, seasons: 1 };
+    const span = a.seasons === 1 ? 'one full season' : `${a.seasons} full seasons`;
+    return [
+      { role: 'system', content: `${resolvePrompt('RELATIONSHIP_BEAT_GUARDRAILS')}\n\nYou are ${characterBrief(c)}` },
+      {
+        role: 'user',
+        content:
+          `Write ONE short, warm text to ${playerName}. Today marks ${span} since ${ANNIVERSARY_PHRASE[a.kind]} — and you're the one who remembered. ` +
+          `${ANNIVERSARY_WEIGHT[a.kind]} ` +
+          `Bring it up naturally, in your own voice: a specific detail you still think about, or how things feel now. ` +
+          `Affectionate and a little nostalgic; never a formal greeting-card "happy anniversary".${memoryBlock}${recentHistoryBlock(chronicle)}\n` +
+          `Write ONE short text for this remembrance only.${deliveryTimeLine(deliveryPhase)}`,
+      },
+    ];
+  }
 
   // The orientation reveal is its own kind of beat: a warm, honest soft-rejection
   // where the character names their orientation rather than letting romance build.

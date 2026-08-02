@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { GIFT_BASE_CHANCE, GIFT_MIN_WARMTH, GIFT_WARMTH_FULL } from './constants';
+import { SEASON_LENGTH } from './time';
 import { type RelationshipStatKey } from './stats';
 
 /**
@@ -866,6 +867,69 @@ export function isOnTheRocks(rel: FlagBag): boolean {
   return rel.flags['state:onTheRocks'] === true;
 }
 
+// --- Anniversaries (remembrance days) ---------------------------------------
+
+/** The moments a relationship can celebrate, in ASCENDING priority of what the
+ *  bond is NOW (the current commitment outranks the first date — you celebrate
+ *  the relationship you have, not just how it began). */
+export const ANNIVERSARY_KINDS = ['firstDate', 'dating', 'exclusive', 'cohabiting'] as const;
+export type AnniversaryKind = (typeof ANNIVERSARY_KINDS)[number];
+
+/** Relationship-flag key holding an anniversary's anchor day (the in-world day
+ *  the moment happened). Stamped by the server when the moment lands: the first
+ *  concluded date, a DTR acceptance, a reconciliation. */
+export function anniversaryAnchorFlag(kind: AnniversaryKind): string {
+  return `anniv:${kind}`;
+}
+
+/** Server-owned date-end bonus per anniversary, GRADED by weight: a first-date
+ *  callback is a small warm nod, while celebrating a commitment you've kept is
+ *  worth more the deeper it runs. Clamped by applyRelationshipChange like the
+ *  weather/venue effects. */
+export const ANNIVERSARY_DATE_BONUS: Record<AnniversaryKind, { affection: number; comfort: number }> = {
+  firstDate: { affection: 1, comfort: 1 },
+  dating: { affection: 2, comfort: 1 },
+  exclusive: { affection: 3, comfort: 2 },
+  cohabiting: { affection: 4, comfort: 2 },
+};
+
+export interface AnniversaryHit {
+  kind: AnniversaryKind;
+  /** Full seasons since the anchor (1 = the first anniversary). */
+  seasons: number;
+  anchorDay: number;
+}
+
+/**
+ * The anniversary (if any) a relationship celebrates on `day`: every full season
+ * (SEASON_LENGTH days) after the bond's ONE meaningful anchor counts.
+ *
+ * GRADED: a committed relationship celebrates its COMMITMENT day — the current
+ * rung's anniversary fully replaces the first-date one (one remembrance per
+ * season, and the one that matters most; climbing a rung moves the celebrated
+ * day to the new milestone). The first date is only celebrated while
+ * uncommitted, or when a legacy save lacks the commitment's anchor.
+ *
+ * A broken-up bond celebrates nothing (its anchors go dormant; reconciling
+ * re-anchors `dating`). Saves without anchors simply have no anniversaries
+ * until new moments stamp them. Pure — safe for future days (the Calendar's
+ * upcoming markers).
+ */
+export function anniversaryOn(rel: FlagBag, day: number): AnniversaryHit | null {
+  if (isBrokenUp(rel)) return null;
+  let kind: AnniversaryKind = 'firstDate';
+  const status = currentStatus(rel);
+  if (status !== 'none') {
+    const a = rel.flags[anniversaryAnchorFlag(status)];
+    if (typeof a === 'number' && a > 0) kind = status;
+  }
+  const anchor = rel.flags[anniversaryAnchorFlag(kind)];
+  if (typeof anchor !== 'number' || anchor <= 0 || day <= anchor) return null;
+  const elapsed = day - anchor;
+  if (elapsed % SEASON_LENGTH !== 0) return null;
+  return { kind, seasons: elapsed / SEASON_LENGTH, anchorDay: anchor };
+}
+
 /** Max tension at which a relationship still counts as calm/settled (shared with intimacy). */
 export const ENDING_MAX_TENSION = 40;
 
@@ -959,7 +1023,8 @@ export function isInternalFlagKey(key: string): boolean {
     key.startsWith('rocks:') ||
     key.startsWith('breakup:') ||
     key.startsWith('beat:') ||
-    key.startsWith('harm:')
+    key.startsWith('harm:') ||
+    key.startsWith('anniv:')
   );
 }
 

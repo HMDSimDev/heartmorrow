@@ -1005,6 +1005,30 @@ export const WorldSimResultSchema = z.object({
 });
 export type WorldSimResult = z.infer<typeof WorldSimResultSchema>;
 
+/** The deterministic end-of-day money story — computed from the day's events and
+ *  the overnight wealth pass, NEVER narrated by the LLM. Rendered as the recap
+ *  modal's Ledger tab; the recap narrator no longer sees these mechanics. */
+export const DayLedgerSchema = z.object({
+  /** Work shifts completed during the day, and what they paid. */
+  workShifts: z.number().int().default(0),
+  workEarned: z.number().int().default(0),
+  /** Casino rounds played and the net win/loss (negative = lost). */
+  gamblingPlays: z.number().int().default(0),
+  gamblingNet: z.number().int().default(0),
+  /** Money spent on shop purchases during the day. */
+  spent: z.number().int().default(0),
+  /** Overnight dividends: how many holdings paid, and the total credited. */
+  dividendHoldings: z.number().int().default(0),
+  dividendsTotal: z.number().int().default(0),
+  /** Overnight lease rent charged, plus any trouble (property names). */
+  rentPaid: z.number().int().default(0),
+  rentOverdue: z.array(z.string()).default([]),
+  evictedFrom: z.array(z.string()).default([]),
+  /** Tonight's biggest price moves (top 3 by magnitude, deterministic). */
+  movers: z.array(z.object({ ticker: z.string(), pct: z.number() })).default([]),
+});
+export type DayLedger = z.infer<typeof DayLedgerSchema>;
+
 export const SleepResponseSchema = z.object({
   state: WorldStateSchema,
   recap: DayRecapSchema.nullable(),
@@ -1019,6 +1043,8 @@ export const SleepResponseSchema = z.object({
   worldSim: WorldSimResultSchema.nullable().default(null),
   /** Passive money credited to this world's wallet for the new day. */
   income: z.number().default(0),
+  /** The deterministic money story (rendered as the recap modal's Ledger tab). */
+  ledger: DayLedgerSchema.nullable().default(null),
   /**
    * Whether this request actually advanced the day. False when a concurrent /
    * duplicate Sleep (a second tab, a retry) sent a stale `expectedDay` and the day
@@ -1039,12 +1065,25 @@ export const DayWeatherViewSchema = z.object({
 });
 export type DayWeatherView = z.infer<typeof DayWeatherViewSchema>;
 
+/** An upcoming remembrance day on the almanac (see shared `anniversaryOn`). */
+export const CalendarAnniversarySchema = z.object({
+  characterId: z.string(),
+  characterName: z.string(),
+  kind: z.enum(['firstDate', 'dating', 'exclusive', 'cohabiting']),
+  /** Full seasons since the anchor (1 = the first anniversary). */
+  seasons: z.number().int().positive(),
+});
+export type CalendarAnniversary = z.infer<typeof CalendarAnniversarySchema>;
+
 /** One day in the almanac: its (recomputed) weather + its persisted record, if any.
  *  Day-of-week / season / holiday are derived client-side via `deriveCalendar(day)`. */
 export const CalendarEntrySchema = z.object({
   day: z.number().int().positive(),
   weather: DayWeatherViewSchema,
   record: DayRecordSchema.nullable().default(null),
+  /** Remembrance days, computed for TODAY + future days only (past days would
+   *  be retro-fitted guesses). Default keeps older clients/payloads compatible. */
+  anniversaries: z.array(CalendarAnniversarySchema).default([]),
 });
 export type CalendarEntry = z.infer<typeof CalendarEntrySchema>;
 

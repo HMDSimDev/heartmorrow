@@ -5,6 +5,7 @@ import {
   RECONCILE_WARMTH,
   RELATIONSHIP_STATUS_LABELS,
   ROCKS_GRACE_DAYS,
+  anniversaryAnchorFlag,
   breakupThresholdFor,
   currentStatus,
   isBrokenUp,
@@ -202,6 +203,9 @@ function maybeReconcile(characterId: string, rel: Relationship, day: number): St
   const name = getCharacter(characterId).name;
   setRelationshipFlag(characterId, 'state:brokenUp', false, { source: 'reconcile' });
   setRelationshipFlag(characterId, 'status', 'dating', { source: 'reconcile' });
+  // A rekindled bond celebrates from its FRESH start, not the original ask —
+  // re-anchor the 'dating' anniversary to today (see shared anniversaryOn).
+  setRelationshipFlag(characterId, anniversaryAnchorFlag('dating'), day, { source: 'reconcile' });
   setRelationshipFlag(characterId, 'beat:pending', 'reconcile', { source: 'reconcile' });
   addMemoriesFromEvaluation(
     characterId,

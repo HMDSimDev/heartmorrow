@@ -13,7 +13,7 @@ import {
   unreadTextCount,
 } from '../services/text-message-service';
 import { generateDailyEmails, listEmails, markEmailRead, unreadEmailCount } from '../services/email-service';
-import { generateDailyTextsForDay } from '../services/text-generation-service';
+import { generateAnniversaryTextsForDay, generateDailyTextsForDay } from '../services/text-generation-service';
 import {
   commentOnPost,
   createPlayerPost,
@@ -144,6 +144,7 @@ export async function phoneRoutes(app: FastifyInstance): Promise<void> {
     if (!worldId) throw badRequest('worldId is required.');
     getWorld(worldId); // 404 if the world doesn't exist (avoids a phantom clock row)
     const day = ensureWorldState(worldId).day;
+    await generateAnniversaryTextsForDay(worldId, day); // before dailies — shares the per-day slot
     await generateDailyTextsForDay(worldId, day);
     await generateDailyEmails(worldId, day);
     await generateFeedForDay(worldId, day);

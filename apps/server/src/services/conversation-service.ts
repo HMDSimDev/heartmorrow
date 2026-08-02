@@ -28,6 +28,8 @@ import {
   jealousyProbability,
   isCommitted,
   isBrokenUp,
+  ANNIVERSARY_DATE_BONUS,
+  anniversaryOn,
   isMemorialized,
   currentStatus,
   RECONCILE_COOLDOWN_DAYS,
@@ -1653,6 +1655,25 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
           owned: propVenue.owned,
         });
       }
+    }
+
+    // Taking them out ON a remembrance day (a season since the first date / the
+    // commitment — see shared anniversaryOn) lands a server-owned bonus GRADED
+    // by the anniversary's weight (a commitment kept outweighs a first-date
+    // callback). Sibling to the weather/venue effects, applied before
+    // milestone/strain so it can tip a crossing.
+    const anniv = anniversaryOn(getRelationship(session.characterId), chronDay);
+    if (anniv) {
+      applyRelationshipChange(session.characterId, { ...ANNIVERSARY_DATE_BONUS[anniv.kind] }, {
+        source: 'anniversary',
+        detail: { kind: anniv.kind, seasons: anniv.seasons },
+      });
+      recordEvent('anniversary_date', {
+        characterId: session.characterId,
+        day: chronDay,
+        kind: anniv.kind,
+        seasons: anniv.seasons,
+      });
     }
   }
 

@@ -3,6 +3,9 @@ import {
   WorldCalendarSchema,
   SEASON_LENGTH,
   GEN_TEXT,
+  anniversaryOn,
+  isMemorialized,
+  type CalendarAnniversary,
   type CalendarEntry,
   type DayRecap,
   type DayRecord,
@@ -11,7 +14,9 @@ import {
   type WorldCalendar,
   type WorldSimResult,
 } from '@dsim/shared';
-import { dayRecordsRepo, eventsRepo, worldStatesRepo } from '../db/repositories';
+import { charactersRepo, dayRecordsRepo, eventsRepo, worldStatesRepo } from '../db/repositories';
+import { getRelationship } from './relationship-service';
+import { romanticCompatFor } from './compatibility-service';
 import { weatherForDay } from './ambiance-service';
 import { RECAP_EVENT_TYPES, beatFromEvent, summarizeRepeatables } from '../lib/day-events';
 
@@ -189,6 +194,28 @@ export function getWorldCalendar(worldId: string): WorldCalendar {
   backfillWorld(worldId, currentDay);
 
   const records = new Map(dayRecordsRepo.listByWorld(worldId).map((r) => [r.day, r] as const));
+  // Upcoming remembrance days (today + future only — decorating PAST days from
+  // the CURRENT flags would be retro-fitted guesswork). Pure per (rel, day), so
+  // the almanac can show an anniversary coming BEFORE it arrives. Memorialized
+  // characters are left in peace, and orientation-incompatible bonds (friends,
+  // not romances) don't get hearts on the almanac.
+  const bonds = charactersRepo
+    .listByWorld(worldId)
+    .map((c) => ({ id: c.id, name: c.name, rel: getRelationship(c.id) }))
+    .filter((b) => !isMemorialized(b.rel))
+    .filter((b) => {
+      const compat = romanticCompatFor(b.id);
+      return !compat || compat.mutual;
+    });
+  const anniversariesFor = (day: number): CalendarAnniversary[] => {
+    if (day < currentDay) return [];
+    const out: CalendarAnniversary[] = [];
+    for (const b of bonds) {
+      const hit = anniversaryOn(b.rel, day);
+      if (hit) out.push({ characterId: b.id, characterName: b.name, kind: hit.kind, seasons: hit.seasons });
+    }
+    return out;
+  };
   // Round up to the end of the current season so the live season renders as a full
   // 4×7 grid (28-day seasons start on a Monday — see deriveCalendar).
   const lastDay = Math.ceil(currentDay / SEASON_LENGTH) * SEASON_LENGTH;
@@ -199,6 +226,7 @@ export function getWorldCalendar(worldId: string): WorldCalendar {
       day,
       weather: { kind: w.kind, label: w.label, icon: w.icon },
       record: records.get(day) ?? null,
+      anniversaries: anniversariesFor(day),
     });
   }
   return WorldCalendarSchema.parse({ worldId, currentDay, entries });

@@ -9,6 +9,7 @@ import {
   neglectTuningFor,
   deriveCalendar,
   phaseForStaminaSpent,
+  type DayLedger,
   type DayRecap,
   type GameEvent,
   type NeglectedCharacter,
@@ -25,11 +26,11 @@ import { evaluateDespairArc } from './crisis-service';
 import { weatherForDay } from './ambiance-service';
 import { recordEvent } from './event-service';
 import { recordDay } from './day-record-service';
-import { runDailyWealth } from './wealth-service';
+import { runDailyWealth, type DailyWealthResult } from './wealth-service';
 import { getLlmSettings } from './settings-service';
 import { callStructuredLlm } from '../llm/structured';
 import { buildDayRecapMessages } from '../prompt/prompt-builder';
-import { formatEventsForRecap } from '../lib/day-events';
+import { buildDayLedger, formatEventsForRecap } from '../lib/day-events';
 
 /**
  * Sole owner of the per-world game clock: day, time-of-day phase, stamina, and
@@ -137,6 +138,8 @@ export interface SleepResult {
   worldSim: WorldSimResult | null;
   /** Passive money credited to this world's wallet for the new day. */
   income: number;
+  /** The deterministic money story (the recap modal's Ledger tab) — never narrated. */
+  ledger: DayLedger | null;
   /** False when a stale `expectedDay` made this a no-op (the day already advanced). */
   advanced: boolean;
 }
@@ -165,6 +168,7 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
       holiday: null,
       worldSim: null,
       income: 0,
+      ledger: null,
       advanced: false,
     };
   }
@@ -210,9 +214,11 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
   //     default), roll the stock market forward (deterministic walk + event shocks
   //     from the day that just ended), and pay dividends. Idempotent per (world,
   //     newDay). Only DIVIDENDS are income; lease rent is an expense already deducted.
+  //     The full result also feeds the deterministic Ledger below.
+  let wealth: DailyWealthResult = { rentPaid: 0, dividends: 0, dividendHoldings: 0, movers: [], rentOverdue: [], evictedFrom: [] };
   try {
-    const { dividends } = runDailyWealth(worldId, newDay, events);
-    income += dividends;
+    wealth = runDailyWealth(worldId, newDay, events);
+    income += wealth.dividends;
   } catch {
     /* wealth is best-effort; never block the day rollover */
   }
@@ -264,6 +270,9 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
     holiday: cal.holiday ? { name: cal.holiday.name, blurb: cal.holiday.blurb } : null,
     worldSim,
     income,
+    // The money story, computed — never narrated. The recap prompt above excludes
+    // ledger-only events entirely, so the LLM's job stays the day's actual story.
+    ledger: buildDayLedger(events, wealth),
     advanced: true,
   };
 }

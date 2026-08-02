@@ -59,7 +59,23 @@ export interface DailyWealthResult {
   rentPaid: number;
   /** Stock dividends CREDITED this day (income). */
   dividends: number;
+  /** Holdings that paid a dividend tonight (feeds the deterministic Ledger). */
+  dividendHoldings: number;
+  /** Tonight's biggest price moves (top 3 by magnitude; empty when market off/quiet). */
+  movers: Array<{ ticker: string; pct: number }>;
+  /** Property names whose rent went overdue / that evicted the player tonight. */
+  rentOverdue: string[];
+  evictedFrom: string[];
 }
+
+const EMPTY_WEALTH_RESULT: DailyWealthResult = {
+  rentPaid: 0,
+  dividends: 0,
+  dividendHoldings: 0,
+  movers: [],
+  rentOverdue: [],
+  evictedFrom: [],
+};
 
 /**
  * Charge due lease rent (evicting on default), roll stock prices forward, and pay
@@ -74,7 +90,7 @@ export function runDailyWealth(
 ): DailyWealthResult {
   const world = worldsRepo.get(worldId);
   const state = worldStatesRepo.get(worldId);
-  if (!world || !state) return { rentPaid: 0, dividends: 0 };
+  if (!world || !state) return { ...EMPTY_WEALTH_RESULT };
 
   // All payouts + the idempotency stamp are ONE atomic unit, so a mid-run failure
   // rolls back cleanly (no money debited/credited without the day's marker advancing,
@@ -83,10 +99,17 @@ export function runDailyWealth(
   const playerId = playerIdForWorld(worldId);
   let rentPaid = 0;
   let dividends = 0;
+  let dividendHoldings = 0;
+  let topMovers: Array<{ ticker: string; pct: number }> = [];
+  let rentOverdue: string[] = [];
+  let evictedFrom: string[] = [];
 
   // --- Lease rent (an EXPENSE): charge due leases, warn + evict on default ---
   if (world.featureFlags.property && state.lastRentCalculatedDay < newDay) {
-    rentPaid = chargeDueLeases(worldId, playerId, newDay);
+    const rent = chargeDueLeases(worldId, playerId, newDay);
+    rentPaid = rent.paid;
+    rentOverdue = rent.overdue;
+    evictedFrom = rent.evicted;
   }
 
   // --- Stock prices (deterministic walk + event shock) + dividends ---
@@ -105,11 +128,8 @@ export function runDailyWealth(
     }
     if (movers.length > 0) {
       const top = [...movers].sort((a, b) => Math.abs(b.pct) - Math.abs(a.pct)).slice(0, 3);
-      recordEvent('stock_market_moved', {
-        worldId,
-        day: newDay,
-        movers: top.map((m) => ({ ticker: m.ticker, pct: Math.round(m.pct * 1000) / 1000 })),
-      });
+      topMovers = top.map((m) => ({ ticker: m.ticker, pct: Math.round(m.pct * 1000) / 1000 }));
+      recordEvent('stock_market_moved', { worldId, day: newDay, movers: topMovers });
     }
     // Dividends on held shares (capped per-company at generation/save time). Only
     // shares HELD across a full day earn — a holding acquired on/after the day that
@@ -123,6 +143,7 @@ export function runDailyWealth(
       if (payout <= 0) continue;
       addMoney(payout, playerId);
       dividends += payout;
+      dividendHoldings += 1;
       recordEvent('dividend_paid', { worldId, day: newDay, companyId: company.id, ticker: company.ticker, amount: payout, shares: h.shares });
     }
   }
@@ -143,7 +164,7 @@ export function runDailyWealth(
     if (changed) worldStatesRepo.update(WorldStateSchema.parse({ ...patch, updatedAt: Date.now() }));
   }
 
-  return { rentPaid, dividends };
+  return { rentPaid, dividends, dividendHoldings, movers: topMovers, rentOverdue, evictedFrom };
   });
 }
 
@@ -163,10 +184,17 @@ function tryPay(amount: number, playerId: string): boolean {
  * Walk the player's active leases as the world enters `newDay`: charge any due rent;
  * a missed payment flips the lease to `overdue` (a grace clock + an urgent landlord
  * text); rent still unpaid past the grace deadline ends the lease (EVICTION). Returns
- * the total rent successfully paid. Synchronous + deterministic.
+ * the total rent successfully paid + the property names that hit trouble (for the
+ * deterministic Ledger). Synchronous + deterministic.
  */
-function chargeDueLeases(worldId: string, playerId: string, newDay: number): number {
+function chargeDueLeases(
+  worldId: string,
+  playerId: string,
+  newDay: number,
+): { paid: number; overdue: string[]; evicted: string[] } {
   let paid = 0;
+  const overdue: string[] = [];
+  const evicted: string[] = [];
   for (const lease of propertyLeasesRepo.listByPlayer(worldId, playerId)) {
     const property = propertiesRepo.get(lease.propertyId);
     if (!property) {
@@ -188,6 +216,7 @@ function chargeDueLeases(worldId: string, playerId: string, newDay: number): num
         propertyLeasesRepo.delete(worldId, playerId, property.id);
         sendLandlordNotice({ worldId, playerId, propertyId: property.id, propertyName: property.name, kind: 'eviction', amount: property.rentAmount, graceDay: cur.graceUntilDay, day: newDay });
         recordEvent('property_evicted', { worldId, playerId, propertyId: property.id, name: property.name });
+        evicted.push(property.name);
         continue;
       }
       cur = propertyLeasesRepo.upsert(
@@ -214,10 +243,11 @@ function chargeDueLeases(worldId: string, playerId: string, newDay: number): num
         cur = propertyLeasesRepo.upsert(PropertyLeaseSchema.parse({ ...cur, status: 'overdue', graceUntilDay: graceDay }));
         sendLandlordNotice({ worldId, playerId, propertyId: property.id, propertyName: property.name, kind: 'overdue', amount: property.rentAmount, graceDay, day: newDay });
         recordEvent('rent_overdue', { worldId, playerId, propertyId: property.id, name: property.name, amount: property.rentAmount, graceDay });
+        overdue.push(property.name);
       }
     }
   }
-  return paid;
+  return { paid, overdue, evicted };
 }
 
 /** The HUD net-worth readout: cash + property equity + stock value. */
