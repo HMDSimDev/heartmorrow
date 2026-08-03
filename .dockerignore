@@ -13,9 +13,22 @@ data
 # Vendored self-contained toolchain from install.sh (huge, host-specific).
 .runtime
 
-# VCS / editor / OS noise.
+# Internal tooling and repo-page assets Docker users never run: the screenshot
+# tool exists to refresh the GitHub README, and gh/ holds the README's images.
+tools
+gh
+
+# do not pick up any LLM-related files the user might have installed if they are working on this with an LLM
+.claude
+.codex
+AGENTS.MD
+CLAUDE.MD
+
+# VCS / CI / editor / OS noise.
 .git
 .gitignore
-*.log
-.DS_Store
-Thumbs.db
+.gitattributes
+.github
+**/*.log
+**/.DS_Store
+**/Thumbs.db

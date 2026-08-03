@@ -8,7 +8,8 @@
 #
 # The web client is built to static assets and served BY the Fastify server, so
 # the container runs a single process on a single port (8787). The server runs
-# TypeScript directly via tsx (a runtime dependency here — do not prune it).
+# TypeScript directly via tsx — a real dependency of @dsim/server, so it
+# survives the prod-only install that strips build/test tooling below.
 # =============================================================================
 
 # ---- build: install deps + compile the web client --------------------------
@@ -29,14 +30,14 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm --filter @dsim/web run build
 
+# The web client is static files now, so drop every devDependency (vite,
+# vitest, typescript, @redocly/cli, ...) — the runtime copy ships only what the
+# server imports at runtime (tsx, fastify and friends). CI=true answers the
+# "purge modules dir?" prompt that switching to prod-only triggers (no TTY here).
+RUN CI=true pnpm install --prod --frozen-lockfile
+
 # ---- runtime: run the Fastify server (serves API + web + uploads) -----------
 FROM node:24-bookworm-slim AS runtime
-# `corepack enable` needs root (writes shims to /usr/local/bin), but `prepare`
-# caches pnpm PER USER — it runs further down, after USER node, so the cache
-# lands where the CMD user finds it. Prepared as root it would sit unreachable
-# in /root/.cache and every container start would re-download pnpm from the
-# registry — fatal on the offline/air-gapped hosts this image targets.
-RUN corepack enable
 WORKDIR /app
 
 ENV NODE_ENV=production \
@@ -49,13 +50,10 @@ ENV NODE_ENV=production \
 # LAN by itself. What exposes it is how you PUBLISH the port on the host; keep
 # that bound to loopback (see docker-compose.yml) because the app has no auth.
 
-# Copy the fully-installed workspace (incl. apps/web/dist) and run as non-root.
+# Copy the pruned workspace (incl. apps/web/dist) and run as non-root.
 COPY --from=build --chown=node:node /app /app
 RUN mkdir -p /data && chown -R node:node /data
 USER node
-# Cache pnpm for the runtime user (see the corepack note above) so container
-# start needs no network. The version must match packageManager in package.json.
-RUN corepack prepare pnpm@11.7.0 --activate
 
 EXPOSE 8787
 VOLUME ["/data"]
@@ -64,4 +62,8 @@ VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=3s --start-period=25s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["pnpm", "--filter", "@dsim/server", "run", "start"]
+# Invoke tsx directly, NOT through pnpm: pnpm as PID 1 does not reliably
+# forward SIGTERM, so `docker stop` would sit out the grace period and SIGKILL.
+# tsx relays signals to the server, which shuts down cleanly (see index.ts).
+# Container start therefore needs no pnpm/corepack/network at all.
+CMD ["apps/server/node_modules/.bin/tsx", "apps/server/src/index.ts"]

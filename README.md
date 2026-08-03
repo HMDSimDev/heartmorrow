@@ -201,11 +201,11 @@ grant itself a cent.
 
 > **Using the [self-contained installer](#quick-start) or [Docker](#run-in-docker)?** You can
 > skip the Node and pnpm requirements below — `install.sh` / `install.ps1` download a pinned,
-> local Node and activate the right pnpm for you, and the Docker image bundles both. The only
-> thing you'd still want is an LLM server to actually play.
+> local Node and activate the right pnpm for you, and the Docker build brings its own. The
+> only thing you'd still want is an LLM server to actually play.
 
-- **Node.js 20+** (developed on Node 24). Uses Node's built-in `node:sqlite`, so installation
-  never compiles a native C addon.
+- **Node.js 24+** — the server uses Node's built-in `node:sqlite` (stable, flag-free on
+  Node 24), so installation never compiles a native C addon.
 - **pnpm** — the repo pins **`pnpm@11.7.0`** via `packageManager`, so running `corepack
   enable` once will fetch the right version automatically (or `npm i -g pnpm`).
 - *(Optional, but basically needed to actually play)* an **OpenAI-API-compatible** LLM server, either local or a cloud API.
@@ -330,7 +330,7 @@ A few things worth knowing:
 - **(Optional) seed sample data.** A fresh container starts with an empty database. To load
   the sample world + characters into the volume:
   ```bash
-  docker compose run --rm heartmorrow pnpm --filter @dsim/server run seed
+  docker compose run --rm heartmorrow apps/server/node_modules/.bin/tsx apps/server/src/seed.ts
   ```
 
 > 🔒 It’s bound to localhost on purpose. Heartmorrow has no authentication — anything that can reach the API can drive your game and read its data. The compose file publishes the port on 127.0.0.1 only, while the app listens on 0.0.0.0 inside the container. That is intentional: the container bind is not the same as the host bind; the published host port is the external boundary. Do not change the mapping to 8787:8787 unless you fully trust the machine and network. On Linux, Docker-published ports can bypass normal UFW/firewalld expectations, so do not rely on the host firewall alone to protect a published unauthenticated service.

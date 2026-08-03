@@ -22,6 +22,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
+    # Tiny init as PID 1: forwards signals and reaps zombies, so `docker stop`
+    # shuts the server down cleanly instead of waiting out the grace period.
+    init: true
+
     restart: unless-stopped
 
 volumes:

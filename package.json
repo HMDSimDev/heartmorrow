@@ -6,7 +6,7 @@
   "description": "Local-first LLM-powered dating simulator framework",
   "packageManager": "pnpm@11.7.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "dev": "pnpm -r --parallel run dev",
