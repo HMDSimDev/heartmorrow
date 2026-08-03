@@ -256,12 +256,15 @@
   /* Bound the stage to the viewport so the composer in .date-foot always stays on
      screen no matter how tall the scene/trajectory/foot grow. The reel (flex:1,
      min-height:0 below) absorbs the remainder rather than a hardcoded subtraction. */
+  max-height: 100vh;
   max-height: 100svh;
   padding: 0;
   overflow-x: hidden;
   overflow-y: visible;
 }
-@media (max-width: 859px) {
+/* Single-column band (.date-wrap goes two-col at 1000px): the stage stacks
+   ABOVE the dossier rail so the conversation is the first thing on screen. */
+@media (max-width: 999.98px) {
   .date-stage { min-height: 0; max-height: none; order: -1; }
 }
 .date-stage > * { z-index: 1; }
@@ -606,10 +609,17 @@
      centered column read as "squeezed" on wide monitors. */
   width: 100%;
 }
-@media (max-width: 859px) {
-  /* Stage is no longer viewport-bounded here (it stacks above the sidebar), so cap
-     the reel to keep it scrollable rather than growing unbounded. */
-  .date-reel { max-height: calc(100svh - 280px); min-height: 240px; }
+@media (max-width: 999.98px) {
+  /* Stage is no longer viewport-bounded here (it stacks above the dossier), so cap
+     the reel to keep it scrollable rather than growing unbounded. The floor must
+     yield to the cap on short landscape viewports — a flat min-height:240px beat
+     the calc() cap there, pushing the composer below the fold. */
+  .date-reel {
+    max-height: calc(100vh - 280px);
+    max-height: calc(100svh - 280px);
+    min-height: min(240px, calc(100vh - 280px));
+    min-height: min(240px, calc(100svh - 280px));
+  }
 }
 .date-cue {
   align-self: center;
@@ -627,7 +637,7 @@
 /* Bubbles — characterful, with a serif voice for the character. */
 .date-msg {
   position: relative;
-  max-width: 84%;
+  max-width: min(84%, 920px);
   padding: 11px 15px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -1180,11 +1190,6 @@
   padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
-}
-.date-actions-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 9px;
 }
 .date-dtr {

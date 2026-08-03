@@ -306,9 +306,21 @@
 .cst-key-item.is-yours { --kc: color-mix(in oklab, var(--accent-2) 68%, var(--rose)); }
 
 /* The key needs the room the hint was using; below 400px the hint is already
-   hidden, so drop the key to where it sat. */
+   hidden, so drop the key to where it sat. On these short stages a rim star's
+   label can still reach the key's band — the ink scrim makes any residual
+   overlap read as the legend layered OVER the sky, not interleaved text. */
 @media (max-width: 400px), (max-height: 480px) {
-  .cst-key { bottom: 8px; }
+  .cst-key {
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: calc(100% - 16px);
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: color-mix(in oklab, var(--ink) 84%, transparent);
+    backdrop-filter: blur(3px);
+  }
 }
 
 .cst-hint {

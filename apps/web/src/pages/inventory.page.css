@@ -17,8 +17,13 @@
 }
 .inv-satchel-titles { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .inv-satchel-titles h1 { margin: 0; font-size: 1.7rem; }
-.inv-satchel-titles p { margin: 0; font-size: 0.86rem; color: var(--text-dim); }
+.inv-satchel-titles p { margin: 0; font-size: 0.86rem; color: var(--text-dim); max-width: 64ch; }
 .inv-satchel-readout { flex: 0 0 auto; align-self: center; }
+/* Short viewports (landscape phones): title + held-count only. */
+@media (max-height: 480px) {
+  .inv-satchel-titles .kicker, .inv-satchel-titles p { display: none; }
+  .inv-satchel-titles h1 { font-size: 1.2rem; }
+}
 
 /* — Item grid: bag pockets ——————————————————————————————————————————— */
 /* Keep auto-fill at every width: a 320px cap stops cards ballooning to ~770px

@@ -35,6 +35,11 @@
 @media (max-width: 560px) {
   .creator-head .creator-head-actions { width: 100%; }
 }
+/* Short viewports (landscape phones): workbench masthead → compact title bar. */
+@media (max-height: 480px) {
+  .creator-head .kicker, .creator-head p { display: none; }
+  .creator-head h1 { margin: 0; font-size: 1.25rem; }
+}
 
 /* A small mono breadcrumb / mode chip line under the kicker. */
 .creator-meta {
@@ -542,9 +547,10 @@
 .we-tab.we-tab-active .we-tab-count { color: var(--brass); border-color: var(--brass-dim); }
 
 @media (max-width: 640px) {
-  .we-tabs { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
-  .we-tabs::-webkit-scrollbar { display: none; }
-  .we-tab { white-space: nowrap; }
+  /* Wrap, don't scroll: a hidden-scrollbar strip left the Notes tab invisible
+     and undiscoverable at 375px (half of Locations was the only hint). Two
+     compact rows cost ~34px and every section stays reachable. */
+  .we-tab { white-space: nowrap; padding: 7px 10px; font-size: 0.78rem; }
 }
 
 /* Hidden panels leave layout but stay in the DOM so form state survives. */

@@ -79,6 +79,17 @@
   letter-spacing: 0.02em;
 }
 
+/* Short viewports (landscape phones): the merchant counter is most of the
+   visible band — collapse it to title + purse. */
+@media (max-height: 480px) {
+  .shop-counter { gap: 12px; }
+  .shop-counter-lamp { display: none; }
+  .shop-counter-text .kicker, .shop-counter-text p { display: none; }
+  .shop-counter-text h1 { font-size: 1.2rem; margin: 0; }
+  .shop-purse { padding: 4px 12px; }
+  .shop-shelf-head { margin: 14px 0 4px; }
+}
+
 /* — Section masthead above the grid ———————————————————————————————————— */
 .shop-shelf-head { margin: 26px 0 4px; }
 

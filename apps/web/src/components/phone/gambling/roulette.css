@@ -255,13 +255,22 @@
   pointer-events: none;
 }
 
-/* Narrow phones: shrink the dense 12-wide grid so numbers + chips stay legible. */
-@media (max-width: 380px) {
-  .rl-nums { grid-template-rows: repeat(3, 26px); gap: 2px; }
-  .rl-num { font-size: 0.5rem; }
-  .rl-num.is-green { flex-basis: 26px; font-size: 0.7rem; }
+/* Narrow phones: 12-across squeezed number cells to ~25px — sub-44px tap targets
+   placing real-money bets. Transpose to the standard portrait table instead:
+   the 0 becomes a full-width top bar and the numbers run 3 across × 12 down
+   (~100×34px cells); the app body scrolls the extra height. direction:rtl flips
+   the column fill so each visual row still reads 1·2·3, 4·5·6, … left-to-right. */
+@media (max-width: 430px) {
+  .rl-grid { flex-direction: column; }
+  .rl-nums {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(12, 34px);
+    grid-auto-flow: column;
+    direction: rtl;
+  }
+  .rl-num { direction: ltr; font-size: 0.72rem; }
+  .rl-num.is-green { flex-basis: auto; min-height: 34px; }
   .rl-cell { font-size: 0.62rem; padding: 7px 3px; }
-  .rl-chip { min-width: 12px; height: 12px; font-size: 0.46rem; line-height: 9px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

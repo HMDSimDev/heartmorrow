@@ -70,6 +70,10 @@
   text-align: center;
   padding: 6px 0 2px;
 }
+/* Short viewports: the marquee is pure atmosphere — give its rows to the games. */
+@media (max-height: 480px) {
+  .gmb-marquee { display: none; }
+}
 .gmb-marquee h2 {
   margin: 0;
   font-family: var(--font-display);

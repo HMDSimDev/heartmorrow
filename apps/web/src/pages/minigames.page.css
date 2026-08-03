@@ -37,10 +37,8 @@
   gap: 14px;
 }
 @media (min-width: 1900px) {
-  .mga-grid { grid-template-columns: repeat(4, minmax(240px, 1fr)); }
-}
-@media (min-width: 2400px) {
-  .mga-grid { grid-template-columns: repeat(4, 1fr); }
+  /* Capped cells: uncapped 1fr ballooned cabinets to ~950px at 5120px wide. */
+  .mga-grid { grid-template-columns: repeat(4, minmax(240px, 620px)); }
 }
 /* Phones: two slimmer cabinets per row instead of one full-width card. */
 @media (max-width: 540px) {
@@ -157,7 +155,14 @@
   margin-inline: auto;
 }
 @media (max-width: 899px) {
-  .mga-active { overflow-y: auto; max-height: calc(100dvh - 220px); }
+  /* Floor the cap: on a 375px-tall landscape phone the raw calc() yields a 155px
+     scroller around a timed game board. 340px keeps a board playable; the page
+     itself scrolls to cover the difference. */
+  .mga-active {
+    overflow-y: auto;
+    max-height: max(340px, calc(100vh - 220px));
+    max-height: max(340px, calc(100dvh - 220px));
+  }
 }
 .mga-stage-head {
   display: flex;
@@ -523,6 +528,7 @@
   border: 1px solid var(--border);
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.25);
   max-height: 38vh;
+  max-height: 38dvh;
   overflow-y: auto;
 }
 .wr-ch { transition: color 0.05s linear; }
@@ -755,6 +761,7 @@
 .rhy-stage {
   position: relative;
   height: clamp(130px, 22vh, 220px);
+  height: clamp(130px, 22dvh, 220px);
   margin: 10px 0;
   border-radius: var(--radius);
   border: 1px solid var(--border);

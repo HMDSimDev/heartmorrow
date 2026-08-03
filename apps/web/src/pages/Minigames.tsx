@@ -154,7 +154,7 @@ export function Minigames() {
             value={characterId}
             onChange={(id) => setCharacterId(id)}
             none={{ label: t('minigames.noOne'), sub: t('minigames.moneyOnly') }}
-            compact
+            strip
           />
         </div>
       )}

@@ -57,6 +57,12 @@
   overflow-wrap: anywhere;
 }
 .prof-mast-vitals .sep { color: var(--border-bright); margin: 0 6px; }
+/* Short viewports (landscape phones): name + vitals only — the blurb returns
+   with the height. */
+@media (max-height: 480px) {
+  .prof-mast .kicker, .prof-mast p { display: none; }
+  .prof-mast h1 { font-size: 1.3rem; margin: 2px 0; }
+}
 .prof-mast p {
   margin: 8px 0 0;
   max-width: 66ch;

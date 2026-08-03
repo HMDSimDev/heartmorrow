@@ -53,6 +53,14 @@
   color: var(--text-dim); line-height: 1.55;
 }
 .dash-hero-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+/* Short viewports (landscape phones): the hero was ~170px of a ~250px band —
+   keep the greeting, shed the trimmings. */
+@media (max-height: 480px) {
+  .dash-hero-inner { gap: 6px; padding: 4px 6px 2px; }
+  .dash-hero-eyebrow { display: none; }
+  .dash-hero-title { font-size: 1.4rem; }
+  .dash-hero-line { font-size: 0.9rem; line-height: 1.4; }
+}
 
 /* --- Status console — a HUD readout of the world clock ------------------- */
 .dash-hud {
@@ -169,7 +177,9 @@
 .dash-menu { display: grid; gap: var(--gap); grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); }
 
 @media (min-width: 1900px) {
-  .dash-menu { grid-template-columns: repeat(4, minmax(236px, 1fr)); }
+  /* Four across, but cap the cell: an uncapped 1fr grew tiles to ~950px on a
+     5120px screen, stranding the chevron most of a metre from its label. */
+  .dash-menu { grid-template-columns: repeat(4, minmax(236px, 620px)); }
   /* No hero width cap here: it must always match the almanac-status strip
      below it (the base rule has no max-width for the same reason). */
 }

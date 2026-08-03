@@ -481,12 +481,7 @@
 .weather-taste-set.is-loves b { color: var(--sage); }
 .weather-taste-set.is-dislikes b { color: var(--ember); }
 
-/* player weather preferences grid (reactions summary) */
-.pl-pref-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 7px;
-}
+/* player weather preferences (reactions summary) */
 .pl-pref {
   display: flex;
   align-items: center;

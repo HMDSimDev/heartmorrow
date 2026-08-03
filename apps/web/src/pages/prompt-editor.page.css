@@ -29,6 +29,7 @@
   /* Don't stretch to the editor's height; stay capped to the viewport and scroll
      internally so a long list never blows the page out vertically. */
   align-self: start;
+  max-height: calc(100vh - 168px);
   max-height: calc(100dvh - 168px);
   overflow-y: auto;
   display: flex;

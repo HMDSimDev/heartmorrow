@@ -237,19 +237,21 @@ function layout(nodeIds: string[], edges: SkyEdge[]): Map<string, { x: number; y
   // Recenter on the hearth + scale so the farthest star lands near the rim.
   // The rim is a slight ellipse: star NAMES hang centered under the nodes (up
   // to ~92px wide), so edge stars need more horizontal margin than vertical or
-  // the labels clip at the screen edge on narrow phones; the bottom also keeps
-  // a little extra room so the lowest label clears the .cst-hint line.
+  // the labels clip at the screen edge on narrow phones; the vertical center
+  // also sits a touch high so the lowest label clears the .cst-key thread
+  // legend (and the .cst-hint line) along the stage's bottom edge — on a
+  // ~330px phone stage that band is a bigger slice than the % margin alone.
   let maxR = 1;
   for (const id of nodeIds) {
     const p = pos.get(id)!;
     maxR = Math.max(maxR, Math.hypot(p.x - 50, p.y - 50));
   }
   const scaleX = 37 / maxR;
-  const scaleY = 39 / maxR;
+  const scaleY = 36 / maxR;
   for (const id of all) {
     const p = pos.get(id)!;
     p.x = 50 + (p.x - 50) * scaleX;
-    p.y = 50 + (p.y - 50) * scaleY;
+    p.y = 48 + (p.y - 50) * scaleY;
   }
   return pos;
 }

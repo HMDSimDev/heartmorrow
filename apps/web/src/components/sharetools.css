@@ -26,6 +26,7 @@
 /* The scrollable body of worlds + people. */
 .share-scroll {
   max-height: 46vh;
+  max-height: 46dvh;
   overflow-y: auto;
   margin: 4px 0 12px;
   padding-right: 4px;

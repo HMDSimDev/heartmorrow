@@ -401,7 +401,7 @@
 .bench-turn {
   display: flex;
   flex-direction: column;
-  max-width: 82%;
+  max-width: min(82%, 920px);
 }
 .bench-turn.player {
   align-self: flex-end;
