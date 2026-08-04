@@ -13,6 +13,7 @@ import {
   generateReply,
   getSessionWithMessages,
   judgeTurn,
+  recordTurnReaction,
   listSessions,
   markDateResultSeen,
   maybeAutoSummarize,
@@ -168,11 +169,16 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
         try {
           turnRead = await judgeTurn(id, ac.signal);
           if (turnRead) {
+            // Stamp the read onto the player's message so a resumed date keeps
+            // its reaction chip; the SSE copy drives the live render.
+            recordTurnReaction(playerMessage.id, turnRead.engagement);
             send('rapport', {
               label: turnRead.label,
               expression: turnRead.expression,
               rapport: turnRead.rapport,
               delta: turnRead.delta,
+              engagement: turnRead.engagement,
+              messageId: playerMessage.id,
             });
           }
         } catch {

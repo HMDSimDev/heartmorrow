@@ -247,9 +247,10 @@ export interface StreamHandlers {
   /** The player's message read as a breakup; the character reacted (awaiting confirm). */
   onBreakupIntent?: (message: Message, reaction: 'accept' | 'hurt' | 'plead') => void;
   /** Per-turn rapport read, emitted BEFORE the reply: a vibe label, the live
-   *  expression, the numeric trajectory (0..100, internal), and the signed change
-   *  this turn — drives the date trajectory bar. */
-  onRapport?: (vibe: string, expression: string, rapport: number, delta: number) => void;
+   *  expression, the numeric trajectory (0..100, internal), the signed change
+   *  this turn, and the judged engagement (−3..+3) stamped on the player message
+   *  `messageId` — drives the trajectory bar and the reaction chip. */
+  onRapport?: (vibe: string, expression: string, rapport: number, delta: number, engagement?: number, messageId?: string) => void;
   /** The character lost interest and ended the date early (a soft exit). */
   onLeft?: (message: Message, reason: string) => void;
   /** The player wound the date down to a natural close; the character said
@@ -372,8 +373,8 @@ async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
         break;
       }
       case 'rapport': {
-        const p = payload as { label: string; expression: string; rapport: number; delta: number };
-        handlers.onRapport?.(p.label, p.expression, p.rapport, p.delta);
+        const p = payload as { label: string; expression: string; rapport: number; delta: number; engagement?: number; messageId?: string };
+        handlers.onRapport?.(p.label, p.expression, p.rapport, p.delta, p.engagement, p.messageId);
         break;
       }
       case 'left': {

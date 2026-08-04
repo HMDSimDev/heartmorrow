@@ -88,6 +88,7 @@ import {
   setLastExpression,
   applyTurnEngagement,
   ensureRapportSeeded,
+  hasJudgedTurn,
   rapportLabel,
   rapportEndEffect,
   clearRapport,
@@ -270,7 +271,12 @@ export function getActiveDateForWorld(worldId: string): ActiveDate | null {
     if (s.mode !== 'date' && s.mode !== 'event') continue;
     const character = charactersRepo.get(s.characterId);
     if (!character || character.worldId !== worldId) continue;
-    const rapport = peekRapport(s.id);
+    // No rapport/vibe until a turn has actually been JUDGED: the rapport row is
+    // seeded (to a guarded character's cooler opening) before the first judge
+    // call, and that seed must not surface as a verdict on a date where nothing
+    // has happened — the client shows its neutral "settling in" state instead.
+    const rawRapport = peekRapport(s.id);
+    const rapport = rawRapport != null && hasJudgedTurn(s.id) ? rawRapport : null;
     return {
       sessionId: s.id,
       characterId: character.id,
@@ -845,6 +851,15 @@ export type TurnVerdict = Pick<TurnReadout, 'engagement' | 'label' | 'note'>;
  * call fails. Fails safe: never throws, never mutates relationship stats — only
  * the ephemeral session rapport.
  */
+/**
+ * Stamp the per-turn judge's read onto the player's message metadata, so a
+ * resumed date re-renders its reaction chips instead of losing them with the
+ * SSE stream. Engagement only — the chip is qualitative (no numbers shown).
+ */
+export function recordTurnReaction(messageId: string, engagement: number): void {
+  messagesRepo.mergeMetadata(messageId, { engagement });
+}
+
 export async function judgeTurn(sessionId: string, signal?: AbortSignal): Promise<TurnReadout | null> {
   let session: ConversationSession;
   try {

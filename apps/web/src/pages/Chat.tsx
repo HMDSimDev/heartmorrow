@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -38,8 +38,9 @@ import {
 import { api, streamChat, streamRetry, streamRegenerate, assetUrl } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
-import { intentLabel, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
+import { intentLabel, intentTip, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
+import { DateOnboarding, DATE_ONBOARDING_KEY } from '../components/DateOnboarding';
 import { Icon } from '../components/Icon';
 import { RelationshipBars } from '../components/StatBars';
 import { RichLine } from '../components/RichText';
@@ -57,6 +58,17 @@ import './date.page.css';
  * with it, so an opening +3 always reads as rightward progress even for a guarded
  * character. Numbers are never shown; only the fill and a qualitative caption. Values 0..100.
  */
+/** Reaction-chip copy, indexed by judged engagement + 3 (−3 … +3). */
+const REACTION_KEYS = [
+  'pages:chat.reaction.m3',
+  'pages:chat.reaction.m2',
+  'pages:chat.reaction.m1',
+  'pages:chat.reaction.zero',
+  'pages:chat.reaction.p1',
+  'pages:chat.reaction.p2',
+  'pages:chat.reaction.p3',
+] as const;
+
 function DateTrajectory({
   value,
   anchor,
@@ -70,8 +82,10 @@ function DateTrajectory({
 }) {
   const { t } = useTranslation(['pages', 'common']);
   const v = value ?? anchor; // no read yet → sit exactly on the opening seam (empty fill)
-  // The label word still reads absolute warmth, so its color stays keyed to the raw value.
-  const tone = v >= 60 ? 'good' : v < 40 ? 'bad' : 'mid';
+  // The label word reads absolute warmth, so its color keys to the raw value — but
+  // before any judged read exists (value null), the "settling in" fallback stays
+  // neutral rather than borrowing a guarded character's cool opening tone.
+  const tone = value == null ? 'mid' : v >= 60 ? 'good' : v < 40 ? 'bad' : 'mid';
   const warming = v >= anchor;
   // Fill each half over its own available range so it can't underfill: warming spans
   // seam→100, cooling spans seam→leave-floor (below which the character leaves anyway).
@@ -187,6 +201,13 @@ export function Chat() {
   // handlers never got to act on (tab closed mid-turn) — conclude the date as
   // soon as the resumed session is on screen, like the live handlers would have.
   const [autoEnd, setAutoEnd] = useState(false);
+  // First-date walkthrough: auto-opens once EVER (client-global localStorage,
+  // across worlds and saves), and reopenable from the rail's "How dating works".
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const closeOnboarding = () => {
+    setOnboardingOpen(false);
+    localStorage.setItem(DATE_ONBOARDING_KEY, '1');
+  };
   // The world already checked for an unacknowledged end-of-date report this mount.
   const replayCheckedRef = useRef<string | null>(null);
   // End-of-date reports already shown this mount. The replay check must never
@@ -204,6 +225,15 @@ export function Chat() {
 
   // Abort any in-flight stream on unmount.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Show the first-date walkthrough when the FIRST date ever opens (fresh start
+  // or resume alike) — the seen-flag is client-global, spanning worlds and saves.
+  useEffect(() => {
+    if (session?.mode === 'date' && localStorage.getItem(DATE_ONBOARDING_KEY) !== '1') {
+      setOnboardingOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id]);
 
   useEffect(() => {
     void api.listCharacters().then(setCharacters).catch((e) => setError(errorMessage(e)));
@@ -307,7 +337,7 @@ export function Chat() {
     messagesEnd.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, streaming]);
 
-  // Keep the date-scene chips (day / weather / mood) in sync if the world clock
+  // Keep the scene card (day / weather / mood) in sync if the world clock
   // advances mid-session — e.g. the player ends the day from the persistent HUD.
   useEffect(() => {
     if (!session || !character?.worldId) return;
@@ -644,11 +674,17 @@ export function Chat() {
             setStreaming({ active: false, text: '' });
             setBreakupPending({ reaction });
           },
-          onRapport: (label, expr, rap, delta) => {
+          onRapport: (label, expr, rap, delta, engagement, messageId) => {
             setVibe(label);
             if (expr) setExpression(expr);
             setRapport(rap);
             if (delta) setRapportPulse((p) => ({ delta, key: (p?.key ?? 0) + 1 }));
+            // Mirror the server's metadata stamp so the reaction chip appears live.
+            if (engagement !== undefined && messageId) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === messageId ? { ...m, metadata: { ...m.metadata, engagement } } : m)),
+              );
+            }
           },
           onLeft: (m) => {
             // The character lost interest and called it a night. Show the soft-exit
@@ -1520,11 +1556,13 @@ export function Chat() {
       {notice && <Banner kind="info">{notice}</Banner>}
       <div className="chat-wrap date-wrap">
         <aside className="chat-side date-dossier">
+          {/* Compact identity plate: portrait beside name so the whole rail fits
+              a laptop viewport and both columns can bottom out together. */}
           <div className="framed bracketed date-plate">
-            <div className="kicker">{t('chat.yourCompanion')}</div>
             <div className="date-plate-portrait">
               <Portrait character={character} expression={expression} crossfade />
             </div>
+            <div className="date-plate-id">
             <div className="date-plate-name">{character.name}</div>
             <div className="date-plate-badges">
               {relationship && isBrokenUp(relationship) ? (
@@ -1537,7 +1575,37 @@ export function Chat() {
               )}
               {expression && <span className="badge accent date-mood-chip">{expression}</span>}
             </div>
+            </div>
           </div>
+
+          {/* The scene, staged as a playbill card: where, when, weather, mood.
+              (Replaces the chip row that used to sit atop the conversation. The
+              venue photo shows once, behind the stage — not here too.) */}
+          <div className="card date-scene-card">
+            <div className="kicker">{t('chat.sceneKicker')}</div>
+            <div className="dsc-place">{locationName}</div>
+            {scene && cal && (
+              <div className="dsc-row">
+                <span className="dsc-label">{t('chat.sceneWhen')}</span>
+                <span title={t('chat.sceneLeadTitle', { weekday: weekdayLabel(cal.dayOfWeek), season: seasonLabel(cal.season) })}>
+                  {PHASE_ICONS[scene.phase]} {t('chat.sceneDay', { day: scene.day })} {phaseLabel(scene.phase)}
+                </span>
+              </div>
+            )}
+            {scene?.weatherLabel && (
+              <div className="dsc-row">
+                <span className="dsc-label">{t('chat.sceneWeather')}</span>
+                <span>{scene.weatherIcon} {scene.weatherLabel}</span>
+              </div>
+            )}
+            {scene?.mood && (
+              <div className="dsc-row">
+                <span className="dsc-label">{t('chat.sceneMood')}</span>
+                <span className="dsc-mood">{scene.moodIcon} {t('chat.seems', { name: character.name, mood: scene.mood })}</span>
+              </div>
+            )}
+          </div>
+
           {relationship && (
             <div className={`card date-gauges ${milestone ? 'stage-up' : ''}`}>
               <div className="date-gauges-head">
@@ -1603,38 +1671,18 @@ export function Chat() {
                 {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {t('chat.cancelDate')}</>}
               </button>
             )}
+            <button className="btn sm ghost block date-howto" onClick={() => setOnboardingOpen(true)}>
+              <Icon name="info" size={13} /> {t('chat.howDating')}
+            </button>
           </div>
         </aside>
 
         <section className="framed date-stage">
-          <div className={`date-scene${locationImage ? ' has-photo' : ''}`}>
-            {locationImage && (
-              <div className="date-scene-backdrop" aria-hidden="true">
-                <img src={assetUrl(locationImage)} alt="" />
-              </div>
-            )}
-            {scene && cal && (
-              <span className="date-scene-lead" title={t('chat.sceneLeadTitle', { weekday: weekdayLabel(cal.dayOfWeek), season: seasonLabel(cal.season) })}>
-                <span className="ph">{PHASE_ICONS[scene.phase]}</span>
-                <span className="day">
-                  {t('chat.sceneDay', { day: scene.day })}<span className="ph-label">{phaseLabel(scene.phase)}</span>
-                </span>
-              </span>
-            )}
-            <span className="date-chip date-chip-place">
-              <span className="ico"><Icon name="location" size={13} /></span> {locationName}
-            </span>
-            {scene && (
-              <span className="date-chip">
-                <span className="ico">{scene.weatherIcon}</span> {scene.weatherLabel}
-              </span>
-            )}
-            {scene?.mood && (
-              <span className="date-chip">
-                <span className="ico">{scene.moodIcon}</span> {t('chat.seems', { name: character.name, mood: scene.mood })}
-              </span>
-            )}
-          </div>
+          {locationImage && (
+            <div className="date-stage-bg" aria-hidden="true">
+              <img src={assetUrl(locationImage)} alt="" />
+            </div>
+          )}
           {!locked && (
             <DateTrajectory
               value={rapport}
@@ -1667,24 +1715,42 @@ export function Chat() {
                 </div>
               </div>
             )}
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
-              >
-                {m.role === 'character' ? <RichLine text={m.text} /> : m.text}
-                {m.id === regenId && (
-                  <button
-                    className="date-regen-btn"
-                    onClick={() => void regenerate()}
-                    aria-label={t('chat.regen')}
-                    title={t('chat.regenTitle')}
+            {messages.map((m) => {
+              // The per-turn judge's read, stamped on the player's message — a
+              // qualitative chip under the bubble (no numbers, like the bar).
+              const engagement =
+                m.role === 'player' && typeof m.metadata?.engagement === 'number'
+                  ? Math.max(-3, Math.min(3, Math.round(m.metadata.engagement)))
+                  : null;
+              return (
+                <Fragment key={m.id}>
+                  <div
+                    className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
                   >
-                    <Icon name="refresh" size={13} />
-                  </button>
-                )}
-              </div>
-            ))}
+                    {m.role === 'character' ? <RichLine text={m.text} /> : m.text}
+                    {m.id === regenId && (
+                      <button
+                        className="date-regen-btn"
+                        onClick={() => void regenerate()}
+                        aria-label={t('chat.regen')}
+                        title={t('chat.regenTitle')}
+                      >
+                        <Icon name="refresh" size={13} />
+                      </button>
+                    )}
+                  </div>
+                  {engagement !== null && (
+                    <span
+                      className={`date-react ${engagement > 0 ? 'warm' : engagement < 0 ? 'cool' : 'flat'}`}
+                      title={t('chat.reactionTitle')}
+                    >
+                      <span className="date-react-pip" aria-hidden="true">◆</span>
+                      {t(REACTION_KEYS[engagement + 3]!)}
+                    </span>
+                  )}
+                </Fragment>
+              );
+            })}
             {streaming.active && (
               <div className="date-msg character">
                 {streaming.text.trim() ? (
@@ -1765,23 +1831,10 @@ export function Chat() {
             </div>
           ) : (
             <div className="date-input-wrap">
-              {relationship && (
-                <div className="intent-chips" role="group" aria-label={t('chat.intentComing')}>
-                  {availableIntents(relationship).map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      className={`intent-chip${intent === opt ? ' active' : ''}`}
-                      aria-pressed={intent === opt}
-                      disabled={streaming.active}
-                      onClick={() => setIntent((cur) => (cur === opt ? null : opt))}
-                    >
-                      <span className="intent-chip-emoji">{INTENT_ICONS[opt]}</span>
-                      {intentLabel(opt)}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {/* One instrument: the message box with the intent moves docked
+                  inside it. An intent is a claim over your NEXT line — the
+                  character reacts to the move and the judges grade its fit
+                  (each button's title spells that out). */}
               <div className="chat-input date-composer">
                 <textarea
                   value={input}
@@ -1794,15 +1847,38 @@ export function Chat() {
                     }
                   }}
                 />
-                <button className="btn primary date-send" onClick={() => void send()} disabled={streaming.active || !input.trim()}>
-                  <Icon name="send" size={15} />
-                </button>
+                <div className="date-composer-bar">
+                  {relationship && (
+                    <div className="date-intents" role="group" aria-label={t('chat.intentComing')}>
+                      {availableIntents(relationship).map((opt) => (
+                        <button
+                          key={opt}
+                          type="button"
+                          className={`date-intent t-${opt}${intent === opt ? ' active' : ''}`}
+                          aria-pressed={intent === opt}
+                          disabled={streaming.active}
+                          title={intentTip(opt)}
+                          onClick={() => setIntent((cur) => (cur === opt ? null : opt))}
+                        >
+                          <span className="date-intent-emoji" aria-hidden="true">{INTENT_ICONS[opt]}</span>
+                          {intentLabel(opt)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <span className="date-composer-spacer" />
+                  <button className="date-send" onClick={() => void send()} disabled={streaming.active || !input.trim()}>
+                    {t('chat.sendLabel')}
+                  </button>
+                </div>
               </div>
             </div>
           )}
           </div>
         </section>
       </div>
+
+      {onboardingOpen && <DateOnboarding onClose={closeOnboarding} />}
     </div>
   );
 }

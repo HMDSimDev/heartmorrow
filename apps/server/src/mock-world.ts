@@ -1106,24 +1106,27 @@ function mock(): void {
       id: newId('sess'), characterId: minhAn.id, locationId: arcade.id, mode: 'date',
       summary: '', ended: false, createdAt: start, updatedAt: NOW,
     }));
-    const dateLines: Array<{ role: 'player' | 'character'; text: string }> = [
+    // Player lines carry the per-turn judge's read (metadata.engagement) exactly
+    // as a live-judged date would — it renders as the reaction chip under each.
+    const dateLines: Array<{ role: 'player' | 'character'; text: string; engagement?: number }> = [
       { role: 'character', text: 'You’re early. The corner cabinet’s still warm, I didn’t save you the stool. …It’s the one on the left. The one I didn’t save. Sit down.' },
-      { role: 'player', text: 'You saved me the stool.' },
+      { role: 'player', text: 'You saved me the stool.', engagement: 1 },
       { role: 'character', text: 'I reject the premise. (she scoots it out half an inch with her foot anyway.)' },
-      { role: 'player', text: 'What are you working on? You closed the laptop fast when I walked up.' },
+      { role: 'player', text: 'What are you working on? You closed the laptop fast when I walked up.', engagement: 0 },
       { role: 'character', text: 'Nothing. The ending. …The ending of the game. I’ve been stuck on it for three weeks and I haven’t told anyone that, so. There. That’s the date going well, I assume.' },
-      { role: 'player', text: 'Stuck how? Walk me through it. I won’t poke at the cat bug, I promise.' },
+      { role: 'player', text: 'Stuck how? Walk me through it. I won’t poke at the cat bug, I promise.', engagement: 2 },
       { role: 'character', text: 'It’s not a bug. That’s the problem. Everything works. The rotation puzzle, the floor cat, all of it. I just can’t make the last room *mean* anything. You solve it and then it’s… over. And I sit here at 2am thinking, that’s it? After all of it, the player just leaves?' },
-      { role: 'player', text: 'Maybe that’s the feeling. Maybe the last room isn’t a puzzle. Maybe it’s just letting them stand in the thing they built before they go.' },
+      { role: 'player', text: 'Maybe that’s the feeling. Maybe the last room isn’t a puzzle. Maybe it’s just letting them stand in the thing they built before they go.', engagement: 3 },
       { role: 'character', text: '(she is very quiet. she turns the stool to face you, which she does not do.)' },
       { role: 'character', text: '…That’s annoyingly good. Don’t look pleased. You look pleased.' },
-      { role: 'player', text: 'I’m not just talking about the game, Minh An.' },
+      { role: 'player', text: 'I’m not just talking about the game, Minh An.', engagement: 2 },
       { role: 'character', text: 'I know. (a long beat, the arcade humming around you both.) I know you’re not. That’s the part I haven’t worked out how to ship either.' },
       { role: 'character', text: 'Okay. Okay — here. (she opens the laptop and turns it toward you, the unfinished build glowing.) Don’t make it weird that I’m letting you see the last room first. Just… tell me what you feel when it ends. Honestly. I’ll know if you lie.' },
     ];
     dateLines.forEach((l, i) => {
       messagesRepo.insert(MessageSchema.parse({
-        id: newId('msg'), sessionId: activeDate.id, role: l.role, text: l.text, metadata: {},
+        id: newId('msg'), sessionId: activeDate.id, role: l.role, text: l.text,
+        metadata: l.engagement !== undefined ? { engagement: l.engagement } : {},
         createdAt: start + i * MIN,
       }));
     });
@@ -1131,7 +1134,9 @@ function mock(): void {
     // 70 → "warming to you": a guarded character (Minh An, guardedness 52) who has
     // clearly thawed over this conversation — the laptop just came around — without
     // overshooting into "really into it". This persists via session_rapport.
-    sessionRapportRepo.upsert(activeDate.id, 70, NOW);
+    // judged=true: this authored date is mid-flight with a full transcript, so the
+    // vibe label must show (an unjudged seed would gate it to "settling in").
+    sessionRapportRepo.upsert(activeDate.id, 70, NOW, true);
     // …and the matching live mood, so the resumed date shows a warm portrait + chip.
     sessionRapportRepo.setExpression(activeDate.id, 'smiling', NOW);
   }

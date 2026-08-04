@@ -267,90 +267,111 @@
 @media (max-width: 999.98px) {
   .date-stage { min-height: 0; max-height: none; order: -1; }
 }
+/* Tall desktop displays (1440p/4K): fill the height instead of stopping at the
+   62vh floor with a dead band below — a short conversation simply shows more of
+   the venue backdrop. 140px ≈ the page's top/bottom padding, so this never
+   pushes the composer past the fold or makes the page scroll. */
+@media (min-width: 1000px) and (min-height: 1100px) {
+  .date-stage {
+    min-height: calc(100vh - 140px);
+    min-height: calc(100svh - 140px);
+  }
+}
 .date-stage > * { z-index: 1; }
 
-/* SIGNATURE: cinematic scene HUD across the top of the stage. */
-.date-scene {
-  position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-  padding: 12px 15px 13px;
+/* Lamplit ambience behind the reel: an accent halo high-right, brass low-left.
+   Lives on the .framed inner-panel layer (::before) — putting it on the element
+   background would fight the chamfered brass frame gradient instead. The
+   double selector keeps it deterministic over styles.css's .framed::before. */
+.framed.date-stage::before {
   background:
-    radial-gradient(360px 160px at 12% -40%, rgba(230, 177, 94, 0.16), transparent 70%),
-    radial-gradient(360px 160px at 100% 150%, rgba(157, 184, 222, 0.12), transparent 70%),
-    linear-gradient(180deg, var(--ink-2), var(--panel));
-  border-bottom: 1px solid var(--border-soft);
-  box-shadow: inset 0 -1px 0 rgba(230, 177, 94, 0.12);
+    radial-gradient(640px 300px at 85% -8%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),
+    radial-gradient(520px 260px at 0% 0%, rgba(230, 177, 94, 0.10), transparent 70%),
+    linear-gradient(180deg, var(--panel-2), var(--panel));
 }
-.date-scene::after {
-  content: '';
-  position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.5), transparent);
-  z-index: 2;
-}
-/* When a venue photo exists, it fills the scene HUD behind the chips, with a
-   scrim so the readout stays legible. */
-.date-scene.has-photo { overflow: hidden; }
-.date-scene.has-photo > :not(.date-scene-backdrop) { position: relative; z-index: 2; }
-.date-scene-backdrop {
+
+/* The venue photo as the stage's backdrop: a dim, scrimmed wash behind the
+   whole conversation (fixed while the reel scrolls over it). Sits above the
+   ::before panel (z0 element vs z0 pseudo → element paints later) and below
+   every z1 child; the .framed clip-path keeps it inside the chamfer. */
+.date-stage > .date-stage-bg {
   position: absolute;
-  inset: 0;
+  inset: 2px;
   z-index: 0;
+  pointer-events: none;
 }
-.date-scene-backdrop img {
+.date-stage-bg img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  opacity: 0.15;
+  filter: saturate(0.85);
 }
-.date-scene-backdrop::after {
+.date-stage-bg::after {
   content: '';
   position: absolute;
   inset: 0;
-  /* darken toward the bottom/left where the chips sit */
-  background:
-    linear-gradient(180deg, rgba(18, 12, 20, 0.45), rgba(18, 12, 20, 0.78)),
-    radial-gradient(420px 180px at 12% 120%, rgba(18, 12, 20, 0.55), transparent 70%);
+  /* keep the reel's reading zone darkest; let the photo breathe at the top */
+  background: linear-gradient(180deg,
+    rgba(14, 17, 32, 0.25),
+    rgba(14, 17, 32, 0.66) 45%,
+    rgba(14, 17, 32, 0.86) 100%);
 }
-/* The primary scene readout (day + phase) leads, set apart. */
-.date-scene-lead {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 13px 5px 11px;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  box-shadow: inset 0 0 14px rgba(230, 177, 94, 0.08), var(--rim);
-}
-.date-scene-lead .ph {
-  font-size: 1.05rem;
-  filter: drop-shadow(0 0 6px rgba(230, 177, 94, 0.4));
-}
-.date-scene-lead .day {
-  font-family: var(--font-mono);
-  font-weight: 600; font-size: 0.78rem; letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text);
-}
-.date-scene-lead .ph-label { color: var(--brass); }
 
-/* Secondary scene facts — quieter HUD chips. */
-.date-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 0.74rem; font-weight: 600;
-  color: var(--text-dim);
-  background: var(--ink-2);
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  padding: 4px 11px;
+/* SIGNATURE: the scene, staged as a playbill card in the dossier rail — venue
+   name under a "The scene" kicker, then when / weather / mood as ledger rows.
+   (Replaces the chip row that used to sit atop the conversation.) */
+.date-scene-card {
+  position: relative;
+  overflow: hidden;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, var(--ink-2), var(--panel));
 }
-.date-chip .ico { font-size: 0.92rem; }
-.date-chip-place { color: var(--text); border-color: var(--border); }
+/* A brass-to-accent thread along the top edge — the card's lamplit signature. */
+.date-scene-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--brass), var(--accent), transparent);
+  z-index: 2;
+}
+.date-scene-card > * { position: relative; z-index: 1; }
+.date-scene-card .kicker { margin-bottom: 7px; }
+.dsc-place {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  line-height: 1.15;
+  margin-bottom: 9px;
+  color: var(--text);
+  text-shadow: 0 0 18px rgba(230, 177, 94, 0.25);
+  overflow-wrap: anywhere;
+}
+.dsc-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 0;
+  border-top: 1px dashed var(--border-soft);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+}
+.dsc-row > span:last-child { text-align: right; }
+.dsc-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+  flex-shrink: 0;
+}
+/* Not italic on purpose: the row starts with an emoji, and slanted emoji look off. */
+.dsc-mood {
+  font-family: var(--font-display);
+  color: color-mix(in srgb, var(--accent) 70%, var(--text));
+}
 
 /* SIGNATURE: the live date "trajectory" — a diverging almanac gauge across the top of
    the stage, framed with HUD corner ticks. A serif caption names the vibe; the seam (a
@@ -660,8 +681,12 @@
 }
 .date-msg.character {
   align-self: flex-start;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--border);
+  /* A faint moonlight tint keeps the two voices color-separated: theirs cool,
+     yours warm (the player bubble carries the accent gradient). */
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--moon) 7%, var(--panel-2)),
+    color-mix(in srgb, var(--moon) 4%, var(--panel)));
+  border: 1px solid color-mix(in srgb, var(--moon) 18%, var(--border));
   border-radius: 16px 16px 16px 5px;
   font-family: var(--font-display);
   font-size: 1.02rem;
@@ -747,6 +772,37 @@
 .date-msg.character .date-rt-action {
   font-style: italic;
   color: var(--text-mute);
+}
+
+/* The per-turn judge's read, hanging under the player's bubble: a qualitative
+   word (never a number, like the trajectory) tinted warm / ember / mute. */
+.date-react {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: -7px 8px 0 0;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-soft);
+  background: var(--ink-2);
+  animation: date-react-in 0.3s ease both;
+}
+.date-react-pip { font-size: 0.5rem; line-height: 1; }
+.date-react.warm { color: var(--brass); border-color: color-mix(in srgb, var(--brass) 45%, transparent); }
+.date-react.cool { color: var(--ember); border-color: color-mix(in srgb, var(--ember) 45%, transparent); }
+.date-react.flat { color: var(--text-mute); }
+@keyframes date-react-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .date-react { animation: none; }
 }
 
 .date-cursor::after {
@@ -1074,52 +1130,120 @@
 .date-breakup p { margin: 0; }
 
 /* Composer — the message bar. */
-/* The composer + its optional intent-chip row stack vertically. */
+/* The composer (with its docked intent toolbar) and any banners stack vertically. */
 .date-input-wrap { display: flex; flex-direction: column; gap: 8px; }
 
-/* Intent chips: "how you want to come across" moves above the composer. Picking
-   one tags the message so the character reacts to the move and the judges grade
-   whether it fit the moment. Repair moves (Reassure/Apologize) only appear under
-   real tension (see availableIntents). */
-.intent-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.intent-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.03em;
-  color: var(--text-dim);
-  background: var(--panel-2);
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
-}
-.intent-chip:hover:not(:disabled) { color: var(--text); border-color: var(--border); }
-.intent-chip.active {
-  color: var(--brass);
-  background: rgba(230, 177, 94, 0.12);
-  border-color: var(--brass);
-  box-shadow: 0 0 0 1px var(--brass);
-}
-.intent-chip:disabled { opacity: 0.5; cursor: default; }
-.intent-chip-emoji { font-size: 0.85rem; line-height: 1; }
-
-.date-composer {
+/* The composer is one instrument: the textarea with the intent moves docked in
+   a toolbar beneath it. Picking an intent tags the next message so the
+   character reacts to the move and the judges grade whether it fit the moment;
+   repair moves (Reassure/Apologize) only appear under real tension (see
+   availableIntents). Each intent keeps its own tint so the five moves read as
+   distinct instruments, not interchangeable chips. */
+/* Double-class selector: outranks the shared `.chat-input` row styles
+   (display/gap/margin) regardless of stylesheet load order. */
+.chat-input.date-composer {
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  padding-top: 4px;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--ink-2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 .date-composer textarea {
-  min-height: 48px;
+  min-height: 46px;
   max-height: 140px;
-  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 11px 14px 6px;
+  resize: none;
 }
-.date-composer textarea:focus { box-shadow: 0 0 0 3px rgba(230, 177, 94, 0.2); }
-.date-send { flex-shrink: 0; align-self: stretch; }
+.date-composer textarea:focus { box-shadow: none; }
+.date-composer:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+/* The toolbar row — inset so nothing touches the composer's rounded border. */
+.date-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 10px;
+  padding: 8px 0 12px;
+  min-width: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--accent) 38%, var(--border-soft));
+}
+.date-composer-spacer { flex: 1; }
+.date-intents { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.date-intent {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  white-space: nowrap;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--tint) 45%, transparent);
+  background: color-mix(in srgb, var(--tint) 12%, var(--panel));
+  color: color-mix(in srgb, var(--tint) 75%, var(--text));
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+.date-intent:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tint) 22%, var(--panel));
+  transform: translateY(-1px);
+}
+.date-intent.active {
+  background: color-mix(in srgb, var(--tint) 34%, var(--panel));
+  border-color: var(--tint);
+  color: var(--text);
+  box-shadow: 0 0 0 1px var(--tint);
+}
+.date-intent:disabled { opacity: 0.5; cursor: default; }
+.date-intent-emoji { font-size: 0.85rem; line-height: 1; }
+/* One tint per move: romance rose, needling brass, sincerity moonlight,
+   comfort sage, repair lavender. */
+.date-intent.t-flirt { --tint: var(--rose); }
+.date-intent.t-tease { --tint: var(--brass); }
+.date-intent.t-open_up { --tint: var(--moon); }
+.date-intent.t-reassure { --tint: var(--sage); }
+.date-intent.t-apologize { --tint: #b9a8e8; }
+
+.date-send {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 15px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--ink);
+  background: linear-gradient(135deg, var(--accent), var(--brass));
+  box-shadow: 0 1px 8px color-mix(in srgb, var(--accent) 28%, transparent);
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+.date-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 38%, transparent);
+}
+.date-send:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Narrow screens: the toolbar stacks — intents wrap, Send drops to its own
+   right-aligned row rather than shrinking anything off the edge. */
+@media (max-width: 560px) {
+  .date-composer-bar { flex-wrap: wrap; }
+  .date-composer-spacer { display: none; }
+  .date-send { margin-left: auto; }
+}
 
 .date-restart {
   display: flex;
@@ -1130,15 +1254,22 @@
 /* --- The character "dossier" — a framed side panel -------------------- */
 .date-dossier { display: flex; flex-direction: column; gap: 13px; }
 
-/* Portrait plate + identity, framed and bracketed. */
+/* Compact identity plate: a small portrait beside the name, so the whole rail
+   (plate + scene + gauges + actions) fits a laptop viewport next to the stage. */
 .date-plate {
   --cut: 16px;
   position: relative;
-  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 12px 14px;
 }
 .date-plate-portrait {
   position: relative;
+  width: 88px;
+  flex: none;
 }
+.date-plate-id { min-width: 0; }
 .date-plate-portrait .portrait {
   box-shadow: inset 0 0 0 1px rgba(230, 177, 94, 0.4), inset 0 0 0 5px rgba(10, 12, 24, 0.3);
 }
@@ -1156,9 +1287,9 @@
 }
 .date-plate-name {
   font-family: var(--font-display);
-  font-weight: 600; font-size: 1.42rem;
-  margin: 13px 0 9px;
-  text-align: center;
+  font-weight: 600; font-size: 1.12rem;
+  line-height: 1.2;
+  margin: 0 0 6px;
   /* break a single long name rather than overflow the fixed dossier */
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -1167,7 +1298,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  justify-content: center;
 }
 .date-mood-chip { font-size: 0.72rem; }
 
@@ -1191,6 +1321,9 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
+  /* Pin to the rail's bottom so both columns end on the same line (the wrap
+     stretches its columns; see .date-wrap). */
+  margin-top: auto;
 }
 .date-dtr {
   position: relative;
@@ -1279,8 +1412,21 @@
 }
 /* Two-column only once there's room for a usable stage beside the 300px dossier.
    Switching at 860px (where the sidebar also appears) squeezed the stage to ~212px. */
+/* align-items: stretch + .date-actions { margin-top: auto } makes both columns
+   end on the same line instead of the rail trailing below the stage. The
+   double-class selector outranks styles.css's `.chat-wrap { align-items: start }`
+   regardless of stylesheet load order (same trick as .ce-canvas). */
 @media (min-width: 1000px) {
-  .date-wrap { grid-template-columns: 300px 1fr; align-items: start; }
+  .chat-wrap.date-wrap { grid-template-columns: 300px 1fr; align-items: stretch; }
+}
+/* Mirror styles.css's 1500px rail upgrade (the double-class rule above would
+   otherwise pin the rail at 300px forever), and let the stage's extra width on
+   big displays go to the conversation with slightly roomier bubbles. */
+@media (min-width: 1500px) {
+  .chat-wrap.date-wrap { grid-template-columns: 340px 1fr; }
+}
+@media (min-width: 2400px) {
+  .date-msg { max-width: min(84%, 1080px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

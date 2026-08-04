@@ -518,6 +518,10 @@ CREATE TABLE IF NOT EXISTS session_rapport (
   session_id TEXT PRIMARY KEY REFERENCES conversation_sessions(id) ON DELETE CASCADE,
   rapport    INTEGER NOT NULL,
   expression TEXT,
+  -- 1 once at least one turn has been JUDGED. The row is seeded (judged=0) before
+  -- the first judge call so the judge sees a guarded character's cooler opening —
+  -- but the player-facing vibe label must not surface until a real read exists.
+  judged     INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL
 );
 
@@ -824,5 +828,13 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
     table: 'session_rapport',
     column: 'expression',
     ddl: `ALTER TABLE session_rapport ADD COLUMN expression TEXT`,
+  },
+  {
+    table: 'session_rapport',
+    column: 'judged',
+    // Pre-existing rows default to 0 ("not yet judged"): a mid-date resumed across
+    // this upgrade shows the neutral "settling in" label until its next judged turn,
+    // then self-heals. Strictly cosmetic for one turn.
+    ddl: `ALTER TABLE session_rapport ADD COLUMN judged INTEGER NOT NULL DEFAULT 0`,
   },
 ];

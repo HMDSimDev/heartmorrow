@@ -1,0 +1,57 @@
+/* ===========================================================================
+   DateOnboarding — the first-date walkthrough (stepped modal).
+   A lamplit emblem, one concept per card, quiet dots for progress.
+   =========================================================================== */
+
+.dob {
+  text-align: center;
+  padding: 6px 4px 2px;
+}
+
+.dob-emblem {
+  width: 58px;
+  height: 58px;
+  margin: 14px auto 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brass);
+  background: radial-gradient(circle at 35% 30%, rgba(230, 177, 94, 0.22), rgba(230, 177, 94, 0.05));
+  border: 1px solid var(--border-bright);
+  box-shadow: inset 0 0 14px rgba(230, 177, 94, 0.15), 0 0 24px rgba(230, 177, 94, 0.1);
+}
+
+.dob-title {
+  margin: 0 0 8px;
+}
+
+.dob-body {
+  margin: 0 auto 16px;
+  max-width: 46ch;
+  color: var(--text-dim);
+  line-height: 1.55;
+}
+
+.dob-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+.dob-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--panel-3);
+  transition: background 0.2s, transform 0.2s;
+}
+.dob-dots span.on {
+  background: var(--brass);
+  transform: scale(1.2);
+}
+
+/* The action row sits centered under a centered card */
+.dob .row.end {
+  justify-content: center;
+}

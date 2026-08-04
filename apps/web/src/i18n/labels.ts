@@ -62,6 +62,8 @@ export const warmthBandLabel = (k: string): string => t(`common:warmthBand.${k}`
 export const relationshipStatusLabel = (s: RelationshipStatus | string): string => t(`common:relationshipStatus.${s}`);
 export const relationshipStyleLabel = (s: RelationshipStyle | string): string => t(`common:relationshipStyle.${s}`);
 export const intentLabel = (i: Intent | string): string => t(`common:intent.${i}`);
+/** Tooltip explaining what attaching this intent to a message actually does. */
+export const intentTip = (i: Intent | string): string => t(`pages:chat.intentTip.${i}`);
 export const itemRarityLabel = (r: ItemRarity | string): string => t(`common:itemRarity.${r}`);
 export const itemCategoryLabel = (c: ItemCategory | string): string => t(`common:itemCategory.${c}`);
 export const casinoGameBlurb = (g: CasinoGame | string): string => t(`common:casinoBlurb.${g}`);

@@ -28,6 +28,10 @@ const sessionRapport = new Map<string, number>();
 // The character's last live expression (portrait mood), same write-through pattern
 // as rapport so a resumed date restores the mood, not just the trajectory bar.
 const sessionExpression = new Map<string, string>();
+// Whether at least one turn has been JUDGED — the seed alone doesn't count. Gates
+// the player-facing vibe label (a fresh date reads "settling in", never its
+// guarded opening temperature). Same write-through pattern as rapport.
+const sessionJudged = new Map<string, boolean>();
 
 /** Read the cache, falling back to the durable row (and warming the cache from it). */
 function lookup(sessionId: string): number | undefined {
@@ -42,16 +46,18 @@ export function getRapport(sessionId: string): number {
   return lookup(sessionId) ?? RAPPORT_START;
 }
 
-function setRapport(sessionId: string, value: number): number {
+function setRapport(sessionId: string, value: number, judged: boolean): number {
   const v = Math.max(0, Math.min(100, Math.round(value)));
   sessionRapport.set(sessionId, v);
-  sessionRapportRepo.upsert(sessionId, v, Date.now());
+  if (judged) sessionJudged.set(sessionId, true);
+  sessionRapportRepo.upsert(sessionId, v, Date.now(), judged);
   return v;
 }
 
 export function clearRapport(sessionId: string): void {
   sessionRapport.delete(sessionId);
   sessionExpression.delete(sessionId);
+  sessionJudged.delete(sessionId);
   sessionRapportRepo.delete(sessionId); // one row holds both; the delete drops the mood too
 }
 
@@ -95,8 +101,23 @@ export function peekRapport(sessionId: string): number | null {
  */
 export function ensureRapportSeeded(sessionId: string, guardedness = 0): number {
   const existing = lookup(sessionId);
-  if (existing === undefined) return setRapport(sessionId, startingRapport(guardedness));
+  if (existing === undefined) return setRapport(sessionId, startingRapport(guardedness), false);
   return existing;
+}
+
+/**
+ * True once at least one turn has actually been JUDGED for this session. The
+ * seed row written before the first judge call does NOT count — so a date where
+ * nothing has happened yet (or whose first reply failed mid-turn) reads as
+ * having no vibe, and the client shows its neutral "settling in" label instead
+ * of the character's guarded opening temperature.
+ */
+export function hasJudgedTurn(sessionId: string): boolean {
+  const cached = sessionJudged.get(sessionId);
+  if (cached !== undefined) return cached;
+  const stored = sessionRapportRepo.getJudged(sessionId);
+  sessionJudged.set(sessionId, stored);
+  return stored;
 }
 
 /** The result of applying a turn: the new rapport plus the signed change this turn
@@ -114,7 +135,7 @@ export interface RapportStep {
  */
 export function applyTurnEngagement(sessionId: string, engagement: number, guardedness = 0): RapportStep {
   const prev = lookup(sessionId) ?? startingRapport(guardedness);
-  const rapport = setRapport(sessionId, prev + turnRapportDelta(engagement, { guardedness }));
+  const rapport = setRapport(sessionId, prev + turnRapportDelta(engagement, { guardedness }), true);
   return { rapport, delta: rapport - prev };
 }
 

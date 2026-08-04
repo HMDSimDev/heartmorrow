@@ -555,6 +555,15 @@ export const messagesRepo = {
     );
     return m;
   },
+  /** Shallow-merge a patch into a message's metadata (read-modify-write; no-op
+   *  if the message is gone). Used to stamp the per-turn judge's read onto the
+   *  player's message after the fact. */
+  mergeMetadata(id: string, patch: Record<string, unknown>): void {
+    const r = getDb().get<Row>('SELECT metadata FROM messages WHERE id = ?', id);
+    if (!r) return;
+    const current = fromJson<Record<string, unknown>>(r.metadata, {});
+    getDb().run('UPDATE messages SET metadata = ? WHERE id = ?', j({ ...current, ...patch }), id);
+  },
   delete(id: string): void {
     getDb().run('DELETE FROM messages WHERE id = ?', id);
   },
@@ -2136,11 +2145,19 @@ export const sessionRapportRepo = {
     const r = getDb().get<Row>('SELECT rapport FROM session_rapport WHERE session_id = ?', sessionId);
     return r ? Number(r.rapport) : undefined;
   },
-  upsert(sessionId: string, rapport: number, updatedAt: number): void {
+  /** Whether at least one turn has been JUDGED (the seed write alone leaves this false). */
+  getJudged(sessionId: string): boolean {
+    const r = getDb().get<Row>('SELECT judged FROM session_rapport WHERE session_id = ?', sessionId);
+    return r ? Number(r.judged) === 1 : false;
+  },
+  /** `judged` is sticky: once a session has a judged turn it never reverts to 0. */
+  upsert(sessionId: string, rapport: number, updatedAt: number, judged: boolean): void {
     getDb().run(
-      `INSERT INTO session_rapport (session_id,rapport,updated_at) VALUES (?,?,?)
-       ON CONFLICT(session_id) DO UPDATE SET rapport = excluded.rapport, updated_at = excluded.updated_at`,
-      sessionId, rapport, updatedAt,
+      `INSERT INTO session_rapport (session_id,rapport,judged,updated_at) VALUES (?,?,?,?)
+       ON CONFLICT(session_id) DO UPDATE SET rapport = excluded.rapport,
+         judged = MAX(session_rapport.judged, excluded.judged),
+         updated_at = excluded.updated_at`,
+      sessionId, rapport, judged ? 1 : 0, updatedAt,
     );
   },
   /** The last live expression (portrait mood) held for this session, or undefined. */

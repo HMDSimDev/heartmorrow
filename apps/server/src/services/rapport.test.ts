@@ -17,6 +17,8 @@ import {
 import {
   getRapport,
   applyTurnEngagement,
+  ensureRapportSeeded,
+  hasJudgedTurn,
   rapportEndEffect,
   hasLostInterest,
 } from './rapport-service';
@@ -200,5 +202,28 @@ describe('endSession applies the rapport consequence', () => {
     const after = getRelationship(character.id);
     expect(after.affection).toBeLessThan(before.affection);
     expect(after.tension).toBeGreaterThan(before.tension);
+  });
+});
+
+describe('vibe gating (seed vs judged)', () => {
+  it('a seeded-but-unjudged date exposes no vibe; the first judged turn reveals it', () => {
+    const { world, session } = startDate();
+
+    // Seeding alone — exactly what a failed first reply leaves behind — must not
+    // surface the guarded opening temperature as a verdict on the date: the
+    // active-date read reports NO rapport and NO vibe until a turn is judged.
+    ensureRapportSeeded(session.id, G);
+    expect(hasJudgedTurn(session.id)).toBe(false);
+    let ad = getActiveDateForWorld(world.id)!;
+    expect(ad.sessionId).toBe(session.id);
+    expect(ad.rapport).toBeNull();
+    expect(ad.vibe).toBeNull();
+
+    // One judged turn flips it on.
+    applyTurnEngagement(session.id, 2, G);
+    expect(hasJudgedTurn(session.id)).toBe(true);
+    ad = getActiveDateForWorld(world.id)!;
+    expect(ad.rapport).toBe(getRapport(session.id));
+    expect(ad.vibe).toBe(rapportLabel(getRapport(session.id)));
   });
 });

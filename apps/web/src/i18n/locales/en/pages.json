@@ -80,7 +80,56 @@
     "dtrEnded": "The date ended.",
     "dtrNotYet": "Not yet — give it a little more time.",
     "dtrNotYetKicker": "Not just yet",
-    "yourCompanion": "Your companion",
+    "howDating": "How dating works",
+    "onboarding": {
+      "kicker": "How dating works · {n} of {total}",
+      "skip": "Skip",
+      "back": "Back",
+      "next": "Next",
+      "done": "Let's go",
+      "talk": {
+        "title": "Say it in your own words",
+        "body": "A date is a live conversation with no scripted choices — type whatever you want to say. The character answers in real time, and their portrait's expression shifts to match how the moment feels."
+      },
+      "scene": {
+        "title": "Read the scene",
+        "body": "The scene card shows where you are, the day, the weather, and how they seemed at first — their mood on arrival. Where the evening goes from there is up to the two of you."
+      },
+      "trajectory": {
+        "title": "Watch the temperature",
+        "body": "The bar up top is the live temperature of the date. The diamond seam marks where this evening opened — guarded people start cooler — and the glow drifts right as things warm, left as they cool. No numbers, just the feel."
+      },
+      "intents": {
+        "title": "Make a move",
+        "body": "The buttons inside the message box color your next line — a flirt, a tease, an apology. They're claims, not magic: the character reacts to the move, and one that fits the moment lands better than one that doesn't. Repair moves appear only when there's tension to smooth."
+      },
+      "stakes": {
+        "title": "Every line lands somewhere",
+        "body": "A small note under each of your messages shows how it was received. When you end the evening, the whole date is weighed — a good night genuinely warms the relationship, a flat or careless one cools it. Gifts, big questions, and goodbyes all count."
+      }
+    },
+    "reactionTitle": "How this line landed on them",
+    "reaction": {
+      "m3": "that stung",
+      "m2": "that missed",
+      "m1": "fell a bit flat",
+      "zero": "passed quietly",
+      "p1": "warmed them a little",
+      "p2": "landed well",
+      "p3": "swept them up"
+    },
+    "sceneKicker": "The scene",
+    "sceneWhen": "When",
+    "sceneWeather": "Weather",
+    "sceneMood": "At first",
+    "sendLabel": "Send",
+    "intentTip": {
+      "flirt": "Colors your next message as a romantic move. Lands when there's real warmth to back it — falls flat with a near-stranger.",
+      "tease": "Frames your next line as playful needling. Fun once there's rapport; risky while they're still guarded.",
+      "open_up": "Marks your next message as sincere and vulnerable. Builds trust when the moment invites it.",
+      "reassure": "Your next line reads as steadying comfort. Best when they're anxious or tense — this appears when there's friction.",
+      "apologize": "Owns a misstep with your next message. Repairs tension — rings hollow if nothing's wrong."
+    },
     "brokenUp": "Broken up",
     "onTheRocks": "On the rocks",
     "whereYouStand": "Where you stand",
@@ -1443,14 +1492,14 @@
             "heading": "Talking, live",
             "body": [
               "A date is a back-and-forth conversation. Type whatever you want in the box and send it; the character types back in real time, with a typing indicator while they think and a portrait whose expression shifts to match their mood. There are no scripted choices — say anything, in your own words.",
-              "Above the box are optional intent chips that frame how a line is meant: Flirt, Tease, and Open Up are always there, and Reassure and Apologize appear when there's tension to smooth over. They're never required, and they don't move anything by themselves — they just tell the character how you meant a message to land, and a move that fits the moment reads better than one that doesn't.",
+              "Docked inside the message box are optional intent buttons that frame how a line is meant: Flirt, Tease, and Open Up are always there, and Reassure and Apologize appear when there's tension to smooth over. Hover one to see what it does. They're never required, and they don't move anything by themselves — they just tell the character how you meant a message to land, and a move that fits the moment reads better than one that doesn't.",
               "If a reply comes out garbled or repetitive, hover the character's most recent line and tap the small refresh button to regenerate it. That rewrites just that reply — it doesn't change how the message was scored or how the date is going, so it's only fixing the wording. (Texting has the same button under a character's last text.)"
             ]
           },
           {
             "heading": "Reading the vibe",
             "body": [
-              "Above the conversation sits a live trajectory bar. Its center seam marks where this date opened, and after your messages the fill glides toward \"warming\" on the right when a line lands well or toward \"cooling\" on the left when it falls flat, with a little +N or −N flourish and a one-word read like \"warming to you\" or \"a bit awkward.\" The bar never shows numbers — just the feel of the moment.",
+              "Above the conversation sits a live trajectory bar. Its center seam marks where this date opened, and after your messages the fill glides toward \"warming\" on the right when a line lands well or toward \"cooling\" on the left when it falls flat, with a little +N or −N flourish and a one-word read like \"warming to you\" or \"a bit awkward.\" The bar never shows numbers — just the feel of the moment. Each of your messages also gets a small note underneath — \"landed well,\" \"fell a bit flat\" — so you can look back and see how every line was received.",
               "Two biases are worth knowing. Warmth is harder to build than to lose, and you can't build by coasting: a forgettable, going-nowhere message won't warm the vibe (with a guarded person it slips a little), so keeping a date warming takes genuine effort. Reserved, guarded people also open cooler — their bar begins left of center — and warm more slowly, so they take real effort to win over.",
               "How the night ends up shapes the aftermath. A genuinely great date boosts your bond; a flat or sour one costs you ground and adds tension — and repeated bad nights can put a committed relationship on the rocks."
             ]
