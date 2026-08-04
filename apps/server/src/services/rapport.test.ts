@@ -13,6 +13,7 @@ import {
   getActiveDateForWorld,
   judgeTurn,
   maybeLeaveForLostInterest,
+  recordTurnReaction,
 } from './conversation-service';
 import {
   getRapport,
@@ -202,6 +203,42 @@ describe('endSession applies the rapport consequence', () => {
     const after = getRelationship(character.id);
     expect(after.affection).toBeLessThan(before.affection);
     expect(after.tension).toBeGreaterThan(before.tension);
+  });
+});
+
+describe('line of the night', () => {
+  it('the recap carries the best judged line, clipped verbatim when long', async () => {
+    const { session } = startDate();
+    const dull = addPlayerMessage(session.id, 'ok.');
+    const longText =
+      'I kept thinking about the way the light hits the harbor when you laugh. '.repeat(6).trim();
+    const star = addPlayerMessage(session.id, longText);
+    recordTurnReaction(dull.id, 0);
+    recordTurnReaction(star.id, 3);
+
+    setAdapterOverride(
+      reply({ mood: 'warm', expression: 'smiling', relationshipDeltas: {}, memoryCandidates: [], summaryLine: 'A good night.' }),
+    );
+    const res = await endSession(session.id);
+
+    expect(res.evaluated).toBe(true);
+    expect(res.bestLine).not.toBeNull();
+    expect(res.bestLine!.engagement).toBe(3);
+    // >240 chars: excerpted (the scripted adapter can't produce a valid excerpt,
+    // so the deterministic sentence clip kicks in — always the player's words).
+    expect(res.bestLine!.excerpted).toBe(true);
+    expect(res.bestLine!.text.length).toBeLessThanOrEqual(241);
+    expect(longText.startsWith(res.bestLine!.text.replace(/…$/, ''))).toBe(true);
+  });
+
+  it('no judged lines -> no keepsake (never invents a reaction)', async () => {
+    const { session } = startDate();
+    setAdapterOverride(
+      reply({ mood: 'flat', expression: 'neutral', relationshipDeltas: {}, memoryCandidates: [], summaryLine: 'Quiet.' }),
+    );
+    const res = await endSession(session.id);
+    expect(res.evaluated).toBe(true);
+    expect(res.bestLine).toBeNull();
   });
 });
 

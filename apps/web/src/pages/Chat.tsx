@@ -58,6 +58,9 @@ import './date.page.css';
  * with it, so an opening +3 always reads as rightward progress even for a guarded
  * character. Numbers are never shown; only the fill and a qualitative caption. Values 0..100.
  */
+/** Single-slot unsent-message draft (one live date at a time). */
+const DATE_DRAFT_KEY = 'dsim.dateDraft';
+
 /** Reaction-chip copy, indexed by judged engagement + 3 (−3 … +3). */
 const REACTION_KEYS = [
   'pages:chat.reaction.m3',
@@ -234,6 +237,36 @@ export function Chat() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id]);
+
+  // Unsent-message draft: a single slot (there's one live date at a time), so a
+  // refresh or accidental navigation mid-thought doesn't eat the line you were
+  // composing. Restores only into an empty box, for this session only; sending
+  // clears the box, which clears the slot; a new session's empty box sweeps a
+  // stale slot from a finished date.
+  useEffect(() => {
+    if (!session) return;
+    try {
+      const raw = localStorage.getItem(DATE_DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { sessionId?: string; text?: string };
+      if (saved.sessionId === session.id && typeof saved.text === 'string' && saved.text) {
+        setInput((cur) => (cur ? cur : saved.text!));
+      }
+    } catch {
+      /* a corrupt slot is just dropped */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id]);
+  useEffect(() => {
+    if (!session) return;
+    try {
+      if (input.trim()) localStorage.setItem(DATE_DRAFT_KEY, JSON.stringify({ sessionId: session.id, text: input }));
+      else localStorage.removeItem(DATE_DRAFT_KEY);
+    } catch {
+      /* storage full — losing a draft is acceptable */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, session?.id]);
 
   useEffect(() => {
     void api.listCharacters().then(setCharacters).catch((e) => setError(errorMessage(e)));
@@ -1416,6 +1449,14 @@ export function Chat() {
             {evalResult.mood && <span className="date-recap-mood">{evalResult.mood}</span>}
           </div>
           {evalResult.summaryLine && <p className="date-recap-summary">{evalResult.summaryLine}</p>}
+          {evalResult.bestLine && (
+            <blockquote className={`date-recap-line ${evalResult.bestLine.engagement > 0 ? 'warm' : 'cool'}`}>
+              <span className="date-recap-line-kicker">
+                {evalResult.bestLine.engagement > 0 ? t('chat.lineOfNight') : t('chat.lineThatStung')}
+              </span>
+              <p>“{evalResult.bestLine.text}”</p>
+            </blockquote>
+          )}
           <div className="date-recap-ledger">
             <span className="date-recap-keepsake">
               <Icon name="chronicle" size={13} /> {t('chat.recapMemories', { count: evalResult.memoriesWritten })}

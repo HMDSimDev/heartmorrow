@@ -18,7 +18,7 @@ import { assetTypeLabel, assetUsageKindLabel, expressionLabel } from '../i18n/la
 import { Icon } from '../components/Icon';
 import { Banner, ConfirmDialog, Empty, Field, Modal, TagInput } from '../components/ui';
 
-type Filter = AssetType | 'all' | 'unused';
+type Filter = AssetType | 'all' | 'unused' | 'dupes';
 
 /**
  * Creator tool: browse, edit, and prune every uploaded image. The management
@@ -50,11 +50,27 @@ export function ImageLibrary() {
     [assets],
   );
 
+  // Byte-identical clusters, by the content hash stamped on every asset. Only
+  // pre-dedup uploads can still have these — new identical uploads reuse a row.
+  const dupeHashes = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const a of assets) {
+      const h = a.metadata.sha256;
+      if (typeof h === 'string') counts.set(h, (counts.get(h) ?? 0) + 1);
+    }
+    return new Set([...counts.entries()].filter(([, n]) => n >= 2).map(([h]) => h));
+  }, [assets]);
+  const dupeExtras = useMemo(
+    () => assets.filter((a) => typeof a.metadata.sha256 === 'string' && dupeHashes.has(a.metadata.sha256)).length - dupeHashes.size,
+    [assets, dupeHashes],
+  );
+
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return assets
+    const base = assets
       .filter((a) => {
         if (filter === 'unused') return usages !== undefined && !usages[a.id];
+        if (filter === 'dupes') return typeof a.metadata.sha256 === 'string' && dupeHashes.has(a.metadata.sha256);
         return filter === 'all' || a.type === filter;
       })
       // "In this world" = referenced by something living in that world. Global
@@ -70,9 +86,15 @@ export function ImageLibrary() {
           a.filename.toLowerCase().includes(q) ||
           a.altText.toLowerCase().includes(q) ||
           a.tags.some((tag) => tag.toLowerCase().includes(q)),
-      )
-      .sort((a, b) => b.createdAt - a.createdAt);
-  }, [assets, filter, query, usages, worldFilter]);
+      );
+    // Duplicates view: clusters sit together (hash, then age); otherwise newest first.
+    if (filter === 'dupes') {
+      return base.sort((a, b) =>
+        String(a.metadata.sha256).localeCompare(String(b.metadata.sha256)) || a.createdAt - b.createdAt,
+      );
+    }
+    return base.sort((a, b) => b.createdAt - a.createdAt);
+  }, [assets, filter, query, usages, worldFilter, dupeHashes]);
 
   const unusedCount = useMemo(
     () => (usages === undefined ? undefined : assets.filter((a) => !usages[a.id]).length),
@@ -268,6 +290,16 @@ export function ImageLibrary() {
                   <span className="badge il-unused-badge">{unusedCount}</span>
                 )}
               </button>
+              {dupeHashes.size > 0 && (
+                <button
+                  type="button"
+                  className={`btn sm ${filter === 'dupes' ? 'primary' : 'ghost'}`}
+                  onClick={() => setFilter('dupes')}
+                >
+                  {t('pages:library.dupes')}
+                  <span className="badge il-unused-badge">{dupeExtras}</span>
+                </button>
+              )}
               {presentTypes.map((ty) => (
                 <button
                   key={ty}

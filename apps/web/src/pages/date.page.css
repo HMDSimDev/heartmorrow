@@ -267,15 +267,42 @@
 @media (max-width: 999.98px) {
   .date-stage { min-height: 0; max-height: none; order: -1; }
 }
-/* Tall desktop displays (1440p/4K): fill the height instead of stopping at the
-   62vh floor with a dead band below — a short conversation simply shows more of
-   the venue backdrop. 140px ≈ the page's top/bottom padding, so this never
-   pushes the composer past the fold or makes the page scroll. */
-@media (min-width: 1000px) and (min-height: 1100px) {
-  .date-stage {
-    min-height: calc(100vh - 140px);
-    min-height: calc(100svh - 140px);
+/* Desktop shell + a LIVE date on screen: the page NEVER scrolls — the reel is
+   the only scroller, and the rail scrolls itself if the window is squat. Same
+   definite-height flex chain as the phone route (styles.css). This also fills
+   tall displays edge to edge: the wrap takes exactly the viewport minus the
+   page padding, so a short conversation shows more venue backdrop instead of a
+   dead band, and a long one can't push the composer past the fold (the old
+   `max-height: 100svh` cap ignored the padding above the stage, so a full reel
+   overflowed the page by exactly that padding). Setup screens (no .date-wrap)
+   keep normal page scrolling. */
+@media (min-width: 1024px) and (min-height: 620px) {
+  .app[data-route='date']:has(.date-wrap) {
+    height: 100vh;
+    height: 100dvh;
   }
+  .app[data-route='date']:has(.date-wrap) .app-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  /* The page's own wrapper (banners above, the date grid below): banners keep
+     their natural height, the grid gets the rest. `.stack` is already a column. */
+  .app[data-route='date'] .app-main > .stack:has(> .date-wrap) {
+    flex: 1;
+    min-height: 0;
+  }
+  .chat-wrap.date-wrap {
+    flex: 1;
+    min-height: 0;
+  }
+  /* Height now comes from the flex chain, not the viewport cap. */
+  .date-stage { max-height: none; }
+  /* Squat windows: the rail gives before the page does — and its cards never
+     flex-shrink (the scene card clips its rows silently under overflow:hidden);
+     they keep natural height and the rail scrolls, like .sidebar-inner. */
+  .date-dossier { min-height: 0; overflow-y: auto; }
+  .date-dossier > * { flex-shrink: 0; }
 }
 .date-stage > * { z-index: 1; }
 
@@ -1054,6 +1081,34 @@
   line-height: 1.5;
   color: var(--text);
 }
+/* The keepsake quote — the player's own most striking judged line. */
+.date-recap-line {
+  margin: 12px 0 0;
+  padding: 9px 13px 10px;
+  border-left: 3px solid var(--tint, var(--brass));
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: color-mix(in srgb, var(--tint, var(--brass)) 8%, var(--ink-2));
+}
+.date-recap-line.warm { --tint: var(--brass); }
+.date-recap-line.cool { --tint: var(--ember); }
+.date-recap-line-kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tint, var(--brass));
+  margin-bottom: 4px;
+}
+.date-recap-line p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--text);
+}
+
 .date-recap-ledger {
   display: flex;
   align-items: center;

@@ -58,6 +58,7 @@ import {
   type RelationshipStatus,
   type SessionWithMessages,
 } from '@dsim/shared';
+import { z } from 'zod';
 import { charactersRepo, chroniclesRepo, dateResultsRepo, messagesRepo, npcKnowledgeRepo, relationshipsRepo, sessionsRepo, worldNotesRepo, worldStatesRepo } from '../db/repositories';
 import { newId, playerIdForWorld, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest, notFound } from '../lib/errors';
@@ -1376,6 +1377,73 @@ export function markDateResultSeen(sessionId: string): void {
   dateResultsRepo.markSeen(sessionId);
 }
 
+/**
+ * Pick the date's most striking JUDGED player line for the recap keepsake: the
+ * best line if anything landed (engagement ≥ 1), else the worst if something
+ * stung (≤ −1); ties go to the LATER line (the later moment reads truer). Null
+ * when nothing was judged or everything read neutral.
+ */
+function pickJudgedLine(messages: Message[]): { text: string; engagement: number } | null {
+  let best: { text: string; engagement: number } | null = null;
+  let worst: { text: string; engagement: number } | null = null;
+  for (const m of messages) {
+    if (m.role !== 'player' || typeof m.metadata?.engagement !== 'number') continue;
+    const e = Math.max(-3, Math.min(3, Math.round(m.metadata.engagement)));
+    if (!best || e >= best.engagement) best = { text: m.text, engagement: e };
+    if (!worst || e <= worst.engagement) worst = { text: m.text, engagement: e };
+  }
+  if (best && best.engagement >= 1) return best;
+  if (worst && worst.engagement <= -1) return worst;
+  return null;
+}
+
+/** Above this the keepsake quote is excerpted rather than shown whole. */
+const BEST_LINE_MAX = 240;
+
+/** Sentence-aware clip — the deterministic excerpt fallback. */
+function clipLine(text: string, max = BEST_LINE_MAX): string {
+  const t = text.trim();
+  if (t.length <= max) return t;
+  const head = t.slice(0, max);
+  const sentenceEnd = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '));
+  if (sentenceEnd > 60) return head.slice(0, sentenceEnd + 1);
+  const space = head.lastIndexOf(' ');
+  return `${head.slice(0, space > 60 ? space : max)}…`;
+}
+
+const BestLineExcerptSchema = z.object({ excerpt: z.string().min(1).max(360) });
+
+/**
+ * Ask the model for the most striking VERBATIM excerpt of a long keepsake line.
+ * The result must be a substring of the original — it's the player's own words
+ * or nothing; any paraphrase falls back to {@link clipLine}. Deliberately not in
+ * the prompt registry: a mechanical utility, not a character voice.
+ */
+async function excerptLongLine(
+  settings: ReturnType<typeof getLlmSettings>,
+  text: string,
+): Promise<string | null> {
+  const messages: ChatMessage[] = [
+    {
+      role: 'system',
+      content:
+        'You select quotes. Given a long message, return the single most striking, self-contained excerpt — one or two sentences, VERBATIM: copied exactly, no rewording, no added words, no ellipses of your own.',
+    },
+    { role: 'user', content: text },
+  ];
+  const result = await callStructuredLlm(BestLineExcerptSchema, messages, {
+    settings,
+    role: 'evaluator',
+    task: 'Pick the most striking verbatim excerpt of a line.',
+    schemaName: 'BestLineExcerpt',
+    minMaxTokens: 256,
+  });
+  if (!result.ok) return null;
+  const excerpt = result.data.excerpt.trim();
+  if (excerpt.length < 12 || excerpt.length > BEST_LINE_MAX + 120) return null;
+  return text.includes(excerpt) ? excerpt : null;
+}
+
 export async function endSession(sessionId: string): Promise<EndSessionResponse> {
   // Serialize the end per session under the SAME key as send/retry/regenerate, so two
   // concurrent ends can't both evaluate + spend, an end can't interleave with a send,
@@ -1413,8 +1481,13 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       onTheRocks: false,
       reconciled: false,
       ending: null,
+      bestLine: null,
     };
   }
+
+  // The keepsake quote — assigned after the evaluator/excerpt awaits below, and
+  // captured by endBase's closure so every real end carries it.
+  let bestLine: EndSessionResponse['bestLine'] = null;
 
   const endBase = (
     evaluated: boolean,
@@ -1439,6 +1512,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       onTheRocks: false,
       reconciled: false,
       ending: null,
+      bestLine,
       ...extra,
     };
     // Persist the report so a client that lost this HTTP response (tab closed or
@@ -1471,6 +1545,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       onTheRocks: false,
       reconciled: false,
       ending: null,
+      bestLine: null,
     };
   }
 
@@ -1521,6 +1596,15 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   //     NOTHING until it succeeds — so a model outage leaves the date OPEN and
   //     re-endable rather than silently ending it un-evaluated. ---
   const settings = getLlmSettings();
+  // Keepsake quote: computed from the stamped per-turn reads. A long line's
+  // excerpt call runs CONCURRENTLY with the evaluator (no added latency) and
+  // falls back to a deterministic sentence clip on any failure.
+  const keepsakeCandidate = pickJudgedLine(messages);
+  const excerptPromise: Promise<string | null> =
+    keepsakeCandidate && keepsakeCandidate.text.trim().length > BEST_LINE_MAX
+      ? excerptLongLine(settings, keepsakeCandidate.text).catch(() => null)
+      : Promise.resolve(null);
+
   const evalMessages = messages.slice(-50);
   const ctx = buildPromptContextForSession(session, evalMessages);
   const result = await callStructuredLlm(SessionEvaluationSchema, buildEvaluatorMessages(ctx), {
@@ -1536,6 +1620,16 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   });
 
   if (!result.ok) recordEvent('session_eval_failed', { sessionId, error: result.error, attempts: result.attempts });
+
+  // Resolve the keepsake now that the concurrent excerpt has settled.
+  const keepsakeExcerpt = await excerptPromise;
+  bestLine = keepsakeCandidate
+    ? {
+        text: keepsakeExcerpt ?? clipLine(keepsakeCandidate.text),
+        engagement: keepsakeCandidate.engagement,
+        excerpted: keepsakeExcerpt != null || keepsakeCandidate.text.trim().length > BEST_LINE_MAX,
+      }
+    : null;
 
   // Manual end + the required evaluator failed → DO NOT end the date. Nothing is
   // mutated (no ended flag, no stamina/money spent, no jealousy, no buff decay, rapport
@@ -1556,6 +1650,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       onTheRocks: false,
       reconciled: false,
       ending: null,
+      bestLine: null,
     };
   }
 

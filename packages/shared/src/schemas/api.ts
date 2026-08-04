@@ -839,6 +839,17 @@ export const BreakupOutcomeSchema = z.object({
 export type BreakupOutcome = z.infer<typeof BreakupOutcomeSchema>;
 
 /** Result of ending + evaluating a session (structured eval may fail safely). */
+/** The date's most striking JUDGED player line — a keepsake quote for the recap.
+ *  `text` is always the player's own words (a clipped or LLM-chosen verbatim
+ *  excerpt when the full line ran long); engagement ≥1 reads as the line of the
+ *  night, ≤−1 as the line that stung. */
+export const DateBestLineSchema = z.object({
+  text: z.string().min(1),
+  engagement: z.number().int().min(-3).max(3),
+  excerpted: z.boolean().default(false),
+});
+export type DateBestLine = z.infer<typeof DateBestLineSchema>;
+
 export const EndSessionResponseSchema = z.object({
   session: ConversationSessionSchema,
   evaluated: z.boolean(),
@@ -862,6 +873,8 @@ export const EndSessionResponseSchema = z.object({
   reconciled: z.boolean().default(false),
   /** The "happy ending" reached this date (committed peak) — a soft win, if any. */
   ending: CharacterEndingSchema.nullable().default(null),
+  /** The date's most striking judged player line, for the recap keepsake. */
+  bestLine: DateBestLineSchema.nullable().default(null),
 });
 export type EndSessionResponse = z.infer<typeof EndSessionResponseSchema>;
 

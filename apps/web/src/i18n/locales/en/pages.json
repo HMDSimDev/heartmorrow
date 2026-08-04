@@ -81,6 +81,8 @@
     "dtrNotYet": "Not yet — give it a little more time.",
     "dtrNotYetKicker": "Not just yet",
     "howDating": "How dating works",
+    "lineOfNight": "Line of the night",
+    "lineThatStung": "The line that stung",
     "onboarding": {
       "kicker": "How dating works · {n} of {total}",
       "skip": "Skip",
@@ -1028,6 +1030,7 @@
     "title": "Image library",
     "blurb": "Every image you've uploaded, in one place — rename, retag, see where each one is used, and clear out the ones nothing needs.",
     "unused": "Unused",
+    "dupes": "Duplicates",
     "select": "Select",
     "selectShown": "Select all shown",
     "selected": "{count, plural, one {# selected} other {# selected}}",
@@ -1564,7 +1567,7 @@
           {
             "heading": "The end-of-date judge: the moments that stick",
             "body": [
-              "When the date ends, a separate judge looks back over the whole evening and adjusts your relationship for the specific, memorable beats, the things this person would actually carry with them. This is the part that genuinely moves a relationship forward or back.",
+              "When the date ends, a separate judge looks back over the whole evening and adjusts your relationship for the specific, memorable beats, the things this person would actually carry with them. This is the part that genuinely moves a relationship forward or back. The report also quotes your \"line of the night\" — the message of yours that landed best (or, on a rough evening, the one that stung), in your own words.",
               "It rewards real connection: a moment of honesty or vulnerability, truly meeting who this character is, or reading what they quietly hoped for that night. Those nudge the warmth between you upward. It penalizes what actually wounds or repels them: hitting a known dislike, crossing a stated boundary, coldness, pushiness, or cruelty. Those cool the relationship and add tension. Staying politely worded while doing something hurtful does not earn it back, the judge sees the hurt, not the manners.",
               "One important thing: the end judge does not punish a date again just for being boring. Dullness was already handled by the live read during the date. So a merely flat, unremarkable night mostly just does not move the needle, while a warm, attentive one is actively rewarded. A single date rarely swings any one part of your relationship by more than a handful of points."
             ]
@@ -1799,7 +1802,7 @@
             "heading": "Managing your images",
             "body": [
               "Anywhere you pick an image — a portrait, an expression, a location photo — the picker opens your shared image library in a dialog: search by name, alt text, or tag, filter by type, and upload with the button, by dragging a file in, or by pasting from the clipboard. Every upload lands in the same pool, so an image uploaded for one character can be reused anywhere else. Uploads are tagged with the character or place you uploaded them for, so searching a name finds their images later — and uploading or importing an identical file never creates a duplicate; the library quietly reuses the copy it already has.",
-              "The Images page (in the sidebar in creator mode, or via Settings) is the library's home. It lists every uploaded image along with where it's used — which portraits, places, shop items, or old texts point at it — and lets you rename, retag, change the type, and rewrite alt text. You can filter to a single world to see just the images its cast and places use, and the \"Unused\" filter gathers everything nothing references so bulk select can clear them out in one sweep. Deleting an image that's still in use leaves those spots blank, so the page warns you first.",
+              "The Images page (in the sidebar in creator mode, or via Settings) is the library's home. It lists every uploaded image along with where it's used — which portraits, places, shop items, or old texts point at it — and lets you rename, retag, change the type, and rewrite alt text. You can filter to a single world to see just the images its cast and places use, the \"Unused\" filter gathers everything nothing references so bulk select can clear them out in one sweep, and a \"Duplicates\" filter appears when byte-identical copies exist (from before the library reused identical uploads), grouping each cluster so you can keep one and drop the rest. Deleting an image that's still in use leaves those spots blank, so the page warns you first.",
               "An image's detail view also has \"Replace image\" — it swaps the picture itself while keeping the name, tags, and every link intact, so a portrait used by a character, a chat thread, and a story moment updates everywhere at once."
             ]
           },
