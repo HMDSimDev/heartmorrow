@@ -5,7 +5,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { ZodError } from 'zod';
-import { MAX_UPLOAD_BYTES } from '@dsim/shared';
+import { MAX_UPLOAD_BYTES, PACK_MAX_FILE_BYTES } from '@dsim/shared';
 import { config, ensureDirectories } from './config';
 import { AppError } from './lib/errors';
 import { healthRoutes } from './routes/health';
@@ -44,7 +44,9 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
 
   const app = Fastify({
     logger: options.logger ?? true,
-    bodyLimit: 64 * 1024 * 1024, // allow large import bundles
+    // Track the share-file cap so a max-size import can never be refused at the
+    // body layer before the pack routes' own limits get to see it.
+    bodyLimit: PACK_MAX_FILE_BYTES,
   });
 
   // CORS is intentionally permissive for LOCAL DEV only (explicit origin list).

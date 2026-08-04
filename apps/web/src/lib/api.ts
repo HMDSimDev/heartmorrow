@@ -191,11 +191,20 @@ async function downloadShareFile(path: string, init: RequestInit, fallbackName: 
   }
   const blob = await res.blob();
   const cd = res.headers.get('Content-Disposition') ?? '';
-  const match = /filename="?([^"]+)"?/.exec(cd);
+  // Prefer the RFC 5987 `filename*` (carries the full unicode name); the quoted
+  // `filename=` is the ASCII-only fallback for legacy parsers.
+  const star = /filename\*=UTF-8''([^;\s]+)/i.exec(cd);
+  const plain = /filename="?([^";]+)"?/.exec(cd);
+  let cdName: string | undefined;
+  try {
+    cdName = star ? decodeURIComponent(star[1]!) : plain?.[1];
+  } catch {
+    cdName = plain?.[1];
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = match?.[1] ?? fallbackName;
+  a.download = cdName ?? fallbackName;
   document.body.appendChild(a);
   a.click();
   a.remove();

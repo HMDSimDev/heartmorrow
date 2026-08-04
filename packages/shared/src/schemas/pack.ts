@@ -40,6 +40,15 @@ export const PACK_FORMAT_VERSION = 1;
 /** The magic string stamped in every manifest's `format` field (sniff/validation). */
 export const PACK_FORMAT_TAG = 'heartmorrow-pack';
 
+/**
+ * Hard ceiling for ONE share file, enforced symmetrically: import refuses a larger
+ * upload (and a larger nested archive inside a `.hmpack`), and EXPORT refuses to
+ * produce one — so the app can never emit a file its own importer would reject.
+ * Images are stored uncompressed in the archive, so this effectively caps the total
+ * image weight a single world/character file can carry.
+ */
+export const PACK_MAX_FILE_BYTES = 256 * 1024 * 1024;
+
 export const PackKindSchema = z.enum(['character', 'world', 'pack']);
 export type PackKind = z.infer<typeof PackKindSchema>;
 

@@ -1,9 +1,11 @@
 import fs from 'node:fs';
 import {
   ALLOWED_IMAGE_MIME_TYPES,
+  EXPRESSIONS,
   MAX_UPLOAD_BYTES,
   PACK_FORMAT_TAG,
   PACK_FORMAT_VERSION,
+  PACK_MAX_FILE_BYTES,
   CharacterSchema,
   CompanySchema,
   PropertySchema,
@@ -79,17 +81,19 @@ const PAYLOAD_FILE = { character: 'character.json', world: 'world.json' } as con
 const MANIFEST_FILE = 'manifest.json';
 
 /** Hard caps for decoding an uploaded archive (anti resource-exhaustion). The outer
- *  file allows a larger per-entry size because a bundled `.hmwrld` is one entry. */
+ *  file allows a larger per-entry size because a bundled `.hmwrld` is one entry.
+ *  Derived from {@link PACK_MAX_FILE_BYTES} so export's own ceiling (which refuses
+ *  to produce a bigger file) always matches what import will accept. */
 const IMPORT_LIMITS: UnzipLimits = {
   maxEntries: 4096,
-  maxEntryBytes: 64 * 1024 * 1024,
-  maxTotalBytes: 256 * 1024 * 1024,
+  maxEntryBytes: PACK_MAX_FILE_BYTES,
+  maxTotalBytes: 4 * PACK_MAX_FILE_BYTES,
   maxNameLength: 512,
 };
 const NESTED_LIMITS: UnzipLimits = {
   maxEntries: 4096,
   maxEntryBytes: 16 * 1024 * 1024, // a single asset is <= 8 MiB; JSON payloads are small
-  maxTotalBytes: 64 * 1024 * 1024, // one nested world, fully decoded
+  maxTotalBytes: PACK_MAX_FILE_BYTES, // one nested world, fully decoded
   maxNameLength: 512,
 };
 /** Max nested archives honored inside a `.hmpack` (bounds the import fan-out). */
@@ -98,10 +102,12 @@ const MAX_PACK_ITEMS = 256;
  * Total decompressed bytes allowed across ONE import/inspect operation. The outer
  * archive AND every nested archive draw from this single shared budget, so a
  * `.hmpack` of many small decompression bombs can't multiply the per-archive caps
- * into an out-of-memory crash. Generous for any real bundle; an adversarial fan-out
- * trips it and gets a clean 400.
+ * into an out-of-memory crash. Scaled off the file cap: the worst LEGIT case is a
+ * max-size bundle decoded twice (outer stored entries + the nested archives'
+ * contents ≈ 2× the file size), so 4× leaves real headroom while an adversarial
+ * fan-out still trips it and gets a clean 400.
  */
-const GLOBAL_DECOMPRESS_BUDGET = 512 * 1024 * 1024;
+const GLOBAL_DECOMPRESS_BUDGET = 4 * PACK_MAX_FILE_BYTES;
 
 const MIME_EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg' };
 
@@ -124,14 +130,32 @@ function sniffImageMime(buf: Buffer): string | null {
   return null;
 }
 
-/** Turn a world/character name into a filesystem-safe download filename stem. */
+/** Turn a world/character name into a filesystem-safe download filename stem.
+ *  Keeps unicode letters/digits (a Japanese world downloads under its real name —
+ *  the route encodes it RFC-5987 style in Content-Disposition); strips separators,
+ *  quotes, and control characters by construction. */
 export function slugFilename(name: string): string {
-  const s = (name ?? '')
-    .normalize('NFKD')
-    .replace(/[^\w.-]+/g, '-')
-    .replace(/^[-.]+|[-.]+$/g, '')
-    .slice(0, 60);
+  const s = [...(name ?? '')
+    .normalize('NFC')
+    .replace(/[^\p{L}\p{N}._-]+/gu, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')]
+    .slice(0, 60)
+    .join('');
   return s || 'heartmorrow';
+}
+
+/** Refuse to produce a share file bigger than what import accepts — otherwise
+ *  export would happily emit archives nobody (including us) can ever open.
+ *  (Exported for tests — building a real 64 MB world per run would be waste.) */
+export function assertShareableSize(buf: Buffer, title: string): Buffer {
+  if (buf.byteLength > PACK_MAX_FILE_BYTES) {
+    const mb = Math.ceil(buf.byteLength / (1024 * 1024));
+    const limitMb = Math.floor(PACK_MAX_FILE_BYTES / (1024 * 1024));
+    throw badRequest(
+      `"${title}" would be ${mb} MB — share files are capped at ${limitMb} MB so they stay importable. Remove or shrink some images and try again.`,
+    );
+  }
+  return buf;
 }
 
 // --- export -----------------------------------------------------------------
@@ -196,6 +220,23 @@ function gatherAssets(ids: Set<string>): { portable: PortableAsset[]; entries: Z
   return { portable, entries };
 }
 
+/** How many of these asset ids would actually ship (row exists, allowed image type,
+ *  non-empty file on disk) — the cheap stat-only twin of {@link gatherAssets}, for
+ *  manifest counts where reading every image's bytes a second time would be waste. */
+function countShippableAssets(ids: Set<string>): number {
+  let n = 0;
+  for (const id of ids) {
+    try {
+      const asset = getAsset(id);
+      if (!isAllowedImageMime(asset.mimeType)) continue;
+      if (fs.statSync(safeUploadsPath(asset.path)).size > 0) n += 1;
+    } catch {
+      // Missing row or file — it wouldn't ship, so it isn't counted.
+    }
+  }
+  return n;
+}
+
 /** Export one or more characters as a `.hmchr` archive (their `worldId` is nulled —
  *  they're portable, and bound to a world only at import). */
 export function exportCharacterPack(ids: string[], opts: { title?: string; note?: string } = {}): Buffer {
@@ -211,7 +252,10 @@ export function exportCharacterPack(ids: string[], opts: { title?: string; note?
     note: opts.note?.trim() ?? '',
     counts: { worlds: 0, characters: chars.length, assets: portable.length },
   });
-  return zipSync([jsonEntry(MANIFEST_FILE, manifest), jsonEntry(PAYLOAD_FILE.character, payload), ...entries]);
+  return assertShareableSize(
+    zipSync([jsonEntry(MANIFEST_FILE, manifest), jsonEntry(PAYLOAD_FILE.character, payload), ...entries]),
+    manifest.title,
+  );
 }
 
 /**
@@ -256,7 +300,10 @@ export function exportWorldPack(
     note: opts.note?.trim() ?? '',
     counts: { worlds: 1, characters: characters.length, assets: portable.length },
   });
-  return zipSync([jsonEntry(MANIFEST_FILE, manifest), jsonEntry(PAYLOAD_FILE.world, payload), ...entries]);
+  return assertShareableSize(
+    zipSync([jsonEntry(MANIFEST_FILE, manifest), jsonEntry(PAYLOAD_FILE.world, payload), ...entries]),
+    manifest.title,
+  );
 }
 
 /**
@@ -285,6 +332,9 @@ export function exportBundlePack(input: {
   // does; without this `counts.assets` was hard-coded to 0 and the pre-import preview
   // reported no images even for packs full of portraits.
   const assetIds = new Set<string>();
+  // Cast members travelling inside the nested worlds — they import as characters
+  // just like the loose ones, so the manifest's character count includes them.
+  let castCount = 0;
 
   worldIds.forEach((wid, i) => {
     const world = getWorld(wid);
@@ -292,6 +342,7 @@ export function exportBundlePack(input: {
     entries.push({ name: file, data: exportWorldPack(wid, { includeCharacters }), store: true });
     items.push({ kind: 'world', file, title: world.name });
     const worldChars = includeCharacters ? charactersRepo.listByWorld(wid) : [];
+    castCount += worldChars.length;
     for (const id of collectCharacterAssetIds(worldChars)) assetIds.add(id);
     for (const loc of world.locations) if (loc.imageAssetId) assetIds.add(loc.imageAssetId);
     for (const p of propertiesRepo.listByWorld(wid)) if (p.assetId) assetIds.add(p.assetId);
@@ -305,16 +356,21 @@ export function exportBundlePack(input: {
   }
 
   // Count only assets that actually resolve to stored bytes (what gets shipped),
-  // deduped across the whole bundle.
-  const assetTotal = gatherAssets(assetIds).portable.length;
+  // deduped across the whole bundle. Stat-only — the nested exports above already
+  // read every image's bytes once; no need to read them all again for a count.
+  const assetTotal = countShippableAssets(assetIds);
 
   const manifest = makeManifest('pack', {
     title: input.title?.trim() || 'Heartmorrow bundle',
     note: input.note?.trim() ?? '',
-    counts: { worlds: worldIds.length, characters: characterIds.length, assets: assetTotal },
+    counts: {
+      worlds: worldIds.length,
+      characters: characterIds.length + castCount,
+      assets: assetTotal,
+    },
     items,
   });
-  return zipSync([jsonEntry(MANIFEST_FILE, manifest), ...entries]);
+  return assertShareableSize(zipSync([jsonEntry(MANIFEST_FILE, manifest), ...entries]), manifest.title);
 }
 
 // --- decode helpers (no side effects) ---------------------------------------
@@ -339,11 +395,15 @@ function readJson(map: Map<string, Buffer>, name: string): unknown {
 }
 
 function parseManifest(map: Map<string, Buffer>): PackManifest {
-  const parsed = PackManifestSchema.safeParse(readJson(map, MANIFEST_FILE));
-  if (!parsed.success) throw badRequest('The share file has an invalid manifest.');
-  if (parsed.data.format !== PACK_FORMAT_TAG) {
+  const raw = readJson(map, MANIFEST_FILE);
+  // Check the magic tag on the RAW json: the schema DEFAULTS a missing `format` to
+  // the tag (so old files stay parseable), which would make a schema-side check
+  // vacuous — any zip with a kind field would sail through as "ours".
+  if (!raw || typeof raw !== 'object' || (raw as Record<string, unknown>).format !== PACK_FORMAT_TAG) {
     throw badRequest('This file is not a Heartmorrow share file.');
   }
+  const parsed = PackManifestSchema.safeParse(raw);
+  if (!parsed.success) throw badRequest('The share file has an invalid manifest.');
   return parsed.data;
 }
 
@@ -360,14 +420,17 @@ function parseWorldPayload(map: Map<string, Buffer>): WorldPackPayload {
 }
 
 /** The nested `.hmchr`/`.hmwrld` files to import from a `.hmpack`: the manifest's
- *  listed items, plus any matching entries actually present (deduped, capped). */
-function nestedFiles(root: Map<string, Buffer>, manifest: PackManifest): string[] {
-  const files = new Set<string>();
-  for (const it of manifest.items) files.add(it.file);
+ *  listed items, plus any matching entries actually present (deduped, capped —
+ *  `dropped` reports how many fell past the cap so callers can warn, not truncate
+ *  silently). */
+function nestedFiles(root: Map<string, Buffer>, manifest: PackManifest): { files: string[]; dropped: number } {
+  const all = new Set<string>();
+  for (const it of manifest.items) all.add(it.file);
   for (const name of root.keys()) {
-    if (name.endsWith('.hmchr') || name.endsWith('.hmwrld')) files.add(name);
+    if (name.endsWith('.hmchr') || name.endsWith('.hmwrld')) all.add(name);
   }
-  return [...files].slice(0, MAX_PACK_ITEMS);
+  const files = [...all].slice(0, MAX_PACK_ITEMS);
+  return { files, dropped: all.size - files.length };
 }
 
 // --- import (mutating) ------------------------------------------------------
@@ -387,6 +450,12 @@ function materializeAssets(
   const idMap = new Map<string, string>();
   let skipped = 0;
   for (const pa of assets) {
+    // A crafted payload can repeat an id; materializing each repeat would leave all
+    // but the last as unreferenced orphan rows + files. First one wins.
+    if (idMap.has(pa.id)) {
+      skipped += 1;
+      continue;
+    }
     const bytes = entries.get(pa.file);
     if (!bytes || bytes.byteLength === 0 || bytes.byteLength > MAX_UPLOAD_BYTES) {
       skipped += 1;
@@ -413,19 +482,57 @@ function materializeAssets(
 const mapId = (id: string | null, idMap: Map<string, string>): string | null =>
   id && idMap.has(id) ? idMap.get(id)! : null;
 
+/** Canonical expression labels — imported `expressionAssets` keys outside this set
+ *  are dropped (a foreign file can't smuggle off-vocabulary labels into the DB). */
+const EXPRESSION_LABELS = new Set<string>(EXPRESSIONS);
+
+/** One inserted character awaiting the deferred link pass. */
+interface ImportedChar {
+  src: Character;
+  cloneId: string;
+}
+
+/**
+ * A `.hmpack` import shares ONE of these across all its nested units: pass 1 of every
+ * unit records old->new character ids into `charIdMap`, and the link remap runs once
+ * at the end over `created` — so a loose character whose links point at a bundled
+ * world's cast keeps those ties (per-unit maps used to drop them).
+ */
+interface DeferredLinks {
+  created: ImportedChar[];
+  charIdMap: Map<string, string>;
+}
+
+/** Remap each inserted character's links onto the new ids; links whose target isn't
+ *  anywhere in `idMap` (an outsider that didn't travel) are dropped. */
+function remapImportedLinks(created: ImportedChar[], idMap: Map<string, string>): void {
+  for (const { src, cloneId } of created) {
+    const links = src.links
+      .filter((l) => idMap.has(l.targetId))
+      .map((l) => ({ ...l, targetId: idMap.get(l.targetId)! }));
+    if (links.length === 0) continue;
+    const cur = charactersRepo.get(cloneId)!;
+    charactersRepo.update(CharacterSchema.parse({ ...cur, links, updatedAt: Date.now() }));
+  }
+}
+
 /**
  * Insert a set of character DEFINITIONS as fresh characters in `targetWorldId`,
  * mirroring {@link cloneCharactersToWorld}: new ids, a clean relationship each, intra
  * set links remapped (links outside the set dropped), and asset references remapped
  * onto the freshly-imported images. Returns the new ids and the old->new id map.
+ *
+ * With `deferred`, ids are recorded into the SHARED bundle-wide map and the link
+ * remap is left to the caller (run once after every unit has inserted).
  */
 function importCharacterDefs(
   defs: Character[],
   targetWorldId: string | null,
   assetIdMap: Map<string, string>,
+  deferred?: DeferredLinks,
 ): { ids: string[]; idMap: Map<string, string> } {
   const now = Date.now();
-  const idMap = new Map<string, string>();
+  const idMap = deferred?.charIdMap ?? new Map<string, string>();
 
   // Pass 1: insert each with links stripped + assets remapped, recording old->new ids.
   const created = defs.map((src) => {
@@ -433,6 +540,7 @@ function importCharacterDefs(
     idMap.set(src.id, cloneId);
     const expressionAssets: Record<string, string> = {};
     for (const [label, assetId] of Object.entries(src.expressionAssets)) {
+      if (!EXPRESSION_LABELS.has(label)) continue;
       const mapped = mapId(assetId, assetIdMap);
       if (mapped) expressionAssets[label] = mapped;
     }
@@ -451,15 +559,10 @@ function importCharacterDefs(
     return { src, cloneId };
   });
 
-  // Pass 2: remap links that point WITHIN the imported set onto the new ids.
-  for (const { src, cloneId } of created) {
-    const links = src.links
-      .filter((l) => idMap.has(l.targetId))
-      .map((l) => ({ ...l, targetId: idMap.get(l.targetId)! }));
-    if (links.length === 0) continue;
-    const cur = charactersRepo.get(cloneId)!;
-    charactersRepo.update(CharacterSchema.parse({ ...cur, links, updatedAt: Date.now() }));
-  }
+  // Pass 2: remap links that point WITHIN the imported set onto the new ids —
+  // bundle imports defer this until every nested unit's ids are known.
+  if (deferred) deferred.created.push(...created);
+  else remapImportedLinks(created, idMap);
 
   return { ids: created.map((c) => c.cloneId), idMap };
 }
@@ -470,6 +573,7 @@ function importWorldPayload(
   payload: WorldPackPayload,
   assetIdMap: Map<string, string>,
   includeCharacters: boolean,
+  deferred?: DeferredLinks,
 ): { worldId: string; characterIds: string[] } {
   const now = Date.now();
   const newWorldId = newId('world');
@@ -491,7 +595,7 @@ function importWorldPayload(
   // Skip the cast entirely when the importer asked for "just the world". A company's
   // linkedCharacterId then resolves to null (the character isn't in this world).
   const cast = includeCharacters ? payload.characters : [];
-  const { ids: characterIds, idMap: charIdMap } = importCharacterDefs(cast, newWorldId, assetIdMap);
+  const { ids: characterIds, idMap: charIdMap } = importCharacterDefs(cast, newWorldId, assetIdMap, deferred);
 
   for (const p of payload.properties as Property[]) {
     propertiesRepo.insert(
@@ -539,6 +643,18 @@ export function inspectPack(buffer: Buffer): PackInspectResult {
   }
   const worlds: PackWorldPreview[] = [];
   const characters: PackCharacterPreview[] = [];
+  // Counts are DERIVED from the parsed payloads, never echoed from the manifest —
+  // the manifest is descriptive, hand-editable text, and the headline "Adds N
+  // characters" must state what import would actually do. (Bundle manifests also
+  // historically under-counted by omitting world casts.)
+  const counts = { worlds: 0, characters: 0, assets: 0 };
+
+  /** Images this unit would really materialize: referenced by something AND present. */
+  const shippedAssets = (
+    assets: WorldPackPayload['assets'],
+    referenced: Set<string>,
+    entries: Map<string, Buffer>,
+  ): number => assets.filter((a) => referenced.has(a.id) && entries.has(a.file)).length;
 
   const charPreview = (
     c: WorldPackPayload['characters'][number],
@@ -553,7 +669,7 @@ export function inspectPack(buffer: Buffer): PackInspectResult {
     world,
   });
 
-  const addWorld = (p: WorldPackPayload): void => {
+  const addWorld = (p: WorldPackPayload, entries: Map<string, Buffer>): void => {
     worlds.push({
       name: p.world.name,
       summary: p.world.summary,
@@ -564,25 +680,32 @@ export function inspectPack(buffer: Buffer): PackInspectResult {
       companyCount: p.companies.length,
     });
     for (const c of p.characters) characters.push(charPreview(c, p.world.name, p.assets));
+    counts.worlds += 1;
+    counts.characters += p.characters.length;
+    counts.assets += shippedAssets(p.assets, collectCharacterAssetIds(p.characters, worldOwnAssetIds(p)), entries);
   };
-  const addLooseCharacters = (p: CharacterPackPayload): void => {
+  const addLooseCharacters = (p: CharacterPackPayload, entries: Map<string, Buffer>): void => {
     for (const c of p.characters) characters.push(charPreview(c, null, p.assets));
+    counts.characters += p.characters.length;
+    counts.assets += shippedAssets(p.assets, collectCharacterAssetIds(p.characters), entries);
   };
 
   if (manifest.kind === 'character') {
-    addLooseCharacters(parseCharacterPayload(root));
+    addLooseCharacters(parseCharacterPayload(root), root);
   } else if (manifest.kind === 'world') {
-    addWorld(parseWorldPayload(root));
+    addWorld(parseWorldPayload(root), root);
   } else {
-    for (const file of nestedFiles(root, manifest)) {
+    const { files, dropped } = nestedFiles(root, manifest);
+    if (dropped > 0) warnings.push(`This bundle lists more than ${MAX_PACK_ITEMS} files; ${dropped} were ignored.`);
+    for (const file of files) {
       const nestedBuf = root.get(file);
       if (!nestedBuf) continue;
       // `nested` is scoped to this iteration → GC-eligible before the next archive,
       // so peak memory is one nested archive, not all of them.
       const nested = safeUnzip(nestedBuf, NESTED_LIMITS, budget);
       const nm = parseManifest(nested);
-      if (nm.kind === 'character') addLooseCharacters(parseCharacterPayload(nested));
-      else if (nm.kind === 'world') addWorld(parseWorldPayload(nested));
+      if (nm.kind === 'character') addLooseCharacters(parseCharacterPayload(nested), nested);
+      else if (nm.kind === 'world') addWorld(parseWorldPayload(nested), nested);
       else warnings.push(`Skipped nested bundle "${file}" (a pack can't contain another pack).`);
     }
   }
@@ -594,7 +717,7 @@ export function inspectPack(buffer: Buffer): PackInspectResult {
     note: manifest.note,
     formatVersion: manifest.formatVersion,
     createdAt: manifest.createdAt,
-    counts: manifest.counts,
+    counts,
     worlds,
     characters,
     warnings,
@@ -602,18 +725,22 @@ export function inspectPack(buffer: Buffer): PackInspectResult {
 }
 
 /** Materialize one character payload's assets + characters into the open transaction,
- *  accumulating into `result`. */
+ *  accumulating into `result`. Only images the characters actually reference are
+ *  materialized — a crafted payload can't dump unreferenced files into the library. */
 function applyCharacterUnit(
   payload: CharacterPackPayload,
   entries: Map<string, Buffer>,
   targetWorldId: string | null,
   written: string[],
   result: PackImportResult,
+  deferred?: DeferredLinks,
 ): void {
-  const { idMap, skipped } = materializeAssets(payload.assets, entries, written);
+  const referenced = collectCharacterAssetIds(payload.characters);
+  const assets = payload.assets.filter((a) => referenced.has(a.id));
+  const { idMap, skipped } = materializeAssets(assets, entries, written);
   result.assets += idMap.size;
   result.skippedAssets += skipped;
-  const { ids } = importCharacterDefs(payload.characters, targetWorldId, idMap);
+  const { ids } = importCharacterDefs(payload.characters, targetWorldId, idMap, deferred);
   result.characters += ids.length;
   result.characterIds.push(...ids);
 }
@@ -637,15 +764,17 @@ function applyWorldUnit(
   written: string[],
   result: PackImportResult,
   includeCharacters: boolean,
+  deferred?: DeferredLinks,
 ): void {
-  // Without the cast, don't materialize their portraits — only the world's own images.
-  const assets = includeCharacters
-    ? payload.assets
-    : payload.assets.filter((a) => worldOwnAssetIds(payload).has(a.id));
+  // Only images something in the payload actually references get materialized; and
+  // without the cast, not their portraits — only the world's own images.
+  const referenced = worldOwnAssetIds(payload);
+  if (includeCharacters) collectCharacterAssetIds(payload.characters, referenced);
+  const assets = payload.assets.filter((a) => referenced.has(a.id));
   const { idMap, skipped } = materializeAssets(assets, entries, written);
   result.assets += idMap.size;
   result.skippedAssets += skipped;
-  const { worldId, characterIds } = importWorldPayload(payload, idMap, includeCharacters);
+  const { worldId, characterIds } = importWorldPayload(payload, idMap, includeCharacters, deferred);
   result.worlds += 1;
   result.worldIds.push(worldId);
   result.characters += characterIds.length;
@@ -700,8 +829,16 @@ export function importPack(
       } else if (manifest.kind === 'world') {
         applyWorldUnit(parseWorldPayload(root), root, written, result, includeCharacters);
       } else {
+        // All of a bundle's units share one character id map, and the link remap
+        // runs once at the end — so ties BETWEEN units (a loose character linked to
+        // a bundled world's cast) survive the import instead of being dropped.
+        const deferred: DeferredLinks = { created: [], charIdMap: new Map() };
         let imported = 0;
-        for (const file of nestedFiles(root, manifest)) {
+        const { files, dropped } = nestedFiles(root, manifest);
+        if (dropped > 0) {
+          warnings.push(`This bundle lists more than ${MAX_PACK_ITEMS} files; ${dropped} were ignored.`);
+        }
+        for (const file of files) {
           const nestedBuf = root.get(file);
           if (!nestedBuf) {
             warnings.push(`Missing nested file "${file}".`);
@@ -717,17 +854,27 @@ export function importPack(
               warnings.push(`Skipped the people in "${file}" (importing worlds only).`);
               continue;
             }
-            applyCharacterUnit(parseCharacterPayload(nested), nested, targetWorldId, written, result);
+            applyCharacterUnit(parseCharacterPayload(nested), nested, targetWorldId, written, result, deferred);
             imported += 1;
           } else if (nm.kind === 'world') {
-            applyWorldUnit(parseWorldPayload(nested), nested, written, result, includeCharacters);
+            applyWorldUnit(parseWorldPayload(nested), nested, written, result, includeCharacters, deferred);
             imported += 1;
           } else {
             warnings.push(`Skipped nested bundle "${file}" (a pack can't contain another pack).`);
           }
         }
         if (imported === 0) throw badRequest('The share file contained nothing importable.');
+        remapImportedLinks(deferred.created, deferred.charIdMap);
       }
+      // Inside the transaction: the audit event commits (or rolls back) atomically
+      // with the content it describes — a failure here can't leave a committed
+      // import that then reports a 500.
+      recordEvent('pack_imported', {
+        kind: manifest.kind,
+        worlds: result.worlds,
+        characters: result.characters,
+        assets: result.assets,
+      });
     });
   } catch (e) {
     // The DB transaction rolled back; unlink any asset files it left behind so a
@@ -742,12 +889,6 @@ export function importPack(
     throw e;
   }
 
-  recordEvent('pack_imported', {
-    kind: manifest.kind,
-    worlds: result.worlds,
-    characters: result.characters,
-    assets: result.assets,
-  });
   return result;
 }
 

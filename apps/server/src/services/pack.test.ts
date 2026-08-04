@@ -12,8 +12,16 @@ import {
   propertiesRepo,
   companiesRepo,
 } from '../db/repositories';
+import { PACK_MAX_FILE_BYTES } from '@dsim/shared';
 import { zipSync, unzipSync } from '../lib/zip';
-import { exportCharacterPack, exportWorldPack, exportBundlePack, importPack, inspectPack } from './pack-service';
+import {
+  assertShareableSize,
+  exportCharacterPack,
+  exportWorldPack,
+  exportBundlePack,
+  importPack,
+  inspectPack,
+} from './pack-service';
 
 const STATS = { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 };
 
@@ -289,10 +297,117 @@ describe('rejecting bad input', () => {
     const buf = zipSync([{ name: 'random.json', data: Buffer.from('{}') }]);
     expect(() => importPack(buf, {})).toThrow(/manifest|Heartmorrow/i);
   });
+  it('rejects a manifest missing the format tag (defaults must not vouch for it)', () => {
+    const w = createWorld({ name: 'W' });
+    const c = createCharacter({ worldId: w.id, name: 'X', age: 25, datingStats: STATS });
+    const map = unzipSync(exportCharacterPack([c.id]));
+    const manifest = JSON.parse(map.get('manifest.json')!.toString('utf8'));
+    delete manifest.format; // the schema would default it back in — the raw check must reject
+    const rebuilt = zipSync([
+      { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest)) },
+      { name: 'character.json', data: map.get('character.json')! },
+    ]);
+    expect(() => importPack(rebuilt, {})).toThrow(/not a Heartmorrow/i);
+    expect(() => inspectPack(rebuilt)).toThrow(/not a Heartmorrow/i);
+  });
   it('rejects importing loose characters into a non-existent world', () => {
     const w = createWorld({ name: 'W' });
     const c = createCharacter({ worldId: w.id, name: 'X', age: 25, datingStats: STATS });
     const buf = exportCharacterPack([c.id]);
     expect(() => importPack(buf, { targetWorldId: 'world_does_not_exist' })).toThrow();
+  });
+});
+
+describe('the export size guard (files must stay importable)', () => {
+  it('refuses to emit an archive bigger than the import cap', () => {
+    const big = Buffer.alloc(PACK_MAX_FILE_BYTES + 1);
+    expect(() => assertShareableSize(big, 'Huge World')).toThrow(/Huge World.*capped/i);
+  });
+  it('passes an archive at the cap through untouched', () => {
+    const ok = Buffer.alloc(1024);
+    expect(assertShareableSize(ok, 'Small')).toBe(ok);
+  });
+});
+
+describe('preview counts are derived from the payloads, not the manifest', () => {
+  it('reports the true numbers even when the manifest lies', () => {
+    const w = createWorld({ name: 'W' });
+    createCharacter({ worldId: w.id, name: 'Mira', age: 27, datingStats: STATS, portraitAssetId: portrait('m') });
+
+    const map = unzipSync(exportWorldPack(w.id));
+    const manifest = JSON.parse(map.get('manifest.json')!.toString('utf8'));
+    manifest.counts = { worlds: 9, characters: 99, assets: 42 }; // a hand-edited lie
+    const rebuilt = zipSync(
+      [...map.entries()].map(([name, data]) =>
+        name === 'manifest.json' ? { name, data: Buffer.from(JSON.stringify(manifest)) } : { name, data },
+      ),
+    );
+
+    const preview = inspectPack(rebuilt);
+    expect(preview.counts).toEqual({ worlds: 1, characters: 1, assets: 1 });
+  });
+
+  it('counts a bundle\'s world casts as characters (not just the loose people)', () => {
+    const w = createWorld({ name: 'One' });
+    createCharacter({ worldId: w.id, name: 'Aria', age: 20, datingStats: STATS });
+    createCharacter({ worldId: w.id, name: 'Brin', age: 21, datingStats: STATS });
+    const w2 = createWorld({ name: 'Two' });
+    const loose = createCharacter({ worldId: w2.id, name: 'Loose', age: 22, datingStats: STATS });
+
+    const preview = inspectPack(exportBundlePack({ worldIds: [w.id], characterIds: [loose.id] }));
+    expect(preview.counts.worlds).toBe(1);
+    expect(preview.counts.characters).toBe(3); // 2 cast + 1 loose
+  });
+});
+
+describe('bundle imports share one id map (cross-unit links survive)', () => {
+  it('keeps a loose character\'s link to a bundled world\'s cast member', () => {
+    const w = createWorld({ name: 'Home' });
+    const ada = createCharacter({ worldId: w.id, name: 'Ada', age: 30, datingStats: STATS });
+    const bob = createCharacter({ worldId: w.id, name: 'Bob', age: 31, datingStats: STATS });
+    updateCharacter(bob.id, { links: [{ targetId: ada.id, kind: 'friend' }] });
+    const dst = createWorld({ name: 'Dst' });
+
+    const buf = exportBundlePack({ worldIds: [w.id], characterIds: [bob.id] });
+    const res = importPack(buf, { targetWorldId: dst.id });
+
+    // The world unit re-created Home with Ada' + Bob'; the loose unit landed Bob'' in Dst.
+    const imported = res.characterIds.map((id) => charactersRepo.get(id)!);
+    const newAda = imported.find((c) => c.name === 'Ada')!;
+    const looseBob = imported.find((c) => c.worldId === dst.id)!;
+    expect(looseBob.name).toBe('Bob');
+    expect(linkPairs(looseBob)).toEqual([{ targetId: newAda.id, kind: 'friend' }]);
+    // The in-world copy keeps its tie too.
+    const castBob = imported.find((c) => c.name === 'Bob' && c.worldId !== dst.id)!;
+    expect(linkPairs(castBob)).toEqual([{ targetId: newAda.id, kind: 'friend' }]);
+  });
+});
+
+describe('import asset hygiene', () => {
+  it('skips unreferenced and duplicate payload assets instead of orphaning them', () => {
+    const w = createWorld({ name: 'W' });
+    const c = createCharacter({ worldId: w.id, name: 'Mira', age: 27, datingStats: STATS, portraitAssetId: portrait('m') });
+
+    const map = unzipSync(exportCharacterPack([c.id]));
+    const payload = JSON.parse(map.get('character.json')!.toString('utf8'));
+    // An image nothing references, plus an exact duplicate of the real portrait row.
+    payload.assets.push(
+      { ...payload.assets[0], id: 'asset_unreferenced', file: 'assets/extra.png' },
+      { ...payload.assets[0] },
+    );
+    const rebuilt = zipSync([
+      { name: 'manifest.json', data: map.get('manifest.json')! },
+      { name: 'character.json', data: Buffer.from(JSON.stringify(payload)) },
+      ...[...map.entries()]
+        .filter(([name]) => name.startsWith('assets/'))
+        .map(([name, data]) => ({ name, data })),
+      { name: 'assets/extra.png', data: pngBytes('extra') },
+    ]);
+
+    const before = listAssets().length;
+    const res = importPack(rebuilt, { targetWorldId: w.id });
+    expect(res.assets).toBe(1); // only the referenced portrait, once
+    expect(listAssets().length).toBe(before + 1); // no orphan rows
+    expect(res.skippedAssets).toBe(1); // the duplicate id was refused
   });
 });

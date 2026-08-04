@@ -156,6 +156,7 @@
     "shareWorlds": "Share {count} worlds",
     "shareCharacters": "{count, plural, one {Share # character} other {Share # characters}}",
     "exportSub": "Saves a {ext} file you can hand to anyone — it carries the content, never your save.",
+    "privacyNote": "Characters travel complete — including their private creator notes — so whoever opens the file can read and play them exactly as authored.",
     "exportCharsToggle": "{count, plural, one {Include each world's characters (uncheck to share just the world & its locations)} other {Include each world's characters (uncheck to share just the worlds & its locations)}}",
     "title": "Title",
     "note": "Note",
@@ -1718,8 +1719,8 @@
           {
             "heading": "Sharing: export and import",
             "body": [
-              "Your creations can be packaged into share files and handed to other players. There are three kinds: one or more characters as a .hmchr file, a whole world as a .hmwrld file, and a mixed bundle of worlds and loose characters as a .hmpack file. Share files carry definitions and images only — never your save. No relationships, money, memories, messages, or day history travels with them.",
-              "To export, go to the world list, choose \"Export worlds,\" pick what to share, then set a title and an optional note in the preview dialog. When you export a world, you can choose whether its cast of characters comes along.",
+              "Your creations can be packaged into share files and handed to other players. There are three kinds: one or more characters as a .hmchr file, a whole world as a .hmwrld file, and a mixed bundle of worlds and loose characters as a .hmpack file. Share files carry definitions and images only — never your save. No relationships, money, memories, messages, or day history travels with them. Characters do travel complete, though — including their private creator notes — so whoever opens the file can read and play them exactly as you authored them.",
+              "To export, go to the world list, choose \"Export worlds,\" pick what to share, then set a title and an optional note in the preview dialog. When you export a world, you can choose whether its cast of characters comes along. A single share file is capped at 256 MB — images are what add up, so a world with a very large cast of full-size portraits may need slimmer images to fit.",
               "To import, use the \"Import file\" button on the world list. You'll see a read-only preview of exactly what's inside — the worlds, the people, and the image counts — before anything is added. Importing is always additive: it creates fresh copies and never overwrites or deletes what you already have. When a file contains both worlds and people, you can choose to take just the worlds or bring the cast too."
             ]
           },

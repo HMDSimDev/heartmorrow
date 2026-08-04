@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { PACK_MIME, PackExportRequestSchema } from '@dsim/shared';
+import { PACK_MAX_FILE_BYTES, PACK_MIME, PackExportRequestSchema } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
 import { docSchema } from '../lib/openapi-schema';
 import { badRequest } from '../lib/errors';
@@ -15,26 +15,49 @@ import {
   slugFilename,
 } from '../services/pack-service';
 
-/** Upload ceiling for an imported share file. Generous (worlds carry portraits) but
- *  bounded so a huge upload can't exhaust memory before the strict ZIP caps apply. */
-const PACK_MAX_UPLOAD_BYTES = 64 * 1024 * 1024;
+/** Upload ceiling for an imported share file — the SAME limit export enforces when
+ *  producing one, so anything the app emits is importable. Bounded so a huge upload
+ *  can't exhaust memory before the strict ZIP caps apply. */
+const PACK_LIMIT_MB = Math.floor(PACK_MAX_FILE_BYTES / (1024 * 1024));
 
 /** Read the single uploaded file as a Buffer, mapping the multipart "too large"
  *  error onto a friendly 400 instead of a 413/500. */
 async function readUploadedArchive(req: import('fastify').FastifyRequest): Promise<Buffer> {
-  const file = await req.file({ limits: { fileSize: PACK_MAX_UPLOAD_BYTES, files: 1 } });
+  const file = await req.file({ limits: { fileSize: PACK_MAX_FILE_BYTES, files: 1 } });
   if (!file) throw badRequest('No file was uploaded.');
   try {
     return await file.toBuffer();
-  } catch {
-    throw badRequest('That file is too large to import (max 64 MB).');
+  } catch (e) {
+    // Only the size limit gets the size message; an aborted/garbled upload is not
+    // "too large" and telling the user so sends them down the wrong path.
+    if ((e as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE') {
+      throw badRequest(`That file is too large to import (max ${PACK_LIMIT_MB} MB).`);
+    }
+    throw badRequest("Couldn't read the uploaded file — the upload may have been interrupted. Try again.");
   }
 }
 
+/** RFC 5987 percent-encoding for the Content-Disposition `filename*` value:
+ *  encodeURIComponent, plus the four attr-char exceptions it leaves bare. */
+function rfc5987(value: string): string {
+  return encodeURIComponent(value).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
 function sendArchive(reply: import('fastify').FastifyReply, filename: string, buffer: Buffer): Buffer {
+  // `filename` may contain unicode (a world's real name). Header rules: the quoted
+  // `filename=` fallback must stay ASCII (legacy parsers), the full name travels in
+  // RFC 5987 `filename*=` which every modern browser prefers.
+  const dot = filename.lastIndexOf('.');
+  const ext = dot >= 0 ? filename.slice(dot) : ''; // always ASCII (.hmchr/.hmwrld/.hmpack)
+  const stem = dot >= 0 ? filename.slice(0, dot) : filename;
+  const asciiStem =
+    stem.replace(/[^\x20-\x7e]+/g, '').replace(/["\\;]+/g, '').replace(/^[-.\s]+|[-.\s]+$/g, '') || 'heartmorrow';
   reply
     .header('Content-Type', PACK_MIME)
-    .header('Content-Disposition', `attachment; filename="${filename}"`)
+    .header(
+      'Content-Disposition',
+      `attachment; filename="${asciiStem}${ext}"; filename*=UTF-8''${rfc5987(filename)}`,
+    )
     .header('Content-Length', String(buffer.length))
     // These files are device-local content, never cache them in a shared proxy.
     .header('Cache-Control', 'no-store');

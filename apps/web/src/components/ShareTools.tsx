@@ -376,6 +376,9 @@ export function ShareExportDialog({
           : t('share.shareCharacters', { count: characters.length })}
       </h2>
       <p className="hint share-sub">{t('share.exportSub', { ext })}</p>
+      {(characters.length > 0 || (worlds.length > 0 && includeChars)) && (
+        <p className="hint share-sub">{t('share.privacyNote')}</p>
+      )}
 
       <div className="share-scroll">
         {worlds.map((w) => (
