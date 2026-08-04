@@ -103,8 +103,10 @@ describe('define-the-relationship', () => {
     const { character } = seedWorldAndCharacter();
     makeWarm(character.id, 50); // warm enough that the 'dating' rung would otherwise unlock
     setRelationshipFlag(character.id, 'state:brokenUp', true, { source: 'test' });
-    // chat mode sidesteps the createSession date gating; the DTR guard is mode-agnostic.
-    const session = createSession({ characterId: character.id, mode: 'chat', locationId: null });
+    // A real date session: DTR is date-only (a hangout is refused before any other
+    // check), and the breakup here carries no `breakup:day`, so the reconcile
+    // cooldown in createSession doesn't fire.
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
     addPlayerMessage(session.id, 'Can we make this official again?');
     setAdapterOverride(reply({ decision: 'accept', line: 'Yes!', reason: 'ready' }));
 

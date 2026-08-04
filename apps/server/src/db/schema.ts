@@ -837,4 +837,13 @@ export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: stri
     // then self-heals. Strictly cosmetic for one turn.
     ddl: `ALTER TABLE session_rapport ADD COLUMN judged INTEGER NOT NULL DEFAULT 0`,
   },
+  {
+    // Which kind of sitting a memory came out of ('date' / 'hangout' / …), so the
+    // profile can say "From a hangout" instead of "From a date". Nullable: memories
+    // with no session behind them (world-sim, breakups) and every legacy row stay
+    // NULL and fall back to the date wording, which is what they all were.
+    table: 'character_memories',
+    column: 'source_mode',
+    ddl: `ALTER TABLE character_memories ADD COLUMN source_mode TEXT`,
+  },
 ];

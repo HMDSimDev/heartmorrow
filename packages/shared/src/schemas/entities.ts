@@ -191,6 +191,42 @@ export const CharacterSchema = z.object({
 });
 export type Character = z.infer<typeof CharacterSchema>;
 
+// --- Conversation mode -----------------------------------------------------
+// Declared here (well above the Conversation section) because CharacterMemory
+// references it for `sourceMode` — a top-level const initializer, so the enum has
+// to exist by the time this module body runs.
+
+/**
+ * What kind of sitting a conversation session is.
+ *  - `date`    — a real date: the full machinery (rapport judging, walkouts, venue
+ *                spend, milestones, DTR, endings).
+ *  - `event`   — a scripted/story date; treated as a date everywhere.
+ *  - `hangout` — a low-stakes meet-up: no rapport judging, no walkouts, no venue
+ *                spend, no milestones/DTR/endings. Still a real meeting (costs a
+ *                day action, counts as seeing them) and still evaluated at the end,
+ *                so memories and stat changes come out of it.
+ *  - `chat`    — a bare, world-less conversation with no meeting semantics at all
+ *                (prompt previews, the bench, tests). Not reachable from the game.
+ *  - `minigame`— a label for minigame-sourced chronicle/milestone entries; never an
+ *                actual session.
+ */
+export const ConversationModeSchema = z.enum(['chat', 'date', 'event', 'hangout', 'minigame']);
+export type ConversationMode = z.infer<typeof ConversationModeSchema>;
+
+/** True for the modes that run the full DATE machinery (rapport, walkouts, venue
+ *  spend, milestones, DTR, endings). Everything date-specific gates on THIS, never
+ *  on `!== 'chat'` — default-deny, so a new mode never inherits date behavior. */
+export function isDateMode(mode: ConversationMode): boolean {
+  return mode === 'date' || mode === 'event';
+}
+
+/** True for the modes that are a real, in-person meeting: they cost a day action,
+ *  require the character to be free, hold the world's one-live-session lock, and
+ *  count as having seen the person. Dates plus hangouts. */
+export function isMeetingMode(mode: ConversationMode): boolean {
+  return isDateMode(mode) || mode === 'hangout';
+}
+
 export const CharacterMemorySchema = z.object({
   id,
   characterId: id,
@@ -199,6 +235,11 @@ export const CharacterMemorySchema = z.object({
   /** Canonical memory tags only; legacy/off-list tags are dropped on read. */
   tags: MemoryTagArraySchema,
   sourceEventId: id.nullable().default(null),
+  /** The session mode this memory came from, so the UI can say "from a date" vs
+   *  "from a hangout". Null for memories with no session behind them (world-sim,
+   *  breakups, minigames) and for legacy rows — which fall back to "from a date"
+   *  when `sourceEventId` is set, since every pre-hangout evaluated memory WAS one. */
+  sourceMode: ConversationModeSchema.nullable().default(null),
   /** The OTHER person this memory is about, when it's a shared/social moment (e.g.
    *  a world-sim meeting) — lets a memory be looked up by "who it involves" and the
    *  two parties' memories of the same encounter be cross-referenced. Null otherwise. */
@@ -281,8 +322,8 @@ export type Asset = z.infer<typeof AssetSchema>;
 
 // --- Conversation -----------------------------------------------------------
 
-export const ConversationModeSchema = z.enum(['chat', 'date', 'event', 'minigame']);
-export type ConversationMode = z.infer<typeof ConversationModeSchema>;
+// ConversationModeSchema / isDateMode / isMeetingMode live near CharacterMemory
+// above — they have to be declared before the memory schema that references them.
 
 export const ConversationSessionSchema = z.object({
   id,

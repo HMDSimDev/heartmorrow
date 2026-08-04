@@ -13,6 +13,51 @@
   max-width: 680px;
 }
 
+/* --- Date or hangout — the fork that changes everything after it -------- */
+.date-mode-pick { margin-bottom: 18px; }
+.date-mode-pick > .kicker { display: block; margin-bottom: 10px; }
+.date-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 540px) {
+  .date-mode-grid { grid-template-columns: 1fr; }
+}
+.date-mode-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 12px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.2s ease, background 0.15s ease;
+}
+.date-mode-card:hover { border-color: var(--border-bright); }
+.date-mode-card.selected {
+  border-color: var(--brass);
+  background: linear-gradient(180deg, rgba(230, 177, 94, 0.14), var(--panel));
+  box-shadow: 0 0 0 1px var(--brass), var(--glow-warm);
+}
+.date-mode-glyph { font-size: 1.15rem; line-height: 1.2; flex-shrink: 0; }
+.date-mode-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.date-mode-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.15;
+}
+.date-mode-sub {
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--text-mute);
+}
+
 /* --- "Who are you meeting?" — a portrait picker, not a dropdown --------- */
 .date-pick { margin-bottom: 18px; }
 .date-pick > .kicker { display: block; margin-bottom: 12px; }
@@ -398,6 +443,48 @@
 .dsc-mood {
   font-family: var(--font-display);
   color: color-mix(in srgb, var(--accent) 70%, var(--text));
+}
+
+/* A hangout has no rapport, so it has no gauge. This ribbon sits in the trajectory's
+   slot instead — same rule and rim-light, a quiet sage tag rather than an instrument —
+   so the top of the stage doesn't just look like a missing feature. */
+.date-hangout-ribbon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 24px 10px;
+  background: linear-gradient(180deg, var(--panel-2), var(--ink-2));
+}
+.date-hangout-ribbon::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, transparent, rgba(243, 236, 221, 0.12), transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent 6%, color-mix(in oklab, var(--sage) 44%, var(--border)) 50%, transparent 94%) bottom / 100% 1px no-repeat;
+}
+.date-hangout-tag {
+  flex-shrink: 0;
+  padding: 2px 9px;
+  border: 1px solid color-mix(in oklab, var(--sage) 55%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--sage) 14%, transparent);
+  color: color-mix(in srgb, var(--sage) 78%, var(--text));
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.date-hangout-note {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-mute);
+}
+@media (max-width: 560px) {
+  .date-hangout-ribbon { padding-left: 14px; padding-right: 14px; }
+  .date-hangout-note { font-size: 0.72rem; }
 }
 
 /* SIGNATURE: the live date "trajectory" — a diverging almanac gauge across the top of

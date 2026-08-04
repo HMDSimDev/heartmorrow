@@ -3,6 +3,7 @@ import {
   NpcKnowledgeSchema,
   PLAYER_GOSSIP,
   currentStatus,
+  isMeetingMode,
   warmthBand,
   bandIndex,
   type Character,
@@ -57,7 +58,9 @@ export async function maybeExtractPlayerFacts(
   day: number,
 ): Promise<void> {
   if (!partner.worldId) return;
-  if (session.mode !== 'date' && session.mode !== 'event') return;
+  // Any real meeting counts — what you shared over an afternoon together is just as
+  // much first-hand knowledge of you as what you shared over dinner.
+  if (!isMeetingMode(session.mode)) return;
 
   const rel = getRelationship(partner.id);
   if (!isInvolved(rel)) return;

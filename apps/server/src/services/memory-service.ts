@@ -2,6 +2,7 @@ import {
   CharacterMemorySchema,
   PROMPT_LIMITS,
   type CharacterMemory,
+  type ConversationMode,
   type MemoryCandidate,
   type MemoryCreate,
 } from '@dsim/shared';
@@ -59,11 +60,18 @@ export function addManualMemory(characterId: string, input: MemoryCreate): Chara
   return memoriesRepo.insert(memory);
 }
 
-/** Persist memory candidates produced by a validated session evaluation. */
+/**
+ * Persist memory candidates produced by a validated session evaluation.
+ *
+ * `sourceMode` records what kind of sitting produced them so the profile can label
+ * a memory "From a hangout" instead of "From a date". Callers with no session
+ * behind them (world-sim, breakups, minigames) leave it null.
+ */
 export function addMemoriesFromEvaluation(
   characterId: string,
   candidates: MemoryCandidate[],
   sourceEventId: string | null,
+  sourceMode: ConversationMode | null = null,
 ): CharacterMemory[] {
   const now = Date.now();
   return candidates.map((c) =>
@@ -75,6 +83,7 @@ export function addMemoriesFromEvaluation(
         importance: c.importance,
         tags: c.tags,
         sourceEventId,
+        sourceMode,
         createdAt: now,
         lastUsedAt: null,
       }),

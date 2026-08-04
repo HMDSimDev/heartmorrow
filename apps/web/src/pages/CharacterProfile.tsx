@@ -768,9 +768,14 @@ function MemoryList({
               </span>
             </span>
             <span className="prof-mem-trail" aria-hidden="true" />
+            {/* Where the memory came from. `sourceMode` was added with hangouts, so
+                every memory written before it is null — and all of those were dates. */}
             <small className={`prof-mem-src${m.sourceEventId ? ' date' : ''}`}>
               {m.sourceEventId ? (
-                <><Icon name="date" size={12} /> {t('profile.fromDate')}</>
+                <>
+                  <Icon name="date" size={12} />{' '}
+                  {t(m.sourceMode === 'hangout' ? 'profile.fromHangout' : 'profile.fromDate')}
+                </>
               ) : (
                 <><Icon name="edit" size={12} /> {t('profile.addedManually')}</>
               )}

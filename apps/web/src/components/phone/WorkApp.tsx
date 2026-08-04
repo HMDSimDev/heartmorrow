@@ -80,7 +80,9 @@ export function WorkApp() {
       return;
     }
     if (onDate) {
-      setError(t('work.errOnDate', { name: activeDate!.characterName }));
+      setError(
+        t(activeDate!.mode === 'hangout' ? 'work.errOnHangout' : 'work.errOnDate', { name: activeDate!.characterName }),
+      );
       return;
     }
     setBusy(true);
@@ -111,7 +113,9 @@ export function WorkApp() {
       return;
     }
     if (onDate) {
-      setError(t('work.errOnDate', { name: activeDate!.characterName }));
+      setError(
+        t(activeDate!.mode === 'hangout' ? 'work.errOnHangout' : 'work.errOnDate', { name: activeDate!.characterName }),
+      );
       return;
     }
     setBusy(true);
@@ -222,7 +226,11 @@ export function WorkApp() {
         {onDate && (
           <div className="pl-lock">
             <span className="pl-lock-glyph"><Icon name="date" size={15} /></span>
-            <span>{t('work.onDateNote', { name: activeDate!.characterName })}</span>
+            <span>
+              {t(activeDate!.mode === 'hangout' ? 'work.onHangoutNote' : 'work.onDateNote', {
+                name: activeDate!.characterName,
+              })}
+            </span>
           </div>
         )}
         {noEnergy && !onDate && (

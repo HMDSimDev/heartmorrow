@@ -74,7 +74,11 @@ export function Minigames() {
 
   const start = async (minigameId: MinigameId) => {
     if (activeDate) {
-      setError(t('minigames.errOnDate', { name: activeDate.characterName }));
+      setError(
+        t(activeDate.mode === 'hangout' ? 'minigames.errOnHangout' : 'minigames.errOnDate', {
+          name: activeDate.characterName,
+        }),
+      );
       return;
     }
     setBusy(true);
@@ -136,7 +140,9 @@ export function Minigames() {
       )}
       {onDate && !active && (
         <Banner kind="info">
-          {t('minigames.onDateBanner', { name: activeDate!.characterName })}
+          {t(activeDate!.mode === 'hangout' ? 'minigames.onHangoutBanner' : 'minigames.onDateBanner', {
+            name: activeDate!.characterName,
+          })}
         </Banner>
       )}
 
@@ -210,7 +216,9 @@ export function Minigames() {
                 disabled={busy || outOfEnergy || onDate}
                 title={
                   onDate
-                    ? t('minigames.finishDateFirst', { name: activeDate!.characterName })
+                    ? t(activeDate!.mode === 'hangout' ? 'minigames.finishHangoutFirst' : 'minigames.finishDateFirst', {
+                        name: activeDate!.characterName,
+                      })
                     : outOfEnergy
                       ? t('minigames.outOfEnergyTitle')
                       : undefined

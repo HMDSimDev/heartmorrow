@@ -173,6 +173,15 @@ export function buildSystemPrompt(ctx: PromptContext, guardrails: string): strin
   // isn't buried beneath world/social/gossip lore.
   const directiveParts: string[] = [];
 
+  // --- Hangout re-framing (highest priority) ---
+  // The core guardrails are written for a date ("you are a PERSON on a date"). A
+  // hangout reuses that whole prompt, so it has to say up front that this sitting
+  // isn't a date — otherwise the character plays an afternoon in the park like a
+  // candlelit dinner. First directive in, so it colors everything that follows.
+  if (ctx.session.mode === 'hangout') {
+    directiveParts.push(resolvePrompt('date.hangout'));
+  }
+
   // A clean "strangers meeting for the first time" beat: it's a first date AND no
   // word about the player has reached them secondhand. When secondhand word HAS
   // reached them, the recognition beat (WORD ABOUT <player>) owns the framing and
@@ -577,7 +586,9 @@ export function buildSystemPrompt(ctx: PromptContext, guardrails: string): strin
       : `The player is: ${ctx.player.name} (${ctx.player.pronouns}${playerGender}).`,
   ];
   if (ctx.player.personaNotes && !strangerMeeting) sceneLines.push(`About the player: ${ctx.player.personaNotes}`);
-  sceneLines.push(`Mode: ${ctx.session.mode}.`);
+  sceneLines.push(
+    ctx.session.mode === 'hangout' ? `Mode: hangout (casual time together — not a date).` : `Mode: ${ctx.session.mode}.`,
+  );
   // Time of day now lives in the "RIGHT NOW" block above (with its consistency rule).
   if (ctx.location) sceneLines.push(`Current location/activity: ${ctx.location.name} — ${ctx.location.description}`);
   // The cost of the outing — let them notice (and react in character to) the spend.
@@ -655,9 +666,14 @@ function transcript(messages: Message[], characterName: string): string {
     .join('\n');
 }
 
-/** Messages for the structured session evaluator. */
+/**
+ * Messages for the structured session evaluator. A hangout swaps in its own
+ * guardrails: no rapport judged it turn by turn, and it is not a romantic occasion,
+ * so the two passes weigh the same transcript differently.
+ */
 export function buildEvaluatorMessages(ctx: PromptContext): ChatMessage[] {
   const c = ctx.character;
+  const hangout = ctx.session.mode === 'hangout';
   // Gift beats (the "🎁 you gave …" narrator line + the character's gift reaction)
   // are EXCLUDED here: a gift's relationship impact is already applied immediately
   // and deterministically by the gift service (capped + anti-grind), so letting the
@@ -682,7 +698,9 @@ export function buildEvaluatorMessages(ctx: PromptContext): ChatMessage[] {
   if (c.dislikes.length) aboutLines.push(`Dislikes / turn-offs: ${c.dislikes.join(', ')}`);
   if (c.loveLanguage) aboutLines.push(`Love language: ${c.loveLanguage}`);
   if (c.boundaries.length) aboutLines.push(`Stated boundaries (crossing one is a real setback): ${c.boundaries.join(', ')}`);
-  const aboutBlock = aboutLines.length ? `Who ${c.name} is (judge against THIS person, not a generic date):\n${bullet(aboutLines)}\n\n` : '';
+  const aboutBlock = aboutLines.length
+    ? `Who ${c.name} is (judge against THIS person, not a generic ${hangout ? 'friend' : 'date'}):\n${bullet(aboutLines)}\n\n`
+    : '';
 
   // The hidden "what they wanted tonight" read — the same need the date prompt
   // and per-turn judge use. Reward reading it; penalize trampling it.
@@ -698,7 +716,7 @@ export function buildEvaluatorMessages(ctx: PromptContext): ChatMessage[] {
     `Conversation transcript:\n${convo || '(no messages)'}\n\n` +
     `Evaluate the conversation per the required schema.`;
   return [
-    { role: 'system', content: resolvePrompt('EVALUATOR_GUARDRAILS') },
+    { role: 'system', content: resolvePrompt(hangout ? 'HANGOUT_EVALUATOR_GUARDRAILS' : 'EVALUATOR_GUARDRAILS') },
     { role: 'user', content },
   ];
 }

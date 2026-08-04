@@ -7,6 +7,7 @@ import {
   TextJudgeSchema,
   TEXT_DAILY_GAIN_CAP,
   isMemorialized,
+  isMeetingMode,
   phaseIndex,
   textEngagementDelta,
   positiveWarmth,
@@ -39,14 +40,13 @@ import { buildTextReplyMessages, buildTextJudgeMessages } from '../prompt/prompt
 import { recordEvent } from './event-service';
 
 /**
- * True once the player has been on a REAL date (or event) with this character —
- * a session they actually participated in. A date that was started but never
- * spoken in does not count (it has no messages), so it never enables texting.
+ * True once the player has actually MET this character — a date, an event, or a
+ * hangout they really participated in. (Hanging out is how you'd get someone's
+ * number in real life, so it unlocks texting exactly like a date does.) A sitting
+ * that was started but never spoken in does not count (it has no messages).
  */
 export function hasDated(characterId: string): boolean {
-  return sessionsRepo
-    .listByCharacter(characterId)
-    .some((s) => (s.mode === 'date' || s.mode === 'event') && messagesRepo.hasRole(s.id, 'player'));
+  return sessionsRepo.listByCharacter(characterId).some((s) => isMeetingMode(s.mode) && messagesRepo.hasRole(s.id, 'player'));
 }
 
 /** Characters the player may text — only those they've actually dated (optionally

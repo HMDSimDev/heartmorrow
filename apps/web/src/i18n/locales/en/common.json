@@ -390,9 +390,13 @@
     "sleep": "Sleep",
     "endDay": "End day",
     "onDateWith": "On a date with {name}",
+    "onHangoutWith": "Hanging out with {name}",
     "dateInProgress": "Date in progress with {name}",
+    "hangoutInProgress": "Hangout in progress with {name}",
     "endDayDateBlock": "You're on a date with {name} — finish it on the Date tab before ending the day.",
-    "onDateNote": "On a date — finish it to end the day."
+    "endDayHangoutBlock": "You're hanging out with {name} — finish it on the Date tab before ending the day.",
+    "onDateNote": "On a date — finish it to end the day.",
+    "onHangoutNote": "Hanging out — finish it to end the day."
   },
   "recap": {
     "newDay": "A new day dawns",

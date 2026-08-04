@@ -7,6 +7,7 @@ import {
   anniversaryAnchorFlag,
   currentStatus,
   isBrokenUp,
+  isDateMode,
   nextDtrRung,
   type DtrResponse,
   type RelationshipStatus,
@@ -76,6 +77,12 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
   const session = sessionsRepo.get(sessionId);
   if (!session) throw notFound(`Session ${sessionId} not found.`);
   if (session.ended) throw badRequest('This date has already ended.');
+  // Defining the relationship is a date conversation. A hangout deliberately carries
+  // no relationship machinery (no rapport, no milestones, no endings), so it can't be
+  // where you ask either — the client hides the button, this backs it up.
+  if (!isDateMode(session.mode)) {
+    throw badRequest("That's a conversation for a real date, not a hangout.");
+  }
   // A date you never spoke in isn't a real date (endSession would discard it),
   // so it must not be able to advance the relationship. Require a player turn.
   if (!messagesRepo.listBySession(sessionId).some((m) => m.role === 'player')) {
@@ -189,8 +196,8 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
         /* strain is best-effort */
       }
     }
-    // A bad ask blows up a real date (chat mode just gets the cold reply).
-    ended = session.mode !== 'chat';
+    // A bad ask blows up a real date (only dates reach here — see the guard above).
+    ended = isDateMode(session.mode);
   } else {
     setCooldown();
     recordEvent('dtr_deflected', { characterId: character.id });

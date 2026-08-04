@@ -283,6 +283,7 @@ function rowToMemory(r: Row): CharacterMemory {
     importance: Number(r.importance),
     tags: fromJson(r.tags, []),
     sourceEventId: nStr(r.source_event_id),
+    sourceMode: nStr(r.source_mode),
     relatedCharacterId: nStr(r.related_character_id),
     createdAt: Number(r.created_at),
     lastUsedAt: nNum(r.last_used_at),
@@ -301,9 +302,9 @@ export const memoriesRepo = {
   },
   insert(m: CharacterMemory): CharacterMemory {
     getDb().run(
-      `INSERT INTO character_memories (id,character_id,text,importance,tags,source_event_id,related_character_id,created_at,last_used_at)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      m.id, m.characterId, m.text, m.importance, j(m.tags), m.sourceEventId, m.relatedCharacterId, m.createdAt, m.lastUsedAt,
+      `INSERT INTO character_memories (id,character_id,text,importance,tags,source_event_id,source_mode,related_character_id,created_at,last_used_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      m.id, m.characterId, m.text, m.importance, j(m.tags), m.sourceEventId, m.sourceMode, m.relatedCharacterId, m.createdAt, m.lastUsedAt,
     );
     return m;
   },

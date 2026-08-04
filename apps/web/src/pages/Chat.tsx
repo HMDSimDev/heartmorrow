@@ -231,8 +231,14 @@ export function Chat() {
 
   // Show the first-date walkthrough when the FIRST date ever opens (fresh start
   // or resume alike) — the seen-flag is client-global, spanning worlds and saves.
+  // Mark it seen the moment it AUTO-OPENS, not on close: a refresh, tab close, or
+  // dev hot-reload while the modal is up would otherwise never write the flag,
+  // and the walkthrough would greet every subsequent date mount. Worst case the
+  // player glimpsed card one — the rail's "How dating works" button is the
+  // deliberate way back in.
   useEffect(() => {
     if (session?.mode === 'date' && localStorage.getItem(DATE_ONBOARDING_KEY) !== '1') {
+      localStorage.setItem(DATE_ONBOARDING_KEY, '1');
       setOnboardingOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1146,12 +1152,13 @@ export function Chat() {
     // hasn't landed). NEVER show the plan-a-date form here — that would let the player
     // open a SECOND concurrent date. Offer to reopen the real one instead.
     if (activeDate) {
+      const openIsHangout = activeDate.mode === 'hangout';
       return (
         <div className="stack">
           <div className="page-head">
-            <div className="kicker">{t('chat.tonightsPlan')}</div>
-            <h1>{t('chat.onADateTitle')}</h1>
-            <p>{t('chat.onADateBody', { name: activeDate.characterName })}</p>
+            <div className="kicker">{t(openIsHangout ? 'chat.todaysPlan' : 'chat.tonightsPlan')}</div>
+            <h1>{t(openIsHangout ? 'chat.onAHangoutTitle' : 'chat.onADateTitle')}</h1>
+            <p>{t(openIsHangout ? 'chat.onAHangoutBody' : 'chat.onADateBody', { name: activeDate.characterName })}</p>
           </div>
           {error && <Banner kind="error">{error}</Banner>}
           <div className="framed date-setup">
@@ -1163,7 +1170,8 @@ export function Chat() {
                 </>
               ) : (
                 <>
-                  <Icon name="date" size={16} /> {t('chat.resumeDate', { name: activeDate.characterName })}
+                  <Icon name="date" size={16} />{' '}
+                  {t(openIsHangout ? 'chat.resumeHangout' : 'chat.resumeDate', { name: activeDate.characterName })}
                 </>
               )}
             </button>
@@ -1176,12 +1184,15 @@ export function Chat() {
     const wallet = setupMoney ?? player?.money ?? 0;
     const sameWorld = !setupWorld || setupWorld.id === activeWorldId;
     const outOfEnergy = sameWorld && worldState != null && worldState.stamina <= 0;
+    // A hangout is the same evening, minus the occasion: no venue spend (so only
+    // free spots are offered) and none of the date machinery once it starts.
+    const planningHangout = setup.mode === 'hangout';
     return (
       <div className="stack">
         <div className="page-head">
-          <div className="kicker">{t('chat.tonightsPlan')}</div>
-          <h1>{t('chat.planADate')}</h1>
-          <p>{t('chat.planSub')}</p>
+          <div className="kicker">{t(planningHangout ? 'chat.todaysPlan' : 'chat.tonightsPlan')}</div>
+          <h1>{t(planningHangout ? 'chat.planAHangout' : 'chat.planADate')}</h1>
+          <p>{t(planningHangout ? 'chat.planSubHangout' : 'chat.planSub')}</p>
         </div>
         {error && <Banner kind="error">{error}</Banner>}
         {characters.length === 0 ? (
@@ -1193,8 +1204,37 @@ export function Chat() {
             <div className="date-setup-head">
               <div className="date-setup-mark" aria-hidden="true" />
               <div>
-                <div className="kicker date-setup-kicker">{t('chat.arrangeEvening')}</div>
+                <div className="kicker date-setup-kicker">
+                  {t(planningHangout ? 'chat.arrangeAfternoon' : 'chat.arrangeEvening')}
+                </div>
                 <h2>{t('chat.whoWhereWhen')}</h2>
+              </div>
+            </div>
+            {/* Date or hangout. Picked first because it changes which venues are on
+                offer (a hangout is always free) and everything that follows. */}
+            <div className="date-mode-pick" role="radiogroup" aria-label={t('chat.modeField')}>
+              <div className="kicker">{t('chat.modeField')}</div>
+              <div className="date-mode-grid">
+                {(['date', 'hangout'] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={setup.mode === m}
+                    className={`date-mode-card${setup.mode === m ? ' selected' : ''}`}
+                    // Switching modes resets the venue: the free-only list a hangout
+                    // offers may not contain whatever a date had selected.
+                    onClick={() => setSetup((s) => ({ ...s, mode: m, locationId: 'anywhere' }))}
+                  >
+                    <span className="date-mode-glyph" aria-hidden="true">{m === 'date' ? '🕯' : '🌿'}</span>
+                    <span className="date-mode-copy">
+                      <span className="date-mode-name">{t(m === 'date' ? 'chat.modeDate' : 'chat.modeHangout')}</span>
+                      <span className="date-mode-sub">
+                        {t(m === 'date' ? 'chat.modeDateSub' : 'chat.modeHangoutSub')}
+                      </span>
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
             <div className="date-pick">
@@ -1233,7 +1273,7 @@ export function Chat() {
               </div>
             </div>
             {((setupWorld && setupWorld.locations.length > 0) || roomUnlocked || setupProperties.length > 0) && (
-              <Field label={t('chat.locationField')}>
+              <Field label={t(planningHangout ? 'chat.hangoutLocationField' : 'chat.locationField')}>
                 {(() => {
                   // One unified list of pickable venues rendered as photo tiles.
                   // Each tile: a value (locationId), label, optional sub-line,
@@ -1249,7 +1289,11 @@ export function Chat() {
                   // "Anywhere" lets the server pick: the first free public venue, else
                   // the cheapest one you can afford. Mirror that here so the tile shows
                   // the right cost (and disables when nothing's affordable).
-                  const locs = setupWorld?.locations ?? [];
+                  // A hangout never spends, so paid venues aren't on offer at all —
+                  // the server refuses them, and "Anywhere" resolves to a free spot.
+                  const locs = (setupWorld?.locations ?? []).filter(
+                    (l) => !planningHangout || venueCost(l.priceTier) === 0,
+                  );
                   const anyFree = locs.some((l) => venueCost(l.priceTier) === 0);
                   const cheapestAffordablePaid = [...locs]
                     .filter((l) => venueCost(l.priceTier) > 0)
@@ -1280,7 +1324,7 @@ export function Chat() {
                       glyph: '🏠',
                     });
                   }
-                  for (const l of setupWorld?.locations ?? []) {
+                  for (const l of locs) {
                     const cost = venueCost(l.priceTier);
                     const meta = venueTierMeta(l.priceTier);
                     const broke = cost > wallet;
@@ -1336,7 +1380,7 @@ export function Chat() {
                   );
                 })()}
                 <div className="muted" style={{ fontSize: '0.78rem', marginTop: '0.5rem' }}>
-                  {t('chat.walletNote', { wallet })}
+                  {planningHangout ? t('chat.hangoutFreeNote') : t('chat.walletNote', { wallet })}
                 </div>
               </Field>
             )}
@@ -1370,7 +1414,7 @@ export function Chat() {
                 </>
               ) : (
                 <>
-                  <Icon name="date" size={16} /> {t('chat.begin')}
+                  <Icon name="date" size={16} /> {t(planningHangout ? 'chat.beginHangout' : 'chat.begin')}
                 </>
               )}
             </button>
@@ -1381,6 +1425,11 @@ export function Chat() {
   }
 
   // --- chat screen ---
+  // A hangout runs the same conversation with none of the date apparatus: nothing is
+  // judging it turn by turn (no trajectory, no intents, no reaction chips), nobody
+  // walks out, and you can't define the relationship over one. Every date-only
+  // surface below hangs off this.
+  const hangout = session.mode === 'hangout';
   const status = relationship ? currentStatus(relationship) : 'none';
   const rung = relationship ? nextDtrRung(relationship) : null;
   const spokeThisSession = messages.some((m) => m.role === 'player');
@@ -1390,7 +1439,7 @@ export function Chat() {
   const dtrLastAttempt = relationship?.flags['dtr:lastAttemptDay'];
   const dtrOnCooldown =
     scene != null && typeof dtrLastAttempt === 'number' && scene.day - dtrLastAttempt < DTR_COOLDOWN_DAYS;
-  const dtrReady = !!rung && rung.warmthMet && spokeThisSession && !dtrOnCooldown;
+  const dtrReady = !hangout && !!rung && rung.warmthMet && spokeThisSession && !dtrOnCooldown;
   // The date is over (evaluated or any terminal path) → no more composing, and the
   // actions collapse to "New date". Mirrors dateConcluded so the lock clears in step.
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
@@ -1445,7 +1494,7 @@ export function Chat() {
         <div className="date-moment date-recap">
           <div className="date-moment-seal" aria-hidden="true">❧</div>
           <div className="date-recap-head">
-            <div className="date-moment-kicker">{t('chat.recapKicker')}</div>
+            <div className="date-moment-kicker">{t(hangout ? 'chat.recapKickerHangout' : 'chat.recapKicker')}</div>
             {evalResult.mood && <span className="date-recap-mood">{evalResult.mood}</span>}
           </div>
           {evalResult.summaryLine && <p className="date-recap-summary">{evalResult.summaryLine}</p>}
@@ -1695,8 +1744,13 @@ export function Chat() {
                 live — you finish it (End & evaluate), or back out of one you haven't
                 spoken in (Cancel date, free). Once it's over, start a new one. */}
             {locked ? (
-              <button className="btn ghost block" onClick={dismissRecap} disabled={busy} title={t('chat.newDateTitle')}>
-                <Icon name="recap" size={14} /> {t('chat.newDate')}
+              <button
+                className="btn ghost block"
+                onClick={dismissRecap}
+                disabled={busy}
+                title={t(hangout ? 'chat.newHangoutTitle' : 'chat.newDateTitle')}
+              >
+                <Icon name="recap" size={14} /> {t(hangout ? 'chat.newHangout' : 'chat.newDate')}
               </button>
             ) : spokeThisSession ? (
               <>
@@ -1704,17 +1758,20 @@ export function Chat() {
                   <Icon name="recap" size={14} /> {t('chat.recap')}
                 </button>
                 <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active}>
-                  {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t('chat.endEvaluate')}</>}
+                  {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t(hangout ? 'chat.endHangout' : 'chat.endEvaluate')}</>}
                 </button>
               </>
             ) : (
               <button className="btn ghost block date-end-btn" onClick={cancelDate} disabled={busy || streaming.active}>
-                {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {t('chat.cancelDate')}</>}
+                {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {t(hangout ? 'chat.cancelHangout' : 'chat.cancelDate')}</>}
               </button>
             )}
-            <button className="btn sm ghost block date-howto" onClick={() => setOnboardingOpen(true)}>
-              <Icon name="info" size={13} /> {t('chat.howDating')}
-            </button>
+            {/* The walkthrough is about dating — it has nothing to say about a hangout. */}
+            {!hangout && (
+              <button className="btn sm ghost block date-howto" onClick={() => setOnboardingOpen(true)}>
+                <Icon name="info" size={13} /> {t('chat.howDating')}
+              </button>
+            )}
           </div>
         </aside>
 
@@ -1724,14 +1781,22 @@ export function Chat() {
               <img src={assetUrl(locationImage)} alt="" />
             </div>
           )}
-          {!locked && (
-            <DateTrajectory
-              value={rapport}
-              anchor={startingRapport(character.guardedness)}
-              label={vibe ?? t('chat.settlingIn')}
-              pulse={rapportPulse}
-            />
-          )}
+          {/* The trajectory bar reads the live rapport. A hangout has none, so it
+              takes the bar's place with a line saying exactly why. */}
+          {!locked &&
+            (hangout ? (
+              <div className="date-hangout-ribbon">
+                <span className="date-hangout-tag">{t('chat.hangoutBadge')}</span>
+                <span className="date-hangout-note">{t('chat.hangoutRibbon')}</span>
+              </div>
+            ) : (
+              <DateTrajectory
+                value={rapport}
+                anchor={startingRapport(character.guardedness)}
+                label={vibe ?? t('chat.settlingIn')}
+                pulse={rapportPulse}
+              />
+            ))}
           <div className="messages date-reel">
             {messages.length === 0 && !streaming.active && (
               <div className="date-opening">
@@ -1889,7 +1954,9 @@ export function Chat() {
                   }}
                 />
                 <div className="date-composer-bar">
-                  {relationship && (
+                  {/* Intents are a claim the judges grade. Nothing judges a hangout,
+                      so offering them would promise a mechanic that isn't running. */}
+                  {relationship && !hangout && (
                     <div className="date-intents" role="group" aria-label={t('chat.intentComing')}>
                       {availableIntents(relationship).map((opt) => (
                         <button

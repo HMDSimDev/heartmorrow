@@ -137,7 +137,9 @@ export function DayHud() {
           disabled={sleeping || !!activeDate}
           title={
             activeDate
-              ? t('hud.endDayDateBlock', { name: activeDate.characterName })
+              ? t(activeDate.mode === 'hangout' ? 'hud.endDayHangoutBlock' : 'hud.endDayDateBlock', {
+                  name: activeDate.characterName,
+                })
               : undefined
           }
         >
@@ -145,7 +147,9 @@ export function DayHud() {
         </button>
       </div>
 
-      {activeDate && <small className="hud-note">{t('hud.onDateNote')}</small>}
+      {activeDate && (
+        <small className="hud-note">{t(activeDate.mode === 'hangout' ? 'hud.onHangoutNote' : 'hud.onDateNote')}</small>
+      )}
       {error && <small className="hud-err">{error}</small>}
       {recap && <RecapModal res={recap} onClose={() => setRecap(null)} />}
     </div>

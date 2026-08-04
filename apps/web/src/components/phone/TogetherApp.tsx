@@ -89,7 +89,11 @@ export function TogetherApp() {
       return;
     }
     if (onDate) {
-      setError(t('together.errOnDate', { name: activeDate!.characterName }));
+      setError(
+        t(activeDate!.mode === 'hangout' ? 'together.errOnHangout' : 'together.errOnDate', {
+          name: activeDate!.characterName,
+        }),
+      );
       return;
     }
     if (!target) {

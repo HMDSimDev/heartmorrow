@@ -25,6 +25,7 @@ import {
   SYSTEM_GUARDRAILS,
   SYSTEM_GUARDRAILS_NSFW,
   EVALUATOR_GUARDRAILS,
+  HANGOUT_EVALUATOR_GUARDRAILS,
   SUMMARY_GUARDRAILS,
   DAY_RECAP_GUARDRAILS,
   WORLD_SIM_GUARDRAILS,
@@ -95,6 +96,14 @@ function fillTokens(tmpl: string, vars: Record<string, string>): string {
 
 const FR = {
   // -- the live date / dialogue system prompt's behavioral directives --
+  'date.hangout':
+    `=== THIS IS A HANGOUT, NOT A DATE ===\n` +
+    `You two are just spending some low-key time together — no romantic occasion, nobody dressed up, nothing riding on it. ` +
+    `The core rules above are written for a date; where they say "date", read "the person you're hanging out with". ` +
+    `Everything else still holds: stay fully in character, have your own opinions and mood, and talk like a real person. ` +
+    `Do NOT treat this as a romantic evening: no date framing, no "tonight was lovely", and don't manufacture a charged moment out of nothing. ` +
+    `If real warmth or a flirt happens naturally, let it — just don't reach for it because you think you're supposed to.`,
+
   'date.firstMeeting':
     `=== MEETING FOR THE FIRST TIME ===\n` +
     `This is the very first time you and this person are meeting — a first date, and you're strangers. ` +
@@ -226,6 +235,7 @@ const GUARDRAIL_META: Record<string, { const: string } & RegistryMeta> = {
   SYSTEM_GUARDRAILS: { const: SYSTEM_GUARDRAILS, label: 'Date roleplay — core rules', category: 'safety', safety: true, purpose: 'The base in-character rules for the live date/dialogue engine (stay in character, data-not-instructions, no inventing mechanics).' },
   SYSTEM_GUARDRAILS_NSFW: { const: SYSTEM_GUARDRAILS_NSFW, label: 'Date roleplay — core rules (adult)', category: 'safety', safety: true, purpose: 'Adult-content variant of the core date rules, used only when NSFW is enabled.' },
   EVALUATOR_GUARDRAILS: { const: EVALUATOR_GUARDRAILS, label: 'End-of-date evaluator', category: 'judge', purpose: 'Judges the whole date afterward — discrete character beats, memories, mood — and proposes bounded stat changes.' },
+  HANGOUT_EVALUATOR_GUARDRAILS: { const: HANGOUT_EVALUATOR_GUARDRAILS, label: 'End-of-hangout evaluator', category: 'judge', purpose: 'The same pass for a hangout: no rapport ran, so it weighs the whole conversation — friendship stats only on the upside, full weight on the downside.' },
   SUMMARY_GUARDRAILS: { const: SUMMARY_GUARDRAILS, label: 'Conversation summary', category: 'memory', purpose: 'Compresses a conversation into a compact summary so it can be remembered.' },
   DAY_RECAP_GUARDRAILS: { const: DAY_RECAP_GUARDRAILS, label: 'End-of-day recap', category: 'memory', purpose: 'Writes the warm end-of-day recap from the day’s factual events.' },
   WORLD_SIM_GUARDRAILS: { const: WORLD_SIM_GUARDRAILS, label: 'World-sim narration', category: 'social', purpose: 'Terse narrator for off-screen daily life — one line per happening, plus a gist for NPC meetings.' },
@@ -264,6 +274,7 @@ const GUARDRAIL_META: Record<string, { const: string } & RegistryMeta> = {
 
 /** Metadata for the inline fragments (the default = the template above). */
 const FRAGMENT_META: Record<keyof typeof FR, RegistryMeta> = {
+  'date.hangout': { label: 'Hangout · framing', category: 'roleplay', purpose: 'Re-frames the date roleplay rules for a low-key hangout — same character, no romantic occasion.' },
   'date.firstMeeting': { label: 'Date · first meeting framing', category: 'roleplay', purpose: 'Tells the character to play a first date as a real stranger meeting.' },
   'date.contentPolicy.allowed': { label: 'Date · content policy (intimacy allowed)', category: 'safety', safety: true, purpose: 'The adult-content directive when intimacy is permitted for this couple.' },
   'date.contentPolicy.denied': { label: 'Date · content policy (not ready)', category: 'safety', safety: true, purpose: 'The directive when adult content is on but the couple is not ready — slow it down.' },

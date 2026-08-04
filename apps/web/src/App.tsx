@@ -100,16 +100,18 @@ export default function App() {
   const badgeFor = (to: string) => {
     if (to === '/phone' && unreadTexts > 0)
       return <span className="nav-badge">{unreadTexts > 9 ? '9+' : unreadTexts}</span>;
-    // A live date is underway — a pulsing dot on the Date tab so a refresh/navigation
-    // away never hides that there's a date to return to.
-    if (to === '/chat' && activeDate)
+    // A live date or hangout is underway — a pulsing dot on the Date tab so a
+    // refresh/navigation away never hides that there's someone to get back to.
+    if (to === '/chat' && activeDate) {
+      const isHangout = activeDate.mode === 'hangout';
       return (
         <span
           className="nav-badge nav-badge-live"
-          title={t('hud.onDateWith', { name: activeDate.characterName })}
-          aria-label={t('hud.dateInProgress', { name: activeDate.characterName })}
+          title={t(isHangout ? 'hud.onHangoutWith' : 'hud.onDateWith', { name: activeDate.characterName })}
+          aria-label={t(isHangout ? 'hud.hangoutInProgress' : 'hud.dateInProgress', { name: activeDate.characterName })}
         />
       );
+    }
     return null;
   };
   return (

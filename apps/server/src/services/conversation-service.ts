@@ -28,6 +28,8 @@ import {
   jealousyProbability,
   isCommitted,
   isBrokenUp,
+  isDateMode,
+  isMeetingMode,
   ANNIVERSARY_DATE_BONUS,
   anniversaryOn,
   isMemorialized,
@@ -166,25 +168,31 @@ export function createSession(input: ConversationCreate): ConversationSession {
   // not a real id) is resolved to a concrete venue inside the date block below; it
   // never reaches a chat or worldless session as a literal location.
   let resolvedLocationId: string | null = input.locationId ?? null;
-  // Real meetings (anything but a free-form chat) cost a daily action and require
-  // the character to be available today (world-bound only). 'chat' is exempt.
-  if (input.mode !== 'chat' && character.worldId) {
+  // `ConversationCreate` is the schema's INPUT type, so `mode` is optional here even
+  // though the parse below defaults it. Resolve it once, up front, so the gates read
+  // the same value the session is actually created with.
+  const mode = input.mode ?? 'chat';
+  // Real meetings (a date OR a hangout) cost a daily action and require the
+  // character to be available today (world-bound only). A bare `chat` is exempt.
+  // Only the venue-SPEND block below is date-only: hanging out is always free.
+  if (isMeetingMode(mode) && character.worldId) {
+    const outing = mode === 'hangout' ? 'hangout' : 'date';
     // Make the Sleep/date exclusion reciprocal. Sleep claims this guard before
     // checking active sessions, so a date cannot begin during a partially committed
     // multi-step day rollover from another tab.
     if (isWorldAdvancing(character.worldId)) {
-      throw badRequest('The day is turning over — give it a moment before starting a date.');
+      throw badRequest(`The day is turning over — give it a moment before starting a ${outing}.`);
     }
-    // One live date per world. The client guards against starting a second date
+    // One live meeting per world. The client guards against starting a second one
     // (Chat.tsx `if (activeDate) return`), but that's best-effort UI state — a
     // double-submit, a second tab, or a stale/failed active-date fetch can slip a
-    // second POST through. Enforce it authoritatively here so dates can't "stack":
+    // second POST through. Enforce it authoritatively here so sittings can't "stack":
     // without this, two open sessions coexist and ending one silently resurfaces the
     // other (getActiveDateForWorld returns them one at a time).
     const openDate = getActiveDateForWorld(character.worldId);
     if (openDate) {
       throw badRequest(
-        `You're already on a date with ${openDate.characterName} — wrap that up before starting another.`,
+        `You're already ${openDate.mode === 'hangout' ? 'hanging out' : 'on a date'} with ${openDate.characterName} — wrap that up before starting another.`,
       );
     }
     const day = ensureWorldState(character.worldId).day;
@@ -194,7 +202,7 @@ export function createSession(input: ConversationCreate): ConversationSession {
     if (isBrokenUp(rel)) {
       const since = rel.flags['breakup:day'];
       if (typeof since === 'number' && day - since < RECONCILE_COOLDOWN_DAYS) {
-        throw badRequest(`${character.name} needs some space right now — give it a little time before reaching out for a date.`);
+        throw badRequest(`${character.name} needs some space right now — give it a little time before reaching out to meet up.`);
       }
     }
     const avail = getCharacterAvailability(character.worldId, day, character.id);
@@ -202,30 +210,48 @@ export function createSession(input: ConversationCreate): ConversationSession {
       throw badRequest(`${character.name} ${avail.reason ?? 'is unavailable today'}.`);
     }
     assertCanAct(character.worldId);
-    // Soft money gate: you can't take someone somewhere you can't afford (free
-    // venues always exist, so dating itself is never blocked). The wallet is only
-    // CHECKED here; it's charged when the date actually ends (mirrors stamina), so
-    // an abandoned setup never costs money.
-    // A property venue is only valid if you own or currently lease it — reject a
-    // `prop:` location you have no claim to rather than silently degrading to a
-    // locationless date.
     const world = worldsRepo.get(character.worldId) ?? null;
-    // "Anywhere": auto-pick a RANDOM free public venue (for variety), else the cheapest
-    // the player can currently afford — refusing the date outright when nothing is affordable.
-    if (resolvedLocationId === 'anywhere') {
-      resolvedLocationId = pickAnywhereVenue(world?.locations ?? [], getOrCreatePlayer(playerIdForWorld(character.worldId)).money);
-    }
-    if (resolvedLocationId?.startsWith('prop:') && !propertyVenueInfo(resolvedLocationId, character.worldId)) {
-      throw badRequest('You can only date at a place you own or lease.');
-    }
-    const venue = resolveSessionLocation(resolvedLocationId, character, world);
-    const cost = venueCost(venue?.priceTier);
-    if (cost > 0) {
-      const money = getOrCreatePlayer(playerIdForWorld(character.worldId)).money;
-      if (money < cost) {
-        throw badRequest(
-          `You can't afford ${venue?.name ?? 'this venue'} right now (it costs ${cost}, you have ${money}). Pick a cheaper spot, or earn more first.`,
-        );
+    if (mode === 'hangout') {
+      // A hangout never costs money, so it can only happen somewhere free — the
+      // spend levers (venue taste, property buff) are date-only anyway, and letting
+      // a hangout book a lavish venue for nothing would read as a loophole.
+      // "Anywhere" picks a random free spot; a paid one is refused outright.
+      const free = (world?.locations ?? []).filter((l) => venueCost(l.priceTier) === 0);
+      if (resolvedLocationId === 'anywhere') {
+        resolvedLocationId = free.length > 0 ? pickAnywhereVenue(free, 0) : null;
+      } else if (resolvedLocationId) {
+        const venue = resolveSessionLocation(resolvedLocationId, character, world);
+        if (venueCost(venue?.priceTier) > 0) {
+          throw badRequest(
+            `Hanging out doesn't come with a night out — pick somewhere free, or save ${venue?.name ?? 'that place'} for a real date.`,
+          );
+        }
+      }
+    } else {
+      // Soft money gate: you can't take someone somewhere you can't afford (free
+      // venues always exist, so dating itself is never blocked). The wallet is only
+      // CHECKED here; it's charged when the date actually ends (mirrors stamina), so
+      // an abandoned setup never costs money.
+      // A property venue is only valid if you own or currently lease it — reject a
+      // `prop:` location you have no claim to rather than silently degrading to a
+      // locationless date.
+      // "Anywhere": auto-pick a RANDOM free public venue (for variety), else the cheapest
+      // the player can currently afford — refusing the date outright when nothing is affordable.
+      if (resolvedLocationId === 'anywhere') {
+        resolvedLocationId = pickAnywhereVenue(world?.locations ?? [], getOrCreatePlayer(playerIdForWorld(character.worldId)).money);
+      }
+      if (resolvedLocationId?.startsWith('prop:') && !propertyVenueInfo(resolvedLocationId, character.worldId)) {
+        throw badRequest('You can only date at a place you own or lease.');
+      }
+      const venue = resolveSessionLocation(resolvedLocationId, character, world);
+      const cost = venueCost(venue?.priceTier);
+      if (cost > 0) {
+        const money = getOrCreatePlayer(playerIdForWorld(character.worldId)).money;
+        if (money < cost) {
+          throw badRequest(
+            `You can't afford ${venue?.name ?? 'this venue'} right now (it costs ${cost}, you have ${money}). Pick a cheaper spot, or earn more first.`,
+          );
+        }
       }
     }
   } else if (resolvedLocationId === 'anywhere') {
@@ -236,7 +262,7 @@ export function createSession(input: ConversationCreate): ConversationSession {
     id: newId('sess'),
     characterId: input.characterId,
     locationId: resolvedLocationId,
-    mode: input.mode,
+    mode,
     summary: '',
     ended: false,
     createdAt: now,
@@ -261,15 +287,15 @@ export function getSessionWithMessages(id: string): SessionWithMessages {
 }
 
 /**
- * The world's single live, in-progress date (if any): the most-recently-updated
- * non-ended date/event session whose character belongs to this world. Drives the
- * client's auto-resume (a date survives a navigation/refresh) and the "a date is
- * underway" lock on day-spending actions. Read-only — never mutates. Only `date`/
- * `event` sessions count — a plain `chat` or a `minigame` session is never a date.
+ * The world's single live, in-progress meeting (if any): the most-recently-updated
+ * non-ended date/event/hangout session whose character belongs to this world. Drives
+ * the client's auto-resume (a sitting survives a navigation/refresh) and the "someone
+ * is waiting on you" lock on day-spending actions. Read-only — never mutates. A bare
+ * `chat` never counts. Read `mode` to tell a date from a hangout.
  */
 export function getActiveDateForWorld(worldId: string): ActiveDate | null {
   for (const s of sessionsRepo.listActive()) {
-    if (s.mode !== 'date' && s.mode !== 'event') continue;
+    if (!isMeetingMode(s.mode)) continue;
     const character = charactersRepo.get(s.characterId);
     if (!character || character.worldId !== worldId) continue;
     // No rapport/vibe until a turn has actually been JUDGED: the rapport row is
@@ -295,17 +321,19 @@ export function getActiveDateForWorld(worldId: string): ActiveDate | null {
 }
 
 /**
- * Throw if this world has a live date underway. Day-spending actions (Sleep, work
- * shifts, minigames) are locked while a date is open: running the clock or the
- * energy budget mid-date would misfile the date's events, reset stamina under it,
- * or neglect-decay the very character you're out with. The client disables those
- * buttons, but only off its own per-tab `activeDate` state — a second tab that
- * loaded before the date began can still send the request, so enforce it here.
+ * Throw if this world has a live date or hangout underway. Day-spending actions
+ * (Sleep, work shifts, minigames) are locked while one is open: running the clock or
+ * the energy budget mid-sitting would misfile its events, reset stamina under it, or
+ * neglect-decay the very person you're out with. The client disables those buttons,
+ * but only off its own per-tab `activeDate` state — a second tab that loaded before
+ * the sitting began can still send the request, so enforce it here.
  */
 export function assertNoActiveDate(worldId: string): void {
   const openDate = getActiveDateForWorld(worldId);
   if (openDate) {
-    throw badRequest(`You're on a date with ${openDate.characterName} — wrap that up first.`);
+    throw badRequest(
+      `You're ${openDate.mode === 'hangout' ? 'hanging out' : 'on a date'} with ${openDate.characterName} — wrap that up first.`,
+    );
   }
 }
 
@@ -451,24 +479,19 @@ function heardAboutPlayer(
 }
 
 /**
- * True when this is the player's FIRST date with the character — they've never
- * actually met, so the character can't know the player's name or anything about
- * them. Stable for the whole first date: it looks at OTHER (prior) date/event
- * sessions the player actually spoke in, and requires the relationship still be at
- * the near-strangers band (so warmth built some other way doesn't fake a stranger).
- * Plain `chat` is never a "meeting".
+ * True when this is the player's FIRST time actually meeting the character — so the
+ * character can't know the player's name or anything about them. Stable for the whole
+ * sitting: it looks at OTHER (prior) meetings the player actually spoke in — dates and
+ * hangouts alike, since either one is a real introduction — and requires the
+ * relationship still be at the near-strangers band (so warmth built some other way
+ * doesn't fake a stranger). A bare `chat` is never a "meeting".
  */
 function isFirstMeeting(session: ConversationSession, relationship: Relationship): boolean {
-  if (session.mode === 'chat') return false;
+  if (!isMeetingMode(session.mode)) return false;
   if (bandIndex(warmthBand(relationship)) > 0) return false; // already warmed up somehow
   return !sessionsRepo
     .listByCharacter(session.characterId)
-    .some(
-      (s) =>
-        s.id !== session.id &&
-        (s.mode === 'date' || s.mode === 'event') &&
-        messagesRepo.hasRole(s.id, 'player'),
-    );
+    .some((s) => s.id !== session.id && isMeetingMode(s.mode) && messagesRepo.hasRole(s.id, 'player'));
 }
 
 export function buildPromptContextForSession(
@@ -499,8 +522,9 @@ export function buildPromptContextForSession(
     session,
     location,
     // The venue's spend tier (date/event only) so the character can notice the
-    // expense; 0 = free/anywhere. Null for plain chat.
-    venueTier: location && session.mode !== 'chat' ? location.priceTier ?? 0 : null,
+    // expense; 0 = free/anywhere. Null for a hangout or a plain chat — neither
+    // spends anything, so there is nothing to notice.
+    venueTier: location && isDateMode(session.mode) ? location.priceTier ?? 0 : null,
     recentMessages: messages,
     worldDay,
     chronicle: (() => {
@@ -518,8 +542,9 @@ export function buildPromptContextForSession(
     dayOfWeek: worldDay != null ? deriveCalendar(worldDay).dayOfWeek : null,
     recentTexts: getRecentTexts(character.id),
     // The hidden "what they want tonight" hint — date/event only, stable per world-day.
+    // A hangout carries no such expectation to read (or trample), by design.
     dateNeed:
-      world && worldDay != null && session.mode !== 'chat'
+      world && worldDay != null && isDateMode(session.mode)
         ? dateNeedFor(world.id, worldDay, character.id).behavior
         : null,
     guardedness: character.guardedness,
@@ -665,10 +690,11 @@ export async function openConversation(sessionId: string): Promise<Message | nul
   } catch {
     return null;
   }
-  if (session.ended || session.mode === 'chat') return null;
+  if (session.ended || !isMeetingMode(session.mode)) return null;
   if (messagesRepo.countBySession(sessionId) > 0) return null; // someone already spoke
   const character = getCharacter(session.characterId);
   const firstMeeting = isFirstMeeting(session, getRelationship(character.id));
+  const hangout = session.mode === 'hangout';
 
   const settings = getLlmSettings();
   try {
@@ -677,17 +703,21 @@ export async function openConversation(sessionId: string): Promise<Message | nul
       messages.push({
         role: 'system',
         content:
-          `OOC stage direction: the date is just beginning and this is the first time the two of you are meeting. ` +
+          (hangout
+            ? `OOC stage direction: the two of you are just meeting up to hang out, and this is the first time you've met. `
+            : `OOC stage direction: the date is just beginning and this is the first time the two of you are meeting. `) +
           `You speak first — open the conversation yourself with a warm, natural greeting in your own voice: ` +
           `say hello, introduce yourself, and break the ice however suits you. Stay true to how guarded or outgoing you are, ` +
           `and keep it to just a line or two (an opening, not a monologue). Follow everything above about what you do and don't know about them.`,
       });
     } else {
-      // Repeat date: no introduction needed — set the scene instead, in third person.
+      // Repeat sitting: no introduction needed — set the scene instead, in third person.
       messages.push({
         role: 'system',
         content:
-          `OOC stage direction: set the scene for the moment the player arrives at the start of this date. ` +
+          (hangout
+            ? `OOC stage direction: set the scene for the moment the player turns up to hang out. `
+            : `OOC stage direction: set the scene for the moment the player arrives at the start of this date. `) +
           `Write 2-3 sentences of vivid third-person narration: where ${character.name} is and what they're doing at the venue, ` +
           `the atmosphere of the place, and the weather and time of day (use the scene and world details above). ` +
           `Describe ${character.name} from the OUTSIDE, by name (e.g. "${character.name} is waiting at a corner table, ..."). ` +
@@ -757,7 +787,9 @@ export async function attemptWalkout(
   signal?: AbortSignal,
 ): Promise<WalkoutOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  // Date machinery only — a hangout has no rapport to judge, nobody storms out of
+  // one, and there is no date to break up or say goodnight to.
+  if (session.ended || !isDateMode(session.mode)) return null;
   const character = getCharacter(session.characterId);
   const relationship = getRelationship(character.id);
 
@@ -817,6 +849,7 @@ export async function attemptWalkout(
       character.id,
       [{ text: walkoutMemory.slice(0, GEN_TEXT.line), importance: 5, tags: ['conflict'] }],
       walkoutEvent.id,
+      session.mode,
     );
   } catch {
     /* best-effort: remembering the blow-up must never block the farewell */
@@ -868,7 +901,9 @@ export async function judgeTurn(sessionId: string, signal?: AbortSignal): Promis
   } catch {
     return null;
   }
-  if (session.ended || session.mode === 'chat') return null;
+  // Date machinery only — a hangout has no rapport to judge, nobody storms out of
+  // one, and there is no date to break up or say goodnight to.
+  if (session.ended || !isDateMode(session.mode)) return null;
 
   const settings = getLlmSettings();
   const all = messagesRepo.listBySession(sessionId);
@@ -944,7 +979,9 @@ export interface LeaveOutcome {
  */
 export async function maybeLeaveForLostInterest(sessionId: string, signal?: AbortSignal): Promise<LeaveOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  // Date machinery only — a hangout has no rapport to judge, nobody storms out of
+  // one, and there is no date to break up or say goodnight to.
+  if (session.ended || !isDateMode(session.mode)) return null;
   if (!hasLostInterest(sessionId)) return null;
   // The character already made an exit this session (the line is in the transcript,
   // but the client may have missed the SSE event to a refresh/disconnect). Rapport is
@@ -1003,6 +1040,7 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
         },
       ],
       leftEvent.id,
+      session.mode,
     );
   } catch {
     /* best-effort */
@@ -1036,7 +1074,9 @@ export async function attemptPlayerBreakupIntent(
   signal?: AbortSignal,
 ): Promise<BreakupIntentOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  // Date machinery only — a hangout has no rapport to judge, nobody storms out of
+  // one, and there is no date to break up or say goodnight to.
+  if (session.ended || !isDateMode(session.mode)) return null;
   if (!BREAKUP_INTENT_RE.test(playerText)) return null;
 
   const character = getCharacter(session.characterId);
@@ -1100,7 +1140,9 @@ export async function attemptPlayerFarewell(
   signal?: AbortSignal,
 ): Promise<FarewellOutcome | null> {
   const session = getSession(sessionId);
-  if (session.ended || session.mode === 'chat') return null;
+  // Date machinery only — a hangout has no rapport to judge, nobody storms out of
+  // one, and there is no date to break up or say goodnight to.
+  if (session.ended || !isDateMode(session.mode)) return null;
   if (!FAREWELL_INTENT_RE.test(playerText)) return null;
 
   const character = getCharacter(session.characterId);
@@ -1141,7 +1183,10 @@ export async function attemptPlayerFarewell(
  */
 export function settleForcedDateEnd(session: ConversationSession): void {
   clearRapport(session.id);
-  if (session.mode !== 'date' && session.mode !== 'event') return;
+  // Only dates reach here — the paths that force an end (a confirmed breakup, a DTR
+  // backfire) are date-only — but gate anyway so a future caller can't sneak a
+  // hangout into the venue charge.
+  if (!isDateMode(session.mode)) return;
   const character = getCharacter(session.characterId);
   if (!character.worldId) return;
   const venue = resolveSessionLocation(session.locationId, character, worldsRepo.get(character.worldId) ?? null);
@@ -1327,12 +1372,14 @@ export async function maybeAutoSummarize(sessionId: string): Promise<void> {
  * from the evaluation happen only when the structured result validates.
  */
 /**
- * Persist a concluded date's report card (best-effort). World-bound dates/events
- * only — a worldless chat has no Date tab to replay on, and nothing at stake.
+ * Persist a concluded sitting's report card (best-effort). World-bound meetings
+ * (dates, events, hangouts) only — a worldless chat has no Date tab to replay on,
+ * and nothing at stake. The stored payload carries its `session.mode`, so the
+ * replayed recap knows whether to read as a date or a hangout.
  */
 function persistDateResult(response: EndSessionResponse): void {
   const s = response.session;
-  if (s.mode !== 'date' && s.mode !== 'event') return;
+  if (!isMeetingMode(s.mode)) return;
   try {
     const worldId = charactersRepo.get(s.characterId)?.worldId;
     if (!worldId) return;
@@ -1538,7 +1585,10 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       expression: null,
       summaryLine: null,
       memoriesWritten: 0,
-      evalError: "You didn't say anything, so this date doesn't count.",
+      evalError:
+        session.mode === 'hangout'
+          ? "You didn't say anything, so this hangout doesn't count."
+          : "You didn't say anything, so this date doesn't count.",
       jealousy: null,
       milestone: null,
       breakup: null,
@@ -1557,12 +1607,13 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // you own or lease is FREE (the lease rent / purchase covers it); any other venue
   // charges its full tier price. Refusing here — BEFORE we spend/end anything — keeps
   // the date OPEN and re-endable once funds return, rather than ending it then
-  // bouncing the charge.
+  // bouncing the charge. A hangout has no venue spend, so its cost is always 0 —
+  // it still books the day action and the last-seen stamp, because it WAS a meeting.
   let pendingCharge: { worldId: string; cost: number; pid: string } | null = null;
-  if (endActor.worldId && (session.mode === 'date' || session.mode === 'event')) {
+  if (endActor.worldId && isMeetingMode(session.mode)) {
     const venue = resolveSessionLocation(session.locationId, endActor, worldsRepo.get(endActor.worldId) ?? null);
     const propVenue = propertyVenueInfo(session.locationId, endActor.worldId);
-    const cost = propVenue ? 0 : venueCost(venue?.priceTier);
+    const cost = isDateMode(session.mode) ? (propVenue ? 0 : venueCost(venue?.priceTier)) : 0;
     const pid = playerIdForWorld(endActor.worldId);
     if (cost > 0 && getOrCreatePlayer(pid).money < cost) {
       throw badRequest(
@@ -1665,15 +1716,16 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
     // now and spent AGAIN when the player settles up and re-ends.
     if (pendingCharge.cost > 0) spendMoney(pendingCharge.cost, pendingCharge.pid);
     spendStamina(pendingCharge.worldId);
-    // Inside the date/event-only guard (pendingCharge is set exactly for those):
-    // a plain chat costs nothing, so it must not reset the neglect clock or the
-    // "it's been a while" date-greeting clock for free either.
+    // Inside the meeting-only guard (pendingCharge is set exactly for dates, events
+    // and hangouts): a plain chat costs nothing, so it must not reset the neglect
+    // clock or the "it's been a while" greeting clock for free either.
     stampLastDate(session.characterId, ensureWorldState(pendingCharge.worldId).day);
   }
 
   // A monogamous character may "find out" about other people you've seen lately.
   // Rolled only now that the date is truly ending — never on a manual failed eval.
-  const jealousy = maybeRollJealousy(getCharacter(session.characterId));
+  // Date-only: a hangout is not the night you get caught out.
+  const jealousy = isDateMode(session.mode) ? maybeRollJealousy(getCharacter(session.characterId)) : null;
 
   // The session is ending → decay temporary buffs by one session now that the
   // evaluator (which ran with them still active) is done. Only on a real end, so a
@@ -1710,7 +1762,12 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
     source: 'session_eval',
     detail: { sessionId },
   });
-  const memories = addMemoriesFromEvaluation(session.characterId, evaluation.memoryCandidates, event.id);
+  const memories = addMemoriesFromEvaluation(
+    session.characterId,
+    evaluation.memoryCandidates,
+    event.id,
+    session.mode, // so the profile can label these "From a hangout" vs "From a date"
+  );
 
   // Resolve the emotional state carried INTO this date — they've now had the
   // chance to air it. Keep jealousy that was freshly discovered this turn so it
@@ -1723,7 +1780,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
 
   // The day's weather + the venue (indoor/outdoor) nudge the date. Server-owned,
   // clamped — and applied BEFORE milestone detection so it can tip a crossing.
-  if (actor.worldId && (session.mode === 'date' || session.mode === 'event')) {
+  if (actor.worldId && isDateMode(session.mode)) {
     const weather = weatherForDay(actor.worldId, chronDay);
     const loc = resolveSessionLocation(session.locationId, actor, worldsRepo.get(actor.worldId) ?? null);
     const eff = weatherDateEffect(actor, loc, weather);
@@ -1792,7 +1849,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // more tense, feeding the strain check below over repeated bad nights. Default
   // rapport (no per-turn judging happened) sits in the neutral band → no effect.
   // Server-owned + clamped, applied BEFORE milestone/strain see the state.
-  if (actor.worldId && (session.mode === 'date' || session.mode === 'event')) {
+  if (actor.worldId && isDateMode(session.mode)) {
     const finalRapport = getRapport(session.id);
     const eff = rapportEndEffect(finalRapport);
     if (Object.keys(eff).length > 0) {
@@ -1803,10 +1860,11 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   clearRapport(session.id);
 
   // (Opt-in) showing up for a real, non-cruel evening helps pull a struggling
-  // partner back from the despair spiral — the off-ramp. A date that ended in a
+  // partner back from the despair spiral — the off-ramp. Turning up to hang out
+  // counts: it's the showing-up that helps, not the occasion. A date that ended in a
   // walkout is the opposite of that, so it never heals (the walkout already applied
   // its own hostility hit). (No-op unless enabled.)
-  if (actor.worldId && (session.mode === 'date' || session.mode === 'event') && !endedInWalkout) {
+  if (actor.worldId && isMeetingMode(session.mode) && !endedInWalkout) {
     try {
       adjustDespair(session.characterId, -DESPAIR.dateHeal, 'time_together', chronDay);
     } catch {
@@ -1856,7 +1914,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // (plus the day) so the next day-or-so of texts honor how the night left them
   // feeling instead of snapping straight back to breezy texting. A fresh date
   // overwrites it; the read side (text prompts) lets it fade after DATE_AFTERGLOW_DAYS.
-  if (session.mode === 'date' || session.mode === 'event') {
+  if (isDateMode(session.mode)) {
     setRelationshipFlag(session.characterId, AFTERGLOW_MOOD_FLAG, evaluation.mood, { source: 'date' });
     setRelationshipFlag(session.characterId, AFTERGLOW_DAY_FLAG, chronDay, { source: 'date' });
   }
@@ -1867,7 +1925,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   let breakup: EndSessionResponse['breakup'] = null;
   let onTheRocks = false;
   let reconciled = false;
-  if (actor.worldId && (session.mode === 'date' || session.mode === 'event')) {
+  if (actor.worldId && isDateMode(session.mode)) {
     try {
       const outcome = evaluateRelationshipStrain(session.characterId, { day: chronDay, trigger: 'date', mode: session.mode });
       if (outcome.kind === 'broke_up') breakup = { fromStatus: outcome.fromStatus!, line: outcome.line ?? '' };
@@ -1882,7 +1940,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // The "happy ending" — a soft win when the relationship reaches its committed
   // peak. Only when nothing went wrong this date (no breakup/rocks/reconcile).
   let ending: EndSessionResponse['ending'] = null;
-  if (actor.worldId && (session.mode === 'date' || session.mode === 'event') && !strainChanged) {
+  if (actor.worldId && isDateMode(session.mode) && !strainChanged) {
     try {
       ending = await maybeReachEnding(session.characterId, { day: chronDay, mode: session.mode });
     } catch {
