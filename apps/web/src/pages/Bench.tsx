@@ -594,6 +594,7 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [compare, setCompare] = useState<string[]>([]);
   const [compareRuns, setCompareRuns] = useState<BenchRunSummary[]>([]);
 
@@ -629,6 +630,8 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
   }, [compare]);
 
   const del = async (id: string) => {
+    if (deleting) return;
+    setDeleting(true);
     try {
       await api.benchDeleteRun(id);
       setConfirmId(null);
@@ -636,6 +639,8 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
       await load();
     } catch (e) {
       setError(errorMessage(e));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -697,6 +702,7 @@ function History({ onOpen }: { onOpen: (run: BenchRunSummary) => void }) {
           body={t('bench.deleteRunBody')}
           confirmLabel={t('bench.delete')}
           danger
+          busy={deleting}
           onConfirm={() => void del(confirmId)}
           onCancel={() => setConfirmId(null)}
         />

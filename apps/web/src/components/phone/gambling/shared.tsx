@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SUIT_PIP, isRedSuit, type Card, type GamblingWallet } from '@dsim/shared';
+import i18n from '../../../i18n';
 
 /** The contract every casino game component fulfils inside GamblingApp. */
 export interface CasinoGameProps {
@@ -11,7 +12,7 @@ export interface CasinoGameProps {
   onSettled: (wallet: GamblingWallet) => void;
 }
 
-export const formatCoin = (n: number): string => `◈ ${Math.round(n).toLocaleString()}`;
+export const formatCoin = (n: number): string => `◈ ${Math.round(n).toLocaleString(i18n.language)}`;
 
 /** The largest stake the player can place right now (cap ∧ daily-remaining ∧ cash). */
 export function maxAffordable(wallet: GamblingWallet): number {

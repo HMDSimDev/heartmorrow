@@ -10,6 +10,7 @@ import { Characters } from './pages/Characters';
 import { CharacterProfile } from './pages/CharacterProfile';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { WorldEditor } from './pages/WorldEditor';
+import { ImageLibrary } from './pages/ImageLibrary';
 import { WorldSelector, WorldOnboarding, WorldSelectorSettings } from './pages/WorldSelector';
 import { Chat } from './pages/Chat';
 import { Shop } from './pages/Shop';
@@ -38,6 +39,9 @@ const NAV: { to: string; icon: IconName; labelKey: CommonKey; shortKey?: CommonK
   { to: '/phone', icon: 'phone', labelKey: 'nav.phone' },
   { to: '/settings', icon: 'settings', labelKey: 'nav.settings' },
   { to: '/help', icon: 'info', labelKey: 'nav.help', hideOnBottomNav: true },
+  // Creator management surface; kept off the cramped bottom nav (reachable via
+  // Settings on mobile, like Help).
+  { to: '/images', icon: 'image', labelKey: 'nav.images', creatorOnly: true, hideOnBottomNav: true },
   { to: '/worlds', icon: 'worlds', labelKey: 'nav.switchWorld', shortKey: 'nav.worldsShort' },
   { to: '/debug', icon: 'debug', labelKey: 'nav.debug', creatorOnly: true },
 ];
@@ -53,6 +57,7 @@ function routeKey(path: string): string {
   if (path.startsWith('/inventory')) return 'bag';
   if (path.startsWith('/minigames')) return 'games';
   if (path.startsWith('/settings')) return 'settings';
+  if (path.startsWith('/images')) return 'settings';
   if (path.startsWith('/help')) return 'settings';
   if (path.startsWith('/bench')) return 'settings';
   if (path.startsWith('/prompts')) return 'settings';
@@ -180,6 +185,7 @@ export default function App() {
           <Route path="/characters/:id" element={<CharacterProfile />} />
           <Route path="/characters/:id/edit" element={<CreatorRoute><CharacterEditor /></CreatorRoute>} />
           <Route path="/world" element={<CreatorRoute><WorldEditor /></CreatorRoute>} />
+          <Route path="/images" element={<CreatorRoute><ImageLibrary /></CreatorRoute>} />
           <Route path="/chat" element={<Chat />} />
           <Route path="/phone" element={<Phone />} />
           <Route path="/shop" element={<Shop />} />

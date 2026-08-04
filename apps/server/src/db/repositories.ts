@@ -442,6 +442,23 @@ export const assetsRepo = {
     );
     return a;
   },
+  /** Everything but id/created_at. path/mime_type only ever change via an
+   *  in-place file replacement (the id — and so every reference — is stable). */
+  update(a: Asset): Asset {
+    getDb().run(
+      `UPDATE assets SET type=?, path=?, filename=?, mime_type=?, alt_text=?, tags=?, metadata=? WHERE id=?`,
+      a.type, a.path, a.filename, a.mimeType, a.altText, j(a.tags), j(a.metadata), a.id,
+    );
+    return a;
+  },
+  /** Oldest asset whose stored `metadata.sha256` matches — content-dedup lookup. */
+  findByHash(sha256: string): Asset | undefined {
+    const r = getDb().get<Row>(
+      `SELECT * FROM assets WHERE json_extract(metadata, '$.sha256') = ? ORDER BY created_at ASC LIMIT 1`,
+      sha256,
+    );
+    return r ? rowToAsset(r) : undefined;
+  },
   delete(id: string): void {
     getDb().run('DELETE FROM assets WHERE id = ?', id);
   },
@@ -881,6 +898,19 @@ export const textMessagesRepo = {
         threadId,
       )
       .map(rowToText);
+  },
+  /** How many texts reference each image asset, split by the world the thread's
+   *  character lives in — feeds the asset-usage scan (and its world filter). */
+  countByImageAsset(): Array<{ assetId: string; worldId: string | null; count: number }> {
+    const rows = getDb().all<Row>(
+      `SELECT t.image_asset_id AS aid, c.world_id AS wid, COUNT(*) AS n
+       FROM text_messages t
+       JOIN message_threads th ON th.id = t.thread_id
+       JOIN characters c ON c.id = th.character_id
+       WHERE t.image_asset_id IS NOT NULL
+       GROUP BY t.image_asset_id, c.world_id`,
+    );
+    return rows.map((r) => ({ assetId: String(r.aid), worldId: nStr(r.wid), count: Number(r.n) }));
   },
   /** All texts (delivered + still-queued) for a thread — used for faithful export. */
   listAllByThread(threadId: string): TextMessage[] {

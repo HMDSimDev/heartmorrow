@@ -369,7 +369,7 @@
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--panel-2);
-  color: var(--muted);
+  color: var(--text-mute);
   cursor: pointer;
   opacity: 0.6;
   transition: opacity 0.15s ease, color 0.15s ease, transform 0.2s ease;

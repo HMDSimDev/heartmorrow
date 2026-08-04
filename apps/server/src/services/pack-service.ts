@@ -39,7 +39,7 @@ import { badRequest, notFound } from '../lib/errors';
 import { getCharacter } from './character-service';
 import { getWorld } from './world-service';
 import { ensureRelationship } from './relationship-service';
-import { getAsset, readAssetFile, saveUploadedAsset, safeUploadsPath } from './asset-service';
+import { dedupeOrSaveAsset, getAsset, readAssetFile, safeUploadsPath, thumbRelPath } from './asset-service';
 import { recordEvent } from './event-service';
 import {
   zipSync,
@@ -437,10 +437,12 @@ function nestedFiles(root: Map<string, Buffer>, manifest: PackManifest): { files
 
 /**
  * Write each portable image to the uploads dir under a FRESH server-generated name
- * (via the audited {@link saveUploadedAsset}) and return an old-id -> new-id map for
- * remapping references. Images that are absent, non-image, oversized, or whose bytes
- * don't match their declared type are dropped. Written file paths are appended to
- * `written` so the caller can unlink them if the surrounding transaction rolls back.
+ * (via the audited {@link dedupeOrSaveAsset} — byte-identical images reuse the
+ * existing asset, so re-importing a pack never multiplies the library) and return
+ * an old-id -> new-id map for remapping references. Images that are absent,
+ * non-image, oversized, or whose bytes don't match their declared type are
+ * dropped. Only freshly written file paths are appended to `written` so the
+ * caller can unlink them if the surrounding transaction rolls back.
  */
 function materializeAssets(
   assets: PortableAsset[],
@@ -465,7 +467,7 @@ function materializeAssets(
       skipped += 1;
       continue;
     }
-    const asset = saveUploadedAsset({
+    const { asset, deduped } = dedupeOrSaveAsset({
       buffer: bytes,
       originalFilename: pa.filename,
       mimeType: pa.mimeType,
@@ -473,7 +475,9 @@ function materializeAssets(
       altText: pa.altText,
       tags: pa.tags,
     });
-    written.push(safeUploadsPath(asset.path));
+    // Only files this import actually created may be unlinked on rollback — a
+    // deduped result points at a PRE-EXISTING asset's file, which must survive.
+    if (!deduped) written.push(safeUploadsPath(asset.path));
     idMap.set(pa.id, asset.id);
   }
   return { idMap, skipped };
@@ -878,12 +882,15 @@ export function importPack(
     });
   } catch (e) {
     // The DB transaction rolled back; unlink any asset files it left behind so a
-    // failed import never leaks orphaned uploads.
+    // failed import never leaks orphaned uploads (thumbnails included — the
+    // upload path may have derived one beside each original).
     for (const p of written) {
-      try {
-        fs.unlinkSync(p);
-      } catch {
-        /* best effort */
+      for (const f of [p, thumbRelPath(p)]) {
+        try {
+          fs.unlinkSync(f);
+        } catch {
+          /* best effort */
+        }
       }
     }
     throw e;

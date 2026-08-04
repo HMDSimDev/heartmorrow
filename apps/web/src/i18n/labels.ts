@@ -9,6 +9,8 @@
 // can't validate), and every component that renders a label also subscribes via
 // useTranslation(), so it re-renders — and re-reads these — on a language change.
 import type {
+  AssetType,
+  AssetUsageKind,
   CareerSkill,
   CasinoGame,
   CharacterLinkKind,
@@ -35,6 +37,8 @@ import i18n from './index';
 // go through a string-typed view of it.
 const t = i18n.t as unknown as (key: string, opts?: Record<string, unknown>) => string;
 
+export const assetTypeLabel = (type: AssetType | string): string => t(`common:assetType.${type}`);
+export const assetUsageKindLabel = (kind: AssetUsageKind | string): string => t(`common:assetUsageKind.${kind}`);
 export const phaseLabel = (phase: Phase | string): string => t(`common:phase.${phase}`);
 export const seasonLabel = (season: Season | string): string => t(`common:season.${season}`);
 export const seasonAbbr = (season: Season | string): string => t(`common:seasonAbbr.${season}`);

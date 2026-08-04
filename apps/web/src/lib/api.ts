@@ -1,6 +1,9 @@
 import type {
   ActivityDef,
   Asset,
+  AssetUpdate,
+  AssetUsageMap,
+  ThumbnailRebuildResult,
   Character,
   CharacterChronicle,
   CharacterEnding,
@@ -177,6 +180,15 @@ const worldQuery = (worldId?: string): string => (worldId ? `?worldId=${encodeUR
 /** Build a browser URL for an uploaded asset path. */
 export function assetUrl(relativePath: string): string {
   return `/uploads/${relativePath.replace(/^\/+/, '')}`;
+}
+
+/**
+ * URL of an asset's derived thumbnail (`x.png` -> `x.thumb.png`). The thumb may
+ * not exist (pre-thumbnail uploads, small originals) — render with
+ * `onError` falling back to {@link assetUrl}, which is always valid.
+ */
+export function assetThumbUrl(relativePath: string): string {
+  return assetUrl(relativePath.replace(/\.(png|jpg)$/i, '.thumb.$1'));
 }
 
 /**
@@ -524,6 +536,20 @@ export const api = {
     }
     return res.json();
   },
+  updateAsset: (id: string, patchBody: AssetUpdate) => patch<Asset>(`/assets/${id}`, patchBody),
+  /** Swap the image bytes in place — same asset id, every reference updates. */
+  replaceAssetFile: async (id: string, file: File): Promise<Asset> => {
+    const form = new FormData();
+    form.append('file', file);
+    const res = await fetch(`${BASE}/assets/${id}/file`, { method: 'POST', body: form });
+    if (!res.ok) {
+      const { message } = await parseErrorBody(res, `Replace failed (${res.status}).`);
+      throw new ApiError(message, res.status);
+    }
+    return res.json();
+  },
+  assetUsage: () => get<AssetUsageMap>('/assets/usage'),
+  rebuildThumbnails: () => post<ThumbnailRebuildResult>('/assets/thumbnails/rebuild'),
   deleteAsset: (id: string) => del<{ ok: true }>(`/assets/${id}`),
 
   // conversations

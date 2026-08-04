@@ -1,0 +1,203 @@
+/* ===========================================================================
+   Image Library — creator management page for uploaded images.
+   Card grid of thumbs with type/usage badges; detail modal for edit/delete.
+   =========================================================================== */
+
+.il-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.il-head-actions {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.il-selcount {
+  align-self: center;
+  font-size: 0.85rem;
+}
+
+/* --- Controls row --------------------------------------------------------- */
+.il-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.il-search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.il-world {
+  flex: 0 1 180px;
+  min-width: 130px;
+}
+
+.il-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Replace strip under the detail preview */
+.il-replace-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.il-count {
+  font-size: 0.8rem;
+  margin-left: auto;
+}
+.il-unused-badge {
+  margin-left: 5px;
+}
+
+/* --- Card grid ------------------------------------------------------------ */
+.il-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.il-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-soft);
+  background: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s ease;
+  min-width: 0;
+}
+.il-card:hover {
+  border-color: var(--border-bright);
+  transform: translateY(-2px);
+}
+.il-card-selected {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brass) 30%, transparent);
+}
+
+.il-card-img {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: calc(var(--radius-sm) - 2px);
+  overflow: hidden;
+  background: var(--ink);
+}
+.il-card-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Selection tick (bulk mode) */
+.il-tick {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-bright);
+  background: color-mix(in srgb, var(--ink) 75%, transparent);
+  color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+.il-tick.on {
+  background: var(--brass);
+  border-color: var(--brass);
+  color: var(--ink);
+}
+
+.il-card-name {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.il-card-meta {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.il-badge-unused {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 45%, transparent);
+}
+
+/* Concrete expression-slot chip (e.g. "Blushing") — brass accent so the
+   at-a-glance answer to "which expression is this?" stands out. */
+.il-badge-expr {
+  color: var(--brass);
+  border-color: color-mix(in srgb, var(--brass) 45%, transparent);
+}
+
+/* --- Detail modal --------------------------------------------------------- */
+.il-detail-preview {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--ink);
+}
+.il-detail-preview img {
+  max-width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  display: block;
+}
+
+.il-usage-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.il-usage-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.il-usage-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.il-detail-actions {
+  margin-top: 14px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Narrow screens: tighter cards, count line drops under the chips */
+@media (max-width: 480px) {
+  .il-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+  .il-count {
+    margin-left: 0;
+    width: 100%;
+  }
+}

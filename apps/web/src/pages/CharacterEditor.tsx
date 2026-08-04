@@ -783,14 +783,12 @@ export function CharacterEditor() {
                   <h2>{t('pages:characterEditor.secPortrait')}</h2>
                   <span className="trail" />
                 </div>
-                <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} />
-                <div className="ce-image-gen">
-                  <button className="btn sm primary" onClick={() => setGenOpen(true)}>
-                    <Icon name="generate" size={13} />
-                    {t('pages:characterEditor.generate')}
-                  </button>
-                  <p className="creator-note">{t('pages:characterEditor.portraitGenNote')}</p>
-                </div>
+                <AssetPicker
+                  value={form.portraitAssetId}
+                  onChange={(v) => set('portraitAssetId', v)}
+                  defaultFilter="portrait"
+                  autoTags={form.name.trim() ? [form.name.trim()] : []}
+                />
                 <div className="divider" />
                 <div
                   className="creator-sec"
@@ -824,23 +822,12 @@ export function CharacterEditor() {
                   <div key={row.name} className="creator-subcard stack">
                     <div className="row">
                       <strong className="flex-fill">{expressionLabel(row.name)}</strong>
-                      {row.assetId && (
-                        <button
-                          className="btn sm danger"
-                          onClick={() => {
-                            const rows = [...form.expressionRows];
-                            rows[i] = { ...rows[i]!, assetId: null };
-                            set('expressionRows', rows);
-                          }}
-                        >
-                          <Icon name="trash" size={13} />
-                          {t('pages:characterEditor.clear')}
-                        </button>
-                      )}
                     </div>
                     <AssetPicker
                       value={row.assetId}
                       uploadType="expression"
+                      defaultFilter="expression"
+                      autoTags={form.name.trim() ? [form.name.trim()] : []}
                       onChange={(v) => {
                         const rows = [...form.expressionRows];
                         rows[i] = { ...rows[i]!, assetId: v };
@@ -1325,7 +1312,12 @@ export function CharacterEditor() {
 
           <div className="stack" style={{ gap: 14 }}>
             <Field label={t('pages:characterEditor.genPortrait')} hint={t('pages:characterEditor.genPortraitHint')}>
-              <AssetPicker value={form.portraitAssetId} onChange={(v) => set('portraitAssetId', v)} />
+              <AssetPicker
+                value={form.portraitAssetId}
+                onChange={(v) => set('portraitAssetId', v)}
+                defaultFilter="portrait"
+                autoTags={form.name.trim() ? [form.name.trim()] : []}
+              />
             </Field>
 
             <Field label={t('pages:characterEditor.genText')} hint={t('pages:characterEditor.genTextHint')}>

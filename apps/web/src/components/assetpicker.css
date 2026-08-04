@@ -1,20 +1,15 @@
 /* ===========================================================================
-   AssetPicker — Nocturne-framed thumbnail grid.
+   AssetPicker — compact trigger + modal library dialog.
    Chamfered framed thumbnails, brass selected-ring, tidy empty state.
    =========================================================================== */
 
-.ap-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-/* Each thumbnail tile */
+/* --- Shared thumbnail tile (trigger + dialog grid) ----------------------- */
 .ap-thumb {
   position: relative;
   width: 72px;
   height: 72px;
+  padding: 0;
+  font: inherit;
   border-radius: var(--radius-sm);
   border: 1.5px solid var(--border-soft);
   background: var(--ink-2);
@@ -57,7 +52,7 @@
   height: 16px;
   border-radius: 50%;
   background: var(--brass);
-  color: var(--ink-1);
+  color: var(--ink);
   align-items: center;
   justify-content: center;
   font-size: 10px;
@@ -75,7 +70,7 @@
   user-select: none;
 }
 
-/* Portrait image inside tile */
+/* Image inside tile */
 .ap-thumb img {
   width: 100%;
   height: 100%;
@@ -83,12 +78,92 @@
   display: block;
 }
 
-/* Upload strip below the grid */
-.ap-upload-row {
+/* --- Compact trigger ------------------------------------------------------ */
+.ap-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ap-trigger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ap-trigger-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ap-filename {
+  color: var(--text-mute);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+}
+
+/* --- Library dialog ------------------------------------------------------- */
+/* The grid scrolls internally so search/filters stay pinned. */
+.modal.ap-dialog {
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* Drag-drop highlight */
+.modal.ap-dialog.ap-drop {
+  outline: 2px dashed var(--brass);
+  outline-offset: -6px;
+}
+
+.ap-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ap-dialog-title {
+  margin: 0;
+}
+
+.ap-search {
+  width: 100%;
+}
+
+.ap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ap-dialog-grid {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  padding: 2px;
+}
+/* Tiles flex-fill their grid cell in the dialog */
+.ap-dialog-grid .ap-thumb {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+
+.ap-dialog-foot {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 2px;
+  flex-wrap: wrap;
 }
 
 .ap-upload-label {
@@ -110,4 +185,11 @@
 .ap-empty {
   padding: 20px 0 8px;
   text-align: center;
+}
+
+/* Tighter tiles on narrow screens so a usable number of columns fit */
+@media (max-width: 480px) {
+  .ap-dialog-grid {
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  }
 }

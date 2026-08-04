@@ -41,7 +41,7 @@
     "cantAffordAny": "no spot you can afford",
     "venueCost": "{symbol} {cost}",
     "roomName": "{name}'s Room",
-    "theirRoomName": "Their's Room",
+    "theirRoomName": "Their Room",
     "stayInFree": "stay in · free",
     "chooseLocation": "Choose a location",
     "tileTitleCantAfford": "{label} — can't afford",
@@ -876,7 +876,6 @@
     "shortDesc": "Short description",
     "secPortrait": "Portrait",
     "generate": "Generate",
-    "portraitGenNote": "Use Generate to draft a whole character — from this portrait, some pasted or uploaded text, or both. Fills every tab for you to review before saving.",
     "genKicker": "Character workbench",
     "genTitle": "Generate a character",
     "genIntro": "Draft a complete character from a portrait, reference text, or both — then review and edit every tab before saving. Provide at least one source.",
@@ -975,6 +974,46 @@
     "characterGenFailed": "Generation failed: {error}",
     "untitledCharacter": "Untitled character"
   },
+  "library": {
+    "kicker": "Creator tools",
+    "title": "Image library",
+    "blurb": "Every image you've uploaded, in one place — rename, retag, see where each one is used, and clear out the ones nothing needs.",
+    "unused": "Unused",
+    "select": "Select",
+    "selectShown": "Select all shown",
+    "selected": "{count, plural, one {# selected} other {# selected}}",
+    "shownCount": "{count, plural, one {# image} other {# images}}",
+    "usedCount": "{count, plural, one {# use} other {# uses}}",
+    "deleteSelected": "Delete",
+    "deleteTitle": "{count, plural, one {Delete this image?} other {Delete # images?}}",
+    "deleteBody": "{count, plural, one {The file is removed for good — nothing currently uses it.} other {The files are removed for good — nothing currently uses them.}}",
+    "deleteInUseWarn": "{count, plural, one {# of these is still in use. Anything pointing at it — a portrait, a place, an old text — will lose its picture.} other {# of these are still in use. Anything pointing at them — portraits, places, old texts — will lose their pictures.}}",
+    "deleteConfirm": "Delete",
+    "deleted": "{count, plural, one {Image deleted.} other {# images deleted.}}",
+    "rebuildThumbs": "Rebuild thumbnails",
+    "rebuildDone": "Thumbnails rebuilt: {generated} generated, {failed} failed.",
+    "uploaded": "Added \"{name}\".",
+    "worldFilter": "Filter by world",
+    "allWorlds": "All worlds",
+    "replace": "Replace image…",
+    "replacing": "Replacing…",
+    "replaceHint": "Swaps the picture everywhere this image is used. Name, tags, and links stay.",
+    "replaced": "Image replaced — everything using it now shows the new picture.",
+    "emptyTitle": "No images yet",
+    "emptyBody": "Upload images here or from any portrait or location picker — they all gather in this one library.",
+    "detailKicker": "Image",
+    "fieldName": "Name",
+    "fieldType": "Type",
+    "fieldAlt": "Alt text",
+    "fieldAltHint": "Describes the image for search and accessibility.",
+    "fieldTags": "Tags",
+    "usageHead": "Used by",
+    "usageNone": "Nothing uses this image. Safe to delete.",
+    "textsCount": "{count, plural, one {# image text} other {# image texts}}",
+    "delete": "Delete…",
+    "save": "Save",
+    "saving": "Saving…"
+  },
   "settings": {
     "head": {
       "kicker": "The control desk",
@@ -1060,6 +1099,12 @@
       "kicker": "Diagnostics",
       "head": "Heartmorrow Benchmark",
       "blurb": "Benchmark how your model handles the real prompts this game runs — the rapport judges, date evaluator, and generators — against a fixed sample. Score the judges against your own baseline, watch a date play out, and track tokens, latency, and tokens/sec. Save runs to compare models.",
+      "open": "Open"
+    },
+    "images": {
+      "kicker": "Creator tools",
+      "head": "Image library",
+      "blurb": "Browse every uploaded image, see where each one is used, edit names and tags, and delete the ones nothing needs.",
       "open": "Open"
     },
     "providers": {
@@ -1699,6 +1744,14 @@
               "You don't have to fill in every field by hand. The character workbench has a \"Generate\" button that drafts a whole character from a portrait image, a block of reference text, or both. Pick a portrait, paste or upload some descriptive text (up to 40,000 characters; an uploaded file is read as plain text), and let it draft the identity, personality, traits, profile, and starting dating stats.",
               "Generating fills the written fields but keeps your chosen portrait, expression images, and world, and it never touches your private creator notes. If you've already written real content, you'll get a heads-up before it's overwritten.",
               "There are also smaller, focused helpers. On the Profile section, a \"Generate from description\" button fills in the appearance, texting, and chemistry details from what you've already written, and the dating-stats section has its own button to suggest a stat spread. Both of those need a name filled in first. Everything generated arrives as a draft you can review and edit before saving, and all of it relies on the AI model you've connected in Settings."
+            ]
+          },
+          {
+            "heading": "Managing your images",
+            "body": [
+              "Anywhere you pick an image — a portrait, an expression, a location photo — the picker opens your shared image library in a dialog: search by name, alt text, or tag, filter by type, and upload with the button, by dragging a file in, or by pasting from the clipboard. Every upload lands in the same pool, so an image uploaded for one character can be reused anywhere else. Uploads are tagged with the character or place you uploaded them for, so searching a name finds their images later — and uploading or importing an identical file never creates a duplicate; the library quietly reuses the copy it already has.",
+              "The Images page (in the sidebar in creator mode, or via Settings) is the library's home. It lists every uploaded image along with where it's used — which portraits, places, shop items, or old texts point at it — and lets you rename, retag, change the type, and rewrite alt text. You can filter to a single world to see just the images its cast and places use, and the \"Unused\" filter gathers everything nothing references so bulk select can clear them out in one sweep. Deleting an image that's still in use leaves those spots blank, so the page warns you first.",
+              "An image's detail view also has \"Replace image\" — it swaps the picture itself while keeping the name, tags, and every link intact, so a portrait used by a character, a chat thread, and a story moment updates everywhere at once."
             ]
           },
           {

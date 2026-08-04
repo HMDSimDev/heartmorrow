@@ -19,7 +19,7 @@ export function Modal({ onClose, children }: { onClose: () => void; children: Re
   }, [onClose]);
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal card" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>,

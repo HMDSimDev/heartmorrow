@@ -13,7 +13,24 @@
     "noPortrait": "No portrait",
     "none": "None",
     "uploading": "Uploading…",
-    "uploadImage": "Upload image"
+    "uploadImage": "Upload image",
+    "choose": "Choose image…",
+    "change": "Change image…",
+    "clear": "Clear",
+    "close": "Close",
+    "dialogTitle": "Image library",
+    "searchPlaceholder": "Search by name, alt text, or tag…",
+    "all": "All",
+    "noMatches": "No images match.",
+    "dropHint": "…or drag & drop / paste an image"
+  },
+  "assetType": {
+    "portrait": "Portraits",
+    "expression": "Expressions",
+    "background": "Backgrounds",
+    "location": "Locations",
+    "item": "Items",
+    "other": "Other"
   },
   "draft": {
     "notSavedTitle": "Couldn't auto-save this draft (storage full). Press Save to keep your work.",
@@ -128,16 +145,26 @@
     "phone": "Phone",
     "settings": "Settings",
     "help": "Help",
+    "images": "Images",
     "switchWorld": "Switch world",
     "worldsShort": "Worlds",
     "debug": "Debug"
+  },
+  "assetUsageKind": {
+    "portrait": "Portrait",
+    "expression": "Expressions",
+    "location": "Location",
+    "item": "Shop item",
+    "property": "Property",
+    "company": "Company",
+    "texts": "Texts"
   },
   "support": {
     "discord": "Join the Discord",
     "discordHint": "Support, updates & community",
     "github": "Source on GitHub",
     "githubHint": "Code, releases & issues",
-    "versionTitle": "Heartmorrow {{version}} · build {{commit}}"
+    "versionTitle": "Heartmorrow {version} · build {commit}"
   },
   "phase": {
     "morning": "Morning",

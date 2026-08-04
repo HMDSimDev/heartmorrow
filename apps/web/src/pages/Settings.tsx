@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -18,7 +17,7 @@ import { errorMessage } from '../lib/hooks';
 import { useAppData } from '../state/app-context';
 import { genderLabel, sexualityLabel } from '../i18n/labels';
 import { SUPPORTED_LOCALES } from '../i18n/locales';
-import { Banner, Field, Spinner } from '../components/ui';
+import { Banner, Field, Modal, Spinner } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { CrisisResources } from '../components/CrisisResources';
 import { ConnectionConsole, type ConnectionForm } from '../components/ConnectionConsole';
@@ -628,6 +627,22 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         </div>
       </Link>
 
+      {creatorMode && (
+        <Link to="/images" className="set-bench-card framed">
+          <div className="set-bench-mark" aria-hidden="true">
+            <Icon name="image" size={22} />
+          </div>
+          <div className="set-bench-body">
+            <div className="kicker">{t('settings.images.kicker')}</div>
+            <h2>{t('settings.images.head')}</h2>
+            <p>{t('settings.images.blurb')}</p>
+          </div>
+          <div className="set-bench-go">
+            {t('settings.images.open')} <Icon name="date" size={15} />
+          </div>
+        </Link>
+      )}
+
       {advancedMode && (
         <Link to="/prompts" className="set-bench-card framed">
           <div className="set-bench-mark" aria-hidden="true">
@@ -937,81 +952,73 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         </Banner>
       )}
 
-      {nsfwModalOpen &&
-        createPortal(
-          <div className="modal-overlay" onClick={closeNsfwModal}>
-            <div className="modal card" onClick={(e) => e.stopPropagation()}>
-              <div className="kicker">{t('settings.nsfwModal.kicker')}</div>
-              <h2 style={{ marginTop: 0 }}>{t('settings.nsfwModal.title')}</h2>
-              <p className="hint" style={{ marginTop: 0 }}>
-                {t('settings.nsfwModal.intro')}
-              </p>
-              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '12px 0', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={ackContent}
-                  onChange={(e) => setAckContent(e.target.checked)}
-                  style={{ marginTop: 3 }}
-                />
-                <span>{t('settings.nsfwModal.ackContent')}</span>
-              </label>
-              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '12px 0', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={ackAge}
-                  onChange={(e) => setAckAge(e.target.checked)}
-                  style={{ marginTop: 3 }}
-                />
-                <span>{t('settings.nsfwModal.ackAge')}</span>
-              </label>
-              <p className="hint">
-                {t('settings.nsfwModal.footnote')}
-              </p>
-              {error && <Banner kind="error">{error}</Banner>}
-              <div className="row" style={{ justifyContent: 'flex-end' }}>
-                <button className="btn ghost" onClick={closeNsfwModal} disabled={nsfwSaving}>
-                  {t('settings.nsfwModal.cancel')}
-                </button>
-                <button
-                  className="btn danger"
-                  disabled={!(ackContent && ackAge) || nsfwSaving}
-                  onClick={confirmEnableNsfw}
-                >
-                  {nsfwSaving ? t('settings.nsfwModal.enabling') : t('settings.nsfwModal.enable')}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {nsfwModalOpen && (
+        <Modal onClose={() => !nsfwSaving && closeNsfwModal()}>
+          <div className="kicker">{t('settings.nsfwModal.kicker')}</div>
+          <h2 style={{ marginTop: 0 }}>{t('settings.nsfwModal.title')}</h2>
+          <p className="hint" style={{ marginTop: 0 }}>
+            {t('settings.nsfwModal.intro')}
+          </p>
+          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '12px 0', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={ackContent}
+              onChange={(e) => setAckContent(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>{t('settings.nsfwModal.ackContent')}</span>
+          </label>
+          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '12px 0', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={ackAge}
+              onChange={(e) => setAckAge(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>{t('settings.nsfwModal.ackAge')}</span>
+          </label>
+          <p className="hint">
+            {t('settings.nsfwModal.footnote')}
+          </p>
+          {error && <Banner kind="error">{error}</Banner>}
+          <div className="row end" style={{ flexWrap: 'wrap' }}>
+            <button className="btn ghost" onClick={closeNsfwModal} disabled={nsfwSaving}>
+              {t('settings.nsfwModal.cancel')}
+            </button>
+            <button
+              className="btn danger"
+              disabled={!(ackContent && ackAge) || nsfwSaving}
+              onClick={confirmEnableNsfw}
+            >
+              {nsfwSaving ? t('settings.nsfwModal.enabling') : t('settings.nsfwModal.enable')}
+            </button>
+          </div>
+        </Modal>
+      )}
 
-      {tragicModalOpen &&
-        createPortal(
-          <div className="modal-overlay" onClick={closeTragicModal}>
-            <div className="modal card" onClick={(e) => e.stopPropagation()}>
-              <div className="kicker">{t('settings.tragicModal.kicker')}</div>
-              <h2 style={{ marginTop: 0 }}>{t('settings.tragicModal.title')}</h2>
-              <p className="hint" style={{ marginTop: 0 }}>
-                {t('settings.tragicModal.intro')}
-              </p>
-              <CrisisResources />
-              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '12px 0', cursor: 'pointer' }}>
-                <input type="checkbox" checked={ackTragic} onChange={(e) => setAckTragic(e.target.checked)} style={{ marginTop: 3 }} />
-                <span>{t('settings.tragicModal.ack')}</span>
-              </label>
-              {error && <Banner kind="error">{error}</Banner>}
-              <div className="row" style={{ justifyContent: 'flex-end' }}>
-                <button className="btn ghost" onClick={closeTragicModal} disabled={tragicSaving}>
-                  {t('settings.tragicModal.cancel')}
-                </button>
-                <button className="btn danger" disabled={!ackTragic || tragicSaving} onClick={confirmEnableTragic}>
-                  {tragicSaving ? t('settings.tragicModal.enabling') : t('settings.tragicModal.enable')}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {tragicModalOpen && (
+        <Modal onClose={() => !tragicSaving && closeTragicModal()}>
+          <div className="kicker">{t('settings.tragicModal.kicker')}</div>
+          <h2 style={{ marginTop: 0 }}>{t('settings.tragicModal.title')}</h2>
+          <p className="hint" style={{ marginTop: 0 }}>
+            {t('settings.tragicModal.intro')}
+          </p>
+          <CrisisResources />
+          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', margin: '12px 0', cursor: 'pointer' }}>
+            <input type="checkbox" checked={ackTragic} onChange={(e) => setAckTragic(e.target.checked)} style={{ marginTop: 3 }} />
+            <span>{t('settings.tragicModal.ack')}</span>
+          </label>
+          {error && <Banner kind="error">{error}</Banner>}
+          <div className="row end" style={{ flexWrap: 'wrap' }}>
+            <button className="btn ghost" onClick={closeTragicModal} disabled={tragicSaving}>
+              {t('settings.tragicModal.cancel')}
+            </button>
+            <button className="btn danger" disabled={!ackTragic || tragicSaving} onClick={confirmEnableTragic}>
+              {tragicSaving ? t('settings.tragicModal.enabling') : t('settings.tragicModal.enable')}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

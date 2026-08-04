@@ -27,6 +27,7 @@
     "@fastify/swagger": "^9.7.0",
     "fastify": "^5.2.1",
     "fflate": "^0.8.3",
+    "jimp": "^1.6.1",
     "tsx": "^4.19.2",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.24.1"

@@ -51,7 +51,7 @@ afterEach(() => {
 });
 
 describe('character share files (.hmchr)', () => {
-  it('round-trips a character and its portrait bytes as fresh ids', () => {
+  it('round-trips a character; identical portrait bytes dedupe to the existing asset', () => {
     const w = createWorld({ name: 'Alpha' });
     const pid = portrait('mira');
     const mira = createCharacter({ worldId: w.id, name: 'Mira', age: 27, datingStats: STATS, portraitAssetId: pid });
@@ -67,9 +67,9 @@ describe('character share files (.hmchr)', () => {
     expect(imported.id).not.toBe(mira.id);
     expect(imported.worldId).toBeNull();
     expect(imported.name).toBe('Mira');
-    expect(imported.portraitAssetId).toBeTruthy();
-    expect(imported.portraitAssetId).not.toBe(pid);
-    // The bytes survived the round-trip intact.
+    // The source asset still exists with the same bytes, so content-dedup reuses
+    // it instead of materializing a fresh copy.
+    expect(imported.portraitAssetId).toBe(pid);
     expect(readAssetFile(imported.portraitAssetId!).buffer.equals(original)).toBe(true);
   });
 
@@ -131,7 +131,9 @@ describe('world share files (.hmwrld)', () => {
     expect(nw.id).not.toBe(w.id);
     expect(nw.name).toBe('Lumen');
     expect(nw.locations[0]!.imageAssetId).toBeTruthy();
-    expect(nw.locations[0]!.imageAssetId).not.toBe(locImg);
+    // Same-database import: every image byte-matches its still-present source,
+    // so content-dedup maps references back onto the original assets.
+    expect(nw.locations[0]!.imageAssetId).toBe(locImg);
     expect(worldNotesRepo.listByWorld(nw.id)).toHaveLength(1);
 
     const cast = charactersRepo.listByWorld(nw.id);
@@ -139,17 +141,16 @@ describe('world share files (.hmwrld)', () => {
     const nm = cast.find((c) => c.name === 'Mira')!;
     const nd = cast.find((c) => c.name === 'Dorian')!;
     expect(linkPairs(nm)).toEqual([{ targetId: nd.id, kind: 'ex' }]);
-    expect(nm.portraitAssetId).toBeTruthy();
-    expect(nm.portraitAssetId).not.toBe(miraPortrait);
+    expect(nm.portraitAssetId).toBe(miraPortrait);
 
     const props = propertiesRepo.listByWorld(nw.id);
     expect(props).toHaveLength(1);
-    expect(props[0]!.assetId).not.toBe(propImg);
+    expect(props[0]!.assetId).toBe(propImg);
 
     const comps = companiesRepo.listByWorld(nw.id);
     expect(comps).toHaveLength(1);
     expect(comps[0]!.linkedCharacterId).toBe(nm.id); // linked character remapped
-    expect(comps[0]!.assetId).not.toBe(compImg);
+    expect(comps[0]!.assetId).toBe(compImg);
 
     // The source world is untouched.
     expect(charactersRepo.listByWorld(w.id)).toHaveLength(2);
@@ -407,7 +408,29 @@ describe('import asset hygiene', () => {
     const before = listAssets().length;
     const res = importPack(rebuilt, { targetWorldId: w.id });
     expect(res.assets).toBe(1); // only the referenced portrait, once
-    expect(listAssets().length).toBe(before + 1); // no orphan rows
+    // No new rows at all: the portrait's bytes match the still-existing source
+    // asset, so content-dedup reuses it (and the extras were refused).
+    expect(listAssets().length).toBe(before);
     expect(res.skippedAssets).toBe(1); // the duplicate id was refused
+  });
+
+  it('re-importing the same pack materializes images once, then reuses them', () => {
+    const w = createWorld({ name: 'W' });
+    const pid = portrait('rae');
+    const c = createCharacter({ worldId: w.id, name: 'Rae', age: 26, datingStats: STATS, portraitAssetId: pid });
+    const buf = exportCharacterPack([c.id]);
+    // Simulate a different install: the source asset is gone before importing.
+    updateCharacter(c.id, { portraitAssetId: null });
+    deleteAsset(pid);
+
+    const before = listAssets().length;
+    const r1 = importPack(buf, { targetWorldId: w.id });
+    expect(listAssets().length).toBe(before + 1); // first import materializes the file
+    const r2 = importPack(buf, { targetWorldId: w.id });
+    expect(listAssets().length).toBe(before + 1); // second import reuses it — no duplicate
+    const p1 = charactersRepo.get(r1.characterIds[0]!)!.portraitAssetId;
+    const p2 = charactersRepo.get(r2.characterIds[0]!)!.portraitAssetId;
+    expect(p1).toBeTruthy();
+    expect(p1).toBe(p2);
   });
 });

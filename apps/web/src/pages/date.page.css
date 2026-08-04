@@ -690,7 +690,7 @@
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--panel);
-  color: var(--muted);
+  color: var(--text-mute);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   opacity: 0.5;

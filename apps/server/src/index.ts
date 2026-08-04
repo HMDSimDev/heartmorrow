@@ -2,6 +2,7 @@ import { buildApp } from './app';
 import { config, ensureDirectories } from './config';
 import { closeDatabase, initDatabase } from './db/index';
 import { migratePlayerIdentity } from './db/migrate-player-identity';
+import { backfillAssetHashes } from './services/asset-service';
 
 async function main(): Promise<void> {
   ensureDirectories();
@@ -29,6 +30,17 @@ async function main(): Promise<void> {
   app.log.info(`DSim server listening on http://${config.host}:${config.port}`);
   app.log.info(`Uploads served from ${config.uploadsDir}`);
   app.log.info(`Database at ${config.dbPath}`);
+
+  // Stamp content hashes onto assets uploaded before dedup existed. Deferred so
+  // it never delays the port opening; idempotent, so a crash mid-pass is fine.
+  setImmediate(() => {
+    try {
+      const stamped = backfillAssetHashes();
+      if (stamped > 0) app.log.info(`Backfilled content hashes for ${stamped} asset(s)`);
+    } catch (err) {
+      app.log.warn(err, 'Asset hash backfill failed');
+    }
+  });
 }
 
 main().catch((err) => {

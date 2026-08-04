@@ -172,7 +172,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   padding: 8px 14px;
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-dim);
@@ -227,7 +227,7 @@
   text-decoration: none;
   transition: background 0.12s, border-color 0.12s, transform 0.12s;
 }
-.prof-conn:hover { background: var(--ink-3); transform: translateX(2px); }
+.prof-conn:hover { background: var(--panel); transform: translateX(2px); }
 .prof-conn svg { color: var(--text-mute); flex-shrink: 0; }
 .prof-conn-kind {
   font-family: var(--font-mono);

@@ -745,7 +745,8 @@ function LocationCard({
               value={location.imageAssetId ?? null}
               onChange={(imageAssetId) => onUpdate({ imageAssetId })}
               uploadType="location"
-              filterType="location"
+              defaultFilter="location"
+              autoTags={location.name.trim() ? [location.name.trim()] : []}
             />
             <small className="muted">{t('worldEditor.photoHint')}</small>
           </Field>

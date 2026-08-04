@@ -615,6 +615,9 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
 .btn:hover { filter: brightness(1.08); }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Label-as-button (file inputs) can't match :disabled — the class variant keeps
+   them visually and functionally inert while their inner <input> is disabled. */
+.btn.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
 /* A price you can't meet yet. Reads as a deliberate lock rather than broken
    chrome — plain :disabled faded a "Not enough ◈" label to near-unreadable. */
 .btn.is-short,

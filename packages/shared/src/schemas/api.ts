@@ -221,6 +221,56 @@ export const AssetUploadFieldsSchema = z.object({
 });
 export type AssetUploadFields = z.infer<typeof AssetUploadFieldsSchema>;
 
+/** Editable asset metadata (the file itself is immutable — re-upload to change it). */
+export const AssetUpdateSchema = z
+  .object({
+    filename: z.string().min(1).max(120),
+    altText: z.string().max(300),
+    tags: z.array(z.string().min(1).max(40)).max(20),
+    type: AssetTypeSchema,
+  })
+  .partial();
+export type AssetUpdate = z.input<typeof AssetUpdateSchema>;
+
+export const AssetUsageKindSchema = z.enum([
+  'portrait',
+  'expression',
+  'location',
+  'item',
+  'property',
+  'company',
+  'texts',
+]);
+export type AssetUsageKind = z.infer<typeof AssetUsageKindSchema>;
+
+/** One place an asset is referenced. `label` is display-ready (a character or
+ *  venue name); `count` only appears on aggregated kinds (texts). `worldId` is
+ *  the world the referencing thing lives in — null for global content (shop
+ *  items) and world-less characters. */
+export const AssetUsageSchema = z.object({
+  kind: AssetUsageKindSchema,
+  refId: z.string(),
+  label: z.string(),
+  worldId: z.string().nullable().default(null),
+  count: z.number().int().positive().optional(),
+  /** kind 'expression' only: the canonical expression names this asset is
+   *  assigned to on that character (clients localize via the expression catalog). */
+  expressions: z.array(z.string()).optional(),
+});
+export type AssetUsage = z.infer<typeof AssetUsageSchema>;
+
+/** asset id -> everywhere it's referenced. Assets with no references are absent. */
+export const AssetUsageMapSchema = z.record(z.string(), z.array(AssetUsageSchema));
+export type AssetUsageMap = z.infer<typeof AssetUsageMapSchema>;
+
+/** Result of a thumbnail backfill pass. */
+export const ThumbnailRebuildResultSchema = z.object({
+  generated: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+});
+export type ThumbnailRebuildResult = z.infer<typeof ThumbnailRebuildResultSchema>;
+
 // --- Conversations ----------------------------------------------------------
 
 export const ConversationCreateSchema = z.object({

@@ -8,7 +8,7 @@ import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PortraitPicker } from '../PortraitPicker';
 import { Portrait } from '../Portrait';
-import { Empty } from '../ui';
+import { Empty, Spinner } from '../ui';
 import './phone-keepsakes.css';
 
 const KIND_ICON: Record<Moment['kind'], string> = {
@@ -134,7 +134,9 @@ export function MomentsApp() {
           </div>
         )}
 
-        {loading ? null : moments.length === 0 ? (
+        {loading ? (
+          <Spinner />
+        ) : moments.length === 0 ? (
           <Empty icon={<Icon name="moments" size={36} />} title={t('moments.emptyTitle')}>
             <p className="muted">{t('moments.emptyBody')}</p>
           </Empty>

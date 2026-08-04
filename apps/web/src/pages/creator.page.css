@@ -125,17 +125,6 @@
   border-radius: 4px;
 }
 
-/* --- Generate-from-portrait (vision) ----------------------------------- */
-.ce-image-gen {
-  margin-top: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ce-image-gen .creator-note {
-  margin: 0;
-}
-
 /* --- Content-flag toggle list ------------------------------------------- */
 .creator-flags { display: grid; gap: 10px; margin: 6px 0 4px; }
 .creator-flag {
@@ -231,9 +220,10 @@
 
 /* Sticky portrait side rail. 80px clears the mobile topbar while it's present. */
 .ce-rail { position: sticky; top: 80px; }
-/* At desktop (≥860px) the mobile topbar is hidden, so the 80px offset just
-   leaves a dead gap — drop the rail to the desktop content padding instead. */
-@media (min-width: 860px) {
+/* Only once the DESKTOP SHELL is active (sidebar shown, topbar hidden — must
+   match the seam in styles.css exactly, width AND height) does the 80px offset
+   become a dead gap; drop the rail to the desktop content padding then. */
+@media (min-width: 1024px) and (min-height: 620px) {
   .ce-rail { top: 34px; }
 }
 
@@ -296,7 +286,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   padding: 8px 14px;
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-dim);
@@ -422,10 +412,10 @@
   position: sticky;
   top: 80px;
 }
-/* Mirror the portrait rail: at desktop (≥860px) the mobile topbar is gone, so
-   the 80px sticky offset leaves a ~20px dead gap — drop to the content padding.
-   Below that the 80px keeps the list clear of the still-present topbar. */
-@media (min-width: 860px) {
+/* Mirror the portrait rail: only under the DESKTOP SHELL condition (matches
+   styles.css — width AND height) is the topbar gone; drop to content padding
+   then. Anywhere else the 80px keeps the list clear of the still-present topbar. */
+@media (min-width: 1024px) and (min-height: 620px) {
   .we-sidebar { top: 34px; }
 }
 @media (max-width: 760px) {
@@ -462,9 +452,9 @@
   transition: background 0.1s, color 0.1s;
   border-left: 2px solid transparent;
 }
-.we-world-item:hover { background: var(--ink-3); color: var(--text); }
+.we-world-item:hover { background: var(--panel); color: var(--text); }
 .we-world-item.we-world-item-active {
-  background: var(--ink-3);
+  background: var(--panel);
   color: var(--brass);
   border-left-color: var(--brass);
 }
@@ -519,7 +509,7 @@
   border: none;
   border-bottom: 2px solid transparent;
   padding: 8px 14px;
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-dim);
@@ -636,7 +626,7 @@
   height: 20px;
   border-radius: 999px;
   border: 1px solid var(--border-bright);
-  background: var(--ink-3);
+  background: var(--ink-2);
   position: relative;
   transition: background 0.18s, border-color 0.18s;
 }
