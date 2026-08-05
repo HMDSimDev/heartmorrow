@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  DIFFICULTIES,
+  DIFFICULTY,
   RAPPORT_START,
+  scaleEvaluationDeltas,
   startingRapport,
   turnRapportDelta,
   rapportLabel,
@@ -45,6 +48,65 @@ describe('turnRapportDelta', () => {
   it('clamps engagement to the -3..+3 range', () => {
     expect(turnRapportDelta(99)).toBe(turnRapportDelta(3));
     expect(turnRapportDelta(-99)).toBe(turnRapportDelta(-3));
+  });
+});
+
+describe('difficulty', () => {
+  it("'normal' is the identity row — the tuned baseline stays byte-identical", () => {
+    expect(DIFFICULTY.normal.posMult).toBe(1);
+    expect(DIFFICULTY.normal.negMult).toBe(1);
+    expect(DIFFICULTY.normal.endShift).toBe(0);
+    expect(DIFFICULTY.normal.evalGainMult).toBe(1);
+    expect(DIFFICULTY.normal.evalHarmMult).toBe(1);
+    for (const e of [-3, -2, -1, 0, 1, 2, 3]) {
+      expect(turnRapportDelta(e, { difficulty: 'normal' })).toBe(turnRapportDelta(e));
+      expect(turnRapportDelta(e, { guardedness: 80, difficulty: 'normal' })).toBe(
+        turnRapportDelta(e, { guardedness: 80 }),
+      );
+    }
+  });
+
+  it('gentle warms faster and cools slower; harsh the reverse', () => {
+    expect(turnRapportDelta(2, { difficulty: 'gentle' })).toBeGreaterThan(turnRapportDelta(2));
+    expect(turnRapportDelta(-2, { difficulty: 'gentle' })).toBeGreaterThan(turnRapportDelta(-2)); // a softer loss
+    expect(turnRapportDelta(2, { difficulty: 'harsh' })).toBeLessThan(turnRapportDelta(2));
+    expect(turnRapportDelta(-2, { difficulty: 'harsh' })).toBeLessThan(turnRapportDelta(-2)); // a deeper loss
+  });
+
+  it('never inverts a turn: an open character’s empty turn stays 0 on every difficulty', () => {
+    for (const d of DIFFICULTIES) expect(turnRapportDelta(0, { difficulty: d })).toBe(0);
+  });
+
+  it('a genuine +1 still registers on harsh, even fully guarded (hard, not futile)', () => {
+    expect(turnRapportDelta(1, { guardedness: 100, difficulty: 'harsh' })).toBeGreaterThanOrEqual(1);
+  });
+
+  it('difficulty never moves the opening rapport (startingRapport has no difficulty input)', () => {
+    expect(startingRapport(0)).toBe(RAPPORT_START);
+    expect(startingRapport.length).toBeLessThanOrEqual(1); // guardedness only — keep it that way
+  });
+});
+
+describe('scaleEvaluationDeltas', () => {
+  it("'normal' is exactly identity", () => {
+    const deltas = { affection: 3, comfort: -2, tension: -1 };
+    expect(scaleEvaluationDeltas(deltas, 'normal')).toEqual(deltas);
+  });
+
+  it('scales by HARM direction, not raw sign — tension is inverted', () => {
+    const gentle = scaleEvaluationDeltas({ affection: -2, comfort: 2, tension: 3 }, 'gentle');
+    expect(gentle.affection).toBe(-1); // a loss, softened (−2 × 0.6)
+    expect(gentle.comfort).toBe(3); // a gain, sweetened (2 × 1.25)
+    expect(gentle.tension).toBe(2); // a tension RISE is harm → softened (3 × 0.6)
+
+    const harsh = scaleEvaluationDeltas({ affection: -2, tension: -2 }, 'harsh');
+    expect(harsh.affection).toBe(-3); // a loss, sharpened (−2 × 1.3)
+    expect(harsh.tension).toBe(-2); // a tension DROP is a win → gain-scaled (−2 × 0.8)
+  });
+
+  it('a zero delta stays zero and unknown junk is dropped', () => {
+    expect(scaleEvaluationDeltas({ affection: 0 }, 'harsh')).toEqual({ affection: 0 });
+    expect(scaleEvaluationDeltas({ affection: Number.NaN }, 'gentle')).toEqual({});
   });
 });
 

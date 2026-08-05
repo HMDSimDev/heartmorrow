@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  DIFFICULTIES,
   GENDER_LABELS,
   SEXUALITY_LABELS,
+  turnRapportDelta,
   type Gender,
   type Sexuality,
+  type Difficulty,
   type LlmHealthResult,
   type LlmModelInfo,
   type LlmRoleConnection,
@@ -53,10 +56,24 @@ type TabKey = 'base' | RoleKey | 'image';
 type Form = ConnectionForm & {
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
+  difficulty: Difficulty;
   tragicOutcomesEnabled: boolean;
   roleOverrides: Record<RoleKey, LlmRoleConnection>;
   image: ImageGenSettings;
 };
+
+/** Typed label keys for the difficulty stops (a map keeps the t() keys literal). */
+const DIFF_LABEL_KEY = {
+  gentle: 'settings.fields.difficultyGentle',
+  normal: 'settings.fields.difficultyNormal',
+  harsh: 'settings.fields.difficultyHarsh',
+} as const;
+
+/** The largest example swing across all difficulties — one fixed scale for the
+ *  example bars, so moving the dial visibly grows/shrinks them. */
+const DIFF_EX_MAX = Math.max(
+  ...DIFFICULTIES.flatMap((d) => [turnRapportDelta(2, { difficulty: d }), -turnRapportDelta(-2, { difficulty: d })]),
+);
 
 /** Keys of one connection, used to project a connection into a settings patch. */
 const CONNECTION_FIELDS = [
@@ -153,6 +170,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           maxRetries: s.maxRetries,
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,
+          difficulty: s.difficulty,
           tragicOutcomesEnabled: s.tragicOutcomesEnabled,
           roleOverrides: { evaluator: s.roleOverrides.evaluator, vision: s.roleOverrides.vision },
           image: s.image,
@@ -187,6 +205,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
     ...connectionPatch(form),
     nsfwEnabled: form.nsfwEnabled,
     rapportCadence: form.rapportCadence,
+    difficulty: form.difficulty,
     tragicOutcomesEnabled: form.tragicOutcomesEnabled,
     roleOverrides: { evaluator: form.roleOverrides.evaluator, vision: form.roleOverrides.vision },
     image: form.image,
@@ -310,6 +329,25 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
     }
   };
 
+  // The playstyle controls (difficulty dial + live-feedback chips) persist on
+  // their own (a minimal PATCH), like the NSFW toggle — their section sits far
+  // from the LLM console's Save button. Optimistic so the dial and its example
+  // readout move with the drag; on failure, surface the error and re-read the
+  // stored values so the UI stays honest.
+  const persistPlaystyle = (patch: { difficulty?: Difficulty; rapportCadence?: 'every' | 'periodic' }) => {
+    setForm((f) => (f ? { ...f, ...patch } : f));
+    setError(undefined);
+    void api.updateSettings(patch).catch(async (e: unknown) => {
+      setError(errorMessage(e));
+      try {
+        const s = await api.getSettings();
+        setForm((f) => (f ? { ...f, difficulty: s.difficulty, rapportCadence: s.rapportCadence } : f));
+      } catch {
+        /* keep the optimistic value; the banner already flags the failure */
+      }
+    });
+  };
+
   const closeNsfwModal = () => {
     setNsfwModalOpen(false);
     setAckContent(false);
@@ -389,6 +427,103 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           </div>
         </Link>
       )}
+
+      <section className="set-group">
+        <h2 className="set-group-head">{t('settings.groups.difficulty')}</h2>
+
+        <div className="framed set-section">
+          <div className="section-head">
+            <div className="titles">
+              <div className="kicker">{t('settings.playstyle.kicker')}</div>
+              <h2>{t('settings.playstyle.head')}</h2>
+            </div>
+            <div className="trail" />
+          </div>
+          <p className="set-lede">{t('settings.playstyle.lede')}</p>
+
+          <div className="set-diff">
+            <div className="set-col-label">{t('settings.fields.difficulty')}</div>
+            <input
+              type="range"
+              className="set-diff-slider"
+              min={0}
+              max={DIFFICULTIES.length - 1}
+              step={1}
+              value={DIFFICULTIES.indexOf(form.difficulty)}
+              onChange={(e) => persistPlaystyle({ difficulty: DIFFICULTIES[Number(e.target.value)] ?? 'normal' })}
+              aria-label={t('settings.fields.difficulty')}
+              aria-valuetext={t(DIFF_LABEL_KEY[form.difficulty])}
+            />
+            <div className="set-diff-ticks">
+              {DIFFICULTIES.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={`set-diff-tick ${form.difficulty === d ? 'active' : ''}`}
+                  onClick={() => persistPlaystyle({ difficulty: d })}
+                >
+                  {t(DIFF_LABEL_KEY[d])}
+                </button>
+              ))}
+            </div>
+            <p className="set-diff-sum">{t(`settings.playstyle.sum.${form.difficulty}`)}</p>
+
+            {/* Example readout, computed from the REAL shared scoring math
+                (turnRapportDelta) so the preview can never drift from the game. */}
+            <div className="set-diff-ex">
+              <div className="set-diff-ex-head">{t('settings.playstyle.exHead')}</div>
+              {(
+                [
+                  { key: 'good' as const, label: t('settings.playstyle.exGood'), delta: turnRapportDelta(2, { difficulty: form.difficulty }) },
+                  { key: 'bad' as const, label: t('settings.playstyle.exBad'), delta: turnRapportDelta(-2, { difficulty: form.difficulty }) },
+                ]
+              ).map((row) => {
+                const tone = row.delta >= 0 ? 'good' : 'bad';
+                return (
+                  <div key={row.key} className="set-diff-ex-row">
+                    <span className="set-diff-ex-label">{row.label}</span>
+                    <span className="set-diff-ex-bar">
+                      <span className={`set-diff-ex-fill ${tone}`} style={{ width: `${(Math.abs(row.delta) / DIFF_EX_MAX) * 100}%` }} />
+                    </span>
+                    <span className={`set-diff-ex-val ${tone}`}>{row.delta >= 0 ? `+${row.delta}` : `−${-row.delta}`}</span>
+                  </div>
+                );
+              })}
+              <div className="set-diff-ex-note">
+                <Icon name="leave" size={14} /> {t(`settings.playstyle.patience.${form.difficulty}`)}
+              </div>
+              <div className="set-diff-ex-note">
+                <Icon name="recap" size={14} /> {t(`settings.playstyle.grading.${form.difficulty}`)}
+              </div>
+            </div>
+          </div>
+
+          <div className="set-cadence">
+            <div className="set-col-label">{t('settings.fields.rapport')}</div>
+            <div className="set-cad-seg">
+              <button
+                type="button"
+                className={`set-provider-chip ${form.rapportCadence === 'every' ? 'active' : ''}`}
+                aria-pressed={form.rapportCadence === 'every'}
+                onClick={() => persistPlaystyle({ rapportCadence: 'every' })}
+              >
+                <span className="set-provider-name">{t('settings.fields.rapportEvery')}</span>
+                <span className="set-provider-tag">{t('settings.playstyle.cadEveryTag')}</span>
+              </button>
+              <button
+                type="button"
+                className={`set-provider-chip ${form.rapportCadence === 'periodic' ? 'active' : ''}`}
+                aria-pressed={form.rapportCadence === 'periodic'}
+                onClick={() => persistPlaystyle({ rapportCadence: 'periodic' })}
+              >
+                <span className="set-provider-name">{t('settings.fields.rapportPeriodic')}</span>
+                <span className="set-provider-tag">{t('settings.playstyle.cadPeriodicTag')}</span>
+              </button>
+            </div>
+            <p className="hint set-cad-hint">{t('settings.fields.rapportHint')}</p>
+          </div>
+        </div>
+      </section>
 
       <section className="set-group">
         <h2 className="set-group-head">{t('settings.groups.appearance')}</h2>
@@ -739,17 +874,6 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             testing={!!testing.base}
             advancedMode={advancedMode}
             hideFooter
-            generationExtra={
-              <Field label={t('settings.fields.rapport')} hint={t('settings.fields.rapportHint')}>
-                <select
-                  value={form.rapportCadence}
-                  onChange={(e) => set({ rapportCadence: e.target.value as 'every' | 'periodic' })}
-                >
-                  <option value="every">{t('settings.fields.rapportEvery')}</option>
-                  <option value="periodic">{t('settings.fields.rapportPeriodic')}</option>
-                </select>
-              </Field>
-            }
           />
         ) : tab === 'image' ? (
           <>

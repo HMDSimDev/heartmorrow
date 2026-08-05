@@ -46,6 +46,7 @@ import {
   venueCost,
   venueDateEffect,
   propertyDateBuff,
+  scaleEvaluationDeltas,
   type Character,
   type ConversationCreate,
   type ConversationSession,
@@ -949,7 +950,7 @@ export async function judgeTurn(sessionId: string, signal?: AbortSignal): Promis
   );
   if (!result.ok) return null; // fail-safe — no rapport change
 
-  const { rapport, delta } = applyTurnEngagement(sessionId, result.data.engagement, character.guardedness);
+  const { rapport, delta } = applyTurnEngagement(sessionId, result.data.engagement, character.guardedness, settings.difficulty);
   // Persist the mood next to rapport so a resumed date restores the portrait + chip.
   setLastExpression(sessionId, result.data.expression);
   return {
@@ -982,7 +983,8 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
   // Date machinery only — a hangout has no rapport to judge, nobody storms out of
   // one, and there is no date to break up or say goodnight to.
   if (session.ended || !isDateMode(session.mode)) return null;
-  if (!hasLostInterest(sessionId)) return null;
+  const settings = getLlmSettings();
+  if (!hasLostInterest(sessionId, settings.difficulty)) return null;
   // The character already made an exit this session (the line is in the transcript,
   // but the client may have missed the SSE event to a refresh/disconnect). Rapport is
   // deliberately left cratered for endSession to score, so without this check the
@@ -998,7 +1000,6 @@ export async function maybeLeaveForLostInterest(sessionId: string, signal?: Abor
   if (priorExit) return null;
 
   const character = getCharacter(session.characterId);
-  const settings = getLlmSettings();
 
   // A brief, in-character "I should get going" — plain dialogue, low budget.
   let line = '';
@@ -1746,19 +1747,23 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   evaluation.mood = evaluation.mood.replace(/[\s.!?…]+$/u, '');
   const actor = getCharacter(session.characterId);
   const chronDay = actor.worldId ? ensureWorldState(actor.worldId).day : 0;
+  // Difficulty scales the evaluator's proposed deltas before anything sees them —
+  // harm-aware (a tension RISE is a setback despite its + sign), identity on
+  // normal. The event records what was actually applied, not the raw proposal.
+  const appliedDeltas = scaleEvaluationDeltas(evaluation.relationshipDeltas, settings.difficulty);
   const event = recordEvent('session_eval', {
     sessionId,
     characterId: session.characterId,
     day: chronDay,
     mood: evaluation.mood,
     expression: evaluation.expression,
-    deltas: evaluation.relationshipDeltas,
+    deltas: appliedDeltas,
     summaryLine: evaluation.summaryLine,
   });
 
   // Capture warmth BEFORE the eval delta so we can detect a band crossing.
   const beforeRel = getRelationship(session.characterId);
-  applyRelationshipChange(session.characterId, evaluation.relationshipDeltas, {
+  applyRelationshipChange(session.characterId, appliedDeltas, {
     source: 'session_eval',
     detail: { sessionId },
   });
@@ -1851,7 +1856,11 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // Server-owned + clamped, applied BEFORE milestone/strain see the state.
   if (actor.worldId && isDateMode(session.mode)) {
     const finalRapport = getRapport(session.id);
-    const eff = rapportEndEffect(finalRapport);
+    // Difficulty shifts how the final rapport GRADES (never where it started) —
+    // and only when a turn was actually judged, so a date the judge never read
+    // (periodic cadence, judge outage) can't be pushed out of the neutral band
+    // by the difficulty shift alone.
+    const eff = rapportEndEffect(finalRapport, hasJudgedTurn(session.id) ? settings.difficulty : 'normal');
     if (Object.keys(eff).length > 0) {
       applyRelationshipChange(session.characterId, eff, { source: 'rapport', detail: { rapport: finalRapport } });
       recordEvent('date_rapport', { characterId: session.characterId, rapport: finalRapport });

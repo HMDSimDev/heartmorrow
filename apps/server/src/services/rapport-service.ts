@@ -1,11 +1,12 @@
 import {
+  DIFFICULTY,
   RAPPORT_START,
-  RAPPORT_LEAVE_FLOOR,
   rapportLabel,
   pickDateNeed,
   startingRapport,
   turnRapportDelta,
   type DateNeed,
+  type Difficulty,
   type RelationshipStatKey,
 } from '@dsim/shared';
 import { hashFloat } from '../lib/seeded-random';
@@ -129,21 +130,29 @@ export interface RapportStep {
 
 /**
  * Apply a turn's engagement (−3..+3) to the running rapport, scaled by the
- * character's guardedness. A guarded character opens cooler (seeded lazily from
- * `startingRapport` on their first judged turn) and warms more slowly; a neutral
- * turn cools the date for everyone. Returns the new value and the signed delta.
+ * character's guardedness and the game difficulty. A guarded character opens
+ * cooler (seeded lazily from `startingRapport` on their first judged turn — the
+ * seed itself is difficulty-blind on purpose) and warms more slowly; difficulty
+ * then scales how far each judged turn moves. Returns the new value and delta.
  */
-export function applyTurnEngagement(sessionId: string, engagement: number, guardedness = 0): RapportStep {
+export function applyTurnEngagement(
+  sessionId: string,
+  engagement: number,
+  guardedness = 0,
+  difficulty: Difficulty = 'normal',
+): RapportStep {
   const prev = lookup(sessionId) ?? startingRapport(guardedness);
-  const rapport = setRapport(sessionId, prev + turnRapportDelta(engagement, { guardedness }), true);
+  const rapport = setRapport(sessionId, prev + turnRapportDelta(engagement, { guardedness, difficulty }), true);
   return { rapport, delta: rapport - prev };
 }
 
 export { rapportLabel };
 
-/** True once rapport has cratered — the character is about to lose interest. */
-export function hasLostInterest(sessionId: string): boolean {
-  return getRapport(sessionId) <= RAPPORT_LEAVE_FLOOR;
+/** True once rapport has cratered — the character is about to lose interest.
+ *  The floor moves with difficulty: on gentle they hold on longer, on harsh
+ *  their patience runs out sooner. */
+export function hasLostInterest(sessionId: string, difficulty: Difficulty = 'normal'): boolean {
+  return getRapport(sessionId) <= DIFFICULTY[difficulty].leaveFloor;
 }
 
 /** What the character is quietly hoping for on this date (stable per world-day). */
@@ -155,14 +164,18 @@ export function dateNeedFor(worldId: string, day: number, characterId: string): 
  * End-of-date consequence from the FINAL rapport — the real stakes. A great date
  * boosts warmth; a bad one nets negative (cooler + more tense), feeding the
  * breakup machine over repeated bad nights. Clamped server-side as always.
+ * Difficulty shifts how the final value GRADES (one ladder, read a few points
+ * kinder or meaner) — the caller must pass 'normal' for a date no turn judge
+ * ever read, so an unjudged date can't be dragged out of the neutral band.
  */
-export function rapportEndEffect(rapport: number): Partial<Record<RelationshipStatKey, number>> {
-  if (rapport >= 82) return { affection: 4, chemistry: 3, comfort: 2, trust: 1 }; // a genuinely great night
-  if (rapport >= 68) return { affection: 2, chemistry: 1, comfort: 1 };
-  if (rapport >= 56) return { comfort: 1 };
-  if (rapport >= 47) return {}; // narrow neutral band — the evaluator's own read stands
-  if (rapport >= 36) return { comfort: -2, tension: 2 }; // flat/awkward — you lose a little ground
-  if (rapport >= 22) return { affection: -3, comfort: -4, tension: 5 };
+export function rapportEndEffect(rapport: number, difficulty: Difficulty = 'normal'): Partial<Record<RelationshipStatKey, number>> {
+  const r = rapport + DIFFICULTY[difficulty].endShift;
+  if (r >= 82) return { affection: 4, chemistry: 3, comfort: 2, trust: 1 }; // a genuinely great night
+  if (r >= 68) return { affection: 2, chemistry: 1, comfort: 1 };
+  if (r >= 56) return { comfort: 1 };
+  if (r >= 47) return {}; // narrow neutral band — the evaluator's own read stands
+  if (r >= 36) return { comfort: -2, tension: 2 }; // flat/awkward — you lose a little ground
+  if (r >= 22) return { affection: -3, comfort: -4, tension: 5 };
   return { affection: -6, comfort: -6, tension: 9 }; // a genuinely bad date sets you back hard
 }
 

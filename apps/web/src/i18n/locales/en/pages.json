@@ -1099,9 +1099,35 @@
       "blurb": "Configure various settings used by the game, including locale, appearance, and LLM endpoint and model settings."
     },
     "groups": {
+      "difficulty": "Difficulty",
       "appearance": "Appearance",
       "gameplay": "Gameplay",
       "model": "Model & diagnostics"
+    },
+    "playstyle": {
+      "kicker": "Playstyle",
+      "head": "Difficulty & date feedback",
+      "lede": "Tune how demanding dates are and how closely the game reads them. Changes save instantly and apply from your next message — they never change what characters say, only how hard the consequences land.",
+      "sum": {
+        "gentle": "Forgiving — warmth comes easier, stumbles cost less, and a rough date is graded with a kind eye.",
+        "normal": "The tuned baseline — every consequence lands exactly as the game was designed.",
+        "harsh": "Demanding — warmth is slow to earn and quick to lose, and a rough date leaves a mark."
+      },
+      "exHead": "How a message moves the vibe here",
+      "exGood": "A line that genuinely lands",
+      "exBad": "A careless, flat reply",
+      "patience": {
+        "gentle": "They stay through almost anything — only a truly dire date makes them leave early.",
+        "normal": "Let the vibe crater and they'll politely cut the date short.",
+        "harsh": "Their patience runs out sooner — a sinking date ends early."
+      },
+      "grading": {
+        "gentle": "The end-of-date judge grades a shade kinder, and setbacks are softened.",
+        "normal": "The end-of-date judge scores things exactly as they went.",
+        "harsh": "The end-of-date judge grades a shade meaner, and setbacks sting more."
+      },
+      "cadEveryTag": "Most responsive",
+      "cadPeriodicTag": "Lighter — fewer model calls"
     },
     "toast": {
       "saved": "Settings saved.",
@@ -1333,7 +1359,11 @@
       "rapport": "Live date feedback",
       "rapportHint": "How often a date reads how your last message landed (updates the vibe + their expression). 'Every message' is most responsive; 'periodic' keeps replies snappier with one fewer model call per turn.",
       "rapportEvery": "Every message",
-      "rapportPeriodic": "Periodically (lighter)"
+      "rapportPeriodic": "Periodically",
+      "difficulty": "Date difficulty",
+      "difficultyGentle": "Gentle",
+      "difficultyNormal": "Normal",
+      "difficultyHarsh": "Harsh"
     },
     "foot": {
       "saving": "Saving…",
@@ -1623,6 +1653,14 @@
             "body": [
               "Both judges are run by the AI model you connect in Settings. A stronger, more capable model reads nuance more reliably. It is better at telling genuine warmth from filler, noticing when you hit a dislike or quietly nail what someone wanted, and scoring honestly in both directions.",
               "A weaker model can be blunter or less consistent. If the judging ever feels off or too easy, connecting a better model is the most direct way to make dates feel as discerning as they are designed to be."
+            ]
+          },
+          {
+            "heading": "Date difficulty: how hard the consequences land",
+            "body": [
+              "A \"Date difficulty\" setting in Settings decides how hard all of this lands. It never changes what characters say, how the judges read your messages, or where a date's vibe starts — every date still opens exactly where it would on Normal. What it changes is the consequences: how far the vibe moves on each message, how quickly a cratering date makes them lose interest, how the date's final vibe is graded, and how strongly the end-of-date judge's read counts.",
+              "On Gentle, good moments carry further and stumbles cost less — characters extend more patience before giving up on a date that's going badly, and setbacks are softened. On Harsh, warmth is slower to earn and easier to lose: missteps bite harder, patience runs out sooner, and the same date is graded a shade meaner. Normal is the tuned baseline the game is designed around.",
+              "Difficulty applies to dates and hangouts (the end judge's read of a hangout scales the same way); texting is unaffected. You can change it at any time and it simply applies from the next message on."
             ]
           }
         ]

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DIFFICULTIES } from '../date-dynamics';
 
 /**
  * LLM provider settings. These configure how the SERVER talks to an
@@ -223,6 +224,15 @@ export const LlmSettingsSchema = z.object({
    * call per turn); 'periodic' judges less often to keep replies snappy.
    */
   rapportCadence: z.enum(['every', 'periodic']).default('every'),
+  /**
+   * How strictly a date's consequences land — the game's difficulty. It never
+   * changes what the LLM judges say and never moves where a date's rapport
+   * opens; it only scales the server-applied consequences (per-turn rapport
+   * movement, the lose-interest floor, the end-of-date stakes ladder, and the
+   * evaluator's applied deltas — see `DIFFICULTY` in date-dynamics). 'normal'
+   * applies the tuned baseline exactly as authored.
+   */
+  difficulty: z.enum(DIFFICULTIES).default('normal'),
   /**
    * Opt-in to dark tragic outcomes (a character's self-harm as the consequence of
    * sustained, severe mistreatment). Requires `nsfwEnabled` to even be toggleable.

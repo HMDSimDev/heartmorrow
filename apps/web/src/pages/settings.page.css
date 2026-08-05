@@ -36,6 +36,123 @@
 /* Mode + adult-content toggles as a tidy choice row. */
 .set-choice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 
+/* --- Playstyle: the difficulty dial + live-feedback chips ----------------- */
+/* A three-stop dial. The track runs sage → brass → ember (forgiving → tuned →
+   demanding); the thumb is a lamplit diamond, echoing the energy pips. */
+.set-diff { max-width: 640px; }
+.set-diff-slider {
+  appearance: none; -webkit-appearance: none;
+  display: block; width: 100%; height: 28px; margin: 4px 0 0;
+  background: transparent; cursor: pointer;
+}
+.set-diff-slider::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sage) 55%, var(--border)),
+    color-mix(in srgb, var(--brass) 60%, var(--border)),
+    color-mix(in srgb, var(--ember) 55%, var(--border))
+  );
+}
+.set-diff-slider::-moz-range-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sage) 55%, var(--border)),
+    color-mix(in srgb, var(--brass) 60%, var(--border)),
+    color-mix(in srgb, var(--ember) 55%, var(--border))
+  );
+}
+.set-diff-slider::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 15px; height: 15px; margin-top: -5.5px;
+  border-radius: 3px; transform: rotate(45deg);
+  background: linear-gradient(135deg, var(--panel-2), var(--panel));
+  border: 1.5px solid var(--brass);
+  box-shadow: 0 0 10px rgba(230, 177, 94, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition: box-shadow 0.2s ease;
+}
+.set-diff-slider::-moz-range-thumb {
+  width: 12px; height: 12px;
+  border-radius: 3px; transform: rotate(45deg);
+  background: linear-gradient(135deg, var(--panel-2), var(--panel));
+  border: 1.5px solid var(--brass);
+  box-shadow: 0 0 10px rgba(230, 177, 94, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+.set-diff-slider:hover::-webkit-slider-thumb { box-shadow: 0 0 14px rgba(230, 177, 94, 0.7); }
+.set-diff-slider:focus-visible { outline: none; }
+.set-diff-slider:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--glow-accent), 0 0 14px rgba(230, 177, 94, 0.7); }
+.set-diff-slider:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--glow-accent), 0 0 14px rgba(230, 177, 94, 0.7); }
+
+/* The three stop labels double as buttons; the active one is lit. */
+.set-diff-ticks { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 2px; }
+.set-diff-tick {
+  appearance: none; background: none; border: none; cursor: pointer; padding: 4px 0;
+  font-family: var(--font-mono); font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-mute);
+  transition: color 0.15s ease;
+}
+.set-diff-tick:hover { color: var(--text); }
+.set-diff-tick.active { color: var(--brass); text-shadow: 0 0 10px rgba(230, 177, 94, 0.45); }
+.set-diff-tick:first-child { text-align: left; }
+.set-diff-tick:last-child { text-align: right; }
+
+/* One serif line of flavor for the chosen stop. */
+.set-diff-sum {
+  margin: 10px 0 0; font-family: var(--font-display); font-style: italic;
+  font-size: 0.95rem; color: var(--text-dim);
+}
+
+/* The live example readout — an inset ledger pocket (darker than its parent,
+   per the nested-card rule) whose numbers come from the real scoring math. */
+.set-diff-ex {
+  margin-top: 12px; padding: 12px 14px;
+  background: var(--ink-2); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.set-diff-ex-head {
+  font-family: var(--font-mono); font-size: 0.62rem; font-weight: 700;
+  letter-spacing: 0.16em; text-transform: uppercase; color: var(--text-mute);
+  margin-bottom: 10px;
+}
+.set-diff-ex-row {
+  display: grid; grid-template-columns: minmax(130px, 190px) 1fr 44px;
+  align-items: center; gap: 12px; margin-bottom: 8px;
+}
+.set-diff-ex-label { font-size: 0.82rem; color: var(--text-dim); }
+.set-diff-ex-bar {
+  display: block; height: 6px; border-radius: 3px; overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+.set-diff-ex-fill { display: block; height: 100%; border-radius: inherit; transition: width 0.3s ease; }
+.set-diff-ex-fill.good { background: linear-gradient(90deg, color-mix(in srgb, var(--sage) 70%, var(--brass)), var(--brass)); }
+.set-diff-ex-fill.bad { background: linear-gradient(90deg, color-mix(in srgb, var(--ember) 55%, black), var(--ember)); }
+.set-diff-ex-val {
+  font-family: var(--font-mono); font-size: 0.82rem; font-weight: 700; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.set-diff-ex-val.good { color: var(--sage); }
+.set-diff-ex-val.bad { color: var(--ember); }
+.set-diff-ex-note {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin-top: 8px; font-size: 0.8rem; line-height: 1.45; color: var(--text-dim);
+}
+.set-diff-ex-note svg { flex: none; margin-top: 2px; color: var(--brass); }
+@media (max-width: 480px) {
+  .set-diff-ex-row { grid-template-columns: 1fr 44px; }
+  .set-diff-ex-label { grid-column: 1 / -1; margin-bottom: -2px; }
+}
+
+/* Live-feedback cadence: two selectable chips, fenced under a hairline like
+   the Appearance accent block (reuses the provider-chip look). */
+.set-cadence { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-soft); }
+.set-cad-seg {
+  display: grid; gap: 8px; max-width: 640px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.set-cad-hint { margin: 10px 0 0; font-size: 0.78rem; max-width: 70ch; }
+
 /* --- Appearance: accent swatches (main page) ----------------------------- */
 /* The language select sits in a normal Field; the accent picker gets the
    gem-swatch treatment, fenced under its own mono sub-label. */

@@ -153,6 +153,14 @@ describe('rapportEndEffect (end-of-date stakes)', () => {
     const flat = rapportEndEffect(40); // below the neutral band
     expect(flat.comfort ?? 0).toBeLessThan(0);
   });
+
+  it('difficulty shifts how the same final rapport GRADES — one ladder, read kinder or meaner', () => {
+    expect(rapportEndEffect(44, 'gentle')).toEqual({}); // 44 grades flat on normal, neutral on gentle
+    expect(rapportEndEffect(44).comfort ?? 0).toBeLessThan(0);
+    expect(rapportEndEffect(80, 'gentle').affection).toBeGreaterThan(rapportEndEffect(80).affection ?? 0);
+    expect(rapportEndEffect(50, 'harsh').comfort ?? 0).toBeLessThan(0); // a mid date reads a shade flat on harsh
+    expect(rapportEndEffect(50, 'gentle')).toEqual({}); // …but gentle never inflates the neutral midpoint into a win
+  });
 });
 
 describe('losing interest ends the date early', () => {
@@ -181,6 +189,95 @@ describe('losing interest ends the date early', () => {
     const { session } = startDate();
     expect(hasLostInterest(session.id)).toBe(false);
     expect(await maybeLeaveForLostInterest(session.id)).toBeNull();
+  });
+
+  it('difficulty moves the lose-interest floor: harsh patience runs out sooner, gentle later', () => {
+    const { session } = startDate();
+    // Drive an open-char rapport to 18 (50 → 26 → 18): between the harsh (20) and normal (14) floors.
+    applyTurnEngagement(session.id, -3);
+    applyTurnEngagement(session.id, -1);
+    expect(getRapport(session.id)).toBe(18);
+    expect(hasLostInterest(session.id)).toBe(false);
+    expect(hasLostInterest(session.id, 'harsh')).toBe(true);
+    expect(hasLostInterest(session.id, 'gentle')).toBe(false);
+
+    applyTurnEngagement(session.id, -1); // 10: below normal (14), still above gentle (8)
+    expect(hasLostInterest(session.id)).toBe(true);
+    expect(hasLostInterest(session.id, 'gentle')).toBe(false);
+
+    applyTurnEngagement(session.id, -1); // 2: even gentle patience is spent
+    expect(hasLostInterest(session.id, 'gentle')).toBe(true);
+  });
+});
+
+describe('difficulty threads through the live judge and the end-of-sitting evaluation', () => {
+  it('the per-turn judge moves rapport by the difficulty-scaled step', async () => {
+    updateLlmSettings({ difficulty: 'harsh' });
+    const { session } = startDate();
+    setAdapterOverride(reply({ engagement: 2, expression: 'smiling', note: 'landed' }));
+
+    const readout = await judgeTurn(session.id);
+    const expected = turnRapportDelta(2, { guardedness: G, difficulty: 'harsh' });
+    expect(readout!.delta).toBe(expected);
+    expect(expected).toBeLessThanOrEqual(turnRapportDelta(2, { guardedness: G }));
+    expect(getRapport(session.id)).toBe(START + expected);
+  });
+
+  it("an UNJUDGED date's rapport consequence ignores difficulty (harsh can't drag a neutral 50 into a penalty)", async () => {
+    updateLlmSettings({ difficulty: 'harsh' });
+    const { character, session } = startDate();
+    applyRelationshipChange(character.id, { comfort: 50 }, { source: 'test' });
+
+    const before = getRelationship(character.id);
+    setAdapterOverride(
+      reply({ mood: 'fine', expression: 'neutral', relationshipDeltas: {}, memoryCandidates: [], summaryLine: 'A quiet evening.' }),
+    );
+    const res = await endSession(session.id);
+    expect(res.evaluated).toBe(true);
+    // No turn was ever judged → the default 50 grades on the NORMAL ladder → neutral band → no change.
+    expect(getRelationship(character.id).comfort).toBe(before.comfort);
+  });
+
+  it('a JUDGED date at the midpoint grades a shade flat on harsh', async () => {
+    updateLlmSettings({ difficulty: 'harsh' });
+    const { character, session } = startDate();
+    applyRelationshipChange(character.id, { comfort: 50, tension: 5 }, { source: 'test' });
+    // A judged turn that holds the open-char midpoint exactly (engagement 0 → delta 0).
+    applyTurnEngagement(session.id, 0);
+    expect(getRapport(session.id)).toBe(50);
+
+    const before = getRelationship(character.id);
+    setAdapterOverride(
+      reply({ mood: 'flat', expression: 'neutral', relationshipDeltas: {}, memoryCandidates: [], summaryLine: 'A flat evening.' }),
+    );
+    await endSession(session.id);
+    const after = getRelationship(character.id);
+    expect(after.comfort).toBeLessThan(before.comfort); // 50 − 4 grades in the flat band
+    expect(after.tension).toBeGreaterThan(before.tension);
+  });
+
+  it("gentle scales the evaluator's applied deltas harm-aware (a hangout, where no other effect interferes)", async () => {
+    updateLlmSettings({ difficulty: 'gentle' });
+    const { character } = seedWorldAndCharacter();
+    const session = createSession({ characterId: character.id, mode: 'hangout', locationId: null });
+    addPlayerMessage(session.id, 'Rough afternoon, honestly.');
+    applyRelationshipChange(character.id, { affection: 50, tension: 5 }, { source: 'test' });
+    const before = getRelationship(character.id);
+
+    setAdapterOverride(
+      reply({
+        mood: 'stung',
+        expression: 'sad',
+        relationshipDeltas: { affection: -2, tension: 3 },
+        memoryCandidates: [],
+        summaryLine: 'An afternoon that went sideways.',
+      }),
+    );
+    const res = await endSession(session.id);
+    expect(res.evaluated).toBe(true);
+    const after = getRelationship(character.id);
+    expect(after.affection).toBe(before.affection - 1); // −2 softened to −1
+    expect(after.tension).toBe(before.tension + 2); // a tension RISE is harm → 3 softened to +2, never amplified
   });
 });
 

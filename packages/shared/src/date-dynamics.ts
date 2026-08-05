@@ -5,6 +5,8 @@
  * This module is the shared vocabulary; the server owns the running value.
  */
 
+import type { RelationshipStatKey } from './stats';
+
 export interface DateNeed {
   key: string;
   /** Hidden behavioral hint fed into the dialogue prompt (the character acts on it). */
@@ -92,6 +94,61 @@ export function startingRapport(guardedness = 0): number {
   return Math.round(RAPPORT_START - (g / 100) * GUARDEDNESS.START_DROP);
 }
 
+/** The player-facing difficulty ladder (a Settings knob; 'normal' is the tuned baseline). */
+export const DIFFICULTIES = ['gentle', 'normal', 'harsh'] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
+export interface DifficultyTuning {
+  /** Scales a turn's positive rapport movement (applied AFTER guardedness damping). */
+  posMult: number;
+  /** Scales a turn's negative rapport movement (including a guarded idle slip). */
+  negMult: number;
+  /** Added to the FINAL rapport before the end-of-date stakes ladder grades it. */
+  endShift: number;
+  /** Rapport at/below which the character loses interest and leaves. */
+  leaveFloor: number;
+  /** Scales end-of-sitting evaluator deltas in the player's FAVOR. */
+  evalGainMult: number;
+  /** Scales end-of-sitting evaluator deltas AGAINST the player (harm-aware: see
+   *  `scaleEvaluationDeltas` — a tension rise is harm even though its sign is +). */
+  evalHarmMult: number;
+}
+
+/**
+ * How difficulty shapes a date's consequences. Difficulty NEVER touches the LLM
+ * judges (their rubric stays impartial) and NEVER moves a date's opening rapport
+ * (every date starts exactly where it would on normal) — it only scales what the
+ * server DOES with the judges' reads. 'normal' is the identity row: it must keep
+ * the tuned baseline byte-identical.
+ */
+export const DIFFICULTY: Record<Difficulty, DifficultyTuning> = {
+  gentle: { posMult: 1.25, negMult: 0.7, endShift: 4, leaveFloor: 8, evalGainMult: 1.25, evalHarmMult: 0.6 },
+  normal: { posMult: 1, negMult: 1, endShift: 0, leaveFloor: RAPPORT_LEAVE_FLOOR, evalGainMult: 1, evalHarmMult: 1 },
+  harsh: { posMult: 0.8, negMult: 1.25, endShift: -4, leaveFloor: 20, evalGainMult: 0.8, evalHarmMult: 1.3 },
+};
+
+/**
+ * Scale an end-of-sitting evaluator's proposed relationship deltas by difficulty.
+ * "Against the player" is judged by HARM direction, not raw sign — tension is
+ * inverted (a rise is a setback, a drop is a win) — so gentle softens a tension
+ * spike and harsh sharpens it, never the other way round. One plain Math.round
+ * per stat; 'normal' is exactly identity.
+ */
+export function scaleEvaluationDeltas(
+  deltas: Partial<Record<RelationshipStatKey, number>>,
+  difficulty: Difficulty,
+): Partial<Record<RelationshipStatKey, number>> {
+  const tune = DIFFICULTY[difficulty];
+  if (tune.evalGainMult === 1 && tune.evalHarmMult === 1) return { ...deltas };
+  const out: Partial<Record<RelationshipStatKey, number>> = {};
+  for (const [key, value] of Object.entries(deltas) as [RelationshipStatKey, number][]) {
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    const harmful = key === 'tension' ? value > 0 : value < 0;
+    out[key] = Math.round(value * (harmful ? tune.evalHarmMult : tune.evalGainMult));
+  }
+  return out;
+}
+
 /**
  * How much a single turn moves the live rapport, given the per-turn judge's
  * engagement (−3..+3) and the character's guardedness. Three deliberate biases:
@@ -101,13 +158,19 @@ export function startingRapport(guardedness = 0): number {
  *    genuine +1/+2 turns. (Real letdowns score negative and cool everyone.)
  *  - GUARDED = SLOW TO WARM: only the upside is dampened by guardedness; a guarded
  *    person still cools at full speed, so they're easy to lose and hard to win.
+ * Difficulty then scales the finished step (gentle: warms faster / cools slower;
+ * harsh: the reverse) — after guardedness, so hard mode compounds with a guarded
+ * character rather than washing them out. An open character's empty turn stays 0
+ * on every difficulty: difficulty never invents drift.
  */
-export function turnRapportDelta(engagement: number, opts: { guardedness?: number } = {}): number {
+export function turnRapportDelta(engagement: number, opts: { guardedness?: number; difficulty?: Difficulty } = {}): number {
   const e = Math.max(-3, Math.min(3, Math.round(engagement)));
   const g = Math.max(0, Math.min(100, opts.guardedness ?? 0));
+  const tune = DIFFICULTY[opts.difficulty ?? 'normal'];
   let d = e >= 0 ? e * GUARDEDNESS.POS_STEP : e * GUARDEDNESS.NEG_STEP;
   if (e === 0) d -= GUARDEDNESS.IDLE_DRIFT_BASE + Math.round((g / 100) * GUARDEDNESS.IDLE_DRIFT_GUARD);
   if (d > 0) d *= 1 - (g / 100) * GUARDEDNESS.GAIN_DAMP;
+  d *= d > 0 ? tune.posMult : tune.negMult;
   return Math.round(d);
 }
 
