@@ -1795,27 +1795,10 @@ a.card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 @media (min-width: 3800px) { :root { --maxw: 3400px; } }
 @media (min-width: 4600px) { :root { --maxw: 4000px; } }
 
-/* Text-and-form routes never ride the --maxw ladder to its 4000px top: reading
-   and typing surfaces cap at a readable column and center in the leftover.
-   Card-grid routes (home/people/shop/bag/games/phone) keep the full width —
-   their guarded auto-fill grids add columns instead of stretching cells.
-   min() keeps this a pure cap: below the cap the normal ladder still rules. */
-.app[data-route='settings'] .app-main,
-.app[data-route='debug'] .app-main,
-.app[data-route='profile'] .app-main,
-.app[data-route='world'] .app-main { max-width: min(var(--maxw), 1560px); }
-/* The date needs room for the dossier rail beside the stage. It grows past the
-   old 1780px readability cap on big displays — a 4K screen shouldn't show the
-   date as a small island — but deliberately never rides --maxw to its 4000px
-   top: bubbles keep their own width caps (date.page.css), and an uncapped reel
-   put player and character bubbles a full screen apart. */
-.app[data-route='date'] .app-main { max-width: min(var(--maxw), 1780px); }
-@media (min-width: 2400px) {
-  .app[data-route='date'] .app-main { max-width: min(var(--maxw), 2200px); }
-}
-@media (min-width: 3600px) {
-  .app[data-route='date'] .app-main { max-width: min(var(--maxw), 2720px); }
-}
+/* Every route rides the same --maxw ladder so screens line up edge-for-edge —
+   the phone route is the lone exception (the device frame sizes itself).
+   Readability is enforced at the element level (ch caps on ledes and prose,
+   bubble width caps in date.page.css), never by narrowing whole pages. */
 
 /* ===========================================================================
    FINAL POLISH — themed scrollbars, selection, sliders, portrait hover.

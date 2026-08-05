@@ -8,9 +8,10 @@
    =========================================================================== */
 
 /* --- Setup screen — "Plan a date" -------------------------------------- */
+/* Spans the full content column like every other page's panels — the picker
+   grids inside auto-fill, so extra width becomes extra columns. */
 .date-setup {
   --cut: 18px;
-  max-width: 680px;
 }
 
 /* --- Date or hangout — the fork that changes everything after it -------- */
