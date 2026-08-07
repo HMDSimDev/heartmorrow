@@ -3,6 +3,7 @@ import {
   MessageSchema,
   RELATIONSHIP_STAT_KEYS,
   isGiftableItem,
+  isDateMode,
   type GiftReaction,
   type GiftReactionResponse,
   type GiftSentiment,
@@ -12,7 +13,7 @@ import {
   type RelationshipStatKey,
   type ShopItem,
 } from '@dsim/shared';
-import { inventoryRepo, messagesRepo, sessionsRepo } from '../db/repositories';
+import { inventoryRepo, messagesRepo, sessionParticipantsRepo, sessionsRepo } from '../db/repositories';
 import { getDb } from '../db/index';
 import { badRequest, notFound } from '../lib/errors';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
@@ -26,7 +27,7 @@ import { recordEvent } from './event-service';
 import { getLlmSettings } from './settings-service';
 import { ensureWorldState } from './world-clock-service';
 import { consumeInventoryItem, getShopItem } from './shop-service';
-import { setLastExpression } from './rapport-service';
+import { setLastExpression, setParticipantLastExpression } from './rapport-service';
 import { callStructuredLlm } from '../llm/structured';
 import { buildGiftReactionMessages } from '../prompt/prompt-builder';
 
@@ -194,12 +195,21 @@ export async function giveGiftOnDate(
   sessionId: string,
   inventoryItemId: string,
   signal?: AbortSignal,
+  characterId?: string,
 ): Promise<GiftReactionResponse> {
   const session = sessionsRepo.get(sessionId);
   if (!session) throw notFound(`Session ${sessionId} not found.`);
   if (session.ended) throw badRequest('This date has already ended.');
+  if (!isDateMode(session.mode)) {
+    throw badRequest("Save the gift for a real date, not a hangout.");
+  }
 
-  const character = getCharacter(session.characterId);
+  const targetId = characterId ?? session.characterId;
+  const participant = sessionParticipantsRepo.get(sessionId, targetId);
+  if (!participant || participant.state !== 'present') {
+    throw badRequest('Choose someone who is still at this date.');
+  }
+  const character = getCharacter(targetId);
   const playerId = playerIdForWorldOrDefault(character.worldId);
   const recent = messagesRepo.listBySession(sessionId).slice(-12);
 
@@ -228,6 +238,7 @@ export async function giveGiftOnDate(
       id: newId('msg'),
       sessionId,
       role: 'character',
+      characterId: character.id,
       text: r.reaction.line.trim(),
       metadata: { gift: r.item.name, expression: r.reaction.expression },
       createdAt: now + 1,
@@ -236,9 +247,11 @@ export async function giveGiftOnDate(
 
   // The reaction is now the character's live mood on screen — persist it so a resume
   // right after a gift restores the same portrait + chip (not the last judged mood).
-  setLastExpression(sessionId, r.reaction.expression);
+  if (character.id === session.characterId) setLastExpression(sessionId, r.reaction.expression);
+  setParticipantLastExpression(sessionId, character.id, r.reaction.expression);
 
   return {
+    characterId: character.id,
     narratorMessage,
     message,
     line: r.reaction.line.trim(),

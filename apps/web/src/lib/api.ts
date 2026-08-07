@@ -40,6 +40,7 @@ import type {
   TogetherResult,
   ActiveDate,
   ConversationCreate,
+  ConversationContextEstimate,
   ConversationSession,
   DtrResponse,
   GiftReactionResponse,
@@ -237,25 +238,28 @@ async function postShareFile<T>(path: string, file: File): Promise<T> {
 
 export interface StreamHandlers {
   onPlayer?: (message: Message) => void;
-  onDelta?: (text: string) => void;
-  onDone?: (message: Message) => void;
+  /** Announces which attendee owns the deltas that follow. */
+  onSpeaker?: (characterId: string) => void;
+  onDelta?: (text: string, characterId?: string) => void;
+  /** `complete` is false when more attendees still owe a reply for this turn. */
+  onDone?: (message: Message, complete: boolean) => void;
   onError?: (message: string) => void;
   /** Non-fatal notice (e.g. the reply was truncated at the token limit). */
   onNotice?: (message: string) => void;
   /** The character ended the date and walked out. */
-  onWalkout?: (message: Message, reason: string) => void;
+  onWalkout?: (message: Message, reason: string, characterId?: string, terminal?: boolean) => void;
   /** The player's message read as a breakup; the character reacted (awaiting confirm). */
-  onBreakupIntent?: (message: Message, reaction: 'accept' | 'hurt' | 'plead') => void;
+  onBreakupIntent?: (message: Message, reaction: 'accept' | 'hurt' | 'plead', characterId?: string) => void;
   /** Per-turn rapport read, emitted BEFORE the reply: a vibe label, the live
    *  expression, the numeric trajectory (0..100, internal), the signed change
    *  this turn, and the judged engagement (−3..+3) stamped on the player message
    *  `messageId` — drives the trajectory bar and the reaction chip. */
-  onRapport?: (vibe: string, expression: string, rapport: number, delta: number, engagement?: number, messageId?: string) => void;
+  onRapport?: (vibe: string, expression: string, rapport: number, delta: number, engagement?: number, messageId?: string, characterId?: string) => void;
   /** The character lost interest and ended the date early (a soft exit). */
-  onLeft?: (message: Message, reason: string) => void;
+  onLeft?: (message: Message, reason: string, characterId?: string, terminal?: boolean) => void;
   /** The player wound the date down to a natural close; the character said
    *  goodbye. The client should run the normal end-and-evaluate flow. */
-  onFarewell?: (message: Message, expression?: string) => void;
+  onFarewell?: (message: Message, expression?: string, characterId?: string, terminal?: boolean) => void;
 }
 
 /** Stream a chat reply via SSE (POST + ReadableStream reader). */
@@ -265,11 +269,12 @@ export async function streamChat(
   handlers: StreamHandlers,
   signal?: AbortSignal,
   intent?: Intent,
+  targetCharacterId?: string,
 ): Promise<void> {
   const res = await fetch(`${BASE}/conversations/${sessionId}/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(intent ? { text, intent } : { text }),
+    body: JSON.stringify({ text, ...(intent ? { intent } : {}), ...(targetCharacterId ? { targetCharacterId } : {}) }),
     signal,
   });
   if (!res.ok || !res.body) {
@@ -350,12 +355,19 @@ async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
       case 'player':
         handlers.onPlayer?.(payload as Message);
         break;
-      case 'delta':
-        handlers.onDelta?.((payload as { text: string }).text);
+      case 'speaker':
+        handlers.onSpeaker?.((payload as { characterId: string }).characterId);
         break;
-      case 'done':
-        handlers.onDone?.((payload as { message: Message }).message);
+      case 'delta': {
+        const p = payload as { text: string; characterId?: string };
+        handlers.onDelta?.(p.text, p.characterId);
         break;
+      }
+      case 'done': {
+        const p = payload as { message: Message; complete?: boolean };
+        handlers.onDone?.(p.message, p.complete ?? true);
+        break;
+      }
       case 'error':
         handlers.onError?.((payload as { message: string }).message);
         break;
@@ -363,28 +375,28 @@ async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
         handlers.onNotice?.((payload as { message: string }).message);
         break;
       case 'walkout': {
-        const p = payload as { message: Message; reason: string };
-        handlers.onWalkout?.(p.message, p.reason);
+        const p = payload as { message: Message; reason: string; characterId?: string; terminal?: boolean };
+        handlers.onWalkout?.(p.message, p.reason, p.characterId, p.terminal);
         break;
       }
       case 'breakup_intent': {
-        const p = payload as { message: Message; reaction: 'accept' | 'hurt' | 'plead' };
-        handlers.onBreakupIntent?.(p.message, p.reaction);
+        const p = payload as { message: Message; reaction: 'accept' | 'hurt' | 'plead'; characterId?: string };
+        handlers.onBreakupIntent?.(p.message, p.reaction, p.characterId);
         break;
       }
       case 'rapport': {
-        const p = payload as { label: string; expression: string; rapport: number; delta: number; engagement?: number; messageId?: string };
-        handlers.onRapport?.(p.label, p.expression, p.rapport, p.delta, p.engagement, p.messageId);
+        const p = payload as { characterId?: string; label: string; expression: string; rapport: number; delta: number; engagement?: number; messageId?: string };
+        handlers.onRapport?.(p.label, p.expression, p.rapport, p.delta, p.engagement, p.messageId, p.characterId);
         break;
       }
       case 'left': {
-        const p = payload as { message: Message; reason: string };
-        handlers.onLeft?.(p.message, p.reason);
+        const p = payload as { message: Message; reason: string; characterId?: string; terminal?: boolean };
+        handlers.onLeft?.(p.message, p.reason, p.characterId, p.terminal);
         break;
       }
       case 'farewell': {
-        const p = payload as { message: Message; expression?: string };
-        handlers.onFarewell?.(p.message, p.expression);
+        const p = payload as { message: Message; expression?: string; characterId?: string; terminal?: boolean };
+        handlers.onFarewell?.(p.message, p.expression, p.characterId, p.terminal);
         break;
       }
     }
@@ -557,15 +569,19 @@ export const api = {
   listConversations: () => get<ConversationSession[]>('/conversations'),
   createConversation: (input: ConversationCreate) => post<ConversationSession>('/conversations', input),
   getConversation: (id: string) => get<SessionWithMessages>(`/conversations/${id}`),
+  getConversationContextEstimate: (id: string) =>
+    get<ConversationContextEstimate>(`/conversations/${id}/context-estimate`),
   sendMessage: (id: string, text: string) =>
     post<{ playerMessage: Message; reply: Message }>(`/conversations/${id}/messages`, { text }),
   summarize: (id: string) => post<ConversationSession>(`/conversations/${id}/summarize`),
   endSession: (id: string) => post<EndSessionResponse>(`/conversations/${id}/end`),
   markDateResultSeen: (id: string) => post<{ ok: true }>(`/conversations/${id}/result-seen`),
-  defineRelationship: (id: string) => post<DtrResponse>(`/conversations/${id}/dtr`),
-  giftOnDate: (id: string, inventoryItemId: string) =>
-    post<GiftReactionResponse>(`/conversations/${id}/gift`, { inventoryItemId }),
-  confirmBreakup: (id: string) => post<PlayerBreakupResponse>(`/conversations/${id}/breakup`),
+  defineRelationship: (id: string, characterId?: string) =>
+    post<DtrResponse>(`/conversations/${id}/dtr`, characterId ? { characterId } : undefined),
+  giftOnDate: (id: string, inventoryItemId: string, characterId?: string) =>
+    post<GiftReactionResponse>(`/conversations/${id}/gift`, { inventoryItemId, characterId: characterId ?? null }),
+  confirmBreakup: (id: string, characterId?: string) =>
+    post<PlayerBreakupResponse>(`/conversations/${id}/breakup`, characterId ? { characterId } : undefined),
 
   // shop + inventory
   listShopItems: () => get<ShopItem[]>('/shop/items'),

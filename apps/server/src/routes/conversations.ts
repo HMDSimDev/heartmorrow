@@ -10,10 +10,14 @@ import {
   createSession,
   dropReplyForRegen,
   endSession,
+  estimateNextTurnContext,
   generateReply,
   getSessionWithMessages,
+  getRecordedGroupSpeakerIds,
   judgeTurn,
   recordTurnReaction,
+  recordGroupSpeakerPlan,
+  selectGroupSpeakers,
   listSessions,
   markDateResultSeen,
   maybeAutoSummarize,
@@ -60,19 +64,32 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     return withKeyedLock(`conv-reply:${id}`, async () => {
       // Re-check inside the lock (parity with /stream + /retry-stream): a send queued
       // behind a concurrent end/reply must not append to an already-ended session.
-      const { session } = getSessionWithMessages(id);
+      const { session, participants } = getSessionWithMessages(id);
       if (session.ended) throw badRequest('This date has already ended.');
       const playerMessage = addPlayerMessage(id, text, intent);
-      const reply = await generateReply(id);
+      const present = participants.filter((entry) => entry.state === 'present');
+      const plan = present.length > 1
+        ? await selectGroupSpeakers(id, present.map((participant) => participant.characterId))
+        : null;
+      if (plan) recordGroupSpeakerPlan(playerMessage.id, plan);
+      const speakers = plan
+        ? plan.characterIds
+            .map((characterId) => present.find((participant) => participant.characterId === characterId))
+            .filter((participant): participant is NonNullable<typeof participant> => participant != null)
+        : present;
+      const replies = [];
+      for (const participant of speakers) {
+        replies.push(await generateReply(id, participant.characterId));
+      }
       void maybeAutoSummarize(id);
-      return { playerMessage, reply };
+      return { playerMessage, reply: replies[0] ?? null, replies };
     });
   });
 
   // Streaming send via Server-Sent Events.
   app.post('/conversations/:id/stream', { schema: docSchema({ tags: ['conversations'], summary: 'Send a message, stream reply via SSE', body: SendMessageSchema }) }, async (req, reply) => {
     const { id } = req.params as { id: string };
-    const { text, intent } = parseInput(SendMessageSchema, req.body);
+    const { text, intent, targetCharacterId } = parseInput(SendMessageSchema, req.body);
 
     reply.hijack();
     const raw = reply.raw;
@@ -111,7 +128,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       // INSIDE the lock so a queued second request sees the first turn's committed
       // state (matching the retry-stream re-check pattern).
       await withKeyedLock(`conv-reply:${id}`, async () => {
-        const { session } = getSessionWithMessages(id);
+        const { session, participants } = getSessionWithMessages(id);
         if (session.ended) {
           send('error', { message: 'This date has already ended.' });
           return;
@@ -123,104 +140,192 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
         const playerMessage = addPlayerMessage(id, text, intent);
         send('player', playerMessage);
 
-        // The character may end the date themselves over egregious behavior (rare).
-        try {
-          const walkout = await attemptWalkout(id, text, ac.signal);
-          if (walkout) {
-            send('walkout', { message: walkout.message, reason: walkout.reason });
-            return;
+        const groupDate = participants.length > 1;
+        let present = participants.filter((participant) => participant.state === 'present');
+
+        // Each attendee makes their own walkout decision. One person leaving a group
+        // date does not end the shared session while somebody else is still present.
+        for (const participant of [...present]) {
+          try {
+            const walkout = await attemptWalkout(id, text, ac.signal, participant.characterId);
+            if (walkout) {
+              present = getSessionWithMessages(id).participants.filter((entry) => entry.state === 'present');
+              send('walkout', {
+                message: walkout.message,
+                reason: walkout.reason,
+                characterId: walkout.characterId,
+                terminal: present.length === 0,
+              });
+            }
+          } catch {
+            /* walkout checks are best-effort; remaining attendees still get a turn */
           }
-        } catch {
-          /* walkout check is best-effort; fall through to a normal reply */
         }
+        if (present.length === 0) return;
 
         // The player may be trying to break up. If so, surface the character's
         // reaction and ask the client to confirm — do NOT end the relationship yet.
-        try {
-          const breakupIntent = await attemptPlayerBreakupIntent(id, text, ac.signal);
-          if (breakupIntent) {
-            send('breakup_intent', { message: breakupIntent.message, reaction: breakupIntent.reaction });
-            return;
+        // A group breakup is relationship-specific, so an untargeted line falls
+        // through as ordinary table talk rather than guessing who the player meant.
+        if (!groupDate || targetCharacterId) {
+          try {
+            const breakupIntent = await attemptPlayerBreakupIntent(
+              id,
+              text,
+              ac.signal,
+              targetCharacterId ?? undefined,
+            );
+            if (breakupIntent) {
+              send('breakup_intent', {
+                message: breakupIntent.message,
+                reaction: breakupIntent.reaction,
+                characterId: breakupIntent.characterId,
+              });
+              return;
+            }
+          } catch {
+            /* breakup-intent check is best-effort; fall through to a normal reply */
           }
-        } catch {
-          /* breakup-intent check is best-effort; fall through to a normal reply */
         }
 
         // The player may be winding the date down to a natural close ("I should get
         // going"). If so, voice the character's goodbye and tell the client to run the
         // normal end-and-evaluate flow — the date is scored in full, exactly as if the
         // player had clicked "End & evaluate". Best-effort: falls through on any miss.
-        try {
-          const farewell = await attemptPlayerFarewell(id, text, ac.signal);
-          if (farewell) {
-            send('farewell', { message: farewell.message, expression: farewell.expression });
-            return;
+        let hadFarewell = false;
+        const farewellTargets = groupDate && !targetCharacterId
+          ? present.map((entry) => entry.characterId)
+          : [targetCharacterId ?? present[0]!.characterId];
+        for (const farewellTarget of farewellTargets) {
+          try {
+            const farewell = await attemptPlayerFarewell(id, text, ac.signal, farewellTarget);
+            if (farewell) {
+              hadFarewell = true;
+              send('farewell', {
+                message: farewell.message,
+                expression: farewell.expression,
+                characterId: farewell.characterId,
+                terminal: farewell.terminal,
+              });
+            }
+          } catch {
+            /* farewell checks are best-effort; remaining attendees still get a turn */
           }
-        } catch {
-          /* farewell check is best-effort; fall through to a normal reply */
         }
+        if (hadFarewell) return;
 
         // Judge how the player's LATEST message landed BEFORE writing the reply, so the
         // character's tone can honestly reflect it (no more "judge says dismissive while
         // the character gushes"). The live 'rapport' read is emitted up front — the
         // trajectory bar + portrait react during the typing indicator, then the reply
         // lands in that register. Best-effort: a failed/skipped read = no verdict this turn.
-        let turnRead: Awaited<ReturnType<typeof judgeTurn>> = null;
-        try {
-          turnRead = await judgeTurn(id, ac.signal);
-          if (turnRead) {
-            // Stamp the read onto the player's message so a resumed date keeps
-            // its reaction chip; the SSE copy drives the live render.
-            recordTurnReaction(playerMessage.id, turnRead.engagement);
-            send('rapport', {
-              label: turnRead.label,
-              expression: turnRead.expression,
-              rapport: turnRead.rapport,
-              delta: turnRead.delta,
-              engagement: turnRead.engagement,
-              messageId: playerMessage.id,
-            });
-          }
-        } catch {
-          /* rapport judging is best-effort; never block the turn */
+        const reads = await Promise.all(
+          present.map(async (participant) => {
+            try {
+              return await judgeTurn(id, ac.signal, participant.characterId);
+            } catch {
+              return null;
+            }
+          }),
+        );
+        const readsByCharacter = new Map(
+          reads.filter((read): read is NonNullable<typeof read> => read != null).map((read) => [read.characterId, read]),
+        );
+        for (const turnRead of readsByCharacter.values()) {
+          // Stamp each independent read onto the player's message; the seat-0 host
+          // also keeps the legacy scalar engagement field for solo clients.
+          recordTurnReaction(playerMessage.id, turnRead.engagement, turnRead.characterId);
+          send('rapport', {
+            characterId: turnRead.characterId,
+            label: turnRead.label,
+            expression: turnRead.expression,
+            rapport: turnRead.rapport,
+            delta: turnRead.delta,
+            engagement: turnRead.engagement,
+            messageId: playerMessage.id,
+          });
         }
 
         // If rapport has cratered (now INCLUDING this turn), the character loses interest
         // and ends the evening early (a soft exit, NOT a walkout) rather than replying —
         // so a final-straw message makes them leave instead of gamely replying. Real cost.
-        try {
-          const left = await maybeLeaveForLostInterest(id, ac.signal);
-          if (left) {
-            send('left', { message: left.message, reason: left.reason });
-            return;
+        for (const participant of [...present]) {
+          try {
+            const left = await maybeLeaveForLostInterest(id, ac.signal, participant.characterId);
+            if (left) {
+              present = getSessionWithMessages(id).participants.filter((entry) => entry.state === 'present');
+              send('left', {
+                message: left.message,
+                reason: left.reason,
+                characterId: left.characterId,
+                terminal: present.length === 0,
+              });
+            }
+          } catch {
+            /* lost-interest checks are best-effort; remaining attendees still reply */
           }
-        } catch {
-          /* lost-interest check is best-effort; fall through to a normal reply */
+        }
+        if (present.length === 0) return;
+
+        // The per-character judges above still let everyone privately hear/react to
+        // the line. The shared-scene director now decides who has enough reason to
+        // speak aloud, using those reads plus the full room context. Persisting this
+        // plan makes a dropped-stream retry preserve both selection and order.
+        let speakers = present;
+        if (groupDate) {
+          const plan = await selectGroupSpeakers(
+            id,
+            present.map((participant) => participant.characterId),
+            {
+              latestReads: Object.fromEntries(
+                [...readsByCharacter.entries()].map(([characterId, read]) => [
+                  characterId,
+                  { engagement: read.engagement, label: read.label, note: read.note },
+                ]),
+              ),
+              signal: ac.signal,
+            },
+          );
+          recordGroupSpeakerPlan(playerMessage.id, plan);
+          const presentById = new Map(present.map((participant) => [participant.characterId, participant]));
+          const selected = plan.characterIds
+            .map((characterId) => presentById.get(characterId))
+            .filter((participant): participant is NonNullable<typeof participant> => participant != null);
+          // A participant can leave between earlier checks only through this locked
+          // flow; still fail safe to somebody answering if a future exit path grows.
+          speakers = selected.length > 0 ? selected : present;
         }
 
-        const { content, finishReason } = await streamReply(
-          id,
-          (delta) => send('delta', { text: delta }),
-          ac.signal,
-          turnRead,
-        );
-        if (!content.trim()) {
-          send('error', {
-            message:
-              finishReason === 'length'
-                ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
-                : 'The model returned an empty reply.',
-          });
-        } else {
-          const message = persistStreamedReply(id, content);
+        for (let index = 0; index < speakers.length; index += 1) {
+          const participant = speakers[index]!;
+          const turnRead = readsByCharacter.get(participant.characterId) ?? null;
+          send('speaker', { characterId: participant.characterId });
+          const { content, finishReason } = await streamReply(
+            id,
+            (delta) => send('delta', { text: delta, characterId: participant.characterId }),
+            ac.signal,
+            turnRead,
+            participant.characterId,
+          );
+          if (!content.trim()) {
+            send('error', {
+              message:
+                finishReason === 'length'
+                  ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
+                  : 'The model returned an empty reply.',
+            });
+            return;
+          }
+
+          const message = persistStreamedReply(id, content, participant.characterId);
           if (finishReason === 'length') {
             send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
           }
-          send('done', { message });
-          void maybeAutoSummarize(id);
-          // The live rapport read was already emitted up front (before the reply), so the
-          // turn's vibe + verdict shaped the reply itself — nothing more to judge here.
+          send('done', { message, complete: index === speakers.length - 1 });
         }
+        void maybeAutoSummarize(id);
+        // Each live rapport read was emitted before the replies, so every attendee's
+        // verdict shapes their own reply without judging the player turn twice.
       });
     } catch (err) {
       // Don't surface an error that was caused by the client disconnecting.
@@ -270,39 +375,80 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       // can't both pass the player-turn check and persist two replies — the second
       // sees the freshly-persisted reply and replays it instead.
       await withKeyedLock(`conv-reply:${id}`, async () => {
-        const { session, messages } = getSessionWithMessages(id);
+        const { session, messages, participants } = getSessionWithMessages(id);
         if (session.ended) {
           send('error', { message: 'This date has already ended.' });
           return;
         }
-        const last = messages[messages.length - 1];
-        // Already answered (a prior retry landed, or the original reply actually
-        // persisted before the connection dropped) — replay it as a clean success.
-        if (last && last.role === 'character') {
-          send('done', { message: last });
-          return;
-        }
-        if (!last || last.role !== 'player') {
+        const playerIndex = messages.findLastIndex((message) => message.role === 'player');
+        if (playerIndex < 0) {
           send('error', { message: 'There’s no message here to reply to.' });
           return;
         }
 
-        const { content, finishReason } = await streamReply(id, (delta) => send('delta', { text: delta }), ac.signal, null);
-        if (!content.trim()) {
-          send('error', {
-            message:
-              finishReason === 'length'
-                ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
-                : 'The model returned an empty reply.',
-          });
-        } else {
-          const message = persistStreamedReply(id, content);
+        const playerMessage = messages[playerIndex]!;
+        const existing = messages.slice(playerIndex + 1).filter((message) => message.role === 'character');
+        const answered = new Set(existing.map((message) => message.characterId ?? session.characterId));
+        const recordedSpeakerIds = getRecordedGroupSpeakerIds(playerMessage);
+        const present = participants.filter((participant) => participant.state === 'present');
+        const planned = recordedSpeakerIds
+          ? recordedSpeakerIds
+              .map((characterId) => present.find((participant) => participant.characterId === characterId))
+              .filter((participant): participant is NonNullable<typeof participant> => participant != null)
+          : present;
+        const pending = planned.filter((participant) => !answered.has(participant.characterId));
+        const noOnePresent = participants.every((participant) => participant.state !== 'present');
+        const total = existing.length + pending.length;
+
+        for (let index = 0; index < existing.length; index += 1) {
+          const message = existing[index]!;
+          const characterId = message.characterId ?? session.characterId;
+          if (message.metadata.walkout === true) {
+            send('walkout', {
+              message,
+              reason: typeof message.metadata.walkoutReason === 'string' ? message.metadata.walkoutReason : 'walkout',
+              characterId,
+              terminal: noOnePresent && index === existing.length - 1,
+            });
+          } else if (message.metadata.left === true) {
+            send('left', {
+              message,
+              reason: 'lost_interest',
+              characterId,
+              terminal: noOnePresent && index === existing.length - 1,
+            });
+          } else {
+            send('done', { message, complete: index === total - 1 });
+          }
+        }
+
+        for (let index = 0; index < pending.length; index += 1) {
+          const participant = pending[index]!;
+          send('speaker', { characterId: participant.characterId });
+          const { content, finishReason } = await streamReply(
+            id,
+            (delta) => send('delta', { text: delta, characterId: participant.characterId }),
+            ac.signal,
+            null,
+            participant.characterId,
+          );
+          if (!content.trim()) {
+            send('error', {
+              message:
+                finishReason === 'length'
+                  ? 'The model ran out of tokens before answering (likely spent on reasoning). Raise "Max tokens" in Settings.'
+                  : 'The model returned an empty reply.',
+            });
+            return;
+          }
+
+          const message = persistStreamedReply(id, content, participant.characterId);
           if (finishReason === 'length') {
             send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
           }
-          send('done', { message });
-          void maybeAutoSummarize(id);
+          send('done', { message, complete: existing.length + index === total - 1 });
         }
+        if (total > 0) void maybeAutoSummarize(id);
       });
     } catch (err) {
       if (!ac.signal.aborted) send('error', { message: (err as Error).message || 'The reply failed unexpectedly — tap retry.' });
@@ -350,8 +496,17 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
       // send/retry. Drop the trailing reply INSIDE the lock, then rewrite it (null
       // verdict → no re-judge) against the now-trailing player turn.
       await withKeyedLock(`conv-reply:${id}`, async () => {
-        dropReplyForRegen(id); // throws → caught below → SSE 'error'
-        const { content, finishReason } = await streamReply(id, (delta) => send('delta', { text: delta }), ac.signal, null);
+        const dropped = dropReplyForRegen(id); // throws → caught below → SSE 'error'
+        const { session } = getSessionWithMessages(id);
+        const characterId = dropped.characterId ?? session.characterId;
+        send('speaker', { characterId });
+        const { content, finishReason } = await streamReply(
+          id,
+          (delta) => send('delta', { text: delta, characterId }),
+          ac.signal,
+          null,
+          characterId,
+        );
         if (!content.trim()) {
           send('error', {
             message:
@@ -360,11 +515,11 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
                 : 'The model returned an empty reply.',
           });
         } else {
-          const message = persistStreamedReply(id, content);
+          const message = persistStreamedReply(id, content, characterId);
           if (finishReason === 'length') {
             send('notice', { message: 'Reply was cut off (token limit reached). Raise Max tokens in Settings.' });
           }
-          send('done', { message });
+          send('done', { message, complete: true });
           void maybeAutoSummarize(id);
         }
       });
@@ -399,11 +554,12 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   // `ended` on a backfire) in the middle of a streaming turn or a concurrent end.
   app.post('/conversations/:id/dtr', { schema: docSchema({ tags: ['conversations'], summary: 'Attempt to advance the relationship status' }) }, async (req) => {
     const { id } = req.params as { id: string };
+    const characterId = (req.body as { characterId?: string } | undefined)?.characterId;
     // Reject a double-fire BEFORE queueing on the turn lock — queued, the second
     // request would wait out the first and run a full second attempt instead of
     // being rejected as an overlap (see assertNoDtrInFlight).
     assertNoDtrInFlight(id);
-    return withKeyedLock(`conv-reply:${id}`, () => attemptDtr(id));
+    return withKeyedLock(`conv-reply:${id}`, () => attemptDtr(id, undefined, characterId));
   });
 
   // Give a held item to your date in-session — triggers a structured gift reaction.
@@ -413,8 +569,10 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   // "answer" to a still-unanswered player turn.
   app.post('/conversations/:id/gift', { schema: docSchema({ tags: ['conversations'], summary: 'Give a held item to your date', body: GiftOnDateSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
-    const { inventoryItemId } = parseInput(GiftOnDateSchema, req.body);
-    return withKeyedLock(`conv-reply:${id}`, () => giveGiftOnDate(id, inventoryItemId));
+    const { inventoryItemId, characterId } = parseInput(GiftOnDateSchema, req.body);
+    return withKeyedLock(`conv-reply:${id}`, () =>
+      giveGiftOnDate(id, inventoryItemId, undefined, characterId ?? undefined),
+    );
   });
 
   // Confirm a player-initiated breakup (the client first sees the reaction via
@@ -422,11 +580,17 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   // flip can't race a concurrent turn's session update (lost update).
   app.post('/conversations/:id/breakup', { schema: docSchema({ tags: ['conversations'], summary: 'Confirm a player-initiated breakup' }) }, async (req) => {
     const { id } = req.params as { id: string };
-    return withKeyedLock(`conv-reply:${id}`, async () => confirmPlayerBreakup(id));
+    const characterId = (req.body as { characterId?: string } | undefined)?.characterId;
+    return withKeyedLock(`conv-reply:${id}`, async () => confirmPlayerBreakup(id, characterId));
   });
 
   app.get('/conversations/:id/prompt-preview', { schema: docSchema({ tags: ['conversations'], summary: 'Preview the assembled session prompt' }) }, async (req) => {
     const { id } = req.params as { id: string };
     return previewSessionPrompt(id);
+  });
+
+  app.get('/conversations/:id/context-estimate', { schema: docSchema({ tags: ['conversations'], summary: 'Estimate context required for the next reply' }) }, async (req) => {
+    const { id } = req.params as { id: string };
+    return estimateNextTurnContext(id);
   });
 }

@@ -469,6 +469,13 @@ export function WorldEditor() {
                         checked={world.featureFlags.gambling}
                         onChange={(v) => setFeature('gambling', v)}
                       />
+                      <FeatureToggle
+                        icon="date"
+                        name={t('pages:worldEditor.featureGroupDatesName')}
+                        desc={t('pages:worldEditor.featureGroupDatesDesc')}
+                        checked={world.featureFlags.groupDates}
+                        onChange={(v) => setFeature('groupDates', v)}
+                      />
                       {world.featureFlags.gambling && (
                         <div className="we-casino-config">
                           <span className="kicker">{t('pages:worldEditor.casinoLimits')}</span>

@@ -10,6 +10,7 @@ import {
   ConversationModeSchema,
   ConversationSessionSchema,
   MessageSchema,
+  SessionParticipantSchema,
   PlayerProfileSchema,
   RelationshipSchema,
   ShopItemSchema,
@@ -275,13 +276,36 @@ export type ThumbnailRebuildResult = z.infer<typeof ThumbnailRebuildResultSchema
 
 export const ConversationCreateSchema = z.object({
   characterId: z.string().min(1),
+  /** Additional attendees invited by the host `characterId`. Shared dates and
+   *  hangouts currently support one invitee; omitting this preserves the solo flow. */
+  participantIds: z.array(z.string().min(1)).max(1).default([]),
   mode: ConversationModeSchema.default('chat'),
   locationId: z.string().min(1).nullable().default(null),
 });
 export type ConversationCreate = z.input<typeof ConversationCreateSchema>;
 
+/** Public roster entry embedded in conversation reads. Live per-person rapport is
+ *  intentionally deferred to the group turn loop; Phase 1 exposes durable identity,
+ *  order, role, and attendance state only. */
+export const ConversationParticipantSchema = SessionParticipantSchema.pick({
+  characterId: true,
+  seat: true,
+  role: true,
+  state: true,
+  rapport: true,
+  expression: true,
+  judged: true,
+}).extend({
+  characterName: z.string(),
+  vibe: z.string().nullable(),
+});
+export type ConversationParticipant = z.infer<typeof ConversationParticipantSchema>;
+
 export const SendMessageSchema = z.object({
   text: z.string().min(1).max(4000),
+  /** Optional addressee for relationship-specific language on a group date
+   *  (notably a breakup or a personal farewell). */
+  targetCharacterId: z.string().min(1).nullable().default(null),
   /**
    * Optional conversational intent chip the player attached to this message
    * (Flirt / Tease / etc.). Stored on the message metadata and shown to the
@@ -301,6 +325,9 @@ export type SendMessage = z.infer<typeof SendMessageSchema>;
  */
 export const ActiveDateSchema = z.object({
   sessionId: z.string(),
+  /** Ordered attendee roster. The legacy singular character fields below continue
+   *  to identify the seat-0 host for backward compatibility. */
+  participants: z.array(ConversationParticipantSchema),
   characterId: z.string(),
   characterName: z.string(),
   mode: ConversationModeSchema,
@@ -817,9 +844,29 @@ export type MinigameFinishResponse = z.infer<typeof MinigameFinishResponseSchema
 /** A session bundled with its messages — used by the chat screen. */
 export const SessionWithMessagesSchema = z.object({
   session: ConversationSessionSchema,
+  participants: z.array(ConversationParticipantSchema),
   messages: z.array(MessageSchema),
 });
 export type SessionWithMessages = z.infer<typeof SessionWithMessagesSchema>;
+
+/** Estimated context required for the next spoken reply in an active conversation. */
+export const ConversationContextEstimateSchema = z.object({
+  /** Largest assembled dialogue prompt across the attendees who may speak next. */
+  estimatedPromptTokens: z.number().int().nonnegative(),
+  /** Configured output ceiling, reported separately from already-used input. */
+  reservedResponseTokens: z.number().int().positive(),
+  /** Context currently allocated to the selected model, when its adapter reports it. */
+  contextWindowTokens: z.number().int().positive().nullable(),
+  contextWindowSource: z.enum(['model', 'unavailable']),
+  /** Raw character count behind the chars/4 token estimate. */
+  promptChars: z.number().int().nonnegative(),
+  /** Chat-message count in the largest assembled prompt. */
+  promptMessageCount: z.number().int().nonnegative(),
+  /** Number of present attendees whose next-reply prompts were compared. */
+  participantCount: z.number().int().positive(),
+  method: z.literal('estimated'),
+});
+export type ConversationContextEstimate = z.infer<typeof ConversationContextEstimateSchema>;
 
 /** Outcome of a jealousy check when ending a date with a monogamous character. */
 export const JealousyOutcomeSchema = z.object({
@@ -850,6 +897,28 @@ export const DateBestLineSchema = z.object({
 });
 export type DateBestLine = z.infer<typeof DateBestLineSchema>;
 
+/** One attendee's independent report from a shared date or hangout. */
+export const DateParticipantResultSchema = z.object({
+  characterId: z.string().min(1),
+  characterName: z.string(),
+  state: z.enum(['present', 'left_early', 'walked_out', 'departed']),
+  evaluated: z.boolean(),
+  relationship: RelationshipSchema.nullable(),
+  mood: z.string().nullable(),
+  expression: z.string().nullable(),
+  summaryLine: z.string().nullable(),
+  memoriesWritten: z.number().int().nonnegative(),
+  evalError: z.string().nullable(),
+  jealousy: JealousyOutcomeSchema.nullable().default(null),
+  milestone: MilestoneSchema.nullable().default(null),
+  breakup: BreakupOutcomeSchema.nullable().default(null),
+  onTheRocks: z.boolean().default(false),
+  reconciled: z.boolean().default(false),
+  ending: CharacterEndingSchema.nullable().default(null),
+  bestLine: DateBestLineSchema.nullable().default(null),
+});
+export type DateParticipantResult = z.infer<typeof DateParticipantResultSchema>;
+
 export const EndSessionResponseSchema = z.object({
   session: ConversationSessionSchema,
   evaluated: z.boolean(),
@@ -875,11 +944,15 @@ export const EndSessionResponseSchema = z.object({
   ending: CharacterEndingSchema.nullable().default(null),
   /** The date's most striking judged player line, for the recap keepsake. */
   bestLine: DateBestLineSchema.nullable().default(null),
+  /** Independent reports for a shared date or hangout, in stable seat order. Empty for
+   *  legacy and solo results; the singular fields above remain the seat-0 view. */
+  participantResults: z.array(DateParticipantResultSchema).default([]),
 });
 export type EndSessionResponse = z.infer<typeof EndSessionResponseSchema>;
 
 /** Result of a Define-the-Relationship attempt. */
 export const DtrResponseSchema = z.object({
+  characterId: z.string().min(1),
   decision: z.enum(['accept', 'deflect', 'backfire']),
   /** The status the player attempted to reach (the rung). */
   attempted: RelationshipStatusSchema,
@@ -908,6 +981,7 @@ export type DtrResponse = z.infer<typeof DtrResponseSchema>;
 /** Body for giving a held item to your date during a session. */
 export const GiftOnDateSchema = z.object({
   inventoryItemId: z.string().min(1),
+  characterId: z.string().min(1).nullable().default(null),
 });
 export type GiftOnDate = z.infer<typeof GiftOnDateSchema>;
 
@@ -917,6 +991,7 @@ export type GiftSentiment = z.infer<typeof GiftSentimentSchema>;
 
 /** Result of giving a gift during a date. */
 export const GiftReactionResponseSchema = z.object({
+  characterId: z.string().min(1),
   /** The "🎁 You gave …" beat inserted into the transcript. */
   narratorMessage: MessageSchema,
   /** The character's spoken reaction line, appended to the thread. */
@@ -935,6 +1010,7 @@ export type GiftReactionResponse = z.infer<typeof GiftReactionResponseSchema>;
 
 /** Result of confirming a player-initiated breakup. */
 export const PlayerBreakupResponseSchema = z.object({
+  characterId: z.string().min(1),
   relationship: RelationshipSchema,
   /** The status that was ended (e.g. "cohabiting", or "none" if uncommitted). */
   fromStatus: RelationshipStatusSchema,
@@ -1307,6 +1383,7 @@ export const ExportBundleSchema = z.object({
   memories: z.array(CharacterMemorySchema),
   relationships: z.array(RelationshipSchema),
   conversationSessions: z.array(ConversationSessionSchema).default([]),
+  sessionParticipants: z.array(SessionParticipantSchema).default([]),
   messages: z.array(MessageSchema).default([]),
   players: z.array(PlayerProfileSchema),
   assets: z.array(AssetSchema),

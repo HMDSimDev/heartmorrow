@@ -530,6 +530,7 @@ function rowToMessage(r: Row): Message {
     id: r.id,
     sessionId: r.session_id,
     role: r.role,
+    characterId: nStr(r.character_id),
     text: r.text,
     metadata: fromJson(r.metadata, {}),
     createdAt: Number(r.created_at),
@@ -537,6 +538,10 @@ function rowToMessage(r: Row): Message {
 }
 
 export const messagesRepo = {
+  get(id: string): Message | undefined {
+    const r = getDb().get<Row>('SELECT * FROM messages WHERE id = ?', id);
+    return r ? rowToMessage(r) : undefined;
+  },
   listBySession(sessionId: string): Message[] {
     return getDb()
       .all<Row>('SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC, rowid ASC', sessionId)
@@ -554,8 +559,8 @@ export const messagesRepo = {
   },
   insert(m: Message): Message {
     getDb().run(
-      `INSERT INTO messages (id,session_id,role,text,metadata,created_at) VALUES (?,?,?,?,?,?)`,
-      m.id, m.sessionId, m.role, m.text, j(m.metadata), m.createdAt,
+      `INSERT INTO messages (id,session_id,role,character_id,text,metadata,created_at) VALUES (?,?,?,?,?,?,?)`,
+      m.id, m.sessionId, m.role, m.characterId, m.text, j(m.metadata), m.createdAt,
     );
     return m;
   },
@@ -2190,12 +2195,14 @@ function rowToSessionParticipant(r: Row): SessionParticipant {
     role: r.role,
     state: r.state,
     rapport: r.rapport == null ? null : Number(r.rapport),
+    expression: nStr(r.expression),
+    judged: intToBool(r.judged),
     updatedAt: Number(r.updated_at),
   });
 }
 
 /** Attendees of a conversation session (the roster + each one's per-seat live
- *  rapport). A solo date has one row (seat 0 = the host); a group date adds more. */
+ *  rapport). A solo outing has one row (seat 0 = the host); a group outing adds more. */
 export const sessionParticipantsRepo = {
   listBySession(sessionId: string): SessionParticipant[] {
     return getDb()
@@ -2217,23 +2224,34 @@ export const sessionParticipantsRepo = {
   },
   upsert(p: SessionParticipant): SessionParticipant {
     getDb().run(
-      `INSERT INTO session_participants (session_id,character_id,seat,role,state,rapport,updated_at)
-       VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO session_participants (session_id,character_id,seat,role,state,rapport,expression,judged,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?)
        ON CONFLICT(session_id,character_id) DO UPDATE SET
          seat = excluded.seat, role = excluded.role, state = excluded.state,
-         rapport = excluded.rapport, updated_at = excluded.updated_at`,
-      p.sessionId, p.characterId, p.seat, p.role, p.state, p.rapport, p.updatedAt,
+         rapport = excluded.rapport, expression = excluded.expression,
+         judged = excluded.judged, updated_at = excluded.updated_at`,
+      p.sessionId, p.characterId, p.seat, p.role, p.state, p.rapport, p.expression,
+      p.judged ? 1 : 0, p.updatedAt,
     );
     return p;
   },
   /** Rapport-only upsert; auto-creates a seat-0 host row if missing (so a pre-existing
    *  1:1 date that never had a participant row still gets one on its first judged turn). */
-  setRapport(sessionId: string, characterId: string, rapport: number, updatedAt: number): void {
+  setRapport(sessionId: string, characterId: string, rapport: number, updatedAt: number, judged = true): void {
     getDb().run(
-      `INSERT INTO session_participants (session_id,character_id,seat,role,state,rapport,updated_at)
-       VALUES (?,?,0,'romance','present',?,?)
-       ON CONFLICT(session_id,character_id) DO UPDATE SET rapport = excluded.rapport, updated_at = excluded.updated_at`,
-      sessionId, characterId, rapport, updatedAt,
+      `INSERT INTO session_participants (session_id,character_id,seat,role,state,rapport,expression,judged,updated_at)
+       VALUES (?,?,0,'romance','present',?,NULL,?,?)
+       ON CONFLICT(session_id,character_id) DO UPDATE SET
+         rapport = excluded.rapport,
+         judged = MAX(session_participants.judged, excluded.judged),
+         updated_at = excluded.updated_at`,
+      sessionId, characterId, rapport, judged ? 1 : 0, updatedAt,
+    );
+  },
+  setExpression(sessionId: string, characterId: string, expression: string, updatedAt: number): void {
+    getDb().run(
+      'UPDATE session_participants SET expression = ?, updated_at = ? WHERE session_id = ? AND character_id = ?',
+      expression, updatedAt, sessionId, characterId,
     );
   },
   setState(sessionId: string, characterId: string, state: SessionParticipantState, updatedAt: number): void {
@@ -2243,7 +2261,10 @@ export const sessionParticipantsRepo = {
     );
   },
   clearRapport(sessionId: string): void {
-    getDb().run('UPDATE session_participants SET rapport = NULL WHERE session_id = ?', sessionId);
+    getDb().run(
+      'UPDATE session_participants SET rapport = NULL, expression = NULL, judged = 0 WHERE session_id = ?',
+      sessionId,
+    );
   },
   deleteBySession(sessionId: string): void {
     getDb().run('DELETE FROM session_participants WHERE session_id = ?', sessionId);

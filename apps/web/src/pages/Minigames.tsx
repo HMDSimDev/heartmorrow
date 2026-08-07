@@ -9,6 +9,7 @@ import {
 } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import { activeDateParticipantNames } from '../lib/active-date';
 import { useAppData } from '../state/app-context';
 import { datingStatLabel, relationshipStatLabel } from '../i18n/labels';
 import { Banner, Empty, Modal, Spinner } from '../components/ui';
@@ -76,7 +77,7 @@ export function Minigames() {
     if (activeDate) {
       setError(
         t(activeDate.mode === 'hangout' ? 'minigames.errOnHangout' : 'minigames.errOnDate', {
-          name: activeDate.characterName,
+          name: activeDateParticipantNames(activeDate),
         }),
       );
       return;

@@ -6,6 +6,7 @@ import { getRelationship } from './relationship-service';
 import { listMemories } from './memory-service';
 import { hasDated } from './text-message-service';
 import { attemptDtr } from './dtr-service';
+import { giveGiftOnDate } from './gift-service';
 import { getWorldState } from './world-clock-service';
 import { buildEvaluatorMessages } from '../prompt/prompt-builder';
 import {
@@ -65,10 +66,11 @@ describe('hangouts: no date machinery', () => {
     expect(active?.vibe).toBeNull();
   });
 
-  it('refuses to define the relationship — that is a date conversation', async () => {
+  it('refuses date-only relationship actions such as DTR and in-scene gifts', async () => {
     const { session } = startHangout();
     setAdapterOverride(new ScriptedAdapter([JSON.stringify({ decision: 'accept', line: 'Yes!', reason: 'ready' })]));
     await expect(attemptDtr(session.id)).rejects.toThrow(/real date, not a hangout/i);
+    await expect(giveGiftOnDate(session.id, 'missing-item')).rejects.toThrow(/real date, not a hangout/i);
   });
 
   it('holds the world lock: you cannot stack a date on top of a hangout', () => {

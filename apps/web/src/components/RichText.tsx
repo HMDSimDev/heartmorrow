@@ -1,4 +1,4 @@
-export type RichSeg = { kind: 'action' | 'text'; text: string };
+export type RichSeg = { kind: 'action' | 'scene' | 'text'; text: string };
 
 /**
  * Split a date reply into inline segments for roleplay-style styling. Physical
@@ -18,7 +18,7 @@ export type RichSeg = { kind: 'action' | 'text'; text: string };
  * when the closing * finally lands. Off for persisted text, where a lone * is a
  * genuine stray character and should render literally.
  */
-export function parseRichLine(input: string, opts?: { open?: boolean }): RichSeg[] {
+export function parseRichLine(input: string, opts?: { open?: boolean; sceneLead?: boolean }): RichSeg[] {
   // Collapse **double** / *** runs (a stray markdown-bold habit) to a single * so
   // they read as one clean action span instead of leaving orphan asterisks behind.
   const src = input.replace(/\*{2,}/g, '*');
@@ -40,7 +40,17 @@ export function parseRichLine(input: string, opts?: { open?: boolean }): RichSeg
     const rest = tail.slice(openAt + 1);
     if (rest) segs.push({ kind: 'action', text: rest });
   }
-  return segs;
+  if (!opts?.sceneLead) return segs;
+
+  // Venue openers begin with plain third-person scene prose. If the model then
+  // continues into roleplay, the first *action* is the reliable boundary: plain
+  // text before it remains scene-setting, while plain text after it is dialogue.
+  // A correctly scene-only opener has no action and stays subdued throughout.
+  const firstAction = segs.findIndex((seg) => seg.kind === 'action');
+  const sceneEnd = firstAction === -1 ? segs.length : firstAction;
+  return segs.map((seg, index) =>
+    seg.kind === 'text' && index < sceneEnd ? { ...seg, kind: 'scene' as const } : seg,
+  );
 }
 
 /**
@@ -49,8 +59,8 @@ export function parseRichLine(input: string, opts?: { open?: boolean }): RichSeg
  * only changes how it looks. The parent bubble keeps `white-space: pre-wrap`, so
  * the inline spans inherit newline/space handling unchanged.
  */
-export function RichLine({ text, open }: { text: string; open?: boolean }) {
-  const segs = parseRichLine(text, { open });
+export function RichLine({ text, open, sceneLead }: { text: string; open?: boolean; sceneLead?: boolean }) {
+  const segs = parseRichLine(text, { open, sceneLead });
   return (
     <>
       {segs.map((s, i) =>
@@ -58,8 +68,12 @@ export function RichLine({ text, open }: { text: string; open?: boolean }) {
           <span key={i} className="date-rt-action">
             {s.text}
           </span>
+        ) : s.kind === 'scene' ? (
+          <span key={i} className="date-rt-scene">
+            {s.text}
+          </span>
         ) : (
-          <span key={i}>{s.text}</span>
+          <span key={i} className="date-rt-dialogue">{s.text}</span>
         ),
       )}
     </>

@@ -4,10 +4,9 @@ import type { Character, GameEvent, PromptEstimateResult } from '@dsim/shared';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
 import i18n from '../i18n';
+import { CONTEXT_WINDOW_STORAGE_KEY, readContextWindowTokens } from '../lib/context-window';
 import { Banner, Field } from '../components/ui';
 import './creator.page.css';
-
-const CONTEXT_WINDOW_KEY = 'dsim.debug.contextWindow';
 
 export function Debug() {
   const { t } = useTranslation('pages');
@@ -23,16 +22,13 @@ export function Debug() {
   const [estCharId, setEstCharId] = useState('');
   const [estLive, setEstLive] = useState(true);
   const [estFull, setEstFull] = useState(false);
-  const [contextWindow, setContextWindow] = useState<number>(() => {
-    const v = Number(localStorage.getItem(CONTEXT_WINDOW_KEY));
-    return Number.isFinite(v) && v > 0 ? v : 8192;
-  });
+  const [contextWindow, setContextWindow] = useState<number>(() => readContextWindowTokens());
   const [estimate, setEstimate] = useState<PromptEstimateResult | null>(null);
   const [estimating, setEstimating] = useState(false);
 
   const setCtxWindow = (v: number) => {
     setContextWindow(v);
-    localStorage.setItem(CONTEXT_WINDOW_KEY, String(v));
+    localStorage.setItem(CONTEXT_WINDOW_STORAGE_KEY, String(v));
   };
 
   const runEstimate = async () => {

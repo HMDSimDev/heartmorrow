@@ -4,6 +4,7 @@ import { PHASE_ICONS, SEASON_ICONS, deriveCalendar, type SleepResponse, type Wea
 import { useAppData } from '../state/app-context';
 import { api } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import { activeDateParticipantNames } from '../lib/active-date';
 import { phaseLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { EnergyPips } from './EnergyPips';
 import { Icon } from './Icon';
@@ -61,6 +62,7 @@ export function DayHud() {
   const phaseTxt = phaseLabel(worldState.phase);
   const weekdayTxt = weekdayLabel(cal.dayOfWeek);
   const seasonTxt = seasonLabel(cal.season);
+  const activeParticipantNames = activeDate ? activeDateParticipantNames(activeDate) : '';
 
   return (
     <div className="hud">
@@ -138,7 +140,7 @@ export function DayHud() {
           title={
             activeDate
               ? t(activeDate.mode === 'hangout' ? 'hud.endDayHangoutBlock' : 'hud.endDayDateBlock', {
-                  name: activeDate.characterName,
+                  name: activeParticipantNames,
                 })
               : undefined
           }

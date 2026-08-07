@@ -23,6 +23,7 @@ import { Bench } from './pages/Bench';
 import { PromptEditor } from './pages/PromptEditor';
 import { Debug } from './pages/Debug';
 import { APP_VERSION, DISCORD_URL, GITHUB_URL, GIT_COMMIT } from './version';
+import { activeDateParticipantNames } from './lib/active-date';
 
 // `shortKey` is the label used by the cramped bottom nav (phones); the roomy
 // sidebar always shows the full `labelKey`. Only set it where the full label is
@@ -104,11 +105,12 @@ export default function App() {
     // refresh/navigation away never hides that there's someone to get back to.
     if (to === '/chat' && activeDate) {
       const isHangout = activeDate.mode === 'hangout';
+      const participantNames = activeDateParticipantNames(activeDate);
       return (
         <span
           className="nav-badge nav-badge-live"
-          title={t(isHangout ? 'hud.onHangoutWith' : 'hud.onDateWith', { name: activeDate.characterName })}
-          aria-label={t(isHangout ? 'hud.hangoutInProgress' : 'hud.dateInProgress', { name: activeDate.characterName })}
+          title={t(isHangout ? 'hud.onHangoutWith' : 'hud.onDateWith', { name: participantNames })}
+          aria-label={t(isHangout ? 'hud.hangoutInProgress' : 'hud.dateInProgress', { name: participantNames })}
         />
       );
     }

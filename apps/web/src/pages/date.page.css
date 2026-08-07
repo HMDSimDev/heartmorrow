@@ -140,6 +140,43 @@
 .date-pick-card.unavailable .portrait { filter: grayscale(0.65); }
 .date-pick-card.unavailable .date-pick-sub { color: var(--ember); text-transform: lowercase; }
 
+/* Optional second seat for worlds with the group-date feature enabled. */
+.date-invite { margin: -2px 0 18px; }
+.date-invite > .kicker { display: block; margin-bottom: 5px; }
+.date-invite-note { margin: 0 0 10px; font-size: 0.76rem; }
+.date-invite-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.date-invite-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 5px 11px 5px 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text-dim);
+  font: 600 0.78rem var(--font-display);
+  cursor: pointer;
+}
+.date-invite-card:hover:not(:disabled) { border-color: var(--border-bright); color: var(--text); }
+.date-invite-card.selected {
+  border-color: var(--brass);
+  background: color-mix(in srgb, var(--brass) 12%, var(--panel));
+  color: var(--text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brass) 35%, transparent);
+}
+.date-invite-card.unavailable { opacity: 0.45; cursor: not-allowed; }
+.date-invite-portrait,
+.date-invite-none { width: 30px; height: 30px; flex: none; border-radius: 50%; overflow: hidden; }
+.date-invite-portrait .portrait { width: 100%; height: 100%; }
+.date-invite-none {
+  display: grid;
+  place-items: center;
+  background: var(--panel-2);
+  font: 700 0.62rem var(--font-mono);
+  color: var(--brass);
+}
+
 /* --- Location picker — photo tiles instead of a bare dropdown ----------- */
 .date-loc-grid {
   display: grid;
@@ -445,6 +482,28 @@
   font-family: var(--font-display);
   color: color-mix(in srgb, var(--accent) 70%, var(--text));
 }
+.dsc-row-moods { align-items: flex-start; }
+.dsc-mood-list {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+.dsc-mood-list .dsc-mood {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: right;
+}
+.dsc-mood-list .dsc-mood + .dsc-mood {
+  padding-top: 4px;
+  border-top: 1px solid rgba(157, 184, 222, 0.12);
+}
+.dsc-mood-list strong {
+  color: var(--text-dim);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
 
 /* A hangout has no rapport, so it has no gauge. This ribbon sits in the trajectory's
    slot instead — same rule and rim-light, a quiet sage tag rather than an instrument —
@@ -507,6 +566,36 @@
 /* the whole gauge glows warmer as the night goes well, embery as it sours */
 .date-trajectory.tone-good { --dt-mood: rgba(230, 177, 94, 0.2); }
 .date-trajectory.tone-bad { --dt-mood: rgba(224, 122, 130, 0.16); }
+
+.date-group-trajectories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: var(--ink-2);
+}
+.date-participant-trajectory { position: relative; min-width: 0; }
+.date-participant-trajectory + .date-participant-trajectory { border-left: 1px solid var(--border-soft); }
+.date-participant-trajectory-name {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  left: 15px;
+  max-width: calc(50% - 16px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 700 0.64rem var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+.date-participant-trajectory .date-trajectory { height: 100%; padding-left: 16px; padding-right: 16px; }
+.date-participant-trajectory.state-left_early,
+.date-participant-trajectory.state-walked_out,
+.date-participant-trajectory.state-departed { opacity: 0.55; filter: saturate(0.55); }
+@media (max-width: 680px) {
+  .date-group-trajectories { grid-template-columns: 1fr; }
+  .date-participant-trajectory + .date-participant-trajectory { border-left: 0; border-top: 1px solid var(--border-soft); }
+}
 /* a hairline rim-light along the top edge + a brass rule closing off the reel below */
 .date-trajectory::before {
   content: '';
@@ -733,15 +822,15 @@
 .date-reel {
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  padding: 16px 15px;
+  gap: 7px;
+  padding: 10px 12px;
   overflow-y: auto;
   /* Absorb whatever height the bounded stage leaves after the scene/trajectory/foot.
      flex:1 + min-height:0 lets this scroll instead of a brittle calc() chrome
      subtraction, so the composer never gets pushed below the fold. */
   flex: 1;
   min-height: 0;
-  /* Full stage width — bubbles cap themselves (max-width: 84%), and a capped
+  /* Full stage width — bubbles cap themselves (max-width: 92%), and a capped
      centered column read as "squeezed" on wide monitors. */
   width: 100%;
 }
@@ -773,14 +862,15 @@
 /* Bubbles — characterful, with a serif voice for the character. */
 .date-msg {
   position: relative;
-  max-width: min(84%, 920px);
-  padding: 11px 15px;
-  line-height: 1.5;
+  max-width: min(92%, 1120px);
+  padding: 8px 11px;
+  font-size: 0.9rem;
+  line-height: 1.42;
   white-space: pre-wrap;
   /* pre-wrap preserves newlines but won't break a single long token (URL, etc.) */
   overflow-wrap: anywhere;
   word-break: break-word;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(8, 10, 22, 0.22);
   animation: date-bubble-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes date-bubble-in {
@@ -791,8 +881,8 @@
   align-self: flex-end;
   background: linear-gradient(135deg, var(--accent-2), var(--accent));
   color: var(--on-accent);
-  border-radius: 16px 16px 5px 16px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 6px 16px rgba(232, 138, 166, 0.2);
+  border-radius: 12px 12px 4px 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 3px 9px rgba(232, 138, 166, 0.16);
 }
 .date-msg.character {
   align-self: flex-start;
@@ -802,18 +892,26 @@
     color-mix(in srgb, var(--moon) 7%, var(--panel-2)),
     color-mix(in srgb, var(--moon) 4%, var(--panel)));
   border: 1px solid color-mix(in srgb, var(--moon) 18%, var(--border));
-  border-radius: 16px 16px 16px 5px;
+  border-radius: 12px 12px 12px 4px;
   font-family: var(--font-display);
-  font-size: 1.02rem;
+  font-size: 0.94rem;
   font-variation-settings: 'SOFT' 40;
-  line-height: 1.55;
+  line-height: 1.42;
   color: var(--text);
 }
 /* A small lamplit tick on the character's voice bubble. */
 .date-msg.character::before {
   content: '';
-  position: absolute; left: 13px; top: -1px; width: 26px; height: 1px;
+  position: absolute; left: 10px; top: -1px; width: 22px; height: 1px;
   background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.5), transparent);
+}
+.date-msg-speaker {
+  display: block;
+  margin-bottom: 2px;
+  font: 700 0.58rem/1.15 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass);
 }
 /* "Regenerate this reply" — a small, quiet control tucked under the character's
    most recent line. Rewrites the prose without re-scoring the turn. */
@@ -851,9 +949,9 @@
   align-self: center;
   max-width: 92%;
   text-align: center;
-  padding: 5px 13px;
+  padding: 3px 9px;
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: 0.68rem;
   letter-spacing: 0.02em;
   color: var(--brass);
   background: rgba(230, 177, 94, 0.08);
@@ -867,17 +965,26 @@
   align-self: stretch;
   max-width: 100%;
   text-align: left;
-  padding: 12px 16px;
+  padding: 8px 11px;
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 0.95rem;
+  font-size: 0.86rem;
   letter-spacing: normal;
-  line-height: 1.6;
+  line-height: 1.45;
   color: var(--text-mute);
   background: linear-gradient(180deg, rgba(230, 177, 94, 0.07), rgba(230, 177, 94, 0.02));
   border: 1px solid rgba(230, 177, 94, 0.16);
   border-left: 2px solid var(--brass);
   border-radius: 10px;
+}
+.date-msg.narrator.venue-flavor .date-rt-dialogue {
+  font-style: normal;
+  color: var(--text);
+}
+.date-msg.narrator.venue-flavor .date-rt-action,
+.date-msg.narrator.venue-flavor .date-rt-scene {
+  font-style: italic;
+  color: var(--text-mute);
 }
 
 /* Inline roleplay styling inside a character bubble: physical actions / narration
@@ -895,14 +1002,14 @@
   align-self: flex-end;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   margin: -7px 8px 0 0;
-  padding: 2px 9px;
+  padding: 1px 7px;
   border-radius: 999px;
   font-family: var(--font-mono);
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 600;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   border: 1px solid var(--border-soft);
   background: var(--ink-2);
@@ -912,6 +1019,16 @@
 .date-react.warm { color: var(--brass); border-color: color-mix(in srgb, var(--brass) 45%, transparent); }
 .date-react.cool { color: var(--ember); border-color: color-mix(in srgb, var(--ember) 45%, transparent); }
 .date-react.flat { color: var(--text-mute); }
+.date-react-group {
+  align-self: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: -4px;
+}
+.date-react-group .date-react { margin: 0; }
+.date-react-name { color: var(--text-dim); }
 @keyframes date-react-in {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: none; }
@@ -956,6 +1073,13 @@
 }
 .date-opening-portrait { width: 84px; flex-shrink: 0; }
 .date-opening-portrait .portrait { box-shadow: inset 0 0 0 1px rgba(230, 177, 94, 0.35); }
+.date-opening-portrait.group {
+  display: flex;
+  width: 126px;
+  align-items: center;
+}
+.date-opening-portrait.group .portrait { width: 76px; flex: none; }
+.date-opening-portrait.group .portrait + .portrait { margin-left: -26px; }
 .date-opening-copy { display: flex; flex-direction: column; gap: 6px; }
 .date-opening-name {
   font-family: var(--font-display);
@@ -1145,12 +1269,17 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  flex-shrink: 0;
+  min-width: 0;
+  max-width: 100%;
   padding: 3px 11px;
+  box-sizing: border-box;
   border-radius: 999px;
   font-family: var(--font-display);
   font-style: italic;
   font-size: 0.84rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  white-space: normal;
   color: var(--brass);
   background: rgba(230, 177, 94, 0.1);
   border: 1px solid rgba(230, 177, 94, 0.28);
@@ -1217,6 +1346,55 @@
 .date-recap-keepsake svg {
   flex-shrink: 0;
   color: var(--brass);
+}
+.date-recap-group-title {
+  margin-top: 3px;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--text);
+}
+.date-recap-spread {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+.date-recap-leaf {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(230, 177, 94, 0.2);
+  border-radius: var(--radius-sm);
+  background:
+    linear-gradient(90deg, rgba(230, 177, 94, 0.06) 1px, transparent 1px) 0 0 / 22px 100%,
+    rgba(14, 17, 32, 0.44);
+}
+.date-recap-leaf.strained { border-color: rgba(224, 122, 130, 0.36); }
+.date-recap-leaf-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+.date-recap-leaf-head .date-recap-mood { align-self: stretch; width: fit-content; }
+.date-recap-leaf-name {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--rose);
+}
+.date-recap-leaf .date-recap-summary { font-size: 0.94rem; }
+.date-recap-leaf .date-recap-line { font-size: 0.9rem; }
+.date-recap-consequence {
+  margin: 10px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid rgba(224, 122, 130, 0.18);
+  color: var(--ember);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+.date-recap-consequence.warm { color: var(--brass); border-top-color: rgba(230, 177, 94, 0.18); }
+@media (max-width: 680px) {
+  .date-recap-spread { grid-template-columns: 1fr; }
 }
 /* Failed eval: a quiet, unrecorded note — muted ember, no celebratory glow. */
 .date-recap-failed {
@@ -1380,6 +1558,76 @@
   box-shadow: 0 3px 12px color-mix(in srgb, var(--accent) 38%, transparent);
 }
 .date-send:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* A quiet instrument beneath the composer: next-prompt input usage measured
+   against the context currently allocated to the active dialogue model. */
+.date-context-meter {
+  --context-tone: var(--moon);
+  align-self: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(88px, 160px);
+  align-items: center;
+  gap: 5px 10px;
+  width: min(100%, 300px);
+  padding: 1px 3px 0;
+  color: var(--text-mute);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.date-context-meter.warning {
+  --context-tone: var(--brass);
+  color: var(--brass);
+}
+.date-context-meter.critical {
+  --context-tone: var(--ember);
+  color: var(--ember);
+}
+.date-context-meter.estimate-only {
+  grid-template-columns: auto;
+  width: auto;
+}
+.date-context-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.date-context-summary strong {
+  color: var(--context-tone);
+  font-size: 0.7rem;
+}
+.date-context-track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--context-tone) 16%, var(--ink-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--context-tone) 16%, transparent);
+}
+.date-context-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--context-tone);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--context-tone) 42%, transparent);
+  transition: width 0.25s ease, background 0.2s ease;
+}
+.date-context-warning {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 1px;
+  color: var(--ember);
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: 0;
+}
+.date-context-warning svg { flex: none; margin-top: 2px; }
 /* Narrow screens: the toolbar stacks — intents wrap, Send drops to its own
    right-aligned row rather than shrinking anything off the edge. */
 @media (max-width: 560px) {
@@ -1397,25 +1645,116 @@
 /* --- The character "dossier" — a framed side panel -------------------- */
 .date-dossier { display: flex; flex-direction: column; gap: 13px; }
 
-/* Compact identity plate: a small portrait beside the name, so the whole rail
-   (plate + scene + gauges + actions) fits a laptop viewport next to the stage. */
-.date-plate {
-  --cut: 16px;
-  position: relative;
+/* Portrait-led company plate. It borrows the People gallery's chamfered portrait
+   language without its overlapping nameplate, leaving the names and live emotions
+   centered beneath each face. */
+.date-company-plate {
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--brass) 24%, var(--border));
+  border-radius: 14px;
+  background:
+    radial-gradient(260px 150px at 50% -15%, rgba(230, 177, 94, 0.08), transparent 72%),
+    linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 92%, var(--brass)), var(--panel));
+  box-shadow: var(--shadow-sm);
+}
+.date-company-title {
+  margin: 0 0 12px;
+  text-align: center;
+}
+.date-company-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+  margin-inline: auto;
+}
+.date-company-person {
+  min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 13px;
-  padding: 12px 14px;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: center;
 }
-.date-plate-portrait {
+.date-company-frame {
+  --cut: 14px;
   position: relative;
-  width: 88px;
-  flex: none;
+  width: 100%;
+  background: linear-gradient(135deg, var(--brass-dim), var(--border-bright));
+  clip-path: polygon(
+    var(--cut) 0, 100% 0,
+    100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%,
+    0 100%, 0 var(--cut)
+  );
+  box-shadow: var(--shadow-sm), var(--rim);
 }
-.date-plate-id { min-width: 0; }
-.date-plate-portrait .portrait {
-  box-shadow: inset 0 0 0 1px rgba(230, 177, 94, 0.4), inset 0 0 0 5px rgba(10, 12, 24, 0.3);
+.date-company-frame::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  z-index: 0;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  clip-path: inherit;
 }
+.date-company-portrait {
+  position: relative;
+  z-index: 1;
+  padding: 4px;
+}
+.date-company-portrait .portrait {
+  border-radius: var(--radius-sm);
+  clip-path: polygon(
+    11px 0, 100% 0,
+    100% calc(100% - 11px), calc(100% - 11px) 100%,
+    0 100%, 0 11px
+  );
+  box-shadow: inset 0 0 0 1px rgba(230, 177, 94, 0.3);
+}
+.date-company-copy {
+  min-width: 0;
+  padding: 9px 3px 1px;
+}
+.date-company-name {
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 650;
+  font-variation-settings: 'SOFT' 30;
+  line-height: 1.16;
+  color: var(--brass);
+}
+.date-company-emotion {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  font-style: italic;
+  line-height: 1.3;
+  color: var(--text-mute);
+}
+.date-company-emotion.departed { color: var(--ember); }
+.date-company-person.state-left_early,
+.date-company-person.state-walked_out,
+.date-company-person.state-departed { opacity: 0.58; filter: saturate(0.55); }
+
+.date-company-plate.solo {
+  padding: 16px 18px 15px;
+}
+.date-company-plate.solo .date-company-person {
+  width: min(68%, 188px);
+  margin-inline: auto;
+}
+.date-company-plate.solo .date-company-frame { --cut: 16px; }
+.date-company-plate.solo .date-company-portrait .portrait {
+  clip-path: polygon(
+    13px 0, 100% 0,
+    100% calc(100% - 13px), calc(100% - 13px) 100%,
+    0 100%, 0 13px
+  );
+}
+.date-company-plate.solo .date-company-copy { padding-top: 11px; }
+.date-company-plate.solo .date-company-name { font-size: 1.18rem; }
+.date-company-plate.solo .date-company-emotion { font-size: 0.8rem; }
+
 /* Per-turn expression swap: the new portrait dissolves in over the dark plate so
    a flirt/wince/blush reads as a live reaction instead of a hard cut. The image
    is keyed on its asset path (see Portrait `crossfade`), so this replays on every
@@ -1428,22 +1767,6 @@
 @media (prefers-reduced-motion: reduce) {
   .portrait-xfade { animation: none; }
 }
-.date-plate-name {
-  font-family: var(--font-display);
-  font-weight: 600; font-size: 1.12rem;
-  line-height: 1.2;
-  margin: 0 0 6px;
-  /* break a single long name rather than overflow the fixed dossier */
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.date-plate-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.date-mood-chip { font-size: 0.72rem; }
-
 /* Relationship gauges — a labelled HUD block. */
 .date-gauges { padding: 15px; }
 .date-gauges-head {
@@ -1456,6 +1779,89 @@
 .date-gauges-head .trail {
   flex: 1; height: 1px; min-width: 18px;
   background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+
+/* A shared date keeps two relationship leaves in one dossier. The portrait tabs
+   are both navigation and addressee selection; the active leaf owns every
+   relationship-specific control below it. */
+.date-gauges.date-bond-tabs {
+  padding: 0;
+  overflow: hidden;
+}
+.date-bond-tablist {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--ink-2);
+}
+.date-bond-tab {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-right: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-mute);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.16s, background 0.16s;
+}
+.date-bond-tab:last-child { border-right: 0; }
+.date-bond-tab::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--rose), var(--brass));
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.16s;
+}
+.date-bond-tab:hover:not(:disabled) { color: var(--text); background: rgba(157, 184, 222, 0.05); }
+.date-bond-tab:focus-visible {
+  z-index: 1;
+  outline: 2px solid var(--moon);
+  outline-offset: -3px;
+}
+.date-bond-tab.active {
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(232, 138, 166, 0.1), rgba(230, 177, 94, 0.04));
+}
+.date-bond-tab.active::after { transform: scaleX(1); }
+.date-bond-tab:disabled { opacity: 0.42; cursor: default; }
+.date-bond-tab > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.date-bond-tab .portrait {
+  width: 32px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(230, 177, 94, 0.3);
+}
+.date-bond-tabs [role='tabpanel'] { padding: 14px 15px 15px; }
+.date-bond-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+.date-bond-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 /* Action deck — grouped date controls. */
@@ -1568,10 +1974,6 @@
 @media (min-width: 1500px) {
   .chat-wrap.date-wrap { grid-template-columns: 340px 1fr; }
 }
-@media (min-width: 2400px) {
-  .date-msg { max-width: min(84%, 1080px); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .date-dtr::after { animation: none; display: none; }
 }

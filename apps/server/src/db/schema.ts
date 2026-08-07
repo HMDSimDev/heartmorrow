@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS messages (
   id         TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES conversation_sessions(id) ON DELETE CASCADE,
   role       TEXT NOT NULL,
+  character_id TEXT REFERENCES characters(id) ON DELETE SET NULL,
   text       TEXT NOT NULL,
   metadata   TEXT NOT NULL DEFAULT '{}',
   created_at INTEGER NOT NULL
@@ -570,8 +571,8 @@ CREATE TABLE IF NOT EXISTS prompt_overrides (
   updated_at    INTEGER NOT NULL
 );
 
--- Attendees of a conversation session. A solo date has one row (seat 0 = the
--- session's character_id); a group date adds a row per co-attendee. Holds the
+-- Attendees of a conversation session. A solo outing has one row (seat 0 = the
+-- session's character_id); a group outing adds a row per co-attendee. Holds the
 -- per-seat live rapport (0..100; NULL = unseeded) so each person's vibe is tracked
 -- independently. Cascades when the session (or a character) is deleted.
 CREATE TABLE IF NOT EXISTS session_participants (
@@ -581,11 +582,22 @@ CREATE TABLE IF NOT EXISTS session_participants (
   role         TEXT    NOT NULL DEFAULT 'romance',
   state        TEXT    NOT NULL DEFAULT 'present',
   rapport      INTEGER,
+  expression   TEXT,
+  judged       INTEGER NOT NULL DEFAULT 0,
   updated_at   INTEGER NOT NULL,
   PRIMARY KEY (session_id, character_id)
 );
 CREATE INDEX IF NOT EXISTS idx_session_participants_session   ON session_participants(session_id);
 CREATE INDEX IF NOT EXISTS idx_session_participants_character ON session_participants(character_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_session_participants_seat ON session_participants(session_id, seat);
+
+-- Existing installs already have conversation sessions when this table first
+-- appears. Seed their seat-0 host rows idempotently so every session read exposes a
+-- complete roster immediately after upgrade (not only after another judged turn).
+INSERT OR IGNORE INTO session_participants
+  (session_id, character_id, seat, role, state, rapport, updated_at)
+SELECT id, character_id, 0, 'romance', 'present', NULL, updated_at
+FROM conversation_sessions;
 `;
 
 /**
@@ -593,6 +605,21 @@ CREATE INDEX IF NOT EXISTS idx_session_participants_character ON session_partici
  * migration system, so we add columns only when absent (checked via table_info).
  */
 export const COLUMN_MIGRATIONS: Array<{ table: string; column: string; ddl: string }> = [
+  {
+    table: 'messages',
+    column: 'character_id',
+    ddl: `ALTER TABLE messages ADD COLUMN character_id TEXT REFERENCES characters(id) ON DELETE SET NULL`,
+  },
+  {
+    table: 'session_participants',
+    column: 'expression',
+    ddl: `ALTER TABLE session_participants ADD COLUMN expression TEXT`,
+  },
+  {
+    table: 'session_participants',
+    column: 'judged',
+    ddl: `ALTER TABLE session_participants ADD COLUMN judged INTEGER NOT NULL DEFAULT 0`,
+  },
   {
     table: 'characters',
     column: 'relationship_style',

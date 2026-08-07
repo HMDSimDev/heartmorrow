@@ -588,6 +588,24 @@ export const EpilogueSchema = z.object({
 export type Epilogue = z.infer<typeof EpilogueSchema>;
 
 /**
+ * Shared-scene turn director for a two-character date or hangout. It chooses who
+ * actually has something worth saying after the player's latest line, in speaking
+ * order. Seats are used instead of model-authored character ids so local models do
+ * not have to reproduce opaque ids exactly. At least one attendee always answers;
+ * silence for the whole room would look like a failed request in the client.
+ */
+export const GroupSpeakerSelectionSchema = z.object({
+  speakerSeats: z
+    .array(z.number().int().min(0).max(1))
+    .min(1)
+    .max(2)
+    .refine((seats) => new Set(seats).size === seats.length, 'Speaker seats must be unique.'),
+  /** Compact internal rationale, persisted for diagnostics but never shown. */
+  reason: z.string().min(1).max(GEN_TEXT.line),
+});
+export type GroupSpeakerSelection = z.infer<typeof GroupSpeakerSelectionSchema>;
+
+/**
  * Per-turn read of how the player's LAST message landed for this character on
  * this date. The model only judges + picks an expression; the SERVER owns the
  * running rapport value and all consequences. `engagement` is how well it landed

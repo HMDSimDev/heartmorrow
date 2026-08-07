@@ -5,7 +5,6 @@ import {
   RELATIONSHIP_STAT_KEYS,
   currentStatus,
   isBrokenUp,
-  isOnTheRocks,
   nextDtrRung,
   DTR_COOLDOWN_DAYS,
   warmthBand,
@@ -24,6 +23,7 @@ import {
   type ShopItem,
   type Character,
   type ConversationMode,
+  type ConversationContextEstimate,
   type Phase,
   type ConversationSession,
   type DtrResponse,
@@ -34,9 +34,12 @@ import {
   type World,
   type PropertyView,
   type ActiveDate,
+  type ConversationParticipant,
 } from '@dsim/shared';
 import { api, streamChat, streamRetry, streamRegenerate, assetUrl } from '../lib/api';
 import { errorMessage } from '../lib/hooks';
+import { activeDateParticipantNames } from '../lib/active-date';
+import { contextUsagePercent, contextUsageTone } from '../lib/context-window';
 import { useAppData } from '../state/app-context';
 import { intentLabel, intentTip, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
@@ -71,6 +74,34 @@ const REACTION_KEYS = [
   'pages:chat.reaction.p2',
   'pages:chat.reaction.p3',
 ] as const;
+
+function hasUnansweredAttendee(
+  session: ConversationSession,
+  messages: Message[],
+  participants: ConversationParticipant[],
+): boolean {
+  const playerIndex = messages.findLastIndex((message) => message.role === 'player');
+  if (playerIndex < 0) return false;
+  const answered = new Set(
+    messages
+      .slice(playerIndex + 1)
+      .filter((message) => message.role === 'character')
+      .map((message) => message.characterId ?? session.characterId),
+  );
+  return participants.some((participant) => participant.state === 'present' && !answered.has(participant.characterId));
+}
+
+async function loadParticipantCharacters(
+  participants: ConversationParticipant[],
+  known: Character[] = [],
+): Promise<Character[]> {
+  return Promise.all(
+    participants.map((participant) => {
+      const cached = known.find((character) => character.id === participant.characterId);
+      return cached ?? api.getCharacter(participant.characterId);
+    }),
+  );
+}
 
 function DateTrajectory({
   value,
@@ -143,6 +174,7 @@ export function Chat() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [setup, setSetup] = useState({
     characterId: params.get('character') ?? '',
+    participantId: '',
     mode: 'date' as ConversationMode,
     // "Anywhere" (the server auto-picks a free venue, else the cheapest affordable one).
     locationId: 'anywhere',
@@ -157,15 +189,22 @@ export function Chat() {
     weatherLabel: string;
     moodIcon: string | null;
     mood: string | null;
+    moodsByCharacter: Record<string, { moodIcon: string | null; mood: string | null }>;
   } | null>(null);
 
   const [session, setSession] = useState<ConversationSession | null>(null);
   const [character, setCharacter] = useState<Character | null>(null);
+  const [participants, setParticipants] = useState<ConversationParticipant[]>([]);
+  const [participantCharacters, setParticipantCharacters] = useState<Character[]>([]);
+  /** Relationship-specific actions on a group date are addressed to this person. */
+  const [actionTargetId, setActionTargetId] = useState<string | null>(null);
   const [relationship, setRelationship] = useState<Relationship | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [contextEstimate, setContextEstimate] = useState<ConversationContextEstimate | null>(null);
   const [input, setInput] = useState('');
   const [intent, setIntent] = useState<Intent | null>(null);
   const [streaming, setStreaming] = useState<{ active: boolean; text: string }>({ active: false, text: '' });
+  const [streamingCharacterId, setStreamingCharacterId] = useState<string | null>(null);
   const [expression, setExpression] = useState<string | null>(null);
   const [evalResult, setEvalResult] = useState<EndSessionResponse | null>(null);
   const [deltas, setDeltas] = useState<Partial<Record<RelationshipStatKey, number>> | null>(null);
@@ -187,7 +226,7 @@ export function Chat() {
     | { kind: 'reply' }
     // priorPlayerTurns: player-turn count BEFORE this send — lets a retry tell "my
     // turn was saved" (count grew) from "a stale prior reply is trailing".
-    | { kind: 'send'; text: string; intent?: Intent; priorPlayerTurns: number }
+    | { kind: 'send'; text: string; intent?: Intent; targetCharacterId?: string; priorPlayerTurns: number }
     | null
   >(null);
   const [walkout, setWalkout] = useState<string | null>(null);
@@ -196,9 +235,15 @@ export function Chat() {
   const [vibe, setVibe] = useState<string | null>(null);
   const [rapport, setRapport] = useState<number | null>(null);
   const [rapportPulse, setRapportPulse] = useState<{ delta: number; key: number } | null>(null);
+  const [participantPulses, setParticipantPulses] = useState<
+    Record<string, { delta: number; key: number } | null>
+  >({});
   const [leftEarly, setLeftEarly] = useState(false);
   // The player typed something that read as a breakup — awaiting their confirm.
-  const [breakupPending, setBreakupPending] = useState<{ reaction: 'accept' | 'hurt' | 'plead' } | null>(null);
+  const [breakupPending, setBreakupPending] = useState<{
+    reaction: 'accept' | 'hurt' | 'plead';
+    characterId: string;
+  } | null>(null);
   const [brokeUp, setBrokeUp] = useState(false);
   // A resumed transcript ended on a walkout/leave/farewell line the live SSE
   // handlers never got to act on (tab closed mid-turn) — conclude the date as
@@ -222,9 +267,15 @@ export function Chat() {
   // Mirrors the live session id so async handlers can detect that the player
   // abandoned this date (New / world-switch) before their request resolved.
   const sessionIdRef = useRef<string | null>(null);
+  const actionTargetRef = useRef<string | null>(null);
   useEffect(() => {
     sessionIdRef.current = session?.id ?? null;
   }, [session]);
+  useEffect(() => {
+    actionTargetRef.current = actionTargetId;
+  }, [actionTargetId]);
+
+  const selectedActionTargetId = actionTargetId ?? session?.characterId ?? null;
 
   // Abort any in-flight stream on unmount.
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -393,6 +444,9 @@ export function Chat() {
           weatherLabel: ww.today.label,
           moodIcon: m?.moodIcon ?? null,
           mood: m?.mood ?? null,
+          moodsByCharacter: Object.fromEntries(
+            ww.characters.map((entry) => [entry.id, { moodIcon: entry.moodIcon ?? null, mood: entry.mood ?? null }]),
+          ),
         });
       })
       .catch(() => undefined);
@@ -404,6 +458,31 @@ export function Chat() {
   // The date has concluded by some terminal path (evaluated, walkout, soft-leave,
   // DTR-ended, or breakup) — the session is no longer open on the server.
   const dateConcluded = !!evalResult || !!walkout || leftEarly || brokeUp || !!dtrOutcome?.ended;
+
+  // Estimate the actual next model request after each completed turn. Group dates
+  // use the largest attendee-specific prompt, so the meter reflects the request
+  // most likely to hit the configured model limit rather than an optimistic average.
+  useEffect(() => {
+    const sessionId = session?.id;
+    if (!sessionId) {
+      setContextEstimate(null);
+      return;
+    }
+    if (streaming.active || dateConcluded) return;
+
+    let live = true;
+    void api
+      .getConversationContextEstimate(sessionId)
+      .then((estimate) => {
+        if (live && sessionIdRef.current === sessionId) setContextEstimate(estimate);
+      })
+      .catch(() => {
+        if (live && sessionIdRef.current === sessionId) setContextEstimate(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [session?.id, messages, participants, streaming.active, dateConcluded]);
 
   // Leaving the Date tab no longer destroys the date — it's held server-side and
   // auto-resumes when you come back (see the resume effect below). The only thing a
@@ -443,6 +522,8 @@ export function Chat() {
     setBrokeUp(false);
     setAutoEnd(false);
     setRapportPulse(null);
+    setParticipantPulses({});
+    setActionTargetId(null);
     setIntent(null);
     setFailed(null);
     try {
@@ -456,6 +537,7 @@ export function Chat() {
         api.getConversation(ad.sessionId),
         refreshActiveDate(),
       ]);
+      const rosterCharacters = await loadParticipantCharacters(sm.participants, [c]);
       // The context can briefly point at a session that just ended elsewhere — never
       // reopen a finished date. Reconcile (await, so the lock clears) and fall back
       // to setup; the resumeFailed flag is a harmless no-op once activeDate is null.
@@ -464,14 +546,22 @@ export function Chat() {
         setResumeFailed(true);
         return;
       }
-      setSetup((s) => ({ ...s, characterId: ad.characterId, locationId: sm.session.locationId ?? '' }));
+      setSetup((s) => ({
+        ...s,
+        characterId: ad.characterId,
+        participantId: sm.participants.find((participant) => participant.characterId !== ad.characterId)?.characterId ?? '',
+        locationId: sm.session.locationId ?? '',
+      }));
       setSession(sm.session);
       setCharacter(c);
+      setActionTargetId(ad.characterId);
+      setParticipants(sm.participants);
+      setParticipantCharacters(rosterCharacters);
       setMessages(sm.messages);
       // Re-derive the retry bar from server truth so it survives a refresh / resume:
       // a transcript ending in an unanswered player turn means the reply never came.
       const lastMsg = sm.messages[sm.messages.length - 1];
-      if (lastMsg && lastMsg.role === 'player') setFailed({ kind: 'reply' });
+      if (hasUnansweredAttendee(sm.session, sm.messages, sm.participants)) setFailed({ kind: 'reply' });
       // Re-derive a terminal exit the SSE stream never delivered (tab closed/refreshed
       // mid-turn): a trailing consequence-bearing character line means the scene
       // already ended in-fiction. Restore the matching moment and conclude the date —
@@ -479,24 +569,33 @@ export function Chat() {
       // walkout/goodbye they never saw. A pending breakup re-raises its confirm.
       if (lastMsg && lastMsg.role === 'character') {
         const md = lastMsg.metadata ?? {};
+        const terminal = !sm.participants.some((participant) => participant.state === 'present');
         if (md.walkout === true) {
-          setWalkout(t('chat.walkoutDefault'));
-          setAutoEnd(true);
+          if (terminal) {
+            setWalkout(t('chat.walkoutDefault'));
+            setAutoEnd(true);
+          }
         } else if (md.left === true) {
-          setLeftEarly(true);
-          setVibe(null);
-          setAutoEnd(true);
+          if (terminal) {
+            setLeftEarly(true);
+            setVibe(null);
+            setAutoEnd(true);
+          }
         } else if (md.farewell === true) {
-          setAutoEnd(true);
+          if (terminal) setAutoEnd(true);
         } else if (md.breakupIntent === true) {
           const r = md.breakupReaction;
-          setBreakupPending({ reaction: r === 'accept' || r === 'hurt' || r === 'plead' ? r : 'hurt' });
+          setBreakupPending({
+            reaction: r === 'accept' || r === 'hurt' || r === 'plead' ? r : 'hurt',
+            characterId: lastMsg.characterId ?? sm.session.characterId,
+          });
         }
       }
       setRelationship(await api.getRelationship(c.id));
       // Restore the live trajectory + mood from the fresh read fetched above (matched
       // by session id), falling back to the `ad` snapshot only if it drifted.
       const live = fresh && fresh.sessionId === ad.sessionId ? fresh : ad;
+      setParticipants(live.participants);
       setExpression(live.expression);
       setVibe(live.vibe);
       setRapport(live.rapport);
@@ -510,6 +609,9 @@ export function Chat() {
           weatherLabel: ww.today.label,
           moodIcon: m?.moodIcon ?? null,
           mood: m?.mood ?? null,
+          moodsByCharacter: Object.fromEntries(
+            ww.characters.map((entry) => [entry.id, { moodIcon: entry.moodIcon ?? null, mood: entry.mood ?? null }]),
+          ),
         });
       }
     } catch (e) {
@@ -540,6 +642,21 @@ export function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateConcluded]);
 
+  // If the selected addressee leaves, move the action focus to the next person
+  // still at the table and refresh the relationship shown in the rail.
+  useEffect(() => {
+    if (!session || participants.length < 2) return;
+    if (participants.some((entry) => entry.characterId === actionTargetId && entry.state === 'present')) return;
+    const next = participants.find((entry) => entry.state === 'present');
+    if (!next) return;
+    setActionTargetId(next.characterId);
+    actionTargetRef.current = next.characterId;
+    setGiftPicker(false);
+    void api.getRelationship(next.characterId).then((rel) => {
+      if (actionTargetRef.current === next.characterId) setRelationship(rel);
+    }).catch(() => undefined);
+  }, [actionTargetId, participants, session]);
+
   // Replay an end-of-date report whose HTTP response was lost (the tab closed or
   // refreshed while the evaluator ran): the server persists the report as the date
   // concludes, so instead of silently dropping the player onto the plan-a-date
@@ -562,9 +679,17 @@ export function Chat() {
           api.getRelationship(result.session.characterId),
         ]);
         if (!live || sessionIdRef.current) return; // a date opened meanwhile — don't clobber it
-        setSetup((s) => ({ ...s, characterId: c.id, locationId: result.session.locationId ?? '' }));
+        setSetup((s) => ({
+          ...s,
+          characterId: c.id,
+          participantId: sm.participants.find((participant) => participant.characterId !== c.id)?.characterId ?? '',
+          locationId: result.session.locationId ?? '',
+        }));
         setSession(result.session);
         setCharacter(c);
+        setActionTargetId(c.id);
+        setParticipants(sm.participants);
+        setParticipantCharacters(await loadParticipantCharacters(sm.participants, [c]));
         setMessages(sm.messages);
         setRelationship(rel);
         setEvalResult(result);
@@ -593,6 +718,12 @@ export function Chat() {
     setGiftItems([]);
     setWalkout(null);
     setVibe(null);
+    setRapport(null);
+    setRapportPulse(null);
+    setParticipantPulses({});
+    setActionTargetId(null);
+    setParticipants([]);
+    setParticipantCharacters([]);
     setLeftEarly(false);
     setBreakupPending(null);
     setBrokeUp(false);
@@ -605,11 +736,13 @@ export function Chat() {
       const c = await api.getCharacter(setup.characterId);
       const created = await api.createConversation({
         characterId: setup.characterId,
+        participantIds: setup.participantId ? [setup.participantId] : [],
         mode: setup.mode,
         locationId: setup.locationId || null,
       });
       setSession(created);
       setCharacter(c);
+      setActionTargetId(c.id);
       // A date is now open server-side — engage the world's "date underway" lock
       // (Sleep / Work / Minigames) and light the Date-tab badge.
       void refreshActiveDate();
@@ -618,6 +751,8 @@ export function Chat() {
       // the server already persisted (empty for repeat dates → the player opens).
       try {
         const sm = await api.getConversation(created.id);
+        setParticipants(sm.participants);
+        setParticipantCharacters(await loadParticipantCharacters(sm.participants, [c]));
         setMessages(sm.messages);
       } catch {
         setMessages([]);
@@ -635,6 +770,9 @@ export function Chat() {
               weatherLabel: ww.today.label,
               moodIcon: m?.moodIcon ?? null,
               mood: m?.mood ?? null,
+              moodsByCharacter: Object.fromEntries(
+                ww.characters.map((entry) => [entry.id, { moodIcon: entry.moodIcon ?? null, mood: entry.mood ?? null }]),
+              ),
             });
           })
           .catch(() => setScene(null));
@@ -650,10 +788,11 @@ export function Chat() {
   // composer. `playerPersisted` tracks whether the server saved the player turn
   // (the `player` event fired) so a failure can pick the right recovery: regenerate
   // the reply (text saved) vs. resend the whole turn (nothing saved).
-  const send = async (resend?: { text: string; intent?: Intent }) => {
+  const send = async (resend?: { text: string; intent?: Intent; targetCharacterId?: string }) => {
     const text = (resend?.text ?? input).trim();
     if (!text || !session || streaming.active || busy) return;
     const chosenIntent = resend ? resend.intent : intent ?? undefined;
+    const chosenTarget = resend?.targetCharacterId ?? selectedActionTargetId ?? undefined;
     if (!resend) {
       setInput('');
       setIntent(null);
@@ -666,6 +805,7 @@ export function Chat() {
     // accepted DTR is a milestone we keep as the primary outcome.
     if (dtrOutcome && dtrOutcome.decision !== 'accept') setDtrOutcome(null);
     setStreaming({ active: true, text: '' });
+    setStreamingCharacterId(null);
     const controller = new AbortController();
     abortRef.current = controller;
     let playerPersisted = false;
@@ -674,7 +814,9 @@ export function Chat() {
     // 'player' event — by the player-turn count growing, not the trailing role.
     const priorPlayerTurns = messages.filter((m) => m.role === 'player').length;
     const recover = () =>
-      playerPersisted ? { kind: 'reply' as const } : { kind: 'send' as const, text, intent: chosenIntent, priorPlayerTurns };
+      playerPersisted
+        ? { kind: 'reply' as const }
+        : { kind: 'send' as const, text, intent: chosenIntent, targetCharacterId: chosenTarget, priorPlayerTurns };
     try {
       await streamChat(
         session.id,
@@ -684,76 +826,143 @@ export function Chat() {
             playerPersisted = true;
             setMessages((prev) => [...prev, m]);
           },
-          onDelta: (delta) => setStreaming((s) => ({ active: true, text: s.text + delta })),
-          onDone: (m) => {
-            settled = true;
+          onSpeaker: (characterId) => {
+            setStreamingCharacterId(characterId);
+            setStreaming({ active: true, text: '' });
+          },
+          onDelta: (delta, characterId) => {
+            if (characterId) setStreamingCharacterId(characterId);
+            setStreaming((s) => ({ active: true, text: s.text + delta }));
+          },
+          onDone: (m, complete) => {
+            settled = complete;
             setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-            setStreaming({ active: false, text: '' });
+            setStreaming({ active: !complete, text: '' });
+            setStreamingCharacterId(null);
           },
           onError: (msg) => {
             settled = true;
             setError(msg);
             setStreaming({ active: false, text: '' });
+            setStreamingCharacterId(null);
             setFailed(recover());
           },
           onNotice: (msg) => setNotice(msg),
-          onWalkout: (m, reason) => {
-            // The character stormed out. Show the walkout moment, then run the normal
-            // end-and-evaluate flow so the blown-up date is scored in full (stamina,
-            // deltas, memories, milestones) — same as a deliberately-ended date.
+          onWalkout: (m, reason, characterId, terminal = true) => {
+            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+            if (characterId) {
+              setParticipants((prev) =>
+                prev.map((participant) =>
+                  participant.characterId === characterId ? { ...participant, state: 'walked_out' } : participant,
+                ),
+              );
+            }
+            if (terminal) {
+              settled = true;
+              setStreaming({ active: false, text: '' });
+              setStreamingCharacterId(null);
+              setWalkout(reason || t('chat.walkoutDefault'));
+              void endDate();
+            }
+          },
+          onBreakupIntent: (m, reaction, characterId) => {
             settled = true;
             setMessages((prev) => [...prev, m]);
             setStreaming({ active: false, text: '' });
-            setWalkout(reason || t('chat.walkoutDefault'));
-            void endDate();
+            setStreamingCharacterId(null);
+            setBreakupPending({ reaction, characterId: characterId ?? session.characterId });
           },
-          onBreakupIntent: (m, reaction) => {
-            settled = true;
-            setMessages((prev) => [...prev, m]);
-            setStreaming({ active: false, text: '' });
-            setBreakupPending({ reaction });
-          },
-          onRapport: (label, expr, rap, delta, engagement, messageId) => {
-            setVibe(label);
-            if (expr) setExpression(expr);
-            setRapport(rap);
-            if (delta) setRapportPulse((p) => ({ delta, key: (p?.key ?? 0) + 1 }));
+          onRapport: (label, expr, rap, delta, engagement, messageId, characterId) => {
+            const targetId = characterId ?? session.characterId;
+            setParticipants((prev) =>
+              prev.map((participant) =>
+                participant.characterId === targetId
+                  ? { ...participant, vibe: label, expression: expr || participant.expression, rapport: rap, judged: true }
+                  : participant,
+              ),
+            );
+            if (targetId === session.characterId) {
+              setVibe(label);
+              if (expr) setExpression(expr);
+              setRapport(rap);
+            }
+            if (delta) {
+              setRapportPulse((p) => ({ delta, key: (p?.key ?? 0) + 1 }));
+              setParticipantPulses((prev) => ({
+                ...prev,
+                [targetId]: { delta, key: (prev[targetId]?.key ?? 0) + 1 },
+              }));
+            }
             // Mirror the server's metadata stamp so the reaction chip appears live.
             if (engagement !== undefined && messageId) {
               setMessages((prev) =>
-                prev.map((m) => (m.id === messageId ? { ...m, metadata: { ...m.metadata, engagement } } : m)),
+                prev.map((m) => {
+                  if (m.id !== messageId) return m;
+                  const prior = m.metadata.engagementByCharacter;
+                  const engagementByCharacter =
+                    prior && typeof prior === 'object' && !Array.isArray(prior)
+                      ? { ...(prior as Record<string, unknown>), [targetId]: engagement }
+                      : { [targetId]: engagement };
+                  return {
+                    ...m,
+                    metadata: {
+                      ...m.metadata,
+                      engagementByCharacter,
+                      ...(targetId === session.characterId ? { engagement } : {}),
+                    },
+                  };
+                }),
               );
             }
           },
-          onLeft: (m) => {
-            // The character lost interest and called it a night. Show the soft-exit
-            // moment, then run the normal end-and-evaluate flow so the flat date is
-            // scored in full (stamina, deltas, memories) like any ended date.
-            settled = true;
-            setMessages((prev) => [...prev, m]);
-            setStreaming({ active: false, text: '' });
-            setLeftEarly(true);
-            setVibe(null);
-            void endDate();
+          onLeft: (m, _reason, characterId, terminal = true) => {
+            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
+            if (characterId) {
+              setParticipants((prev) =>
+                prev.map((participant) =>
+                  participant.characterId === characterId ? { ...participant, state: 'left_early' } : participant,
+                ),
+              );
+            }
+            if (terminal) {
+              settled = true;
+              setStreaming({ active: false, text: '' });
+              setStreamingCharacterId(null);
+              setLeftEarly(true);
+              setVibe(null);
+              void endDate();
+            }
           },
-          onFarewell: (m, expr) => {
+          onFarewell: (m, expr, characterId, terminal = true) => {
             // The player ended the date by chatting (a natural goodbye). Show the
             // character's send-off, then run the normal end-and-evaluate flow so the
             // date is scored in full — no need to click "End & evaluate".
             settled = true;
-            setMessages((prev) => [...prev, m]);
+            setMessages((prev) => (prev.some((entry) => entry.id === m.id) ? prev : [...prev, m]));
             setStreaming({ active: false, text: '' });
-            if (expr) setExpression(expr);
-            void endDate();
+            setStreamingCharacterId(null);
+            if (characterId) {
+              setParticipants((prev) =>
+                prev.map((participant) =>
+                  participant.characterId === characterId
+                    ? { ...participant, state: 'departed', expression: expr || participant.expression }
+                    : participant,
+                ),
+              );
+              if (characterId === session.characterId && expr) setExpression(expr);
+            }
+            if (terminal) void endDate();
           },
         },
         controller.signal,
         chosenIntent,
+        chosenTarget,
       );
       // The stream ended with no terminal event (the connection dropped mid-reply):
       // recover instead of leaving the typing indicator spinning forever.
       if (!settled && !controller.signal.aborted) {
         setStreaming({ active: false, text: '' });
+        setStreamingCharacterId(null);
         setError(t('chat.replyDropped'));
         setFailed(recover());
       }
@@ -764,6 +973,7 @@ export function Chat() {
         setFailed(recover());
       }
       setStreaming({ active: false, text: '' });
+      setStreamingCharacterId(null);
     }
   };
 
@@ -780,15 +990,17 @@ export function Chat() {
       setBusy(true);
       try {
         const sm = await api.getConversation(session.id);
+        setParticipants(sm.participants);
         const newPlayerTurns = sm.messages.filter((m) => m.role === 'player').length;
-        const last = sm.messages[sm.messages.length - 1];
         if (newPlayerTurns > failed.priorPlayerTurns) {
-          // The turn WAS saved (count grew). If a reply also landed, we're done.
-          if (last && last.role === 'character') {
+          // The turn WAS saved (count grew). It is complete only once every attendee
+          // who is still present has answered it.
+          if (!hasUnansweredAttendee(sm.session, sm.messages, sm.participants)) {
             setMessages(sm.messages);
             setFailed(null);
             return;
           }
+          setMessages(sm.messages);
           action = 'reply'; // saved but unanswered → regenerate
         } else {
           action = 'send'; // genuinely not saved → resend
@@ -802,9 +1014,9 @@ export function Chat() {
 
     if (action === 'abort') return; // payload preserved in `failed`; they can retry again
     if (action === 'send' && failed.kind === 'send') {
-      const { text, intent: keptIntent } = failed;
+      const { text, intent: keptIntent, targetCharacterId } = failed;
       setFailed(null);
-      await send({ text, intent: keptIntent });
+      await send({ text, intent: keptIntent, targetCharacterId });
       return;
     }
 
@@ -812,6 +1024,7 @@ export function Chat() {
     setError(undefined);
     setNotice(undefined);
     setStreaming({ active: true, text: '' });
+    setStreamingCharacterId(null);
     const controller = new AbortController();
     abortRef.current = controller;
     let settled = false;
@@ -819,24 +1032,69 @@ export function Chat() {
       await streamRetry(
         session.id,
         {
-          onDelta: (delta) => setStreaming((s) => ({ active: true, text: s.text + delta })),
-          onDone: (m) => {
-            settled = true;
+          onSpeaker: (characterId) => {
+            setStreamingCharacterId(characterId);
+            setStreaming({ active: true, text: '' });
+          },
+          onDelta: (delta, characterId) => {
+            if (characterId) setStreamingCharacterId(characterId);
+            setStreaming((s) => ({ active: true, text: s.text + delta }));
+          },
+          onDone: (m, complete) => {
+            settled = complete;
             setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-            setStreaming({ active: false, text: '' });
+            setStreaming({ active: !complete, text: '' });
+            setStreamingCharacterId(null);
           },
           onError: (msg) => {
             settled = true;
             setError(msg);
             setStreaming({ active: false, text: '' });
+            setStreamingCharacterId(null);
             setFailed({ kind: 'reply' });
           },
           onNotice: (msg) => setNotice(msg),
+          onWalkout: (m, reason, characterId, terminal = true) => {
+            setMessages((prev) => (prev.some((entry) => entry.id === m.id) ? prev : [...prev, m]));
+            if (characterId) {
+              setParticipants((prev) =>
+                prev.map((participant) =>
+                  participant.characterId === characterId ? { ...participant, state: 'walked_out' } : participant,
+                ),
+              );
+            }
+            if (terminal) {
+              settled = true;
+              setStreaming({ active: false, text: '' });
+              setStreamingCharacterId(null);
+              setWalkout(reason || t('chat.walkoutDefault'));
+              void endDate();
+            }
+          },
+          onLeft: (m, _reason, characterId, terminal = true) => {
+            setMessages((prev) => (prev.some((entry) => entry.id === m.id) ? prev : [...prev, m]));
+            if (characterId) {
+              setParticipants((prev) =>
+                prev.map((participant) =>
+                  participant.characterId === characterId ? { ...participant, state: 'left_early' } : participant,
+                ),
+              );
+            }
+            if (terminal) {
+              settled = true;
+              setStreaming({ active: false, text: '' });
+              setStreamingCharacterId(null);
+              setLeftEarly(true);
+              setVibe(null);
+              void endDate();
+            }
+          },
         },
         controller.signal,
       );
       if (!settled && !controller.signal.aborted) {
         setStreaming({ active: false, text: '' });
+        setStreamingCharacterId(null);
         setError(t('chat.replyDropped'));
         setFailed({ kind: 'reply' });
       }
@@ -846,6 +1104,7 @@ export function Chat() {
         setFailed({ kind: 'reply' });
       }
       setStreaming({ active: false, text: '' });
+      setStreamingCharacterId(null);
     }
   };
 
@@ -872,6 +1131,7 @@ export function Chat() {
     setFailed(null);
     setMessages((prev) => prev.slice(0, -1));
     setStreaming({ active: true, text: '' });
+    setStreamingCharacterId(last.characterId ?? session.characterId);
     const controller = new AbortController();
     abortRef.current = controller;
     let settled = false;
@@ -879,16 +1139,25 @@ export function Chat() {
       await streamRegenerate(
         sid,
         {
-          onDelta: (delta) => setStreaming((s) => ({ active: true, text: s.text + delta })),
-          onDone: (m) => {
-            settled = true;
+          onSpeaker: (characterId) => {
+            setStreamingCharacterId(characterId);
+            setStreaming({ active: true, text: '' });
+          },
+          onDelta: (delta, characterId) => {
+            if (characterId) setStreamingCharacterId(characterId);
+            setStreaming((s) => ({ active: true, text: s.text + delta }));
+          },
+          onDone: (m, complete) => {
+            settled = complete;
             setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
             setStreaming({ active: false, text: '' });
+            setStreamingCharacterId(null);
           },
           onError: (msg) => {
             settled = true;
             setError(msg);
             setStreaming({ active: false, text: '' });
+            setStreamingCharacterId(null);
             setFailed({ kind: 'reply' });
             resync();
           },
@@ -898,6 +1167,7 @@ export function Chat() {
       );
       if (!settled && !controller.signal.aborted) {
         setStreaming({ active: false, text: '' });
+        setStreamingCharacterId(null);
         setError(t('chat.replyDropped'));
         setFailed({ kind: 'reply' });
         resync();
@@ -909,14 +1179,19 @@ export function Chat() {
         resync();
       }
       setStreaming({ active: false, text: '' });
+      setStreamingCharacterId(null);
     }
   };
 
   const newConversation = () => {
     abortRef.current?.abort();
     setStreaming({ active: false, text: '' });
+    setStreamingCharacterId(null);
     setSession(null);
     setCharacter(null);
+    setParticipants([]);
+    setParticipantCharacters([]);
+    setActionTargetId(null);
     setMessages([]);
     setEvalResult(null);
     setDeltas(null);
@@ -929,6 +1204,7 @@ export function Chat() {
     setVibe(null);
     setRapport(null);
     setRapportPulse(null);
+    setParticipantPulses({});
     setLeftEarly(false);
     setBreakupPending(null);
     setBrokeUp(false);
@@ -955,12 +1231,27 @@ export function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWorldId]);
 
+  const selectActionTarget = async (characterId: string) => {
+    if (characterId === selectedActionTargetId) return;
+    setActionTargetId(characterId);
+    actionTargetRef.current = characterId;
+    setGiftPicker(false);
+    setDtrOutcome(null);
+    setDeltas(null);
+    try {
+      const rel = await api.getRelationship(characterId);
+      if (actionTargetRef.current === characterId) setRelationship(rel);
+    } catch (e) {
+      if (actionTargetRef.current === characterId) setError(errorMessage(e));
+    }
+  };
+
   const defineRelationship = async () => {
     if (!session) return;
     setBusy(true);
     setError(undefined);
     try {
-      const res = await api.defineRelationship(session.id);
+      const res = await api.defineRelationship(session.id, selectedActionTargetId ?? undefined);
       setMessages((prev) => [...prev, res.message]);
       setRelationship(res.relationship);
       setDtrOutcome(res);
@@ -995,12 +1286,19 @@ export function Chat() {
     setBusy(true);
     setError(undefined);
     try {
-      const res = await api.giftOnDate(sid, inventoryItemId);
+      const res = await api.giftOnDate(sid, inventoryItemId, selectedActionTargetId ?? undefined);
       if (sessionIdRef.current !== sid) return; // player switched dates mid-gift
       // The "🎁 you gave …" beat + the character's reaction land in the transcript.
       setMessages((prev) => [...prev, res.narratorMessage, res.message]);
       setRelationship(res.relationship);
-      if (res.expression) setExpression(res.expression);
+      setParticipants((prev) =>
+        prev.map((participant) =>
+          participant.characterId === res.characterId
+            ? { ...participant, expression: res.expression || participant.expression }
+            : participant,
+        ),
+      );
+      if (res.characterId === session.characterId && res.expression) setExpression(res.expression);
       setDeltas(res.deltas);
       setTimeout(() => setDeltas(null), 1800);
       setGiftPicker(false);
@@ -1026,11 +1324,18 @@ export function Chat() {
     setBusy(true);
     setError(undefined);
     try {
-      const res = await api.confirmBreakup(session.id);
+      const res = await api.confirmBreakup(session.id, breakupPending?.characterId);
       setRelationship(res.relationship);
       setSession((s) => (s ? { ...s, ended: res.ended || s.ended } : s));
+      if (!res.ended) {
+        setParticipants((prev) =>
+          prev.map((participant) =>
+            participant.characterId === res.characterId ? { ...participant, state: 'departed' } : participant,
+          ),
+        );
+      }
       setBreakupPending(null);
-      setBrokeUp(true);
+      setBrokeUp(res.ended);
       await reloadPlayer();
     } catch (e) {
       setError(errorMessage(e));
@@ -1086,22 +1391,27 @@ export function Chat() {
       // made the recap replay on Date-tab visits for days afterwards.
       seenResultsRef.current.add(sid);
       void api.markDateResultSeen(sid).catch(() => undefined);
-      if (result.relationship) {
+      const selectedResult = result.participantResults.find(
+        (entry) => entry.characterId === selectedActionTargetId,
+      );
+      const resultRelationship = selectedResult?.relationship ?? result.relationship;
+      if (resultRelationship) {
         // Surface the date's net change as floating chips, then clear them so the
         // animation can replay on the next date.
         if (prev) {
           const d: Partial<Record<RelationshipStatKey, number>> = {};
           for (const k of RELATIONSHIP_STAT_KEYS) {
-            const diff = result.relationship[k] - prev[k];
+            const diff = resultRelationship[k] - prev[k];
             if (diff !== 0) d[k] = diff;
           }
           setDeltas(Object.keys(d).length ? d : null);
           setTimeout(() => setDeltas(null), 1800);
         }
-        setRelationship(result.relationship);
+        setRelationship(resultRelationship);
       }
-      setMilestone(result.milestone ?? null);
-      if (result.expression) setExpression(result.expression);
+      setMilestone(selectedResult?.milestone ?? result.milestone ?? null);
+      const resultExpression = selectedResult?.expression ?? result.expression;
+      if (resultExpression) setExpression(resultExpression);
       await reloadPlayer();
       await refreshWorldState();
     } catch (e) {
@@ -1158,7 +1468,7 @@ export function Chat() {
           <div className="page-head">
             <div className="kicker">{t(openIsHangout ? 'chat.todaysPlan' : 'chat.tonightsPlan')}</div>
             <h1>{t(openIsHangout ? 'chat.onAHangoutTitle' : 'chat.onADateTitle')}</h1>
-            <p>{t(openIsHangout ? 'chat.onAHangoutBody' : 'chat.onADateBody', { name: activeDate.characterName })}</p>
+            <p>{t(openIsHangout ? 'chat.onAHangoutBody' : 'chat.onADateBody', { name: activeDateParticipantNames(activeDate) })}</p>
           </div>
           {error && <Banner kind="error">{error}</Banner>}
           <div className="framed date-setup">
@@ -1171,7 +1481,7 @@ export function Chat() {
               ) : (
                 <>
                   <Icon name="date" size={16} />{' '}
-                  {t(openIsHangout ? 'chat.resumeHangout' : 'chat.resumeDate', { name: activeDate.characterName })}
+                  {t(openIsHangout ? 'chat.resumeHangout' : 'chat.resumeDate', { name: activeDateParticipantNames(activeDate) })}
                 </>
               )}
             </button>
@@ -1224,7 +1534,14 @@ export function Chat() {
                     className={`date-mode-card${setup.mode === m ? ' selected' : ''}`}
                     // Switching modes resets the venue: the free-only list a hangout
                     // offers may not contain whatever a date had selected.
-                    onClick={() => setSetup((s) => ({ ...s, mode: m, locationId: 'anywhere' }))}
+                    onClick={() =>
+                      setSetup((s) => ({
+                        ...s,
+                        mode: m,
+                        participantId: s.participantId,
+                        locationId: 'anywhere',
+                      }))
+                    }
                   >
                     <span className="date-mode-glyph" aria-hidden="true">{m === 'date' ? '🕯' : '🌿'}</span>
                     <span className="date-mode-copy">
@@ -1251,7 +1568,9 @@ export function Chat() {
                         key={c.id}
                         type="button"
                         className={`date-pick-card${selected ? ' selected' : ''}${unavailable ? ' unavailable' : ''}`}
-                        onClick={() => setSetup((s) => ({ ...s, characterId: c.id, locationId: 'anywhere' }))}
+                        onClick={() =>
+                          setSetup((s) => ({ ...s, characterId: c.id, participantId: '', locationId: 'anywhere' }))
+                        }
                         disabled={unavailable}
                         title={unavailable ? t('chat.cardTitleUnavailable', { name: c.name, reason: avail?.reason ?? t('chat.unavailableToday') }) : t('chat.cardTitleMeet', { name: c.name })}
                       >
@@ -1272,6 +1591,57 @@ export function Chat() {
                   })}
               </div>
             </div>
+            {setupWorld?.featureFlags.groupDates && setup.characterId && (
+              <div className="date-invite">
+                <div className="kicker">{t('chat.groupInvite')}</div>
+                <p className="muted date-invite-note">{t('chat.groupInviteNote')}</p>
+                <div className="date-invite-grid" role="radiogroup" aria-label={t('chat.groupInvite')}>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={!setup.participantId}
+                    className={`date-invite-card${!setup.participantId ? ' selected' : ''}`}
+                    onClick={() => setSetup((s) => ({ ...s, participantId: '' }))}
+                  >
+                    <span className="date-invite-none" aria-hidden="true">1:1</span>
+                    <span>{t('chat.justUs')}</span>
+                  </button>
+                  {characters
+                    .filter(
+                      (candidate) =>
+                        candidate.id !== setup.characterId &&
+                        (!activeWorldId || candidate.worldId === activeWorldId),
+                    )
+                    .map((candidate) => {
+                      const avail = availability[candidate.id];
+                      const unavailable = !!avail && !avail.available;
+                      const selected = setup.participantId === candidate.id;
+                      return (
+                        <button
+                          key={candidate.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          className={`date-invite-card${selected ? ' selected' : ''}${unavailable ? ' unavailable' : ''}`}
+                          onClick={() => setSetup((s) => ({ ...s, participantId: candidate.id }))}
+                          disabled={unavailable}
+                          title={
+                            unavailable
+                              ? t('chat.cardTitleUnavailable', {
+                                  name: candidate.name,
+                                  reason: avail?.reason ?? t('chat.unavailableToday'),
+                                })
+                              : t('chat.inviteAlong', { name: candidate.name })
+                          }
+                        >
+                          <span className="date-invite-portrait"><Portrait character={candidate} /></span>
+                          <span>{candidate.name}</span>
+                        </button>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
             {((setupWorld && setupWorld.locations.length > 0) || roomUnlocked || setupProperties.length > 0) && (
               <Field label={t(planningHangout ? 'chat.hangoutLocationField' : 'chat.locationField')}>
                 {(() => {
@@ -1392,6 +1762,14 @@ export function Chat() {
                 })}
               </div>
             )}
+            {setup.participantId && availability[setup.participantId] && !availability[setup.participantId]!.available && (
+              <div className="banner error" style={{ fontSize: '0.82rem' }}>
+                {t('chat.inviteeUnavailable', {
+                  name: characters.find((candidate) => candidate.id === setup.participantId)?.name ?? '',
+                  reason: availability[setup.participantId]!.reason ?? t('chat.isUnavailableToday'),
+                })}
+              </div>
+            )}
             {outOfEnergy && (
               <div className="banner info" style={{ fontSize: '0.82rem' }}>
                 {t('chat.outOfEnergy')}
@@ -1404,6 +1782,7 @@ export function Chat() {
                 starting ||
                 !setup.characterId ||
                 (availability[setup.characterId] && !availability[setup.characterId]!.available) ||
+                (setup.participantId && availability[setup.participantId] && !availability[setup.participantId]!.available) ||
                 outOfEnergy
               }
             >
@@ -1430,6 +1809,24 @@ export function Chat() {
   // walks out, and you can't define the relationship over one. Every date-only
   // surface below hangs off this.
   const hangout = session.mode === 'hangout';
+  const groupDate = participants.length > 1;
+  const participantCharacterById = new Map(participantCharacters.map((entry) => [entry.id, entry]));
+  const participantName = (characterId: string | null | undefined) =>
+    participants.find((participant) => participant.characterId === (characterId ?? session.characterId))?.characterName ??
+    participantCharacterById.get(characterId ?? session.characterId)?.name ??
+    character.name;
+  const companyName = groupDate
+    ? participants.map((participant) => participant.characterName).join(' & ')
+    : character.name;
+  const selectedParticipant = participants.find(
+    (participant) => participant.characterId === selectedActionTargetId,
+  ) ?? participants[0];
+  const selectedTargetName = selectedParticipant?.characterName ?? character.name;
+  // The relationship tab targets personal actions (gift/DTR); ordinary dialogue is
+  // still table talk shared by the whole group, so its composer must name everyone.
+  const composerTargetName = groupDate
+    ? participants.map((participant) => participant.characterName).join(' and ')
+    : selectedTargetName;
   const status = relationship ? currentStatus(relationship) : 'none';
   const rung = relationship ? nextDtrRung(relationship) : null;
   const spokeThisSession = messages.some((m) => m.role === 'player');
@@ -1443,6 +1840,12 @@ export function Chat() {
   // The date is over (evaluated or any terminal path) → no more composing, and the
   // actions collapse to "New date". Mirrors dateConcluded so the lock clears in step.
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
+  const contextWindowKnown =
+    contextEstimate?.contextWindowSource === 'model' && contextEstimate.contextWindowTokens != null;
+  const contextPercent = contextWindowKnown
+    ? contextUsagePercent(contextEstimate.estimatedPromptTokens, contextEstimate.contextWindowTokens!)
+    : null;
+  const contextTone = contextPercent == null ? 'normal' : contextUsageTone(contextPercent);
   // The id of the trailing character reply, when it's a plain line the player may
   // regenerate (not a consequence-bearing walkout/farewell/etc, and not mid-stream
   // or mid-recovery). Drives the small "rewrite this reply" button on that bubble.
@@ -1484,13 +1887,57 @@ export function Chat() {
   const locationImage = assetById(locationAssetId)?.path;
   const cal = scene ? deriveCalendar(scene.day) : null;
 
+  const renderParticipantRecap = (entry: EndSessionResponse['participantResults'][number]) => (
+    <article
+      className={`date-recap-leaf${entry.jealousy?.triggered || entry.breakup ? ' strained' : ''}`}
+      key={entry.characterId}
+    >
+      <div className="date-recap-leaf-head">
+        <span className="date-recap-leaf-name">{entry.characterName}</span>
+        {entry.mood && <span className="date-recap-mood">{entry.mood}</span>}
+      </div>
+      {entry.summaryLine && <p className="date-recap-summary">{entry.summaryLine}</p>}
+      {entry.bestLine && (
+        <blockquote className={`date-recap-line ${entry.bestLine.engagement > 0 ? 'warm' : 'cool'}`}>
+          <span className="date-recap-line-kicker">
+            {entry.bestLine.engagement > 0 ? t('chat.lineOfNight') : t('chat.lineThatStung')}
+          </span>
+          <p>&ldquo;{entry.bestLine.text}&rdquo;</p>
+        </blockquote>
+      )}
+      {entry.jealousy?.triggered && <p className="date-recap-consequence">{entry.jealousy.message}</p>}
+      {entry.breakup?.line && <p className="date-recap-consequence">{entry.breakup.line}</p>}
+      {entry.milestone?.line && <p className="date-recap-consequence warm">{entry.milestone.line}</p>}
+      <div className="date-recap-ledger">
+        <span className="date-recap-keepsake">
+          <Icon name="chronicle" size={13} /> {t('chat.recapMemories', { count: entry.memoriesWritten })}
+        </span>
+      </div>
+    </article>
+  );
+
   // The end-of-date evaluation note (mood, summary, memories) — or a safe-failure
   // notice. Extracted so it can stand in as the primary moment OR ride along as a
   // secondary note when a milestone/DTR moment takes the primary slot (going
   // official otherwise hid the evaluation entirely).
   const evalBanner = evalResult
     ? evalResult.evaluated
-      ? (
+      ? groupDate && evalResult.participantResults.length > 1
+        ? (
+          <div className="date-moment date-recap date-recap-group">
+            <div className="date-moment-seal" aria-hidden="true">&#10087;</div>
+            <div className="date-recap-head">
+              <div>
+                <div className="date-moment-kicker">{t('chat.groupRecapKicker')}</div>
+                <div className="date-recap-group-title">{t('chat.groupRecapTitle')}</div>
+              </div>
+            </div>
+            <div className="date-recap-spread">
+              {evalResult.participantResults.map(renderParticipantRecap)}
+            </div>
+          </div>
+        )
+        : (
         <div className="date-moment date-recap">
           <div className="date-moment-seal" aria-hidden="true">❧</div>
           <div className="date-recap-head">
@@ -1512,7 +1959,7 @@ export function Chat() {
             </span>
           </div>
         </div>
-      )
+        )
       : (
         <div className="date-moment date-recap date-recap-failed">
           <div className="date-moment-seal" aria-hidden="true">⚠</div>
@@ -1584,7 +2031,7 @@ export function Chat() {
         <div className="date-moment date-moment-breakup">
           <div className="date-moment-seal" aria-hidden="true">💔</div>
           <div className="date-moment-kicker">{t('chat.youEndedKicker')}</div>
-          <div className="date-moment-title">{t('chat.youEndedTitle', { name: character.name })}</div>
+          <div className="date-moment-title">{t('chat.youEndedTitle', { name: selectedTargetName })}</div>
           <p className="date-moment-body">{t('chat.youEndedBody')}</p>
         </div>
       );
@@ -1646,27 +2093,60 @@ export function Chat() {
       {notice && <Banner kind="info">{notice}</Banner>}
       <div className="chat-wrap date-wrap">
         <aside className="chat-side date-dossier">
-          {/* Compact identity plate: portrait beside name so the whole rail fits
-              a laptop viewport and both columns can bottom out together. */}
-          <div className="framed bracketed date-plate">
-            <div className="date-plate-portrait">
-              <Portrait character={character} expression={expression} crossfade />
+          {/* Portrait-led identity plate: the group shares two equal columns, while
+              a solo date uses the same composition at a modestly larger scale. */}
+          {groupDate ? (
+            <div className="date-company-plate group">
+              <div className="kicker date-company-title">{t('chat.yourCompany')}</div>
+              <div className="date-company-grid">
+                {participants.map((participant) => {
+                  const person = participantCharacterById.get(participant.characterId);
+                  return (
+                    <div
+                      key={participant.characterId}
+                      className={`date-company-person state-${participant.state}`}
+                    >
+                      <div className="date-company-frame">
+                        <div className="date-company-portrait">
+                          {person && <Portrait character={person} expression={participant.expression} crossfade />}
+                        </div>
+                      </div>
+                      <div className="date-company-copy">
+                        <div className="date-company-name">{participant.characterName}</div>
+                        {participant.state !== 'present' ? (
+                          <div className="date-company-emotion departed">
+                            {t(
+                              participant.state === 'walked_out'
+                                ? 'chat.walkedOut'
+                                : participant.state === 'departed'
+                                  ? 'chat.saidGoodnight'
+                                  : 'chat.leftDate',
+                            )}
+                          </div>
+                        ) : participant.expression ? (
+                          <div className="date-company-emotion">{participant.expression}</div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="date-plate-id">
-            <div className="date-plate-name">{character.name}</div>
-            <div className="date-plate-badges">
-              {relationship && isBrokenUp(relationship) ? (
-                <span className="badge danger"><Icon name="breakup" size={12} /> {t('chat.brokenUp')}</span>
-              ) : (
-                <>
-                  {status !== 'none' && <span className="badge accent"><Icon name="date" size={12} /> {relationshipStatusLabel(status)}</span>}
-                  {relationship && isOnTheRocks(relationship) && <span className="badge warn"><Icon name="warn" size={12} /> {t('chat.onTheRocks')}</span>}
-                </>
-              )}
-              {expression && <span className="badge accent date-mood-chip">{expression}</span>}
+          ) : (
+            <div className="date-company-plate solo">
+              <div className="date-company-person">
+                <div className="date-company-frame">
+                  <div className="date-company-portrait">
+                    <Portrait character={character} expression={expression} crossfade />
+                  </div>
+                </div>
+                <div className="date-company-copy">
+                  <div className="date-company-name">{character.name}</div>
+                  {expression && <div className="date-company-emotion">{expression}</div>}
+                </div>
+              </div>
             </div>
-            </div>
-          </div>
+          )}
 
           {/* The scene, staged as a playbill card: where, when, weather, mood.
               (Replaces the chip row that used to sit atop the conversation. The
@@ -1688,30 +2168,111 @@ export function Chat() {
                 <span>{scene.weatherIcon} {scene.weatherLabel}</span>
               </div>
             )}
-            {scene?.mood && (
+            {scene && groupDate ? (
+              <div className="dsc-row dsc-row-moods">
+                <span className="dsc-label">{t('chat.sceneMood')}</span>
+                <div className="dsc-mood-list">
+                  {participants.map((participant) => {
+                    const arrival = scene.moodsByCharacter[participant.characterId];
+                    return arrival?.mood ? (
+                      <span className="dsc-mood" key={participant.characterId}>
+                        <strong>{participant.characterName}</strong>
+                        <span>{arrival.moodIcon} {arrival.mood}</span>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            ) : scene?.mood ? (
               <div className="dsc-row">
                 <span className="dsc-label">{t('chat.sceneMood')}</span>
                 <span className="dsc-mood">{scene.moodIcon} {t('chat.seems', { name: character.name, mood: scene.mood })}</span>
               </div>
-            )}
+            ) : null}
           </div>
 
-          {relationship && (
-            <div className={`card date-gauges ${milestone ? 'stage-up' : ''}`}>
+          {!hangout && relationship && (
+            <div className={`card date-gauges${groupDate ? ' date-bond-tabs' : ''} ${milestone ? 'stage-up' : ''}`}>
+              {groupDate && (
+                <div className="date-bond-tablist" role="tablist" aria-label={t('chat.relationshipTabs')}>
+                  {participants.map((participant) => {
+                    const person = participantCharacterById.get(participant.characterId);
+                    const selected = participant.characterId === selectedActionTargetId;
+                    return (
+                      <button
+                        type="button"
+                        role="tab"
+                        key={participant.characterId}
+                        className={`date-bond-tab${selected ? ' active' : ''}`}
+                        aria-selected={selected}
+                        aria-controls="date-selected-bond"
+                        disabled={busy || streaming.active || (!locked && participant.state !== 'present')}
+                        onClick={() => void selectActionTarget(participant.characterId)}
+                      >
+                        {person && <Portrait character={person} expression={participant.expression} crossfade />}
+                        <span>{participant.characterName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <div id={groupDate ? 'date-selected-bond' : undefined} role={groupDate ? 'tabpanel' : undefined}>
               <div className="date-gauges-head">
-                <div className="kicker">{t('chat.whereYouStand')}</div>
+                  <div className="kicker">{t('chat.whereYouStand')}</div>
                 <div className="trail" />
+                  {groupDate && isBrokenUp(relationship) ? (
+                    <span className="badge danger">{t('chat.brokenUp')}</span>
+                  ) : groupDate && status !== 'none' ? (
+                    <span className="badge accent">{relationshipStatusLabel(status)}</span>
+                  ) : null}
               </div>
               <RelationshipBars relationship={relationship} deltas={deltas ?? undefined} />
+                {groupDate && !locked && (
+                  <div className="date-bond-actions">
+                    {dtrReady && (
+                      <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active} title={t('chat.dtrTitleFor', { name: selectedTargetName })}>
+                        <Icon name="commit" size={16} /> {rung!.rung.label}
+                      </button>
+                    )}
+                    <button
+                      className="btn ghost block date-gift-btn"
+                      onClick={() => (giftPicker ? setGiftPicker(false) : void openGiftPicker())}
+                      disabled={busy || streaming.active}
+                      title={t('chat.giveSomething')}
+                    >
+                      <Icon name="gift" size={15} /> {giftPicker ? t('chat.neverMind') : t('chat.giveGift')}
+                    </button>
+                    {giftPicker && (
+                      <div className="date-gift-picker">
+                        {giftItems.length === 0 ? (
+                          <p className="muted date-gift-empty">{t('chat.giftEmpty')}</p>
+                        ) : (
+                          giftItems.map((e) => (
+                            <button
+                              key={e.inventoryItem.id}
+                              className="date-gift-item"
+                              onClick={() => void giveGift(e.inventoryItem.id)}
+                              disabled={busy || streaming.active}
+                            >
+                              <span className="date-gift-item-name">{e.item.name}</span>
+                              <span className="date-gift-item-qty">&times;{e.inventoryItem.quantity}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
           <div className="card date-actions">
-            {dtrReady && !locked && (
-              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active} title={t('chat.dtrTitle')}>
+            {!groupDate && dtrReady && !locked && (
+              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active} title={t('chat.dtrTitleFor', { name: selectedTargetName })}>
                 <Icon name="commit" size={16} /> {rung!.rung.label}
               </button>
             )}
-            {!locked && relationship && (
+            {!hangout && !groupDate && !locked && relationship && (
               <button
                 className="btn ghost block date-gift-btn"
                 onClick={() => (giftPicker ? setGiftPicker(false) : void openGiftPicker())}
@@ -1721,7 +2282,7 @@ export function Chat() {
                 <Icon name="gift" size={15} /> {giftPicker ? t('chat.neverMind') : t('chat.giveGift')}
               </button>
             )}
-            {giftPicker && !locked && (
+            {!hangout && !groupDate && giftPicker && !locked && (
               <div className="date-gift-picker">
                 {giftItems.length === 0 ? (
                   <p className="muted date-gift-empty">{t('chat.giftEmpty')}</p>
@@ -1789,6 +2350,34 @@ export function Chat() {
                 <span className="date-hangout-tag">{t('chat.hangoutBadge')}</span>
                 <span className="date-hangout-note">{t('chat.hangoutRibbon')}</span>
               </div>
+            ) : groupDate ? (
+              <div className="date-group-trajectories">
+                {participants.map((participant) => {
+                  const person = participantCharacterById.get(participant.characterId);
+                  const stateLabel =
+                    participant.state === 'walked_out'
+                      ? t('chat.walkedOut')
+                      : participant.state === 'departed'
+                        ? t('chat.saidGoodnight')
+                      : participant.state === 'left_early'
+                        ? t('chat.leftDate')
+                        : participant.vibe ?? t('chat.settlingIn');
+                  return (
+                    <div
+                      className={`date-participant-trajectory state-${participant.state}`}
+                      key={participant.characterId}
+                    >
+                      <div className="date-participant-trajectory-name">{participant.characterName}</div>
+                      <DateTrajectory
+                        value={participant.judged ? participant.rapport : null}
+                        anchor={startingRapport(person?.guardedness ?? character.guardedness)}
+                        label={stateLabel}
+                        pulse={participantPulses[participant.characterId] ?? null}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
               <DateTrajectory
                 value={rapport}
@@ -1800,22 +2389,36 @@ export function Chat() {
           <div className="messages date-reel">
             {messages.length === 0 && !streaming.active && (
               <div className="date-opening">
-                <div className="date-opening-portrait">
-                  <Portrait character={character} expression={expression} crossfade />
+                <div className={`date-opening-portrait${groupDate ? ' group' : ''}`}>
+                  {groupDate
+                    ? participants.map((participant) => {
+                        const person = participantCharacterById.get(participant.characterId);
+                        return person ? (
+                          <Portrait
+                            key={participant.characterId}
+                            character={person}
+                            expression={participant.expression}
+                            crossfade
+                          />
+                        ) : null;
+                      })
+                    : <Portrait character={character} expression={expression} crossfade />}
                 </div>
                 <div className="date-opening-copy">
-                  <div className="date-opening-name">{character.name}</div>
+                  <div className="date-opening-name">
+                    {companyName}
+                  </div>
                   <p className="date-opening-scene">
                     {scene?.mood
                       ? t('chat.openingWithMood', {
-                          name: character.name,
+                          name: companyName,
                           mood: scene.mood,
                           atLocation: locationName !== t('chat.loc.anywhere') ? t('chat.openingAtLocation', { location: locationName }) : '',
                           weather: scene.weatherLabel ? t('chat.openingWeather', { weather: scene.weatherLabel.toLowerCase() }) : '',
                         })
                       : locationName !== t('chat.loc.anywhere')
-                        ? t('chat.openingWaitingAt', { name: character.name, location: locationName })
-                        : t('chat.openingWaiting', { name: character.name })}
+                        ? t('chat.openingWaitingAt', { name: companyName, location: locationName })
+                        : t('chat.openingWaiting', { name: companyName })}
                   </p>
                   <div className="date-opening-cue">{t('chat.sayHello')}</div>
                 </div>
@@ -1828,12 +2431,27 @@ export function Chat() {
                 m.role === 'player' && typeof m.metadata?.engagement === 'number'
                   ? Math.max(-3, Math.min(3, Math.round(m.metadata.engagement)))
                   : null;
+              const rawEngagements = m.metadata?.engagementByCharacter;
+              const groupEngagements =
+                groupDate && m.role === 'player' && rawEngagements && typeof rawEngagements === 'object' && !Array.isArray(rawEngagements)
+                  ? Object.entries(rawEngagements as Record<string, unknown>)
+                      .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+                      .map(([characterId, value]) => ({
+                        characterId,
+                        engagement: Math.max(-3, Math.min(3, Math.round(value))),
+                      }))
+                  : [];
               return (
                 <Fragment key={m.id}>
                   <div
                     className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
                   >
-                    {m.role === 'character' ? <RichLine text={m.text} /> : m.text}
+                    {groupDate && m.role === 'character' && (
+                      <span className="date-msg-speaker">{participantName(m.characterId)}</span>
+                    )}
+                    {m.role === 'character' || m.metadata?.venueFlavor === true
+                      ? <RichLine text={m.text} sceneLead={m.metadata?.venueFlavor === true} />
+                      : m.text}
                     {m.id === regenId && (
                       <button
                         className="date-regen-btn"
@@ -1845,7 +2463,21 @@ export function Chat() {
                       </button>
                     )}
                   </div>
-                  {engagement !== null && (
+                  {groupEngagements.length > 0 ? (
+                    <span className="date-react-group">
+                      {groupEngagements.map((read) => (
+                        <span
+                          key={read.characterId}
+                          className={`date-react ${read.engagement > 0 ? 'warm' : read.engagement < 0 ? 'cool' : 'flat'}`}
+                          title={t('chat.reactionTitle')}
+                        >
+                          <span className="date-react-name">{participantName(read.characterId)}</span>
+                          <span className="date-react-pip" aria-hidden="true">◆</span>
+                          {t(REACTION_KEYS[read.engagement + 3]!)}
+                        </span>
+                      ))}
+                    </span>
+                  ) : engagement !== null && (
                     <span
                       className={`date-react ${engagement > 0 ? 'warm' : engagement < 0 ? 'cool' : 'flat'}`}
                       title={t('chat.reactionTitle')}
@@ -1859,6 +2491,9 @@ export function Chat() {
             })}
             {streaming.active && (
               <div className="date-msg character">
+                {groupDate && streamingCharacterId && (
+                  <span className="date-msg-speaker">{participantName(streamingCharacterId)}</span>
+                )}
                 {streaming.text.trim() ? (
                   <>
                     <RichLine text={streaming.text.trimStart()} open />
@@ -1922,9 +2557,9 @@ export function Chat() {
             </div>
           ) : breakupPending ? (
             <div className="date-breakup">
-              <div className="date-breakup-title"><Icon name="breakup" size={16} /> {t('chat.breakupConfirmTitle', { name: character.name })}</div>
+              <div className="date-breakup-title"><Icon name="breakup" size={16} /> {t('chat.breakupConfirmTitle', { name: participantName(breakupPending.characterId) })}</div>
               <p>
-                {t('chat.breakupConfirmBody', { name: character.name })}
+                {t('chat.breakupConfirmBody', { name: participantName(breakupPending.characterId) })}
               </p>
               <div className="row">
                 <button className="btn danger" onClick={confirmBreakup} disabled={busy}>
@@ -1944,7 +2579,7 @@ export function Chat() {
               <div className="chat-input date-composer">
                 <textarea
                   value={input}
-                  placeholder={intent ? t('chat.composerIntent', { intent: intentLabel(intent), name: character.name }) : t('chat.composerPlain', { name: character.name })}
+                  placeholder={intent ? t('chat.composerIntent', { intent: intentLabel(intent), name: composerTargetName }) : t('chat.composerPlain', { name: composerTargetName })}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1980,6 +2615,49 @@ export function Chat() {
                   </button>
                 </div>
               </div>
+              {contextEstimate && (
+                <div
+                  className={`date-context-meter ${contextWindowKnown ? contextTone : 'estimate-only'}`}
+                  role="status"
+                  title={
+                    contextWindowKnown
+                      ? t('chat.contextUsageTitle', {
+                          used: contextEstimate.estimatedPromptTokens.toLocaleString(),
+                          window: contextEstimate.contextWindowTokens!.toLocaleString(),
+                        })
+                      : t('chat.promptEstimateTitle')
+                  }
+                >
+                  <div className="date-context-summary">
+                    <span>{t(contextWindowKnown ? 'chat.contextUsage' : 'chat.promptEstimate')}</span>
+                    <strong>
+                      {contextWindowKnown && contextPercent != null
+                        ? `≈${contextPercent}%`
+                        : t('chat.promptEstimateTokens', {
+                            tokens: contextEstimate.estimatedPromptTokens.toLocaleString(),
+                          })}
+                    </strong>
+                  </div>
+                  {contextWindowKnown && contextPercent != null && (
+                    <div
+                      className="date-context-track"
+                      role="progressbar"
+                      aria-label={t('chat.contextUsage')}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={Math.min(100, contextPercent)}
+                    >
+                      <span style={{ width: `${Math.min(100, contextPercent)}%` }} />
+                    </div>
+                  )}
+                  {contextTone === 'critical' && (
+                    <div className="date-context-warning">
+                      <Icon name="warn" size={12} />
+                      <span>{t('chat.contextWarning')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           </div>
