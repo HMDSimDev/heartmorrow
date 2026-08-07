@@ -14,17 +14,44 @@
    here read as the page failing to use the screen. */
 .set-page { gap: 30px; }
 
-/* Group dividers — cluster the framed sections under mono brass headers so the
-   page reads as a few labelled groups rather than one undifferentiated stack. */
+/* The former stacked groups now live under page-level tabs (same underline
+   idiom as the World Editor's .we-tab strip). Hidden panels stay mounted
+   (display:none) so in-progress edits survive a tab switch. */
 .set-group { display: flex; flex-direction: column; gap: 16px; }
-.set-group-head {
-  display: flex; align-items: center; gap: 10px; margin: 0 0 2px; padding: 0 2px;
-  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
-  letter-spacing: 0.18em; text-transform: uppercase; color: var(--brass);
+.set-tabpanel-hidden { display: none; }
+
+.set-page-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+  /* Pull the panel below back up so the strip + panel read as one instrument. */
+  margin-bottom: -14px;
 }
-.set-group-head::after {
-  content: ''; flex: 1; height: 1px;
-  background: linear-gradient(90deg, var(--border-bright), transparent);
+.set-page-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 9px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  margin-bottom: -1px;
+}
+.set-page-tab:hover { color: var(--text); }
+.set-page-tab.active {
+  color: var(--brass);
+  border-bottom-color: var(--brass);
+}
+@media (max-width: 640px) {
+  /* Wrap, don't scroll — every tab stays reachable at phone widths (the same
+     lesson the World Editor's strip learned at 375px). */
+  .set-page-tab { white-space: nowrap; padding: 8px 11px; font-size: 0.7rem; }
 }
 
 /* A labelled section block. Quieter than .card so the one framed console
@@ -37,6 +64,21 @@
 .set-choice { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 
 /* --- Playstyle: the difficulty dial + live-feedback chips ----------------- */
+/* Two panes at desk widths — the dial on the left, the cadence on the right —
+   so the framed section fills its width instead of trailing off empty. Stacks
+   (with the original divider) below the split point. */
+.set-playstyle-grid { display: grid; gap: 22px; grid-template-columns: 1fr; }
+@media (min-width: 980px) {
+  .set-playstyle-grid { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .set-playstyle-grid .set-cadence {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    padding-left: 22px;
+    border-left: 1px solid var(--border-soft);
+  }
+}
+
 /* A three-stop dial. The track runs sage → brass → ember (forgiving → tuned →
    demanding); the thumb is a lamplit diamond, echoing the energy pips. */
 .set-diff { max-width: 640px; }

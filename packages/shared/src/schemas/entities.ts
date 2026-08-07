@@ -302,6 +302,9 @@ export const AssetTypeSchema = z.enum([
   'background',
   'location',
   'item',
+  /** Audio reference clip (character TTS). Kept here so rows written by the
+   *  voice feature stay parseable even where that feature isn't present. */
+  'voice',
   'other',
 ]);
 export type AssetType = z.infer<typeof AssetTypeSchema>;

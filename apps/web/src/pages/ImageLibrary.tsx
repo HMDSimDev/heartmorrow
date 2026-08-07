@@ -411,12 +411,20 @@ export function ImageLibrary() {
 }
 
 /** Thumb with graceful fallback: pre-thumbnail uploads 404 on the thumb URL and
- *  drop back to the original. `epoch` remounts after a rebuild so they retry. */
+ *  drop back to the original. `epoch` remounts after a rebuild so they retry.
+ *  Audio assets have no picture to show, so they get a speaker tile instead. */
 function ThumbImg({ asset, epoch }: { asset: Asset; epoch: number }) {
   const [fallback, setFallback] = useState(false);
   // The epoch query also busts the browser cache after an in-place replace,
   // where the URL would otherwise be identical to the old image's.
   const bust = epoch ? `?e=${epoch}` : '';
+  if (asset.mimeType.startsWith('audio/')) {
+    return (
+      <span className="il-audio-tile" role="img" aria-label={asset.altText || asset.filename}>
+        <Icon name="voice" size={28} />
+      </span>
+    );
+  }
   return (
     <img
       src={fallback ? `${assetUrl(asset.path)}${bust}` : `${assetThumbUrl(asset.path)}${bust}`}
@@ -497,7 +505,12 @@ function AssetDetail({
       <h2 style={{ marginTop: 0 }}>{form.filename}</h2>
 
       <div className="il-detail-preview">
-        <img src={assetUrl(asset.path)} alt={form.altText || form.filename} />
+        {asset.mimeType.startsWith('audio/') ? (
+          // eslint-disable-next-line jsx-a11y/media-has-caption -- a reference clip has no captions to carry
+          <audio controls src={assetUrl(asset.path)} className="il-detail-audio" />
+        ) : (
+          <img src={assetUrl(asset.path)} alt={form.altText || form.filename} />
+        )}
       </div>
 
       <div className="il-replace-row">

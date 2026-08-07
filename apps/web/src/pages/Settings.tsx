@@ -51,6 +51,12 @@ const ROLE_KEYS: RoleKey[] = ['evaluator', 'vision'];
  *  Image (Stable Diffusion) endpoint — which is NOT an LLM connection. */
 type TabKey = 'base' | RoleKey | 'image';
 
+/** The page-level tabs the settings are grouped under (one per former section
+ *  group, reusing the same `settings.groups.*` labels). Persona only exists
+ *  inside a world, so its tab hides until one is active. */
+const PAGE_TABS = ['difficulty', 'appearance', 'gameplay', 'persona', 'model'] as const;
+type PageTab = (typeof PAGE_TABS)[number];
+
 /** The base config: a connection (shared with the role consoles) plus the
  *  game-level toggles, the per-role overrides, and the image endpoint. */
 type Form = ConnectionForm & {
@@ -119,6 +125,9 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const [loadingSamplers, setLoadingSamplers] = useState(false);
   // Which connection tab is showing: the main config, a role override, or Image.
   const [tab, setTab] = useState<TabKey>('base');
+  // Which page-level tab is showing. Hidden panels stay MOUNTED (display:none)
+  // so unsaved edits — a typed API key, a half-filled persona — survive switching.
+  const [pageTab, setPageTab] = useState<PageTab>('difficulty');
   const [health, setHealth] = useState<LlmHealthResult | null>(null);
   const [error, setError] = useState<string>();
   const [savedNote, setSavedNote] = useState<string>();
@@ -185,6 +194,10 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   }, [activeWorldId]);
 
   if (!form) return <Spinner />;
+  // Persona is a per-world identity, so its tab only exists inside a world. If the
+  // world drops away while Persona is showing, fall back to the first tab.
+  const visibleTabs: readonly PageTab[] = player && activeWorldId ? PAGE_TABS : PAGE_TABS.filter((id) => id !== 'persona');
+  const shownTab: PageTab = visibleTabs.includes(pageTab) ? pageTab : 'difficulty';
   // The LLM connection backing the active tab (null for the Image tab, which is
   // not an LLM connection) — drives the header status readout.
   const activeConn: ConnectionForm | null =
@@ -428,9 +441,24 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         </Link>
       )}
 
-      <section className="set-group">
-        <h2 className="set-group-head">{t('settings.groups.difficulty')}</h2>
+      {/* The page's sections, grouped under tabs (the former stacked group heads).
+          Hidden panels stay mounted so in-progress edits survive a switch. */}
+      <nav className="set-page-tabs" role="tablist" aria-label={t('settings.tabsAria')}>
+        {visibleTabs.map((id) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={shownTab === id}
+            className={`set-page-tab ${shownTab === id ? 'active' : ''}`}
+            onClick={() => setPageTab(id)}
+          >
+            {t(`settings.groups.${id}`)}
+          </button>
+        ))}
+      </nav>
 
+      <section className={`set-group ${shownTab === 'difficulty' ? '' : 'set-tabpanel-hidden'}`}>
         <div className="framed set-section">
           <div className="section-head">
             <div className="titles">
@@ -441,6 +469,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           </div>
           <p className="set-lede">{t('settings.playstyle.lede')}</p>
 
+          <div className="set-playstyle-grid">
           <div className="set-diff">
             <div className="set-col-label">{t('settings.fields.difficulty')}</div>
             <input
@@ -522,12 +551,11 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             </div>
             <p className="hint set-cad-hint">{t('settings.fields.rapportHint')}</p>
           </div>
+          </div>
         </div>
       </section>
 
-      <section className="set-group">
-        <h2 className="set-group-head">{t('settings.groups.appearance')}</h2>
-
+      <section className={`set-group ${shownTab === 'appearance' ? '' : 'set-tabpanel-hidden'}`}>
         <div className="framed set-section">
           <div className="section-head">
             <div className="titles">
@@ -590,9 +618,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         </div>
       </section>
 
-      <section className="set-group">
-        <h2 className="set-group-head">{t('settings.groups.gameplay')}</h2>
-
+      <section className={`set-group ${shownTab === 'gameplay' ? '' : 'set-tabpanel-hidden'}`}>
       <div className="framed set-section">
         <div className="section-head">
           <div className="titles">
@@ -673,7 +699,10 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         )}
       </div>
 
+      </section>
+
       {player && activeWorldId && (
+        <section className={`set-group ${shownTab === 'persona' ? '' : 'set-tabpanel-hidden'}`}>
         <div className="framed set-section">
           <div className="section-head">
             <div className="titles">
@@ -727,12 +756,10 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             {playerSaved && <span className="badge good">{t('settings.persona.saved')}</span>}
           </div>
         </div>
+        </section>
       )}
-      </section>
 
-      <section className="set-group">
-        <h2 className="set-group-head">{t('settings.groups.model')}</h2>
-
+      <section className={`set-group ${shownTab === 'model' ? '' : 'set-tabpanel-hidden'}`}>
       <div className="framed set-section">
         <div className="section-head">
           <div className="titles">
@@ -1055,8 +1082,9 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           )}
         </div>
       </div>
-      </section>
 
+      {/* Lives inside the Model panel: it reports THIS console's test results,
+          so it must appear where the Test button was pressed. */}
       {health && (
         <Banner kind={health.ok ? 'ok' : 'error'}>
           <strong>{health.ok ? t('settings.health.connected') : t('settings.health.failed')}</strong> {health.message}
@@ -1075,6 +1103,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           )}
         </Banner>
       )}
+      </section>
 
       {nsfwModalOpen && (
         <Modal onClose={() => !nsfwSaving && closeNsfwModal()}>

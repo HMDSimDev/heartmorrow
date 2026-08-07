@@ -1102,8 +1102,10 @@
       "difficulty": "Difficulty",
       "appearance": "Appearance",
       "gameplay": "Gameplay",
+      "persona": "Your persona",
       "model": "Model & diagnostics"
     },
+    "tabsAria": "Settings sections",
     "playstyle": {
       "kicker": "Playstyle",
       "head": "Difficulty & date feedback",

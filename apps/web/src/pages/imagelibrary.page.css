@@ -102,6 +102,16 @@
   object-fit: cover;
   display: block;
 }
+/* Stand-in tile for assets with nothing to show (audio reference clips). */
+.il-audio-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--brass);
+  background: color-mix(in srgb, var(--brass) 8%, var(--ink));
+}
 
 /* Selection tick (bulk mode) */
 .il-tick {
@@ -163,6 +173,11 @@
   max-height: 260px;
   object-fit: contain;
   display: block;
+}
+/* Audio assets preview as a player rather than a picture. */
+.il-detail-audio {
+  width: 100%;
+  margin: 16px 12px;
 }
 
 .il-usage-list {

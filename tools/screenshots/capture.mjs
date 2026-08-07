@@ -32,6 +32,7 @@ const WIDTH = 1920;
 const HEIGHT = 1080;
 const ACTIVE_WORLD_KEY = 'dsim.activeWorldId';
 const CREATOR_KEY = 'dsim.creatorMode';
+const DATE_ONBOARDING_KEY = 'dsim.dateOnboardingSeen'; // mirrors DateOnboarding.tsx
 
 const log = (...a) => console.log('•', ...a);
 
@@ -81,10 +82,12 @@ async function main() {
   // Boot straight into the world (the app keeps the active world in localStorage),
   // and turn OFF creator mode so every app shows its player-facing surface (the
   // Market portfolio, not the company-authoring form, etc.) and the chrome stays clean.
+  // Also mark the first-date walkthrough as seen so its modal never covers the date UI.
   await context.addInitScript((args) => {
     localStorage.setItem(args.key, args.worldId);
     localStorage.setItem(args.creatorKey, 'false');
-  }, { key: ACTIVE_WORLD_KEY, creatorKey: CREATOR_KEY, worldId: ids.worldId });
+    localStorage.setItem(args.onboardingKey, '1');
+  }, { key: ACTIVE_WORLD_KEY, creatorKey: CREATOR_KEY, onboardingKey: DATE_ONBOARDING_KEY, worldId: ids.worldId });
 
   const page = await context.newPage();
 

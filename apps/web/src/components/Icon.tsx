@@ -65,6 +65,7 @@ import {
   TrendingUp,
   Landmark,
   Dice5,
+  AudioLines,
   type LucideProps,
 } from 'lucide-react';
 
@@ -194,6 +195,7 @@ const ICONS = {
   play: Play,
   send: Send,
   image: Images,
+  voice: AudioLines,
 
   // phone apps
   messages: MessageCircle,
