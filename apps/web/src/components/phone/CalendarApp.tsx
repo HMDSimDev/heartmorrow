@@ -38,7 +38,7 @@ function DayBeat({ beat }: { beat: DayRecordBeat }) {
         {beat.icon}
       </span>
       <div className="pal-beat-body">
-        <span className={`pal-beat-text${long && !expanded ? ' clamped' : ''}`}>{beat.text}</span>
+        <span className={`pal-beat-text${long && !expanded ? ' clamped' : ''}`} dir="auto">{beat.text}</span>
         {long && (
           <button type="button" className="pal-beat-more" onClick={() => setExpanded((v) => !v)}>
             {expanded ? t('calendar.showLess') : t('calendar.showMore')}
@@ -383,12 +383,12 @@ function DayDetail({
         {/* The generated summary of the day */}
         {hasSummary ? (
           <div className="pal-recap">
-            {rec!.headline && <h3 className="pal-recap-head">{rec!.headline}</h3>}
-            {rec!.narrative && <p className="pal-recap-body">{rec!.narrative}</p>}
+            {rec!.headline && <h3 className="pal-recap-head" dir="auto">{rec!.headline}</h3>}
+            {rec!.narrative && <p className="pal-recap-body" dir="auto">{rec!.narrative}</p>}
             {!rec!.reconstructed && rec!.highlights.length > 0 && (
               <ul className="pal-highlights">
                 {rec!.highlights.map((h, i) => (
-                  <li key={i}>{h}</li>
+                  <li key={i} dir="auto">{h}</li>
                 ))}
               </ul>
             )}

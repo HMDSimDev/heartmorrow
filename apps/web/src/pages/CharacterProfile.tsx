@@ -217,7 +217,7 @@ export function CharacterProfile() {
                       </>
                     )}
                 </div>
-                {character.shortDescription && <p>{character.shortDescription}</p>}
+                {character.shortDescription && <p dir="auto">{character.shortDescription}</p>}
               </div>
               <div className="prof-mast-actions">
                 {!memorial && (
@@ -433,7 +433,7 @@ export function CharacterProfile() {
                           </div>
                           <span className="trail" />
                         </div>
-                        {character.personality && <p className="prof-personality">{character.personality}</p>}
+                        {character.personality && <p className="prof-personality" dir="auto">{character.personality}</p>}
                         <Prose label={t('profile.speechStyle')} value={character.speechStyle} />
                         <Prose label={t('profile.whatTheyWant')} value={character.relationshipPreferences} />
                       </div>
@@ -558,7 +558,7 @@ export function CharacterProfile() {
                             </div>
                             <span className="trail" />
                           </div>
-                          <p className="prof-personality">{character.roomDescription}</p>
+                          <p className="prof-personality" dir="auto">{character.roomDescription}</p>
                         </div>
                       )}
                     </>
@@ -587,13 +587,13 @@ export function CharacterProfile() {
                           <span className="num">{chronicle.data!.sessionCount}</span> {t('profile.datesReadout')}
                         </span>
                       </div>
-                      {chronicle.data!.chronicle && <div className="prof-chronicle">{chronicle.data!.chronicle}</div>}
+                      {chronicle.data!.chronicle && <div className="prof-chronicle" dir="auto">{chronicle.data!.chronicle}</div>}
                       {chronicle.data!.recentLines.length > 0 && (
                         <ul className="prof-log">
                           {chronicle.data!.recentLines.map((l, i) => (
                             <li key={i} className="prof-log-line">
                               <span className="prof-log-day">{t('profile.day', { day: l.day })}</span>
-                              <span>{l.line}</span>
+                              <span dir="auto">{l.line}</span>
                             </li>
                           ))}
                         </ul>
@@ -663,7 +663,7 @@ function Prose({ label, value }: { label: string; value: string }) {
   return (
     <div className="prof-detail">
       <div className="prof-detail-label">{label}</div>
-      <p className="prof-detail-text">{value}</p>
+      <p className="prof-detail-text" dir="auto">{value}</p>
     </div>
   );
 }
@@ -676,7 +676,7 @@ function TagRow({ label, items, variant }: { label: string; items: string[]; var
       <div className="prof-detail-label">{label}</div>
       <div className="tags">
         {items.map((t) => (
-          <span className={`tag ${cls}`} key={t}>
+          <span className={`tag ${cls}`} key={t} dir="auto">
             {t}
           </span>
         ))}
@@ -786,11 +786,11 @@ function MemoryList({
               </button>
             )}
           </header>
-          <blockquote className="prof-mem-text">{m.text}</blockquote>
+          <blockquote className="prof-mem-text" dir="auto">{m.text}</blockquote>
           <footer className="prof-mem-meta">
             <small className="prof-mem-when">{relativeTime(m.createdAt)}</small>
             {m.tags.map((tag) => (
-              <span className="tag prof-mem-tag" key={tag}>
+              <span className="tag prof-mem-tag" key={tag} dir="auto">
                 {tag}
               </span>
             ))}

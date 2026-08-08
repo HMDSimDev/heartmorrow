@@ -5,6 +5,7 @@ import { AnthropicAdapter } from './anthropic-adapter';
 import { LmStudioAdapter } from './lmstudio-adapter';
 import { OllamaAdapter } from './ollama-adapter';
 import { KoboldcppAdapter } from './koboldcpp-adapter';
+import { withOutputLanguage } from './output-language';
 
 /**
  * Optional adapter override. When set (used by tests), every consumer that
@@ -34,7 +35,7 @@ export function setAdapterOverride(adapter: ChatAdapter | null): void {
  *  - `responses`        — reserved (`/v1/responses`); falls back to OpenAI today
  */
 export function getAdapter(settings: LlmSettings): ChatAdapter {
-  if (adapterOverride) return adapterOverride;
+  if (adapterOverride) return withOutputLanguage(adapterOverride, settings.outputLanguage);
   const openAiCfg = {
     baseUrl: settings.baseUrl,
     apiKey: settings.apiKey,
@@ -48,39 +49,47 @@ export function getAdapter(settings: LlmSettings): ChatAdapter {
       repeatPenalty: settings.repeatPenalty,
     },
   };
+  let adapter: ChatAdapter;
   switch (settings.endpointMode) {
     case 'anthropic':
-      return new AnthropicAdapter({
+      adapter = new AnthropicAdapter({
         baseUrl: settings.baseUrl,
         apiKey: settings.apiKey,
         model: settings.model,
         anthropicVersion: settings.anthropicVersion,
         sampling: { topP: settings.topP, topK: settings.topK },
       });
+      break;
     case 'lmstudio':
-      return new LmStudioAdapter(openAiCfg);
+      adapter = new LmStudioAdapter(openAiCfg);
+      break;
     case 'ollama':
-      return new OllamaAdapter({
+      adapter = new OllamaAdapter({
         baseUrl: settings.baseUrl,
         apiKey: settings.apiKey,
         model: settings.model,
         think: settings.ollamaThink,
         sampling: openAiCfg.sampling,
       });
+      break;
     case 'koboldcpp':
-      return new KoboldcppAdapter({
+      adapter = new KoboldcppAdapter({
         baseUrl: settings.baseUrl,
         apiKey: settings.apiKey,
         model: settings.model,
         template: settings.koboldTemplate,
         sampling: openAiCfg.sampling,
       });
+      break;
     case 'responses':
       // Not yet implemented. Fall back to chat/completions so the app keeps
       // working; swap in a ResponsesAdapter here when ready.
-      return new OpenAiCompatibleAdapter(openAiCfg);
+      adapter = new OpenAiCompatibleAdapter(openAiCfg);
+      break;
     case 'chat_completions':
     default:
-      return new OpenAiCompatibleAdapter(openAiCfg);
+      adapter = new OpenAiCompatibleAdapter(openAiCfg);
+      break;
   }
+  return withOutputLanguage(adapter, settings.outputLanguage);
 }

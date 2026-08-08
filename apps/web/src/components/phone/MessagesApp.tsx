@@ -6,6 +6,7 @@ import {
   ALLOWED_IMAGE_LABEL,
   IMAGE_UPLOAD_ACCEPT,
   isGiftableItem,
+  outputLanguageDirection,
   type Character,
   type InventoryItem,
   type LandlordNotice,
@@ -257,7 +258,7 @@ function ThreadList({
                      same as the picker) instead of the message-preview style. */
                   <span className="pcom-busy">{th.unavailableReason ?? t('messages.isUnavailableToday')}</span>
                 ) : th.lastBody ? (
-                  <span className="pcom-preview">
+                  <span className="pcom-preview" dir="auto">
                     {th.lastFromPlayer && <span className="pcom-preview-you">{t('messages.list.you')}</span>}
                     {th.lastBody}
                   </span>
@@ -342,7 +343,9 @@ function NewMessage({ onPick, onBack }: { onPick: (id: string) => void; onBack: 
 
 function ThreadView({ characterId, onBack }: { characterId: string; onBack: () => void }) {
   const { t } = useTranslation(['phone', 'common']);
-  const { reloadPlayer, refreshInbox, assets, reloadAssets, dayTick } = useAppData();
+  const { reloadPlayer, refreshInbox, assets, reloadAssets, dayTick, outputLanguage } = useAppData();
+  const conversationDirection = outputLanguageDirection(outputLanguage);
+  const conversationLanguage = outputLanguage === 'auto' ? undefined : outputLanguage;
   const [character, setCharacter] = useState<Character | null>(null);
   const [availability, setAvailability] = useState<{ available: boolean; reason: string | null }>({
     available: true,
@@ -709,7 +712,11 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
           return (
             <Fragment key={m.id}>
               {showDivider && <div className="pcom-day">{label}</div>}
-              <div className={`pcom-msg ${m.sender}`}>
+              <div
+                className={`pcom-msg ${m.sender}`}
+                dir={conversationDirection}
+                lang={conversationLanguage}
+              >
                 {imgSrc && (
                   <a className="pcom-image-link" href={imgSrc} target="_blank" rel="noreferrer" title={t('messages.thread.openFullSize')}>
                     <img className="pcom-image" src={imgSrc} alt={t('messages.thread.sentPhoto')} loading="lazy" />
@@ -753,7 +760,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
           );
         })}
         {sending && (
-          <div className="pcom-msg character">
+          <div className="pcom-msg character" dir={conversationDirection} lang={conversationLanguage}>
             <div className="pcom-bubble">
               <span className="typing">
                 <span />
@@ -861,6 +868,8 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
         </button>
         <input
           value={input}
+          dir={conversationDirection}
+          lang={conversationLanguage}
           disabled={!availability.available}
           placeholder={
             !availability.available

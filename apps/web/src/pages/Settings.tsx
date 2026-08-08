@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   DIFFICULTIES,
   GENDER_LABELS,
+  OUTPUT_LANGUAGES,
   SEXUALITY_LABELS,
   turnRapportDelta,
   type Gender,
@@ -12,6 +13,7 @@ import {
   type LlmHealthResult,
   type LlmModelInfo,
   type LlmRoleConnection,
+  type OutputLanguage,
   type ImageGenSettings,
   type EndpointMode,
 } from '@dsim/shared';
@@ -60,6 +62,7 @@ type PageTab = (typeof PAGE_TABS)[number];
 /** The base config: a connection (shared with the role consoles) plus the
  *  game-level toggles, the per-role overrides, and the image endpoint. */
 type Form = ConnectionForm & {
+  outputLanguage: OutputLanguage;
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
   difficulty: Difficulty;
@@ -109,7 +112,7 @@ interface PlayerForm {
  *  Settings under its own "Settings" heading, so the title isn't shown twice. */
 export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, i18n } = useTranslation(['pages', 'common']);
-  const { reloadPlayer, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, activeWorldId, theme, setTheme } = useAppData();
+  const { reloadPlayer, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, activeWorldId, setOutputLanguage, theme, setTheme } = useAppData();
   const [player, setPlayer] = useState<PlayerForm | null>(null);
   const [playerSaved, setPlayerSaved] = useState(false);
   const [playerSaving, setPlayerSaving] = useState(false);
@@ -132,6 +135,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const [error, setError] = useState<string>();
   const [savedNote, setSavedNote] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const [outputLanguageSaving, setOutputLanguageSaving] = useState(false);
   const [nsfwModalOpen, setNsfwModalOpen] = useState(false);
   const [ackContent, setAckContent] = useState(false);
   const [ackAge, setAckAge] = useState(false);
@@ -158,6 +162,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         const s = await api.getSettings();
         if (cancelled) return;
         setApiKeySet({ base: s.apiKeySet, evaluator: s.roleApiKeySet.evaluator, vision: s.roleApiKeySet.vision });
+        setOutputLanguage(s.outputLanguage);
         setForm({
           baseUrl: s.baseUrl,
           apiKey: '',
@@ -177,6 +182,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           ollamaThink: s.ollamaThink,
           koboldTemplate: s.koboldTemplate,
           maxRetries: s.maxRetries,
+          outputLanguage: s.outputLanguage,
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,
           difficulty: s.difficulty,
@@ -216,6 +222,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   // both role overrides whole (a blank role key is preserved server-side).
   const buildUpdate = (): Record<string, unknown> => ({
     ...connectionPatch(form),
+    outputLanguage: form.outputLanguage,
     nsfwEnabled: form.nsfwEnabled,
     rapportCadence: form.rapportCadence,
     difficulty: form.difficulty,
@@ -359,6 +366,25 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         /* keep the optimistic value; the banner already flags the failure */
       }
     });
+  };
+
+  const persistOutputLanguage = async (outputLanguage: OutputLanguage) => {
+    const previous = form.outputLanguage;
+    setForm((f) => (f ? { ...f, outputLanguage } : f));
+    setOutputLanguage(outputLanguage);
+    setOutputLanguageSaving(true);
+    setError(undefined);
+    try {
+      const s = await api.updateSettings({ outputLanguage });
+      setForm((f) => (f ? { ...f, outputLanguage: s.outputLanguage } : f));
+      setOutputLanguage(s.outputLanguage);
+    } catch (e) {
+      setForm((f) => (f ? { ...f, outputLanguage: previous } : f));
+      setOutputLanguage(previous);
+      setError(errorMessage(e));
+    } finally {
+      setOutputLanguageSaving(false);
+    }
   };
 
   const closeNsfwModal = () => {
@@ -573,6 +599,33 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             >
               {SUPPORTED_LOCALES.map((loc) => (
                 <option key={loc.code} value={loc.code}>{loc.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field
+            label={t('settings.appearance.outputLanguage')}
+            hint={
+              outputLanguageSaving
+                ? t('settings.appearance.outputLanguageSaving')
+                : (
+                  <Trans
+                    i18nKey="settings.appearance.outputLanguageHint"
+                    ns="pages"
+                    components={[<strong />]}
+                  />
+                )
+            }
+          >
+            <select
+              value={form.outputLanguage}
+              disabled={outputLanguageSaving}
+              onChange={(e) => { void persistOutputLanguage(e.target.value as OutputLanguage); }}
+            >
+              {OUTPUT_LANGUAGES.map((language) => (
+                <option key={language} value={language}>
+                  {t(`settings.appearance.outputLanguageOptions.${language}`)}
+                </option>
               ))}
             </select>
           </Field>

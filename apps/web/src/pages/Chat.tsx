@@ -19,6 +19,7 @@ import {
   startingRapport,
   RAPPORT_LEAVE_FLOOR,
   INTENT_ICONS,
+  outputLanguageDirection,
   type Intent,
   type InventoryItem,
   type ShopItem,
@@ -133,8 +134,10 @@ function DateTrajectory({
 export function Chat() {
   const { t } = useTranslation(['pages', 'common']);
   const [params] = useSearchParams();
-  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, assetById } =
+  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, assetById, outputLanguage } =
     useAppData();
+  const conversationDirection = outputLanguageDirection(outputLanguage);
+  const conversationLanguage = outputLanguage === 'auto' ? undefined : outputLanguage;
   const [availability, setAvailability] = useState<Record<string, { available: boolean; reason: string | null }>>({});
   // The wallet of the SELECTED character's world (may differ from the active
   // world when arriving via a deep link); falls back to the context player.
@@ -1122,21 +1125,6 @@ export function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoEnd, session, busy]);
 
-  const summarize = async () => {
-    if (!session) return;
-    const sid = session.id;
-    setBusy(true);
-    try {
-      const updated = await api.summarize(sid);
-      if (sessionIdRef.current !== sid) return; // player abandoned this date
-      setSession(updated);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   // --- setup screen ---
   if (!session || !character) {
     // Don't flash "Plan a date" before we know whether a date is already underway,
@@ -1497,7 +1485,7 @@ export function Chat() {
             <div className="date-moment-kicker">{t(hangout ? 'chat.recapKickerHangout' : 'chat.recapKicker')}</div>
             {evalResult.mood && <span className="date-recap-mood">{evalResult.mood}</span>}
           </div>
-          {evalResult.summaryLine && <p className="date-recap-summary">{evalResult.summaryLine}</p>}
+          {evalResult.summaryLine && <p className="date-recap-summary" dir="auto">{evalResult.summaryLine}</p>}
           {evalResult.bestLine && (
             <blockquote className={`date-recap-line ${evalResult.bestLine.engagement > 0 ? 'warm' : 'cool'}`}>
               <span className="date-recap-line-kicker">
@@ -1534,7 +1522,7 @@ export function Chat() {
           <div className="date-moment-seal" aria-hidden="true">✦</div>
           <div className="date-moment-kicker">{t('chat.endingKicker')}</div>
           <div className="date-moment-title">{t('chat.endingTitle', { title: evalResult.ending.title })}</div>
-          <p className="date-moment-body">{evalResult.ending.epilogue}</p>
+          <p className="date-moment-body" dir="auto">{evalResult.ending.epilogue}</p>
           <p className="date-moment-note">
             {t('chat.endingNote')}
           </p>
@@ -1753,14 +1741,9 @@ export function Chat() {
                 <Icon name="recap" size={14} /> {t(hangout ? 'chat.newHangout' : 'chat.newDate')}
               </button>
             ) : spokeThisSession ? (
-              <>
-                <button className="btn sm block" onClick={summarize} disabled={busy || streaming.active}>
-                  <Icon name="recap" size={14} /> {t('chat.recap')}
-                </button>
-                <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active}>
-                  {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t(hangout ? 'chat.endHangout' : 'chat.endEvaluate')}</>}
-                </button>
-              </>
+              <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active}>
+                {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t(hangout ? 'chat.endHangout' : 'chat.endEvaluate')}</>}
+              </button>
             ) : (
               <button className="btn ghost block date-end-btn" onClick={cancelDate} disabled={busy || streaming.active}>
                 {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {t(hangout ? 'chat.cancelHangout' : 'chat.cancelDate')}</>}
@@ -1832,8 +1815,12 @@ export function Chat() {
                 <Fragment key={m.id}>
                   <div
                     className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
+                    dir={conversationDirection}
+                    lang={conversationLanguage}
                   >
-                    {m.role === 'character' ? <RichLine text={m.text} /> : m.text}
+                    {m.role === 'character' || m.metadata?.venueFlavor === true
+                      ? <RichLine text={m.text} sceneLead={m.metadata?.venueFlavor === true} />
+                      : m.text}
                     {m.id === regenId && (
                       <button
                         className="date-regen-btn"
@@ -1848,6 +1835,7 @@ export function Chat() {
                   {engagement !== null && (
                     <span
                       className={`date-react ${engagement > 0 ? 'warm' : engagement < 0 ? 'cool' : 'flat'}`}
+                      dir={conversationDirection}
                       title={t('chat.reactionTitle')}
                     >
                       <span className="date-react-pip" aria-hidden="true">◆</span>
@@ -1858,7 +1846,7 @@ export function Chat() {
               );
             })}
             {streaming.active && (
-              <div className="date-msg character">
+              <div className="date-msg character" dir={conversationDirection} lang={conversationLanguage}>
                 {streaming.text.trim() ? (
                   <>
                     <RichLine text={streaming.text.trimStart()} open />
@@ -1944,6 +1932,8 @@ export function Chat() {
               <div className="chat-input date-composer">
                 <textarea
                   value={input}
+                  dir={conversationDirection}
+                  lang={conversationLanguage}
                   placeholder={intent ? t('chat.composerIntent', { intent: intentLabel(intent), name: character.name }) : t('chat.composerPlain', { name: character.name })}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {

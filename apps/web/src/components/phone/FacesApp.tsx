@@ -120,6 +120,7 @@ export function FacesApp() {
           <div className={`fcs-compose${composeOpen ? '' : ' is-collapsed'}`}>
             <textarea
               className="fcs-compose-input"
+              dir="auto"
               value={draft}
               placeholder={t('faces.composePlaceholder')}
               rows={composeOpen ? 3 : 1}
@@ -210,8 +211,8 @@ function PostCard({
         </span>
       </header>
 
-      <p className="fcs-body">{post.body}</p>
-      {post.mood && <div className="fcs-mood">— {post.mood}</div>}
+      <p className="fcs-body" dir="auto">{post.body}</p>
+      {post.mood && <div className="fcs-mood" dir="auto">— {post.mood}</div>}
 
       <ReactionSummary post={post} />
 
@@ -320,8 +321,8 @@ function CommentList({
           </span>
           <span className="fcs-comment-bubble">
             <span className="fcs-comment-name">{c.authorName}</span>
-            <span className="fcs-comment-body">{c.body}</span>
-            {c.tone && <span className="fcs-comment-tone">{c.tone}</span>}
+            <span className="fcs-comment-body" dir="auto">{c.body}</span>
+            {c.tone && <span className="fcs-comment-tone" dir="auto">{c.tone}</span>}
           </span>
         </div>
       ))}
@@ -329,6 +330,7 @@ function CommentList({
         <div className="fcs-comment-compose">
           <input
             className="fcs-comment-input"
+            dir="auto"
             value={text}
             placeholder={t('faces.addComment')}
             maxLength={GEN_TEXT.line}

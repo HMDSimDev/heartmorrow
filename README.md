@@ -461,6 +461,7 @@ LLM_MODEL=local-model
 LLM_VISION_MODEL=                # optional; blank reuses the main model
 LLM_TEMPERATURE=0.8
 LLM_MAX_TOKENS=2048              # reasoning models need plenty of room
+LLM_OUTPUT_LANGUAGE=auto         # e.g. ja, ko, zh-Hans, es, fr, de, ar, he, fa, ur
 LLM_STRUCTURED_MODE=json_schema  # json_schema | json_object | prompt_only
 LLM_ENDPOINT_MODE=chat_completions
 LLM_MAX_RETRIES=3

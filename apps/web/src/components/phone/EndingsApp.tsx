@@ -63,14 +63,14 @@ export function EndingsApp() {
                       </div>
                     )}
                     <div>
-                      <div className="end-title">{e.title}</div>
+                  <div className="end-title" dir="auto">{e.title}</div>
                       <span className="end-by">
                         {t('endings.by', { name: c?.name ?? t('endings.someone'), day: e.day })}
                       </span>
                     </div>
                   </div>
                   <div className="end-thread" />
-                  <p className="end-prose">{e.epilogue}</p>
+                  <p className="end-prose" dir="auto">{e.epilogue}</p>
                 </div>
               );
             })}

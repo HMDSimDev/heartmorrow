@@ -1,7 +1,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
-import type { ActiveDate, Asset, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
+import type { ActiveDate, Asset, OutputLanguage, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
 import { deriveCalendar } from '@dsim/shared';
 import { api } from '../lib/api';
 import { idbGet, idbSet, idbDel } from '../lib/idb-kv';
@@ -94,6 +94,11 @@ interface AppData {
    *  Client-only UI gating, persisted to localStorage; the server enforces nothing. */
   advancedMode: boolean;
   setAdvancedMode: (on: boolean) => void;
+  /** Language selected for model-generated prose. Kept in app state so every
+   * generated-content surface can apply the correct bidi direction independently
+   * of the interface locale. */
+  outputLanguage: OutputLanguage;
+  setOutputLanguage: (language: OutputLanguage) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
   /** Set (or clear, with null) the phone wallpaper from an image Blob/File. The
@@ -131,6 +136,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [dayTick, setDayTick] = useState(0);
   const [creatorMode, setCreatorModeState] = useState<boolean>(() => localStorage.getItem(CREATOR_KEY) !== 'false');
   const [advancedMode, setAdvancedModeState] = useState<boolean>(() => localStorage.getItem(ADVANCED_KEY) === 'true');
+  const [outputLanguage, setOutputLanguageState] = useState<OutputLanguage>('auto');
   const [theme, setThemeState] = useState<Theme>(loadThemeMeta);
   const [unreadTexts, setUnreadTexts] = useState(0);
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
@@ -216,6 +222,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     void reloadWorlds();
   }, [reloadPlayer, reloadAssets, reloadWorlds]);
 
+  useEffect(() => {
+    let live = true;
+    void api
+      .getSettings()
+      .then((settings) => {
+        if (live) setOutputLanguageState(settings.outputLanguage);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
+
   // Poll the unread-text count so the sidebar badge stays current (texts can
   // arrive in the background as the world clock advances).
   useEffect(() => {
@@ -285,6 +304,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const setAdvancedMode = useCallback((on: boolean) => {
     localStorage.setItem(ADVANCED_KEY, String(on));
     setAdvancedModeState(on);
+  }, []);
+
+  const setOutputLanguage = useCallback((language: OutputLanguage) => {
+    setOutputLanguageState(language);
   }, []);
 
   const setTheme = useCallback((t: Theme) => {
@@ -460,6 +483,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setCreatorMode,
       advancedMode,
       setAdvancedMode,
+      outputLanguage,
+      setOutputLanguage,
       theme,
       setTheme,
       setWallpaper,
@@ -470,7 +495,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       refreshActiveDate,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

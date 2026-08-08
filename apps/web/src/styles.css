@@ -82,6 +82,7 @@
   --font-display: 'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-body: 'Hanken Grotesk Variable', 'Hanken Grotesk', ui-sans-serif, system-ui,
     -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-rtl: 'Noto Sans Arabic', 'Noto Sans Hebrew', 'Segoe UI', Tahoma, Arial, sans-serif;
   --font-mono: 'Spline Sans Mono Variable', 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   font-family: var(--font-body);
@@ -126,6 +127,17 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   transition: background-color 1.2s ease;
+}
+
+/* Model/user-authored content may use a different script direction than the UI.
+   `dir=auto` gives each prose block its own bidi paragraph and keeps it isolated
+   from neighboring English labels, dates, icons, and numbers. */
+[dir='auto'] {
+  unicode-bidi: isolate;
+  text-align: start;
+}
+[dir='auto']:dir(rtl) {
+  font-family: var(--font-rtl);
 }
 a { color: var(--moon); text-decoration: none; }
 a:hover { color: #c2d6f1; }
