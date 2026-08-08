@@ -67,6 +67,22 @@
     "kicker": "Real estate",
     "noWorldTitle": "No world active",
     "noWorldBody": "Pick a world to browse properties.",
+    "onb": {
+      "kicker": "Before you sign · {n} of {total}",
+      "rent": {
+        "title": "Rent comes due on a schedule",
+        "body": "Every lease has a cadence — daily, weekly, or monthly — and the card shows the day the next payment lands. It leaves your purse whether you visit the place or not, so make sure your work can carry it."
+      },
+      "eviction": {
+        "title": "Come up short and the clock starts",
+        "body": "Rent pays itself from your purse on the due day. If the purse can't cover it, the lease turns overdue, the landlord writes you a warning, and you have three days' grace to settle up before you're evicted. Walking away from a lease yourself forgives what's owed — eviction just takes the keys."
+      },
+      "venue": {
+        "title": "A place is also a date venue",
+        "body": "Anywhere you hold can host a date. A leased place gives the evening a modest lift; a place you own gives the full one. And if you buy outright there's no rent at all — selling later simply refunds what you paid."
+      },
+      "done": "Sign the papers"
+    },
     "resultOwned": "Now yours",
     "resultSold": "Sold",
     "resultLease": "Leased",
@@ -198,6 +214,8 @@
     },
     "row": {
       "dividend": "pays ◈{amount}/day per share",
+      "dividendHold": "Dividends pay only on shares you've held a full day — buying tonight earns nothing by morning.",
+      "dividendHoldShort": "after a full day held",
       "held": "{count, plural, one {You hold # share} other {You hold # shares}}",
       "buying": "Buying…",
       "buy": "Buy",
@@ -570,6 +588,23 @@
     "they": "They",
     "resultKicker": "Time together",
     "boardNote": "An afternoon is yours to give. Some moods suit some people — and pushing too hard, too soon, or too often can cool things. The deepest closeness still only comes from a real date.",
+    "howTo": "How time together works",
+    "onb": {
+      "kicker": "How time together works · {n} of {total}",
+      "fit": {
+        "title": "Match the mood to the person",
+        "body": "Every outing has a mood — cozy, deep, lively, playful, cultured — and every person has tastes. The little fit chip on each tile reads them for you: something right up their alley lands warm; a poor fit mostly fizzles."
+      },
+      "risk": {
+        "title": "Bold asks can misfire",
+        "body": "The deeper or more forward the outing, the more it asks of someone still guarded — a heart-to-heart with a near-stranger can backfire into tension. And twice in one day with the same person starts to crowd them; a third time does nothing at all."
+      },
+      "ceiling": {
+        "title": "Only dates reach the heart",
+        "body": "Time together builds comfort, trust, chemistry — but only so far. Near the cusp of real closeness the gains taper to nothing, and affection never moves here at all. When an evening starts landing flat, that's your sign: ask them on a real date."
+      },
+      "done": "Plan the afternoon"
+    },
     "noEnergy": "You're out of energy for today — end the day to rest.",
     "onDateNote": "You're with {name} right now — finish it on the Date tab first.",
     "noOne": "No one to spend time with in this world yet.",

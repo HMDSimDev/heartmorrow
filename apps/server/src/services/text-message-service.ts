@@ -234,7 +234,7 @@ export interface SendTextResult {
   /** Small relationship change this exchange caused (empty if none). */
   relationshipDelta: Partial<Record<RelationshipStatKey, number>>;
   /** Present when the player attached a gift — the character's reaction to it. */
-  giftReaction?: { line: string; expression: string; sentiment: GiftSentiment; itemName: string } | null;
+  giftReaction?: { line: string; expression: string; sentiment: GiftSentiment; itemName: string; giftsToday: number } | null;
 }
 
 /** Player texts a character; the character replies (short, structured). Free — no stamina.
@@ -318,7 +318,7 @@ export async function sendPlayerText(
         reply: giftReply,
         error: null,
         relationshipDelta: r.appliedDeltas,
-        giftReaction: { line: r.reaction.line.trim(), expression: r.reaction.expression, sentiment: r.sentiment, itemName: r.item.name },
+        giftReaction: { line: r.reaction.line.trim(), expression: r.reaction.expression, sentiment: r.sentiment, itemName: r.item.name, giftsToday: r.giftsToday },
       };
     });
   }

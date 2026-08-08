@@ -147,6 +147,31 @@
   "shell": {
     "serverWaking": "Connecting to the server — your world will appear in a moment…"
   },
+  "onboarding": {
+    "back": "Back",
+    "skip": "Skip",
+    "next": "Next"
+  },
+  "gift": {
+    "second": "A second gift in one day lands lighter.",
+    "dry": "Gifts have run dry with them for today — tomorrow starts fresh."
+  },
+  "dayOnb": {
+    "kicker": "How your days work · {n} of {total}",
+    "actions": {
+      "title": "A day is a few good hours",
+      "body": "Every morning you wake with a small pool of energy — three actions on a weekday, four on a weekend. A date, an afternoon spent together, a shift of work, or a minigame each spend one; heavy jobs take two. Spend them with intent."
+    },
+    "talk": {
+      "title": "Texting is always free",
+      "body": "Texting on your phone never touches your energy. Keep a conversation going all day if you like — it's showing up in person that costs you the hours."
+    },
+    "sleep": {
+      "title": "Sleep turns the page",
+      "body": "When the day is spent, End day. The world lives on without you for a while — people cross paths and talk among themselves — and the morning brings a recap of it all, fresh energy, and a new sky."
+    },
+    "done": "Start the day"
+  },
   "nav": {
     "home": "Home",
     "people": "People",
@@ -299,9 +324,6 @@
         "title": "Know when to press",
         "body": "When a buyer bites you can shake on it and bank the deal — or press for a fifth more. If their limit can bear the raise, they grumble and pay. If it can't, the whole sale dies on the table. Greed pays, right up until it doesn't."
       },
-      "back": "Back",
-      "skip": "Skip",
-      "next": "Next",
       "done": "Set up the stall"
     }
   },

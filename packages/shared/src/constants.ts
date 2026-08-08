@@ -322,3 +322,14 @@ export const AVAILABILITY_REASONS = [
   'is off the grid, dealing with something personal',
   'asked for a quiet day to themselves',
 ] as const;
+
+/**
+ * Header every MUTATING request from the app must carry (any value; presence is
+ * the proof). The local-app CSRF defense: a drive-by page on another site can
+ * fire cross-origin POSTs at the local server (CORS only blocks READING the
+ * response), but it cannot attach a custom header without passing a CORS
+ * preflight — which the server's explicit origin allowlist refuses. Client:
+ * attached centrally in `apps/web/src/lib/api.ts`. Server: enforced by the
+ * onRequest hook in `apps/server/src/app.ts`.
+ */
+export const APP_REQUEST_HEADER = 'x-heartmorrow';

@@ -930,6 +930,10 @@ export const GiftReactionResponseSchema = z.object({
   relationship: RelationshipSchema,
   item: ShopItemSchema,
   memoryWritten: z.boolean().default(false),
+  /** Same-day gifts to this character BEFORE this one (0 = first of the day).
+   *  Lets the UI say that repeat gifts land lighter (1) or not at all (2+)
+   *  instead of the anti-grind scale reading as a silent bug. */
+  giftsToday: z.number().int().min(0).default(0),
 });
 export type GiftReactionResponse = z.infer<typeof GiftReactionResponseSchema>;
 

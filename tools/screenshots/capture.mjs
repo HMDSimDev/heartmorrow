@@ -19,7 +19,7 @@
  *   WORLD      world name to shoot          (default "Asterfall Bay")
  */
 import { chromium } from 'playwright';
-import { mkdir } from 'node:fs/promises';
+import { copyFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const BASE_URL = (process.env.BASE_URL ?? 'http://localhost:5173').replace(/\/$/, '');
@@ -30,9 +30,27 @@ const WORLD_NAME = process.env.WORLD ?? 'Asterfall Bay';
 
 const WIDTH = 1920;
 const HEIGHT = 1080;
+// The repo's README images (gh/1.png … gh/7.png) that certain shots replace
+// 1:1. Each mapped shot ALSO lands in OUT/gh/ under its README name, so
+// refreshing the GitHub images is a straight copy of that folder over gh/.
+// (Mapping read off the README's own alt texts + the current gh/ images.)
+const GH_NAMES = {
+  'date': '1.png',           // "dating gameplay" — the in-progress date screen
+  'phone-home': '2.png',     // "phone UI" — the phone home grid
+  'sofia-memories': '3.png', // "memory UI" — Sofía's Memories tab
+  'luca-profile': '4.png',   // "a dating profile" — Luca's character page
+  'people': '5.png',         // the People/cast grid
+  'faces': '6.png',          // "Faces app" — the town feed
+  'messages': '7.png',       // "Messages app" — the inbox thread list
+};
+
 const ACTIVE_WORLD_KEY = 'dsim.activeWorldId';
 const CREATOR_KEY = 'dsim.creatorMode';
-const DATE_ONBOARDING_KEY = 'dsim.dateOnboardingSeen'; // mirrors DateOnboarding.tsx
+// Master kill-switch for ALL first-use walkthroughs (date, first-day, Together,
+// Property, the Flip, and any added later) — mirrors ONBOARDING_SUPPRESS_KEY in
+// components/OnboardingSteps.tsx. One key, so a new walkthrough can never cover
+// a shot; explicit "how this works" reopen buttons still work if a shot wants one.
+const ONBOARDING_SUPPRESS_KEY = 'dsim.onboardingSuppressed';
 
 const log = (...a) => console.log('•', ...a);
 
@@ -82,15 +100,17 @@ async function main() {
   // Boot straight into the world (the app keeps the active world in localStorage),
   // and turn OFF creator mode so every app shows its player-facing surface (the
   // Market portfolio, not the company-authoring form, etc.) and the chrome stays clean.
-  // Also mark the first-date walkthrough as seen so its modal never covers the date UI.
+  // Also flip the master onboarding suppress switch so NO first-use walkthrough
+  // (current or future) ever covers a shot.
   await context.addInitScript((args) => {
     localStorage.setItem(args.key, args.worldId);
     localStorage.setItem(args.creatorKey, 'false');
-    localStorage.setItem(args.onboardingKey, '1');
-  }, { key: ACTIVE_WORLD_KEY, creatorKey: CREATOR_KEY, onboardingKey: DATE_ONBOARDING_KEY, worldId: ids.worldId });
+    localStorage.setItem(args.suppressKey, '1');
+  }, { key: ACTIVE_WORLD_KEY, creatorKey: CREATOR_KEY, suppressKey: ONBOARDING_SUPPRESS_KEY, worldId: ids.worldId });
 
   const page = await context.newPage();
 
+  await mkdir(path.join(OUT, 'gh'), { recursive: true });
   let n = 0;
   const shot = async (name) => {
     n += 1;
@@ -99,7 +119,9 @@ async function main() {
     await page.evaluate(() => document.fonts?.ready).catch(() => {});
     await page.waitForTimeout(450);
     await page.screenshot({ path: file }); // viewport-only ⇒ exactly 1920×1080 (× SCALE)
-    log(`saved ${path.basename(file)}`);
+    const gh = GH_NAMES[name];
+    if (gh) await copyFile(file, path.join(OUT, 'gh', gh));
+    log(`saved ${path.basename(file)}${gh ? `  ↳ gh/${gh}` : ''}`);
   };
 
   const go = async (route) => {
@@ -195,6 +217,7 @@ async function main() {
 
   await browser.close();
   log(`Done — ${n} screenshots in ${OUT}`);
+  log(`README images refreshed under ${path.join(OUT, 'gh')} — copy that folder over the repo's gh/ to update GitHub.`);
 }
 
 main().catch((e) => {

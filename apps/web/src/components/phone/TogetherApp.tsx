@@ -8,6 +8,7 @@ import { useAppData } from '../../state/app-context';
 import { relationshipStatLabel } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
+import { OnboardingSteps, shouldAutoOpenOnboarding, type OnboardingStep } from '../OnboardingSteps';
 import { PortraitPicker } from '../PortraitPicker';
 import { ResultCard, type ResultTone } from '../ResultCard';
 import { Banner } from '../ui';
@@ -50,6 +51,26 @@ const FIT_CLS: Record<TogetherResult['fit'], string> = {
   poor: 'is-poor',
 };
 
+/** Seen-flag for the first-use Together walkthrough (client-global). */
+export const TOGETHER_ONBOARDING_KEY = 'dsim.togetherOnboardingSeen';
+
+const ONB_STEPS = [
+  { icon: 'people', titleKey: 'phone:together.onb.fit.title', bodyKey: 'phone:together.onb.fit.body' },
+  { icon: 'preview', titleKey: 'phone:together.onb.risk.title', bodyKey: 'phone:together.onb.risk.body' },
+  { icon: 'date', titleKey: 'phone:together.onb.ceiling.title', bodyKey: 'phone:together.onb.ceiling.body' },
+] as const satisfies ReadonlyArray<OnboardingStep>;
+
+function TogetherOnboarding({ onClose }: { onClose: () => void }) {
+  return (
+    <OnboardingSteps
+      steps={ONB_STEPS}
+      kickerKey="phone:together.onb.kicker"
+      doneKey="phone:together.onb.done"
+      onClose={onClose}
+    />
+  );
+}
+
 export function TogetherApp() {
   const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate } = useAppData();
@@ -59,6 +80,15 @@ export function TogetherApp() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<TogetherNote>();
   const [error, setError] = useState<string>();
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+
+  // First open: the soft-ceiling rule is the game's most bug-shaped feature —
+  // casual time stalls near the cusp and NEVER reaches affection — so say it
+  // before someone grinds an evening into the wall. Marked seen immediately
+  // (the Chat.tsx pattern); "How time together works" below is the way back in.
+  useEffect(() => {
+    if (shouldAutoOpenOnboarding(TOGETHER_ONBOARDING_KEY)) setOnboardingOpen(true);
+  }, []);
 
   const noEnergy = (worldState?.stamina ?? 0) <= 0;
   const onDate = !!activeDate;
@@ -131,8 +161,13 @@ export function TogetherApp() {
         <div className="pl-board">
           <p className="pl-board-note">
             {t('together.boardNote')}
+            {' '}
+            <button type="button" className="pl-note-link" onClick={() => setOnboardingOpen(true)}>
+              {t('together.howTo')}
+            </button>
           </p>
         </div>
+        {onboardingOpen && <TogetherOnboarding onClose={() => setOnboardingOpen(false)} />}
 
         {/* Locks live outside the board so a temporary block never reads as more
             house rules. Date first — it outranks energy as the reason. */}

@@ -140,6 +140,21 @@
   background: var(--ink-2);
   color: var(--rose);
 }
+/* "Their favorite" — the warmth bonus said up front, not sprung afterward. */
+.mga-fav {
+  display: inline-block;
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--rose);
+  border: 1px solid rgba(232, 138, 166, 0.4);
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
 .mga-heart {
   margin-left: auto;
   font-size: 0.78rem;

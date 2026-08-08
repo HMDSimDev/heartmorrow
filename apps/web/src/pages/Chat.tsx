@@ -42,6 +42,7 @@ import { useAppData } from '../state/app-context';
 import { intentLabel, intentTip, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { DateOnboarding, DATE_ONBOARDING_KEY } from '../components/DateOnboarding';
+import { shouldAutoOpenOnboarding } from '../components/OnboardingSteps';
 import { Icon } from '../components/Icon';
 import { RelationshipBars } from '../components/StatBars';
 import { RichLine } from '../components/RichText';
@@ -240,8 +241,7 @@ export function Chat() {
   // player glimpsed card one — the rail's "How dating works" button is the
   // deliberate way back in.
   useEffect(() => {
-    if (session?.mode === 'date' && localStorage.getItem(DATE_ONBOARDING_KEY) !== '1') {
-      localStorage.setItem(DATE_ONBOARDING_KEY, '1');
+    if (session?.mode === 'date' && shouldAutoOpenOnboarding(DATE_ONBOARDING_KEY)) {
       setOnboardingOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1006,6 +1006,11 @@ export function Chat() {
       if (res.expression) setExpression(res.expression);
       setDeltas(res.deltas);
       setTimeout(() => setDeltas(null), 1800);
+      // Say the anti-grind out loud: repeat gifts the same day land lighter (1)
+      // or not at all (2+) — silent scaling read as a bug.
+      if (res.giftsToday >= 1) {
+        setNotice(t(res.giftsToday === 1 ? 'common:gift.second' : 'common:gift.dry'));
+      }
       setGiftPicker(false);
       // Reflect the consumed unit so a second gift this date reads correctly.
       setGiftItems((items) =>

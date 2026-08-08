@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FlipConfig, FlipSubmission } from '@dsim/shared';
-import { Icon, type IconName } from '../Icon';
-import { Modal } from '../ui';
+import { OnboardingSteps, shouldAutoOpenOnboarding, type OnboardingStep } from '../OnboardingSteps';
 import { MinigameShell } from './MinigameShell';
-// The walkthrough deliberately wears the date-onboarding chrome (.dob classes) so
-// every "how this works" moment in the game looks like the same almanac page.
-import '../date-onboarding.css';
 
 /* The Flip — market-day haggling. One buyer at a time: read the two tells, name a
    price above the piece's worth, and (on a bite) choose to shake or press for more.
@@ -25,48 +21,21 @@ const NUDGES = [-10, -1, +1, +10] as const;
 export const FLIP_ONBOARDING_KEY = 'dsim.flipOnboardingSeen';
 
 const ONB_STEPS = [
-  { icon: 'coin', titleKey: 'minigame.flipOnb.margin.title', bodyKey: 'minigame.flipOnb.margin.body' },
-  { icon: 'preview', titleKey: 'minigame.flipOnb.read.title', bodyKey: 'minigame.flipOnb.read.body' },
-  { icon: 'work', titleKey: 'minigame.flipOnb.press.title', bodyKey: 'minigame.flipOnb.press.body' },
-] as const satisfies ReadonlyArray<{ icon: IconName; titleKey: string; bodyKey: string }>;
+  { icon: 'coin', titleKey: 'common:minigame.flipOnb.margin.title', bodyKey: 'common:minigame.flipOnb.margin.body' },
+  { icon: 'preview', titleKey: 'common:minigame.flipOnb.read.title', bodyKey: 'common:minigame.flipOnb.read.body' },
+  { icon: 'work', titleKey: 'common:minigame.flipOnb.press.title', bodyKey: 'common:minigame.flipOnb.press.body' },
+] as const satisfies ReadonlyArray<OnboardingStep>;
 
 /** Stepped "how the stall works" walkthrough: auto-shown before the first shift,
  *  reopenable from the board. The caller owns the seen-flag. */
 function FlipOnboarding({ onClose }: { onClose: () => void }) {
-  const { t } = useTranslation();
-  const [step, setStep] = useState(0);
-  const s = ONB_STEPS[step]!;
-  const last = step === ONB_STEPS.length - 1;
   return (
-    <Modal onClose={onClose}>
-      <div className="dob">
-        <div className="kicker">{t('minigame.flipOnb.kicker', { n: step + 1, total: ONB_STEPS.length })}</div>
-        <div className="dob-emblem" aria-hidden="true">
-          <Icon name={s.icon} size={26} />
-        </div>
-        <h2 className="dob-title">{t(s.titleKey)}</h2>
-        <p className="dob-body">{t(s.bodyKey)}</p>
-        <div className="dob-dots" aria-hidden="true">
-          {ONB_STEPS.map((x, i) => (
-            <span key={x.titleKey} className={i === step ? 'on' : ''} />
-          ))}
-        </div>
-        <div className="row end" style={{ flexWrap: 'wrap' }}>
-          {step > 0 ? (
-            <button className="btn ghost" onClick={() => setStep(step - 1)}>
-              {t('minigame.flipOnb.back')}
-            </button>
-          ) : (
-            <button className="btn ghost" onClick={onClose}>
-              {t('minigame.flipOnb.skip')}
-            </button>
-          )}
-          <button className="btn primary" onClick={() => (last ? onClose() : setStep(step + 1))} autoFocus>
-            {last ? t('minigame.flipOnb.done') : t('minigame.flipOnb.next')}
-          </button>
-        </div>
-      </div>
-    </Modal>
+    <OnboardingSteps
+      steps={ONB_STEPS}
+      kickerKey="common:minigame.flipOnb.kicker"
+      doneKey="common:minigame.flipOnb.done"
+      onClose={onClose}
+    />
   );
 }
 
@@ -92,10 +61,7 @@ export function FlipGame({
   // seen immediately (the Chat.tsx pattern) so a mid-walkthrough refresh doesn't
   // greet every later shift — the "how the stall works" button is the way back in.
   useEffect(() => {
-    if (localStorage.getItem(FLIP_ONBOARDING_KEY) !== '1') {
-      localStorage.setItem(FLIP_ONBOARDING_KEY, '1');
-      setOnboardingOpen(true);
-    }
+    if (shouldAutoOpenOnboarding(FLIP_ONBOARDING_KEY)) setOnboardingOpen(true);
   }, []);
 
   const buyer = config.buyers[Math.min(idx, total - 1)]!;

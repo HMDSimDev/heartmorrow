@@ -355,6 +355,8 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
+  // Transient "repeat gifts land lighter" note — the anti-grind said out loud.
+  const [giftNote, setGiftNote] = useState<string>();
   // A send that didn't land, with how to recover it. 'reply' = your text saved but
   // the reply failed → regenerate it (no duplicate text). 'send' = nothing saved
   // (network/blocked) → resend the original payload, which we keep here.
@@ -539,6 +541,10 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       await load();
       // A gift was consumed from the bag — keep the held-money/inventory in sync.
       if (gift) await reloadPlayer();
+      // Say the anti-grind out loud: a repeat gift the same day lands lighter (1)
+      // or not at all (2+) — silent scaling read as a bug.
+      const repeat = res.giftReaction?.giftsToday ?? 0;
+      setGiftNote(repeat >= 1 ? t(repeat === 1 ? 'common:gift.second' : 'common:gift.dry') : undefined);
       if (res.error) {
         // Your text saved, but the reply failed — offer to regenerate it.
         setError(t('messages.thread.noReply', { error: res.error }));
@@ -700,6 +706,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
         }
       />
       {error && !failed && <Banner kind="error">{error}</Banner>}
+      {giftNote && <Banner kind="info">{giftNote}</Banner>}
       <div className="pcom-thread">
         {messages.map((m, i) => {
           const label = dayLabel(m);

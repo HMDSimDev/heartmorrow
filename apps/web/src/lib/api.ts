@@ -116,6 +116,7 @@ import type {
   WorldNoteUpdate,
   WorldUpdate,
 } from '@dsim/shared';
+import { APP_REQUEST_HEADER } from '@dsim/shared';
 
 const BASE = '/api';
 
@@ -149,6 +150,21 @@ async function parseErrorBody(res: Response, fallback: string): Promise<{ messag
   return { message: message || fallback, details };
 }
 
+/**
+ * Attach the app's mutation header (see {@link APP_REQUEST_HEADER}) to a fetch
+ * init — the server refuses mutating requests without it as cross-site. GETs are
+ * left bare: they mutate nothing, and a custom header on them would force a CORS
+ * preflight per read in two-process dev for no protection gained.
+ */
+function withAppHeader(init: RequestInit): RequestInit {
+  const method = (init.method ?? 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return init;
+  return {
+    ...init,
+    headers: { ...(init.headers as Record<string, string> | undefined), [APP_REQUEST_HEADER]: '1' },
+  };
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
   // Only declare a JSON content-type when we actually send a JSON body. A POST
@@ -157,7 +173,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (options.body != null && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${path}`, withAppHeader({ ...options, headers }));
   if (!res.ok) {
     const { message, details } = await parseErrorBody(res, `Request failed (${res.status}).`);
     throw new ApiError(message, res.status, details);
@@ -196,7 +212,7 @@ export function assetThumbUrl(relativePath: string): string {
  * server's Content-Disposition filename, falling back to a supplied name.
  */
 async function downloadShareFile(path: string, init: RequestInit, fallbackName: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, init);
+  const res = await fetch(`${BASE}${path}`, withAppHeader(init));
   if (!res.ok) {
     const { message } = await parseErrorBody(res, `Download failed (${res.status}).`);
     throw new ApiError(message, res.status);
@@ -227,7 +243,7 @@ async function downloadShareFile(path: string, init: RequestInit, fallbackName: 
 async function postShareFile<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${BASE}${path}`, { method: 'POST', body: form });
+  const res = await fetch(`${BASE}${path}`, withAppHeader({ method: 'POST', body: form }));
   if (!res.ok) {
     const { message, details } = await parseErrorBody(res, `Upload failed (${res.status}).`);
     throw new ApiError(message, res.status, details);
@@ -266,12 +282,12 @@ export async function streamChat(
   signal?: AbortSignal,
   intent?: Intent,
 ): Promise<void> {
-  const res = await fetch(`${BASE}/conversations/${sessionId}/stream`, {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/stream`, withAppHeader({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(intent ? { text, intent } : { text }),
     signal,
-  });
+  }));
   if (!res.ok || !res.body) {
     const { message } = await parseErrorBody(res, `The server couldn’t start the reply (${res.status}).`);
     handlers.onError?.(message);
@@ -291,10 +307,10 @@ export async function streamRetry(
   handlers: StreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${BASE}/conversations/${sessionId}/retry-stream`, {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/retry-stream`, withAppHeader({
     method: 'POST',
     signal,
-  });
+  }));
   if (!res.ok || !res.body) {
     const { message } = await parseErrorBody(res, `The server couldn’t start the reply (${res.status}).`);
     handlers.onError?.(message);
@@ -314,10 +330,10 @@ export async function streamRegenerate(
   handlers: StreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${BASE}/conversations/${sessionId}/regenerate-stream`, {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/regenerate-stream`, withAppHeader({
     method: 'POST',
     signal,
-  });
+  }));
   if (!res.ok || !res.body) {
     const { message } = await parseErrorBody(res, `The server couldn’t start the reply (${res.status}).`);
     handlers.onError?.(message);
@@ -530,7 +546,7 @@ export const api = {
     if (altText) form.append('altText', altText);
     if (tags) form.append('tags', tags);
     form.append('file', file);
-    const res = await fetch(`${BASE}/assets`, { method: 'POST', body: form });
+    const res = await fetch(`${BASE}/assets`, withAppHeader({ method: 'POST', body: form }));
     if (!res.ok) {
       const { message } = await parseErrorBody(res, `Upload failed (${res.status}).`);
       throw new ApiError(message, res.status);
@@ -669,7 +685,7 @@ export const api = {
       reply: TextMessage | null;
       error: string | null;
       relationshipDelta: Partial<Record<string, number>>;
-      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string; giftsToday: number } | null;
     }>(`/phone/threads/${characterId}/send`, { text, imageAssetId, giftId }),
   /** Regenerate a reply when a prior send saved the player's text but the model
    *  failed to answer — no new player message is created. Same shape as phoneSend. */
@@ -679,7 +695,7 @@ export const api = {
       reply: TextMessage | null;
       error: string | null;
       relationshipDelta: Partial<Record<string, number>>;
-      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string; giftsToday: number } | null;
     }>(`/phone/threads/${characterId}/retry-reply`),
   /** Regenerate the character's last text reply (a bad/looping line). Rewrites the
    *  prose only — the relationship judge does NOT re-run. Same shape as phoneSend. */
@@ -689,7 +705,7 @@ export const api = {
       reply: TextMessage | null;
       error: string | null;
       relationshipDelta: Partial<Record<string, number>>;
-      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string; giftsToday: number } | null;
     }>(`/phone/threads/${characterId}/regenerate-reply`),
   phoneClaimGift: (textId: string) =>
     post<{ item: ShopItem; inventoryItem: InventoryItem }>(`/phone/messages/${textId}/claim-gift`),

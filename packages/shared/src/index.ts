@@ -16,6 +16,7 @@ export * from './wealth';
 export * from './gambling';
 export * from './activities';
 export * from './career';
+export * from './minigame-favorites';
 export * from './together';
 export * from './venues';
 export * from './schemas/settings';

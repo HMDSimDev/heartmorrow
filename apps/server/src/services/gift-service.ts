@@ -52,6 +52,10 @@ export interface ReactToGiftResult {
   item: ShopItem;
   inventoryItem: InventoryItem;
   memoryWritten: boolean;
+  /** Same-day gifts to this character BEFORE this one (0 = first of the day) —
+   *  the UI reads it to say out loud that repeat gifts land lighter/not at all,
+   *  so the anti-grind scale never feels like a silent bug. */
+  giftsToday: number;
 }
 
 /**
@@ -181,6 +185,7 @@ export async function reactToGift(args: {
       item,
       inventoryItem,
       memoryWritten,
+      giftsToday,
     };
   });
 }
@@ -248,5 +253,6 @@ export async function giveGiftOnDate(
     relationship: r.relationship,
     item: r.item,
     memoryWritten: r.memoryWritten,
+    giftsToday: r.giftsToday,
   };
 }

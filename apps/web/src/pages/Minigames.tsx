@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  favoriteMinigameFor,
   type Character,
   type MinigameFinishResponse,
   type MinigameId,
@@ -199,6 +200,14 @@ export function Minigames() {
                   </span>
                 )}
               </div>
+              {/* Their favorite, said UP FRONT — the warmth bonus for playing it
+                  (and the sting of flopping their beloved game) shouldn't be a
+                  surprise the server springs afterward. */}
+              {partner && g.id === favoriteMinigameFor(partner) && (
+                <span className="mga-fav">
+                  {t('minigames.theirFavorite', { name: partner.name.split(' ')[0] })}
+                </span>
+              )}
               <p className="mga-desc">{g.description}</p>
               {g.targetStats.length > 0 && (
                 <div className="mga-stats">

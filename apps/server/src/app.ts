@@ -5,7 +5,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import { ZodError } from 'zod';
-import { MAX_UPLOAD_BYTES, PACK_MAX_FILE_BYTES } from '@dsim/shared';
+import { APP_REQUEST_HEADER, MAX_UPLOAD_BYTES, PACK_MAX_FILE_BYTES } from '@dsim/shared';
 import { config, ensureDirectories } from './config';
 import { AppError } from './lib/errors';
 import { healthRoutes } from './routes/health';
@@ -50,7 +50,27 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
   });
 
   // CORS is intentionally permissive for LOCAL DEV only (explicit origin list).
-  await app.register(cors, { origin: config.corsOrigins, credentials: true });
+  // No `credentials` flag: nothing in the app uses cookies, and allowing
+  // credentialed cross-origin requests would only loosen the policy for free.
+  await app.register(cors, { origin: config.corsOrigins });
+
+  // The local-app CSRF defense: any website open in the player's browser can
+  // fire "simple" cross-origin POSTs at this server (CORS only stops it READING
+  // the response), and this API is deliberately unauthenticated — so every
+  // mutating request must carry the app's custom header. A cross-origin page
+  // cannot attach one without passing a CORS preflight, which the allowlist
+  // above refuses; the app's own fetch helpers attach it centrally (api.ts).
+  // Reads stay open (GET mutates nothing and cross-origin reads are already
+  // CORS-blocked), and OPTIONS must pass untouched or the dev-mode preflight
+  // that AUTHORIZES the header could itself never succeed.
+  app.addHook('onRequest', async (req, reply) => {
+    const m = req.method;
+    if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return;
+    if (req.headers[APP_REQUEST_HEADER] !== undefined) return;
+    return reply
+      .code(403)
+      .send({ error: 'Cross-site request refused — this API only answers the Heartmorrow app.' });
+  });
 
   await app.register(multipart, {
     limits: { fileSize: MAX_UPLOAD_BYTES, files: 1, fields: 10 },
@@ -118,7 +138,8 @@ export async function buildApp(options: BuildAppOptions = {}): Promise<FastifyIn
       openapi: {
         info: {
           title: 'DSim API',
-          description: 'Local-first LLM-powered dating simulator — HTTP API.',
+          description:
+            'Local-first LLM-powered dating simulator — HTTP API. All mutating requests (POST/PUT/PATCH/DELETE) must carry the `x-heartmorrow` header (any value); requests without it are refused with 403 as cross-site.',
           version: '0.1.0',
         },
         servers: [{ url: `http://${config.host}:${config.port}` }],

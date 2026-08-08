@@ -140,6 +140,20 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* An inline "how this works" link inside a board note — quiet, but findable. */
+.pl-note-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--brass);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.pl-note-link:hover { color: var(--text); }
+
 /* A state lock: why the board's buttons are dark RIGHT NOW. Deliberately not a
    .pl-board-note — that prose explains the app and never changes, and stacking
    the two made a standing rule and a temporary block look identical. */
