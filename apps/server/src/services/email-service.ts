@@ -8,6 +8,7 @@ import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { notFound } from '../lib/errors';
 import { hashFloat, type SeededRandom } from '../lib/seeded-random';
 import { recordEvent } from './event-service';
+import { featureEnabled } from './world-feature-service';
 
 /** Generate the day's in-world emails (companies/strangers — never characters). */
 export async function generateDailyEmails(
@@ -16,6 +17,10 @@ export async function generateDailyEmails(
   playerId: string = DEFAULT_PLAYER_ID,
   rng: SeededRandom = hashFloat,
 ): Promise<void> {
+  // Guard at the SERVICE (not just the clock hook) so every caller — day-start
+  // hook, dev route — respects a world that turned Mail off: no letters, no
+  // model calls.
+  if (!featureEnabled(worldId, 'email')) return;
   // CADENCE GATE: most days bring no email at all. Deterministic per (world, day)
   // so it stays idempotent/replay-safe. Gate here (not just in the hook) so the
   // dev/generate route path is rate-limited too.

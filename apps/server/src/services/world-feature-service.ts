@@ -25,12 +25,13 @@ export function requireFeature(worldId: string, key: FeatureKey): void {
   const world = worldsRepo.get(worldId);
   if (!world) throw notFound(`World ${worldId} not found.`);
   if (!world.featureFlags?.[key]) {
-    throw forbidden(
-      key === 'property'
-        ? 'Property ownership is not enabled for this world.'
-        : key === 'gambling'
-          ? 'The casino is not enabled for this world.'
-          : 'The stock market is not enabled for this world.',
-    );
+    const messages: Record<FeatureKey, string> = {
+      property: 'Property ownership is not enabled for this world.',
+      gambling: 'The casino is not enabled for this world.',
+      stockMarket: 'The stock market is not enabled for this world.',
+      email: 'The Mail app is not enabled for this world.',
+      faces: 'The Faces feed is not enabled for this world.',
+    };
+    throw forbidden(messages[key]);
   }
 }

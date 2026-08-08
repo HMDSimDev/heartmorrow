@@ -61,6 +61,14 @@ export const FeatureFlagsSchema = z.object({
   /** The casino: wager money on slots/blackjack/roulette/video poker, behind a
    *  flat per-bet cap and a per-day wager cap so it never becomes a money engine. */
   gambling: z.boolean().default(false),
+  /** The Mail app: daily in-world letters + away-postcards. ON by default (a core
+   *  phone surface, unlike the opt-in money systems above — the default keeps
+   *  every existing world unchanged); off hides the app and stops email
+   *  generation (and its model calls) for this world. */
+  email: z.boolean().default(true),
+  /** The Faces social feed: cast posts, comments, and reactions. ON by default;
+   *  off hides the app and stops feed generation (and its model calls). */
+  faces: z.boolean().default(true),
 });
 export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 

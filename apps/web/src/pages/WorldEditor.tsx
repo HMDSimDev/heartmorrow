@@ -469,6 +469,20 @@ export function WorldEditor() {
                         checked={world.featureFlags.gambling}
                         onChange={(v) => setFeature('gambling', v)}
                       />
+                      <FeatureToggle
+                        icon="mail"
+                        name={t('pages:worldEditor.featureEmailName')}
+                        desc={t('pages:worldEditor.featureEmailDesc')}
+                        checked={world.featureFlags.email}
+                        onChange={(v) => setFeature('email', v)}
+                      />
+                      <FeatureToggle
+                        icon="faces"
+                        name={t('pages:worldEditor.featureFacesName')}
+                        desc={t('pages:worldEditor.featureFacesDesc')}
+                        checked={world.featureFlags.faces}
+                        onChange={(v) => setFeature('faces', v)}
+                      />
                       {world.featureFlags.gambling && (
                         <div className="we-casino-config">
                           <span className="kicker">{t('pages:worldEditor.casinoLimits')}</span>

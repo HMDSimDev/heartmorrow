@@ -191,7 +191,9 @@ partners) plus an off-screen world-sim means the cast knows each other:
 ### 💰 Optional money systems
 
 Work and **Together** (time spent with people) are always on. Each world's creator can also switch on
-three richer, opt-in systems (all **OFF by default**):
+three richer, opt-in systems (all **OFF by default**) — and, the other way around, can switch
+**Mail** or **Faces** *off* for a world where they don't fit: the app vanishes from the phone
+and nothing is generated (or spends tokens) for it.
 
 - **Property** — lease in-world places (rent comes due on a real schedule; come up short and
   the landlord's eviction clock starts) or buy them outright, then date somewhere you hold

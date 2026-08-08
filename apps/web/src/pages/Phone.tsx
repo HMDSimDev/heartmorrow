@@ -133,6 +133,9 @@ export function Phone() {
     if (app === 'property' && !activeWorld?.featureFlags?.property) setApp('home', { replace: true });
     if (app === 'market' && !activeWorld?.featureFlags?.stockMarket) setApp('home', { replace: true });
     if (app === 'gambling' && !activeWorld?.featureFlags?.gambling) setApp('home', { replace: true });
+    // Mail/Faces are on-by-default (`?? true` guards the no-world moment).
+    if (app === 'email' && !(activeWorld?.featureFlags?.email ?? true)) setApp('home', { replace: true });
+    if (app === 'faces' && !(activeWorld?.featureFlags?.faces ?? true)) setApp('home', { replace: true });
   }, [app, activeWorld, worldsLoaded, setApp]);
 
   const badgeFor = (id: AppId) =>
@@ -161,15 +164,22 @@ export function Phone() {
     );
   };
 
-  // Per-world feature toggles: hide the wealth apps a world has disabled.
-  const featureOk = (id: AppDef['id']): boolean => {
+  // Per-world feature toggles: hide the apps a world has disabled. The wealth
+  // apps are opt-IN (off unless enabled); Mail and Faces are opt-OUT (on unless
+  // a world switched them off — `?? true` keeps them present with no world).
+  const featureOk = (id: AppId): boolean => {
     if (id === 'property') return !!activeWorld?.featureFlags?.property;
     if (id === 'market') return !!activeWorld?.featureFlags?.stockMarket;
     if (id === 'gambling') return !!activeWorld?.featureFlags?.gambling;
+    if (id === 'email') return activeWorld?.featureFlags?.email ?? true;
+    if (id === 'faces') return activeWorld?.featureFlags?.faces ?? true;
     return true;
   };
   const gridApps = ALL_APPS.filter((a) => !DOCK_IDS.includes(a.id) && featureOk(a.id));
-  const dockApps = DOCK_IDS.map((id) => ALL_APPS.find((a) => a.id === id)!).filter(Boolean);
+  // Mail lives in the DOCK, so the dock must respect the toggles too.
+  const dockApps = DOCK_IDS.map((id) => ALL_APPS.find((a) => a.id === id)!)
+    .filter(Boolean)
+    .filter((a) => featureOk(a.id));
 
   const phaseTxt = worldState ? phaseLabel(worldState.phase) : t('phone.twilight');
   const phaseIcon = worldState ? PHASE_ICONS[worldState.phase] : '🌙';
@@ -182,7 +192,9 @@ export function Phone() {
     { id: 'messages' as AppId, count: inbox.unreadTexts + inbox.landlordUnread, key: 'phone.waiting.texts' },
     { id: 'email' as AppId, count: inbox.unreadEmails, key: 'phone.waiting.letters' },
     { id: 'faces' as AppId, count: inbox.feedUnread, key: 'phone.waiting.posts' },
-  ].filter((p) => p.count > 0);
+    // A hint must never point at an app this world has hidden (stale unread
+    // counts can outlive a toggle-off).
+  ].filter((p) => p.count > 0 && featureOk(p.id));
   const lowEnergy = batteryPct <= 30;
   const homeHint = lowEnergy ? t('phone.hintLowEnergy') : t('phone.hintAmbient');
 

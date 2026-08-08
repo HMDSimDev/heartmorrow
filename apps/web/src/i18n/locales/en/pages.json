@@ -860,13 +860,17 @@
     "globalNotes": "Global notes",
     "lore": "Lore",
     "rulesInFiction": "Rules (in-fiction)",
-    "featuresNote": "Optional life-and-money systems. Turn these off for a world where they wouldn't fit — the apps disappear and authored property/companies simply lie dormant.",
+    "featuresNote": "Per-world systems. The money systems are off unless you turn them on; Mail and Faces are on unless you turn them off. A disabled system's app disappears from the phone, it generates nothing (and spends no model tokens), and anything already authored simply lies dormant.",
     "featurePropertyName": "Property",
-    "featurePropertyDesc": "Rent or buy places, collect rent, and date there for a buff.",
+    "featurePropertyDesc": "Rent or buy places and date there for a relationship buff.",
     "featureStockName": "Stock market",
     "featureStockDesc": "Invest in fictional in-world companies.",
     "featureCasinoName": "Casino",
     "featureCasinoDesc": "Wager money on slots, blackjack, roulette & video poker.",
+    "featureEmailName": "Mail",
+    "featureEmailDesc": "In-world letters and away-postcards. Off: no Mail app, no email generation.",
+    "featureFacesName": "Faces",
+    "featureFacesDesc": "The cast's social feed. Off: no Faces app, no posts or comments generated.",
     "casinoLimits": "Casino limits",
     "maxBet": "Max bet (◈)",
     "maxBetHint": "Flat per-bet cap · up to {max}",
@@ -1767,14 +1771,14 @@
       "phone": {
         "label": "Your phone",
         "title": "Your phone",
-        "overview": "Your phone is one tab on the bottom bar, and opening it drops you onto a home screen of apps — like a real phone, complete with the in-world day and time, a warm greeting that shifts with the hour, and a \"battery\" that quietly tracks how much energy you have left today. Each app is its own little tool: some keep you close to people, others run your life and your money. A few of the money apps only appear if the world you're playing was built to include them.",
+        "overview": "Your phone is one tab on the bottom bar, and opening it drops you onto a home screen of apps — like a real phone, complete with the in-world day and time, a warm greeting that shifts with the hour, and a \"battery\" that quietly tracks how much energy you have left today. Each app is its own little tool: some keep you close to people, others run your life and your money. A few of the money apps only appear if the world you're playing was built to include them — and a world can also switch off Mail or Faces entirely.",
         "sections": [
           {
             "heading": "How the home screen works",
             "body": [
               "At the top, the phone always shows the current in-world day and time of day, plus a battery that fills green when you're rested and drains toward red as you spend energy across the day. The greeting under the clock changes with the time — morning, afternoon, evening, or night.",
               "Apps sit in a grid, with four kept in the dock along the bottom: Messages, Mail, Moments, and Settings. A small number badge on an app means something is waiting for you — unread texts, unread mail, or new posts on Faces. Tap any app to open it; the round button below the screen takes you back home.",
-              "Three of the money apps — Property, Market, and Casino — only show up when the world you're in was set up to use them. In a world that doesn't, they simply aren't on your home screen."
+              "Three of the money apps — Property, Market, and Casino — only show up when the world you're in was set up to use them. Mail and Faces work the other way: every world starts with them, but a creator can switch either off, and it vanishes from the home screen the same way. A missing app simply isn't part of this world."
             ]
           },
           {
@@ -1919,11 +1923,11 @@
             "body": [
               "The world workbench has a sidebar listing your worlds (with a \"New world\" button) and a detail pane for the one you've selected. Here you set the world's name, summary, tone, lore, in-fiction rules, and global notes. You can also add World Notes — scoped reference entries (global, location, faction, lore, rule, character, or misc) that are fed to the AI as background.",
               "Locations are the venues your dates happen in. Each has a name, description, tags, an indoor/outdoor setting, an optional photo, and a \"cost to date there\" price tier. You can add them by hand or use \"Generate with AI,\" which drafts a batch (1 to 8 at a time) from your world's lore plus a free-form prompt. Generated locations drop straight into the editor for you to review and tweak — they're only kept once you click \"Save world.\"",
-              "Each world can turn three optional systems on or off independently, under \"Game features\": Property (rent or buy places), the Stock Market, and the Casino. All three are off by default, and the setting is enforced per world — if a world has a feature off, those screens simply aren't available there. When you enable the Casino, you can also set its betting limits.",
+              "Each world can turn five systems on or off independently, under \"Game features\". The three money systems — Property (rent or buy places), the Stock Market, and the Casino — are off by default. Mail and Faces are on by default, and switching either off removes the app and stops its generation for that world (letters, postcards, feed posts — none are written, and none of their model calls happen). Every setting is enforced per world — if a world has a feature off, those screens simply aren't available there. When you enable the Casino, you can also set its betting limits.",
               "Worlds are also where shop stock comes from: open the Shop in Creator mode and use \"Generate items\" to draft themed gifts and goods (your world's setting is woven in automatically), then keep the ones you like."
             ],
             "bullets": [
-              "Property, Stock Market, and Casino are per-world toggles, all off by default.",
+              "Property, Stock Market, and Casino are per-world toggles, all off by default; Mail and Faces are per-world toggles too, on by default.",
               "Casino limits you can set: a maximum single bet (up to 1,000) and a daily wager cap (up to 10,000), with a minimum bet of 5.",
               "A location's price tier sets how much a date there costs; the \"Free\" tier costs nothing.",
               "Deleting a world offers an optional checkbox to also delete its characters — leave it unchecked to keep the cast."
@@ -1978,7 +1982,7 @@
               "Nobody texts me — you only hear from people you've already been on a date with. Someone you dated and then neglected may send a wistful message; people you've never met never text.",
               "I can't sleep or end the day — you have a date in progress. Finish it with \"End & evaluate,\" or leave it, and the day button unlocks.",
               "I'm out of money — there's no allowance. Open the Work app and take a shift; that's how you earn.",
-              "An app is missing from my phone — Property, Market, and Casino only appear in worlds that switch them on (a per-world setting in Creator mode).",
+              "An app is missing from my phone — Property, Market, and Casino only appear in worlds that switch them on, and a world can also switch Mail or Faces off (both are per-world settings in the World editor's Game features).",
               "They keep walking out on me — walkouts happen only for hostile or cruel behavior, or coming on strong with someone you're not close to yet. Ease off and let the vibe recover.",
               "My ask to define the relationship failed — you need enough warmth and good timing. After any ask they want a few days before you bring it up again, so try again after a good date.",
               "A character treats an old plan as if it is still on — texts can go stale; the game flags when a plan is days old, but smaller models occasionally miss it."
