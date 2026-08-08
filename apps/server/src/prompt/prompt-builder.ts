@@ -1715,10 +1715,17 @@ export function buildGiftReactionMessages(args: {
     scene === 'date'
       ? `You are together on a date right now; ${playerName} just handed you this gift.`
       : `${playerName} just sent you this gift in a text.`;
-  const convo =
-    scene === 'date' && recentMessages && recentMessages.length
-      ? `Recent exchange:\n${transcript(recentMessages.slice(-6), c.name)}\n\n`
-      : '';
+  // A prior gift's narrator beat and reaction are especially sticky context for
+  // smaller models: when two gifts are given back-to-back, they can answer as if
+  // the previous item were handed over again. Gift messages add no useful scene
+  // context here, so exclude them before selecting the recent exchange.
+  const contextualMessages =
+    scene === 'date' && recentMessages
+      ? recentMessages.filter((message) => !message.metadata.gift).slice(-6)
+      : [];
+  const convo = contextualMessages.length
+    ? `Recent exchange:\n${transcript(contextualMessages, c.name)}\n\n`
+    : '';
   const said = playerText && playerText.trim() ? `As they gave it, ${playerName} said: "${playerText.trim()}"\n` : '';
   return [
     {
@@ -1732,10 +1739,10 @@ export function buildGiftReactionMessages(args: {
       role: 'user',
       content:
         `Your relationship with ${playerName}: stage ${stage.label}. ${relationshipStatLine(relationship)}.\n` +
-        `${sceneNote}\n` +
-        `The gift: "${item.name}" — ${item.description || 'no description'} (${item.rarity} ${item.category}).\n` +
-        said +
         convo +
+        `${sceneNote}\n` +
+        `CURRENT GIFT — react to this item only: "${item.name}" — ${item.description || 'no description'} (${item.rarity} ${item.category}).\n` +
+        said +
         `React per the schema: your spoken line, an expression, small relationship changes, and an optional keepsake memory.`,
     },
   ];

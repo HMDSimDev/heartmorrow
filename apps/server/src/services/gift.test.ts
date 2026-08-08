@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { type ShopItemCreate } from '@dsim/shared';
 import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
+import type { ChatRequest } from '../llm/types';
 import { setAdapterOverride } from '../llm/provider';
 import { createShopItem, grantItem } from './shop-service';
 import { getRelationship } from './relationship-service';
@@ -25,6 +26,15 @@ function item(partial: Partial<ShopItemCreate> & { name: string }): ShopItemCrea
 }
 
 const reply = (o: object) => new ScriptedAdapter([JSON.stringify(o)]);
+
+class CapturingAdapter extends ScriptedAdapter {
+  readonly requests: ChatRequest[] = [];
+
+  override async chat(req: ChatRequest) {
+    this.requests.push(req);
+    return super.chat(req);
+  }
+}
 
 beforeEach(() => resetDb());
 afterEach(() => setAdapterOverride(null));
@@ -88,6 +98,29 @@ describe('gift reactions (on a date)', () => {
     expect(a1).toBe(a0 + 6);
     await giveGiftOnDate(session.id, inv.id); // capped 6, then scaled ×0.5 → +3
     expect(getRelationship(character.id).affection).toBe(a1 + 3);
+  });
+
+  it('does not put the previous gift in the next gift reaction prompt', async () => {
+    const { world, character } = seedWorldAndCharacter();
+    const rose = createShopItem(item({ name: 'Single Rose', description: 'A fragrant red rose.' }));
+    const novel = createShopItem(item({ name: 'Mystery Novel', description: 'A clever locked-room mystery.' }));
+    const roseInv = grantItem(rose.id, 1, playerIdForWorld(world.id)).inventoryItem;
+    const novelInv = grantItem(novel.id, 1, playerIdForWorld(world.id)).inventoryItem;
+    const session = createSession({ characterId: character.id, mode: 'date', locationId: null });
+    const adapter = new CapturingAdapter([
+      JSON.stringify({ expression: 'happy', line: 'What a lovely rose!', relationshipDeltas: {}, memory: null }),
+      JSON.stringify({ expression: 'happy', line: 'I love a good mystery!', relationshipDeltas: {}, memory: null }),
+    ]);
+    setAdapterOverride(adapter);
+
+    await giveGiftOnDate(session.id, roseInv.id);
+    await giveGiftOnDate(session.id, novelInv.id);
+
+    const secondPrompt = adapter.requests[1]?.messages.find((message) => message.role === 'user')?.content;
+    expect(secondPrompt).toEqual(expect.any(String));
+    expect(secondPrompt).toContain('CURRENT GIFT — react to this item only: "Mystery Novel"');
+    expect(secondPrompt).not.toContain('Single Rose');
+    expect(secondPrompt).not.toContain('What a lovely rose!');
   });
 
   it('fails safe: a malformed reaction changes nothing and consumes nothing', async () => {
