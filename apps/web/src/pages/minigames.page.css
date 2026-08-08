@@ -499,6 +499,90 @@
   .mga-log { transition: none; }
 }
 
+/* --- The Flip (market haggling) ------------------------------------------- */
+.mga-flip { display: flex; flex-direction: column; gap: 12px; }
+.mga-flip-buyer { display: flex; align-items: center; gap: 12px; }
+.mga-flip-glyph {
+  font-size: 1.9rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(230, 177, 94, 0.35));
+}
+.mga-flip-item { font-weight: 600; color: var(--text); }
+.mga-flip-worth {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+/* The two reads on the buyer — an observation, not a menu. */
+.mga-flip-tells {
+  margin: 0;
+  padding: 2px 0 2px 12px;
+  list-style: none;
+  border-left: 2px solid var(--border-bright);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mga-flip-tells li {
+  font-style: italic;
+  font-size: 0.86rem;
+  color: var(--text-dim);
+}
+.mga-flip-price {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.mga-flip-quote {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--brass);
+  min-width: 4ch;
+  text-align: center;
+}
+/* The live "what you'd clear" readout — the game's whole economy in one line. */
+.mga-flip-margin {
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+.mga-flip-line {
+  text-align: center;
+  font-size: 0.92rem;
+  min-height: 1.4em;
+}
+.mga-flip-line.fp-bite { color: var(--brass); }
+.mga-flip-line.fp-sold,
+.mga-flip-line.fp-presswin { color: var(--sage); }
+.mga-flip-line.fp-presslose,
+.mga-flip-line.fp-walked { color: var(--ember); }
+.mga-flip-choices {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.mga-flip-choices .btn { flex: 1; }
+.mga-flip-pouch {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--brass);
+  white-space: nowrap;
+}
+.mga-flip-help {
+  display: flex;
+  justify-content: center;
+  margin-top: 2px;
+}
+.mga-flip-help .btn {
+  color: var(--text-mute);
+  font-size: 0.76rem;
+}
+
 /* --- The Copy Desk (writer) --------------------------------------------- */
 .wr-board { display: flex; flex-direction: column; gap: 12px; }
 .wr-headline {

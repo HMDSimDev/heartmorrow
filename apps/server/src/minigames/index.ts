@@ -7,6 +7,7 @@ import { twoTruthsModule } from './two-truths-a-lie';
 import { rhythmSerenadeModule } from './rhythm-serenade';
 import { lumberjackModule } from './lumberjack';
 import { writerModule } from './writer';
+import { flipModule } from './flip';
 
 // Register all built-in minigames. To add a new one, create a module that
 // implements `MinigameModule` and register it here (see docs/ADDING_MINIGAMES.md).
@@ -18,5 +19,6 @@ registerMinigame(twoTruthsModule);
 registerMinigame(rhythmSerenadeModule);
 registerMinigame(lumberjackModule);
 registerMinigame(writerModule);
+registerMinigame(flipModule);
 
 export * from './registry';

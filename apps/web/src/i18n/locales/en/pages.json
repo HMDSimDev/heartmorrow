@@ -1835,7 +1835,7 @@
             "heading": "Earning money",
             "body": [
               "You start with nothing, and there's no daily allowance -- money comes from work. Open the work options and pick the shift that fits your day. The more you repeat a kind of work, the better you get at it: your skill in that trade levels up and slowly raises its pay. No single shift can ever pay a runaway amount, so steady work is the honest road to a full wallet.",
-              "Two jobs are played as quick skill games -- the Woodlot (felling logs) and the Copy Desk (transcribing the day's news). They pay you purely for how well you play, up to a solid flat payout, and a good run there is as good as it gets for one shift.",
+              "Three jobs are played as quick skill games -- the Woodlot (felling logs), the Copy Desk (transcribing the day's news), and the Flip (haggling scrounged goods at a market stall). They pay you purely for how well you play, up to a solid flat payout, and a good run there is as good as it gets for one shift. At the Flip, you pocket only the margin: each piece has a street value, and only what a buyer pays above that worth is yours to keep. The buyer's two tells honestly hint at the most they'd pay -- price under that hidden limit and they pay your asking price, push past it and they walk -- and an accepted deal can be pressed for a richer cut at the risk of losing the whole sale.",
               "Beyond work, the only money that arrives on its own is dividends from any stocks you're holding, in worlds that have a stock market. Nothing pays you just for sleeping.",
               "When you end the day, the morning summary keeps the money story on its own Ledger tab — work, casino results, shopping, overnight rent and dividends, and the market's biggest moves, itemized exactly. The written recap sticks to what actually happened between people."
             ],
@@ -1843,7 +1843,7 @@
               "Work a shift -- steady, dependable pay with no surprises; builds your Service skill.",
               "Hustle odd jobs -- the same pay on average but a wide swing, great on a good day and thin on a bad one; builds your Hustle skill.",
               "Day-labor outdoors -- the biggest single payday, but it takes two actions and the weather sets the price (storms pay best, fair days least); unlocks once you've built up your Craft skill.",
-              "The Woodlot and the Copy Desk -- minigame jobs that pay you for how well you play."
+              "The Woodlot, the Copy Desk, and the Flip -- minigame jobs that pay you for how well you play."
             ]
           },
           {

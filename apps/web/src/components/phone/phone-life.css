@@ -79,6 +79,66 @@
   color: var(--text-dim);
   line-height: 1.4;
 }
+/* Day-plate internals: the title row carries the energy pips — the budget the
+   whole board spends — and the sub-line is the sky pricing the outdoor work. */
+.pl-plate-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.pl-plate-energy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.pl-pips { display: inline-flex; gap: 3px; }
+.pl-pip { color: var(--border-bright); font-size: 0.78rem; }
+.pl-pip.on {
+  color: var(--brass);
+  text-shadow: 0 0 7px rgba(230, 177, 94, 0.55);
+}
+.pl-plate-energy.is-spent { color: var(--ember); }
+.pl-plate-energy.is-spent .pl-pip { color: color-mix(in srgb, var(--ember) 45%, transparent); }
+
+/* Tab bar — the phone's segmented control (mirrors the Market app's tabs). */
+.pl-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 3px;
+  margin: 11px 0 12px;
+  background: var(--ink-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+}
+.pl-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-mute);
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+.pl-tab:hover { color: var(--text-dim); }
+.pl-tab.active {
+  background: var(--panel-2);
+  color: var(--brass);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
 
 /* A state lock: why the board's buttons are dark RIGHT NOW. Deliberately not a
    .pl-board-note — that prose explains the app and never changes, and stacking
@@ -154,6 +214,12 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 0 10px rgba(232, 138, 166, 0.16);
 }
 .pl-tile.pl-together .pl-tile-icon { font-size: 1.15rem; }
+/* A posting's diegetic glyph sits on the same lamplit medallion as the icons. */
+.pl-tile-glyph {
+  font-size: 1.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(230, 177, 94, 0.3));
+}
 
 /* Together: a meta row of small read-at-a-glance chips (fit · risk · cost) */
 .pl-meta {
@@ -225,15 +291,37 @@
 .pl-work-tag.locked { color: var(--text-mute); border-color: var(--border); }
 .pl-tile.is-locked { opacity: 0.62; }
 
-/* --- Career skills bar (Work app) --------------------------------------- */
-.pl-skills {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px 12px;
-  margin: 4px 0 10px;
+/* --- Career trades (Work app, "Your trades" tab) ------------------------- */
+.pl-trades { display: flex; flex-direction: column; gap: 9px; }
+/* Each trade is a card, not a bar in a grid — room for its blurb and the jobs
+   that feed it, so a lagging trade tells you where to go earn it. */
+.pl-trade {
+  padding: 11px 12px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
 }
-@media (max-width: 360px) {
-  .pl-skills { grid-template-columns: 1fr; }
+.pl-trade-blurb {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.pl-trade-jobs {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: var(--text-mute);
+  margin-top: 3px;
+}
+/* The standing house rules, quiet at the bottom of the trades ledger. */
+.pl-trades-note {
+  margin: 12px 2px 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--text-mute);
 }
 .pl-skill { display: flex; flex-direction: column; gap: 4px; }
 .pl-skill-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -300,20 +388,6 @@
   letter-spacing: 0.02em;
   color: var(--text-mute);
 }
-/* Remaining-energy readout on the board header. */
-.pl-energy-readout {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 6px 0 2px;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--text-dim);
-}
-.pl-energy-readout > span:first-child { color: var(--brass); }
-.pl-energy-readout.is-spent { color: var(--ember); }
-.pl-energy-readout.is-spent > span:first-child { color: var(--ember); }
-
 /* training partner picker — now uses PortraitPicker */
 .pl-partner-pick {
   margin: 0 0 12px;

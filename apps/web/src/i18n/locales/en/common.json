@@ -120,6 +120,12 @@
     "craft": "Craft",
     "knowledge": "Knowledge"
   },
+  "careerSkillBlurb": {
+    "service": "steady shifts and counter work",
+    "hustle": "gigs, odd jobs, and side cuts",
+    "craft": "trades and hard, hands-on labor",
+    "knowledge": "writing, records, and know-how"
+  },
   "videoPokerRank": {
     "none": "No pay",
     "jacksOrBetter": "Jacks or Better",
@@ -257,7 +263,44 @@
     "go": "Go!",
     "combo": "combo",
     "tapToBeat": "Tap to the beat",
-    "pressSpace": "(or press Space)"
+    "pressSpace": "(or press Space)",
+    "theFlip": "The Flip",
+    "flipWorth": "worth about ◈{value}",
+    "flipLower": "Lower the price by {n}",
+    "flipRaise": "Raise the price by {n}",
+    "flipOffer": "Ask ◈{q}",
+    "flipMargin": "◈{m} above its worth — yours if they bite",
+    "flipNoMargin": "asking its bare worth — a sale, but nothing cleared",
+    "flipBite": "They bite — ◈{q} is on the table.",
+    "flipShake": "Shake on it",
+    "flipPress": "Press for ◈{p}",
+    "flipSold": "Sold for ◈{n} — ◈{m} cleared.",
+    "flipPressWin": "They wince, grumble — and pay ◈{n}. ◈{m} cleared.",
+    "flipPressLose": "Too greedy. The deal dies on the table.",
+    "flipWalked": "They scoff at the price and walk off.",
+    "flipNext": "Next buyer",
+    "flipPack": "Pack up the stall",
+    "flipPouch": "◈{n} cleared",
+    "flipHowTo": "How the stall works",
+    "flipOnb": {
+      "kicker": "How the stall works · {n} of {total}",
+      "margin": {
+        "title": "You keep the margin",
+        "body": "Every piece on your table has a street value — what it's honestly worth. A sale at that price earns you nothing. Whatever a buyer pays above the mark is yours, and that cleared margin is exactly the coin this shift pays out."
+      },
+      "read": {
+        "title": "Read the buyer",
+        "body": "Two tells, every time: the first says how badly they want the piece, the second how deep their purse runs. Together they whisper the most they'd ever pay. Ask under that hidden limit and they pay your price — ask past it and they walk with nothing."
+      },
+      "press": {
+        "title": "Know when to press",
+        "body": "When a buyer bites you can shake on it and bank the deal — or press for a fifth more. If their limit can bear the raise, they grumble and pay. If it can't, the whole sale dies on the table. Greed pays, right up until it doesn't."
+      },
+      "back": "Back",
+      "skip": "Skip",
+      "next": "Next",
+      "done": "Set up the stall"
+    }
   },
   "weather": {
     "sunny": "sunny",

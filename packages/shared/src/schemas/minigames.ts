@@ -19,6 +19,7 @@ export const MINIGAME_IDS = [
   'rhythm_serenade',
   'lumberjack',
   'writer',
+  'flip',
 ] as const;
 export const MinigameIdSchema = z.enum(MINIGAME_IDS);
 export type MinigameId = z.infer<typeof MinigameIdSchema>;
@@ -175,6 +176,35 @@ export const WriterConfigSchema = z.object({
 });
 export type WriterConfig = z.infer<typeof WriterConfigSchema>;
 
+// flip — a money-only SKILL JOB: hawk scrounged goods to a queue of buyers. Each
+// buyer's two tells honestly signal how much they WANT the piece and how deep
+// their PURSE runs; the player names a price against the buyer's hidden walk-away
+// ceiling, then may "press" an accepted deal for a richer cut at the risk of
+// killing it. Like the rhythm pattern / grain zones, the ceiling necessarily
+// ships to the client so it can adjudicate accept-vs-walk live (the honest UI
+// never shows it); the server keeps its own copy and re-derives every outcome
+// from the raw quote sequence — the client never submits a take or a score.
+export const FlipBuyerSchema = z.object({
+  /** What's on the table for this buyer. */
+  item: z.string(),
+  /** A diegetic emoji glyph for the item card. */
+  glyph: z.string(),
+  /** The item's rough street value — the player's only hard number. */
+  baseValue: z.number().int().positive(),
+  /** Two honest reads, in fixed order: [how much they want it, how deep the purse]. */
+  tells: z.array(z.string()).length(2),
+  /** The buyer's hidden walk-away ceiling (see note above on why it's shipped). */
+  ceiling: z.number().int().positive(),
+});
+export type FlipBuyer = z.infer<typeof FlipBuyerSchema>;
+
+export const FlipConfigSchema = z.object({
+  buyers: z.array(FlipBuyerSchema).min(1).max(12),
+  /** Multiplier a "press" asks for on top of an accepted quote. */
+  pressMult: z.number().positive(),
+});
+export type FlipConfig = z.infer<typeof FlipConfigSchema>;
+
 export const MinigameConfigSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('memory_match'), config: MemoryMatchConfigSchema }),
   z.object({ minigameId: z.literal('timing_meter'), config: TimingMeterConfigSchema }),
@@ -184,6 +214,7 @@ export const MinigameConfigSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('rhythm_serenade'), config: RhythmSerenadeConfigSchema }),
   z.object({ minigameId: z.literal('lumberjack'), config: LumberjackConfigSchema }),
   z.object({ minigameId: z.literal('writer'), config: WriterConfigSchema }),
+  z.object({ minigameId: z.literal('flip'), config: FlipConfigSchema }),
 ]);
 export type MinigameConfig = z.infer<typeof MinigameConfigSchema>;
 
@@ -263,6 +294,22 @@ export const WriterSubmissionSchema = z.object({
 });
 export type WriterSubmission = z.infer<typeof WriterSubmissionSchema>;
 
+export const FlipSubmissionSchema = z.object({
+  /** One entry per buyer, in order: the price quoted and whether an accepted deal
+   *  was pressed. Raw decisions only — the SERVER holds the ceilings and derives
+   *  every accept/walk/press outcome, the take, and the score from these. */
+  deals: z
+    .array(
+      z.object({
+        quote: z.number().int().min(0).max(9999),
+        pressed: z.boolean().default(false),
+      }),
+    )
+    .min(1)
+    .max(12),
+});
+export type FlipSubmission = z.infer<typeof FlipSubmissionSchema>;
+
 export const MinigameSubmissionSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('memory_match'), submission: MemoryMatchSubmissionSchema }),
   z.object({ minigameId: z.literal('timing_meter'), submission: TimingMeterSubmissionSchema }),
@@ -272,6 +319,7 @@ export const MinigameSubmissionSchema = z.discriminatedUnion('minigameId', [
   z.object({ minigameId: z.literal('rhythm_serenade'), submission: RhythmSerenadeSubmissionSchema }),
   z.object({ minigameId: z.literal('lumberjack'), submission: LumberjackSubmissionSchema }),
   z.object({ minigameId: z.literal('writer'), submission: WriterSubmissionSchema }),
+  z.object({ minigameId: z.literal('flip'), submission: FlipSubmissionSchema }),
 ]);
 export type MinigameSubmission = z.infer<typeof MinigameSubmissionSchema>;
 
@@ -285,6 +333,8 @@ export const MinigameInfoSchema = z.object({
   /** Where this surfaces: a bonding game lives in the Arcade; a `job` is paid skill
    *  work and lives in the Work app. Omitted = 'date' (bonding). */
   mode: z.enum(['date', 'job']).optional(),
+  /** A diegetic emoji glyph for the Work-app posting tile. */
+  glyph: z.string().optional(),
   /** Job games only: the career skill this builds (see shared `career.ts`). */
   skill: z.string().optional(),
   /** Job games only: XP granted to {@link skill}, scaled by the play's score. */

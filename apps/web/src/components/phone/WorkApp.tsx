@@ -3,17 +3,20 @@ import { useTranslation } from 'react-i18next';
 import {
   CAREER,
   CAREER_SKILLS,
+  HARSH_WEATHER,
+  PLEASANT_WEATHER,
   careerProgress,
   isCareerSkill,
   masteryMult,
   type ActivityDef,
+  type DayWeather,
   type MinigameInfo,
   type MinigameSubmission,
 } from '@dsim/shared';
 import { api } from '../../lib/api';
 import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
-import { careerSkillLabel, phaseLabel } from '../../i18n/labels';
+import { careerSkillBlurb, careerSkillLabel, phaseLabel, weatherLabel } from '../../i18n/labels';
 import { Icon, type IconName } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { ResultCard, ResultPill, type ResultTone } from '../ResultCard';
@@ -33,11 +36,20 @@ type WorkNote = {
   ledger?: Array<{ icon?: IconName; text: string; tone?: 'up' | 'down' }>;
 };
 
+type WorkTab = 'board' | 'trades';
+
+/** Mirror of the server's weather-priced pay multipliers (activity-service) —
+ *  display-only, used to sharpen a weather-priced tile's range to TODAY's sky. */
+const HARSH_PAY = 1.4;
+const PLEASANT_PAY = 0.85;
+
 export function WorkApp() {
   const { t } = useTranslation(['phone', 'common']);
   const { activeWorldId, reloadPlayer, refreshWorldState, worldState, dayTick, activeDate, player } = useAppData();
   const [activities, setActivities] = useState<ActivityDef[]>([]);
   const [jobGames, setJobGames] = useState<MinigameInfo[]>([]);
+  const [weather, setWeather] = useState<DayWeather | null>(null);
+  const [tab, setTab] = useState<WorkTab>('board');
   const [active, setActive] = useState<ActiveGame | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<WorkNote | null>(null);
@@ -56,7 +68,13 @@ export function WorkApp() {
     api.listActivities().then(setActivities).catch(() => undefined);
     // Job games (paid skill work) live HERE, not the dating arcade.
     api.listMinigames().then((g) => setJobGames(g.filter((x) => x.mode === 'job'))).catch(() => undefined);
-  }, [dayTick]);
+    // Today's sky, so the plate can price the day (weather-priced day labor).
+    if (activeWorldId) {
+      api.worldWeather(activeWorldId).then((w) => setWeather(w.today)).catch(() => setWeather(null));
+    } else {
+      setWeather(null);
+    }
+  }, [dayTick, activeWorldId]);
 
   // A world switch must not leave a previous world's run on screen — finishing it would
   // reconcile its reward into that world while the HUD now reflects the new one. Mirrors
@@ -142,8 +160,9 @@ export function WorkApp() {
       setActive(null);
       await Promise.all([reloadPlayer(), refreshWorldState()]);
       const r = res.result;
-      // Tone the keepsake by grade: A/B glows sage, C is neutral brass, D–F reads ember.
-      const tone: ResultTone = r.grade === 'A' || r.grade === 'B' ? 'sage' : r.grade === 'C' ? 'brass' : 'ember';
+      // Tone the keepsake by grade: S–B glows sage, C is neutral brass, D–F reads ember.
+      const tone: ResultTone =
+        r.grade === 'S' || r.grade === 'A' || r.grade === 'B' ? 'sage' : r.grade === 'C' ? 'brass' : 'ember';
       setNote({
         tone,
         seal: tone === 'ember' ? '⚠' : '✦',
@@ -186,6 +205,21 @@ export function WorkApp() {
 
   const work = activities.filter((a) => a.kind === 'work');
 
+  // The plate's sky line prices the day for weather-priced work.
+  const skyLine = weather
+    ? HARSH_WEATHER.includes(weather.kind)
+      ? t('work.weatherPremium', { icon: weather.icon, label: weatherLabel(weather.kind) })
+      : PLEASANT_WEATHER.includes(weather.kind)
+        ? t('work.weatherThin', { icon: weather.icon, label: weatherLabel(weather.kind) })
+        : t('work.weatherPlain', { icon: weather.icon, label: weatherLabel(weather.kind) })
+    : null;
+
+  /** Jobs that feed a trade, for the trade card's "earned at" line. */
+  const jobsFor = (s: string): string[] => [
+    ...work.filter((a) => a.skill === s).map((a) => a.label),
+    ...jobGames.filter((g) => g.skill === s).map((g) => g.title),
+  ];
+
   return (
     <div className="phone-app">
       <PhoneAppBar title={t('work.title')} kicker={t('work.daysShifts')} icon="work" />
@@ -215,177 +249,232 @@ export function WorkApp() {
           </div>
         )}
 
+        {/* The day plate: the app's masthead — today's postings, the energy left to
+            spend on them, and the sky pricing the outdoor work. */}
         <div className="pl-board">
-          <p className="pl-board-note">
-            {t('work.boardNote')}
-          </p>
-        </div>
-
-        {/* Locks live outside the board so a temporary block never reads as more
-            house rules. Date first — it outranks energy as the reason. */}
-        {onDate && (
-          <div className="pl-lock">
-            <span className="pl-lock-glyph"><Icon name="date" size={15} /></span>
-            <span>
-              {t(activeDate!.mode === 'hangout' ? 'work.onHangoutNote' : 'work.onDateNote', {
-                name: activeDate!.characterName,
-              })}
-            </span>
-          </div>
-        )}
-        {noEnergy && !onDate && (
-          <div className="pl-lock is-rest">
-            <span className="pl-lock-glyph"><Icon name="moon" size={15} /></span>
-            <span>{t('work.noEnergy')}</span>
-          </div>
-        )}
-
-        {/* --- Career skills ------------------------------------------------ */}
-        <div className="pl-eyebrow">{t('work.skillsHead')}</div>
-        <div className="pl-skills">
-          {CAREER_SKILLS.map((s) => {
-            const p = careerProgress(player?.career?.[s]?.xp ?? 0);
-            return (
-              <div className={`pl-skill${p.xp === 0 ? ' is-untouched' : ''}`} key={s}>
-                <div className="pl-skill-head">
-                  <span className="pl-skill-name">{careerSkillLabel(s)}</span>
-                  <span className="pl-skill-lv">
-                    {t('work.level', { level: p.level })}
-                    {p.atMax ? t('work.maxSuffix') : ''} · ×{masteryMult(p.level).toFixed(2)}
-                  </span>
-                </div>
-                {/* One segment per level, not one continuous bar — the ceiling is
-                    part of the information, and a single bar hid how far Lv 5 is. */}
-                <div
-                  className="pl-skill-bar"
-                  title={
-                    p.atMax
-                      ? t('work.xpMax')
-                      : t('work.xpInto', { into: p.intoLevel, span: p.span, next: p.level + 1 })
-                  }
-                >
-                  {Array.from({ length: CAREER.MAX_LEVEL }, (_, i) => (
-                    <span key={i} className={`pl-skill-seg${i < p.level ? ' is-done' : ''}`}>
-                      {i === p.level && !p.atMax && <i style={{ width: `${Math.round(p.pct * 100)}%` }} />}
-                    </span>
+          <div className="pl-plate-top">
+            <div className="pl-board-title">{t('work.plateTitle')}</div>
+            {worldState && (
+              <span
+                className={`pl-plate-energy${noEnergy ? ' is-spent' : ''}`}
+                title={t('work.energyLeft', { stamina, max: worldState.staminaMax })}
+              >
+                <span className="pl-pips" aria-hidden>
+                  {Array.from({ length: worldState.staminaMax }, (_, i) => (
+                    <span key={i} className={`pl-pip${i < stamina ? ' on' : ''}`}>◆</span>
                   ))}
-                </div>
-              </div>
-            );
-          })}
+                </span>
+                {stamina}/{worldState.staminaMax}
+              </span>
+            )}
+          </div>
+          {skyLine && <div className="pl-board-sub">{skyLine}</div>}
         </div>
 
-        {/* --- Flat shifts -------------------------------------------------- */}
-        <div className="pl-eyebrow">{t('work.shiftsHead')}</div>
-        {worldState && (
-          <div className={`pl-energy-readout${noEnergy ? ' is-spent' : ''}`}>
-            <span>◆</span>
-            <span>
-              {t('work.energyLeft', { stamina: worldState.stamina, max: worldState.staminaMax })}
-            </span>
-          </div>
-        )}
-        {work.map((a) => {
-          const cost = a.staminaCost ?? 1;
-          const reqLocked =
-            isCareerSkill(a.requiresSkill) && lvl(a.requiresSkill) < (a.requiresLevel ?? 0);
-          const cantAfford = stamina < cost;
-          const v = a.moneyVariance ?? 0;
-          const base = a.money ?? 0;
-          const m = masteryMult(lvl(a.skill));
-          const loMult = (a.weatherPriced ? 0.85 : 1) * m;
-          const hiMult = (a.weatherPriced ? 1.4 : 1) * m;
-          const payLabel =
-            v > 0 || a.weatherPriced
-              ? `◈ ${Math.round(base * loMult * (1 - v))}–${Math.round(base * hiMult * (1 + v))}`
-              : `◈ ${Math.round(base * m)}`;
-          return (
-            <div className={`pl-tile pl-work${reqLocked ? ' is-locked' : ''}`} key={a.id}>
-              <div className="pl-tile-icon"><Icon name="work" size={18} /></div>
-              <div className="pl-tile-body">
-                <div className="pl-tile-label">{a.label}</div>
-                <div className="pl-tile-desc">{a.description}</div>
-                <div className="pl-work-tags">
-                  {isCareerSkill(a.skill) && <span className="pl-work-tag">{skillName(a.skill)}</span>}
-                  {v > 0 && <span className="pl-work-tag">{t('work.payVaries')}</span>}
-                  {a.weatherPriced && <span className="pl-work-tag">{t('work.weatherPriced')}</span>}
-                  {reqLocked && (
-                    <span className="pl-work-tag locked">
-                      {t('work.lockedTag', { skill: skillName(a.requiresSkill), level: a.requiresLevel })}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="pl-tile-action">
-                <span className="pl-tile-cost" title={t('work.costTitle', { count: cost })}>
-                  −{cost} ◆
-                </span>
-                <button
-                  className="btn sm primary"
-                  onClick={() => perform(a)}
-                  disabled={busy || cantAfford || onDate || reqLocked}
-                  title={
-                    reqLocked
-                      ? t('work.lockedTitle', { skill: skillName(a.requiresSkill), level: a.requiresLevel })
-                      : cantAfford && !noEnergy
-                        ? t('work.needEnergyTitle', { cost, stamina })
-                        : undefined
-                  }
-                >
-                  <span className="pl-coin">{payLabel}</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        <div className="pl-tabs" role="tablist">
+          <button
+            className={`pl-tab${tab === 'board' ? ' active' : ''}`}
+            role="tab"
+            aria-selected={tab === 'board'}
+            onClick={() => setTab('board')}
+          >
+            <Icon name="work" size={14} /> {t('work.tabBoard')}
+          </button>
+          <button
+            className={`pl-tab${tab === 'trades' ? ' active' : ''}`}
+            role="tab"
+            aria-selected={tab === 'trades'}
+            onClick={() => setTab('trades')}
+          >
+            <Icon name="trophy" size={14} /> {t('work.tabTrades')}
+          </button>
+        </div>
 
-        {/* --- Skill work (job minigames) ---------------------------------- */}
-        {jobGames.length > 0 && (
+        {tab === 'board' && (
           <>
-            <div className="pl-eyebrow">{t('work.skillWorkHead')}</div>
-            {jobGames.map((g) => {
+            {/* Locks live outside the postings so a temporary block never reads as
+                more house rules. Date first — it outranks energy as the reason. */}
+            {onDate && (
+              <div className="pl-lock">
+                <span className="pl-lock-glyph"><Icon name="date" size={15} /></span>
+                <span>
+                  {t(activeDate!.mode === 'hangout' ? 'work.onHangoutNote' : 'work.onDateNote', {
+                    name: activeDate!.characterName,
+                  })}
+                </span>
+              </div>
+            )}
+            {noEnergy && !onDate && (
+              <div className="pl-lock is-rest">
+                <span className="pl-lock-glyph"><Icon name="moon" size={15} /></span>
+                <span>{t('work.noEnergy')}</span>
+              </div>
+            )}
+
+            {/* --- Flat shifts ---------------------------------------------- */}
+            <div className="pl-eyebrow">{t('work.shiftsHead')}</div>
+            {work.map((a) => {
+              const cost = a.staminaCost ?? 1;
               const reqLocked =
-                isCareerSkill(g.requiresSkill) && lvl(g.requiresSkill) < (g.requiresLevel ?? 0);
-              const potential = Math.min(250, Math.round(100 * masteryMult(lvl(g.skill))));
+                isCareerSkill(a.requiresSkill) && lvl(a.requiresSkill) < (a.requiresLevel ?? 0);
+              const cantAfford = stamina < cost;
+              const v = a.moneyVariance ?? 0;
+              const base = a.money ?? 0;
+              const m = masteryMult(lvl(a.skill));
+              // With today's sky known, a weather-priced range collapses to today's
+              // actual band (mirror of the server's harsh/pleasant multipliers).
+              const todayW =
+                a.weatherPriced && weather
+                  ? HARSH_WEATHER.includes(weather.kind)
+                    ? HARSH_PAY
+                    : PLEASANT_WEATHER.includes(weather.kind)
+                      ? PLEASANT_PAY
+                      : 1
+                  : null;
+              const loMult = (todayW ?? (a.weatherPriced ? PLEASANT_PAY : 1)) * m;
+              const hiMult = (todayW ?? (a.weatherPriced ? HARSH_PAY : 1)) * m;
+              const cap = (n: number) => Math.min(CAREER.ABSOLUTE_MAX_PAY, Math.round(n));
+              const payLabel =
+                v > 0 || a.weatherPriced
+                  ? `◈ ${cap(base * loMult * (1 - v))}–${cap(base * hiMult * (1 + v))}`
+                  : `◈ ${cap(base * m)}`;
               return (
-                <div className={`pl-tile pl-work pl-job${reqLocked ? ' is-locked' : ''}`} key={g.id}>
-                  <div className="pl-tile-icon"><Icon name="games" size={18} /></div>
+                <div className={`pl-tile pl-work${reqLocked ? ' is-locked' : ''}`} key={a.id}>
+                  <div className="pl-tile-icon">
+                    {a.icon ? <span className="pl-tile-glyph">{a.icon}</span> : <Icon name="work" size={18} />}
+                  </div>
                   <div className="pl-tile-body">
-                    <div className="pl-tile-label">{g.title}</div>
-                    <div className="pl-tile-desc">{g.description}</div>
+                    <div className="pl-tile-label">{a.label}</div>
+                    <div className="pl-tile-desc">{a.description}</div>
                     <div className="pl-work-tags">
-                      {isCareerSkill(g.skill) && (
-                        <span className="pl-work-tag">
-                          {skillName(g.skill)}
-                          {lvl(g.skill) > 0 ? ` Lv ${lvl(g.skill)}` : ''}
-                        </span>
-                      )}
-                      <span className="pl-work-tag">{t('work.skillGraded')}</span>
+                      {isCareerSkill(a.skill) && <span className="pl-work-tag">{skillName(a.skill)}</span>}
+                      {v > 0 && <span className="pl-work-tag">{t('work.payVaries')}</span>}
+                      {a.weatherPriced && <span className="pl-work-tag">{t('work.weatherPriced')}</span>}
                       {reqLocked && (
                         <span className="pl-work-tag locked">
-                          {t('work.lockedTag', { skill: skillName(g.requiresSkill), level: g.requiresLevel })}
+                          {t('work.lockedTag', { skill: skillName(a.requiresSkill), level: a.requiresLevel })}
                         </span>
                       )}
                     </div>
                   </div>
                   <div className="pl-tile-action">
-                    <span className="pl-tile-cost" title={t('work.costOneTitle')}>−1 ◆</span>
+                    <span className="pl-tile-cost" title={t('work.costTitle', { count: cost })}>
+                      −{cost} ◆
+                    </span>
                     <button
                       className="btn sm primary"
-                      onClick={() => startJob(g)}
-                      disabled={busy || noEnergy || onDate || reqLocked}
+                      onClick={() => perform(a)}
+                      disabled={busy || cantAfford || onDate || reqLocked}
                       title={
                         reqLocked
-                          ? t('work.lockedTitle', { skill: skillName(g.requiresSkill), level: g.requiresLevel })
-                          : undefined
+                          ? t('work.lockedTitle', { skill: skillName(a.requiresSkill), level: a.requiresLevel })
+                          : cantAfford && !noEnergy
+                            ? t('work.needEnergyTitle', { cost, stamina })
+                            : undefined
                       }
                     >
-                      <span className="pl-coin">{t('work.upTo', { potential })}</span>
+                      <span className="pl-coin">{payLabel}</span>
                     </button>
                   </div>
                 </div>
               );
             })}
+
+            {/* --- Skill work (job minigames) ------------------------------- */}
+            {jobGames.length > 0 && (
+              <>
+                <div className="pl-eyebrow">{t('work.skillWorkHead')}</div>
+                {jobGames.map((g) => {
+                  const reqLocked =
+                    isCareerSkill(g.requiresSkill) && lvl(g.requiresSkill) < (g.requiresLevel ?? 0);
+                  const potential = Math.min(CAREER.ABSOLUTE_MAX_PAY, Math.round(100 * masteryMult(lvl(g.skill))));
+                  return (
+                    <div className={`pl-tile pl-work pl-job${reqLocked ? ' is-locked' : ''}`} key={g.id}>
+                      <div className="pl-tile-icon">
+                        {g.glyph ? <span className="pl-tile-glyph">{g.glyph}</span> : <Icon name="games" size={18} />}
+                      </div>
+                      <div className="pl-tile-body">
+                        <div className="pl-tile-label">{g.title}</div>
+                        <div className="pl-tile-desc">{g.description}</div>
+                        <div className="pl-work-tags">
+                          {isCareerSkill(g.skill) && (
+                            <span className="pl-work-tag">
+                              {skillName(g.skill)}
+                              {lvl(g.skill) > 0 ? ` Lv ${lvl(g.skill)}` : ''}
+                            </span>
+                          )}
+                          <span className="pl-work-tag">{t('work.skillGraded')}</span>
+                          {reqLocked && (
+                            <span className="pl-work-tag locked">
+                              {t('work.lockedTag', { skill: skillName(g.requiresSkill), level: g.requiresLevel })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="pl-tile-action">
+                        <span className="pl-tile-cost" title={t('work.costOneTitle')}>−1 ◆</span>
+                        <button
+                          className="btn sm primary"
+                          onClick={() => startJob(g)}
+                          disabled={busy || noEnergy || onDate || reqLocked}
+                          title={
+                            reqLocked
+                              ? t('work.lockedTitle', { skill: skillName(g.requiresSkill), level: g.requiresLevel })
+                              : undefined
+                          }
+                        >
+                          <span className="pl-coin">{t('work.upTo', { potential })}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </>
+        )}
+
+        {tab === 'trades' && (
+          <>
+            <div className="pl-eyebrow">{t('work.skillsHead')}</div>
+            <div className="pl-trades">
+              {CAREER_SKILLS.map((s) => {
+                const p = careerProgress(player?.career?.[s]?.xp ?? 0);
+                const jobs = jobsFor(s);
+                return (
+                  <div className={`pl-skill pl-trade${p.xp === 0 ? ' is-untouched' : ''}`} key={s}>
+                    <div className="pl-skill-head">
+                      <span className="pl-skill-name">{careerSkillLabel(s)}</span>
+                      <span className="pl-skill-lv">
+                        {t('work.level', { level: p.level })}
+                        {p.atMax ? t('work.maxSuffix') : ''} · ×{masteryMult(p.level).toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="pl-trade-blurb">{careerSkillBlurb(s)}</div>
+                    {/* One segment per level, not one continuous bar — the ceiling is
+                        part of the information, and a single bar hid how far Lv 5 is. */}
+                    <div
+                      className="pl-skill-bar"
+                      title={
+                        p.atMax
+                          ? t('work.xpMax')
+                          : t('work.xpInto', { into: p.intoLevel, span: p.span, next: p.level + 1 })
+                      }
+                    >
+                      {Array.from({ length: CAREER.MAX_LEVEL }, (_, i) => (
+                        <span key={i} className={`pl-skill-seg${i < p.level ? ' is-done' : ''}`}>
+                          {i === p.level && !p.atMax && <i style={{ width: `${Math.round(p.pct * 100)}%` }} />}
+                        </span>
+                      ))}
+                    </div>
+                    {jobs.length > 0 && (
+                      <div className="pl-trade-jobs">{t('work.earnedAt', { jobs: jobs.join(' · ') })}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="pl-trades-note">{t('work.boardNote')}</p>
           </>
         )}
       </div>

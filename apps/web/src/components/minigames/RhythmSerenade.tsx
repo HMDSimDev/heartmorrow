@@ -109,7 +109,16 @@ export function RhythmSerenade({
   return (
     <MinigameShell title={config.themeLabel} combo={comboSlot}>
       <div className="mg-board mga-board rhy-board">
-        <div className="rhy-stage" onClick={tap}>
+        {/* Taps land on PRESS (pointerdown), not click — click fires on release,
+            which read as "late" against the scrolling lanterns. Keyboard stays on
+            the window Space listener (its preventDefault suppresses button clicks);
+            the button's click handler survives only for Enter (detail 0). */}
+        <div
+          className="rhy-stage"
+          onPointerDown={(e) => {
+            if (e.button === 0) tap();
+          }}
+        >
           <div className="rhy-strike" style={{ left: `${STRIKE_X}%` }} />
           {config.slots.map((s) => {
             const ideal = ideals[s.index] ?? 0;
@@ -129,7 +138,15 @@ export function RhythmSerenade({
           {feedback && started && <div className="rhy-feedback">{feedback}</div>}
         </div>
 
-        <button className="btn primary block" onClick={tap}>
+        <button
+          className="btn primary block"
+          onPointerDown={(e) => {
+            if (e.button === 0) tap();
+          }}
+          onClick={(e) => {
+            if (e.detail === 0) tap();
+          }}
+        >
           {tr('minigame.tapToBeat')} <span className="rhy-key">{tr('minigame.pressSpace')}</span>
         </button>
       </div>

@@ -57,6 +57,8 @@ export const weatherLabel = (kind: WeatherKind | string): string => t(`common:we
 export const videoPokerRankLabel = (r: VideoPokerRank | string): string => t(`common:videoPokerRank.${r}`);
 export const casinoGameLabel = (g: CasinoGame | string): string => t(`common:casinoGame.${g}`);
 export const careerSkillLabel = (s: CareerSkill | string): string => t(`common:careerSkill.${s}`);
+/** One-line flavor for a career skill (the Work app's trade-card subtitle). */
+export const careerSkillBlurb = (s: CareerSkill | string): string => t(`common:careerSkillBlurb.${s}`);
 export const characterLinkLabel = (k: CharacterLinkKind | string): string => t(`common:characterLink.${k}`);
 export const warmthBandLabel = (k: string): string => t(`common:warmthBand.${k}`);
 export const relationshipStatusLabel = (s: RelationshipStatus | string): string => t(`common:relationshipStatus.${s}`);

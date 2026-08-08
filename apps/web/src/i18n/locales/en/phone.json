@@ -512,7 +512,14 @@
     "needEnergyTitle": "Needs {cost} energy — you have {stamina} left.",
     "skillWorkHead": "Skill work · play to earn",
     "skillGraded": "skill-graded",
-    "upTo": "up to ◈{potential}"
+    "upTo": "up to ◈{potential}",
+    "plateTitle": "The day's postings",
+    "tabBoard": "The board",
+    "tabTrades": "Your trades",
+    "weatherPremium": "{icon} {label} — outdoor work pays a premium today",
+    "weatherThin": "{icon} {label} — fair skies, outdoor work pays light",
+    "weatherPlain": "{icon} {label} today",
+    "earnedAt": "earned at {jobs}"
   },
   "calendar": {
     "title": "Almanac",

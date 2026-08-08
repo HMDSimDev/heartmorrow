@@ -38,6 +38,7 @@ const INFO: MinigameInfo = {
   targetStats: [],
   rewardsCharacter: false,
   mode: 'job',
+  glyph: '🖋️',
   skill: 'knowledge',
   skillXp: 50,
 };
