@@ -116,6 +116,10 @@ interface AppData {
    *  before it knows whether a date is already underway. */
   activeDateLoaded: boolean;
   refreshActiveDate: () => Promise<ActiveDate | null>;
+  /** True while the API server is unreachable (the latest world-list fetch
+   *  failed). The wake loop below is already retrying — UI should read this as
+   *  "the emptiness is temporary", never as an empty save. */
+  serverWaking: boolean;
   // Total reset
   resetProgress: () => Promise<void>;
 }
@@ -286,6 +290,59 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshActiveDate();
   }, [refreshActiveDate]);
+
+  // --- Boot resilience -------------------------------------------------------
+  // run.bat (and the future desktop shell) start the web and API halves in
+  // PARALLEL, so the app's first fetches can race a server that is still
+  // transpiling / opening its database. Every boot loader above swallows that
+  // failure ("server may not be up yet") — which used to leave a convincing,
+  // permanently EMPTY world until a manual refresh. Instead: while the latest
+  // world-list fetch has failed, keep knocking with a gentle backoff (0.5s →
+  // 4s cap) and re-run every boot-time load once the door opens. The same loop
+  // quietly re-syncs the app after a mid-session server restart.
+  const [wakeAttempt, setWakeAttempt] = useState(0);
+  useEffect(() => {
+    if (!worldsLoaded || worldsFetchedOk) return; // first try in flight, or reachable
+    let cancelled = false;
+    const delay = Math.min(4000, 500 * 2 ** Math.min(wakeAttempt, 3));
+    const timer = setTimeout(() => {
+      void Promise.all([
+        reloadWorlds(), // success flips worldsFetchedOk, which ends this loop
+        reloadPlayer(),
+        reloadAssets(),
+        refreshWorldState(),
+        refreshActiveDate(),
+        refreshInbox(),
+        api
+          .getSettings()
+          .then((s) => setOutputLanguageState(s.outputLanguage))
+          .catch(() => undefined),
+      ]).finally(() => {
+        if (!cancelled) setWakeAttempt((a) => a + 1); // re-arm if still failing
+      });
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [worldsLoaded, worldsFetchedOk, wakeAttempt, reloadWorlds, reloadPlayer, reloadAssets, refreshWorldState, refreshActiveDate, refreshInbox]);
+
+  // When the server transitions unreachable → reachable, bump dayTick: it is the
+  // established "refetch your world-derived data" signal, so every page keyed on
+  // it (characters, feeds, recaps, …) heals itself without a manual refresh. The
+  // loads above only fix app-context's own globals — page-local fetches that ran
+  // against the dead server would otherwise stay empty until navigation.
+  const wasWakingRef = useRef(false);
+  useEffect(() => {
+    if (worldsLoaded && !worldsFetchedOk) {
+      wasWakingRef.current = true;
+      return;
+    }
+    if (worldsFetchedOk && wasWakingRef.current) {
+      wasWakingRef.current = false;
+      setDayTick((t) => t + 1);
+    }
+  }, [worldsLoaded, worldsFetchedOk]);
 
   const sleep = useCallback(async (expectedDay?: number): Promise<SleepResponse | null> => {
     if (!activeWorldId) return null;
@@ -462,6 +519,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
   const activeWorld = useMemo(() => worlds.find((w) => w.id === activeWorldId) ?? null, [worlds, activeWorldId]);
 
+  // Unreachable = the latest world-list fetch failed; the wake loop is retrying.
+  const serverWaking = worldsLoaded && !worldsFetchedOk;
+
   const value = useMemo<AppData>(
     () => ({
       player,
@@ -493,9 +553,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       activeDate,
       activeDateLoaded,
       refreshActiveDate,
+      serverWaking,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, serverWaking, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

@@ -144,6 +144,9 @@
     "roulette": "One green zero. Place your chips and watch the wheel.",
     "videoPoker": "Jacks or better pays. Hold the keepers, draw the rest."
   },
+  "shell": {
+    "serverWaking": "Connecting to the server — your world will appear in a moment…"
+  },
   "nav": {
     "home": "Home",
     "people": "People",

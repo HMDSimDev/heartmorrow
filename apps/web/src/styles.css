@@ -1875,3 +1875,37 @@ select {
   }
   .app-main { animation: none; }
 }
+
+/* --- Server-waking pill (see components/ServerWakingNotice.tsx) ------------
+   Shown while the API server is unreachable and the app-context wake loop is
+   retrying — the boot race with run.bat, or a mid-session server restart. The
+   global reduced-motion clamp above already stills the dot's pulse. */
+.server-waking {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border: 1px solid rgba(157, 184, 222, 0.35);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+.server-waking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--moon);
+  animation: server-waking-pulse 1.4s ease-in-out infinite;
+}
+@keyframes server-waking-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
+}
