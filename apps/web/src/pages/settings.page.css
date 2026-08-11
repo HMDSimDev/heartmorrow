@@ -13,6 +13,14 @@
 /* Full content-column width, same as Home/People — a narrower centered column
    here read as the page failing to use the screen. */
 .set-page { gap: 30px; }
+.set-page.is-model-setup { gap: 18px; }
+.set-page.is-model-setup > .set-page-tabs { display: none; }
+.set-page.is-model-setup > .set-group > .set-section { display: none; }
+.set-page.is-model-setup > .set-group > .set-bench-card { display: none; }
+.set-page.is-model-setup .set-console > .set-tabs { display: none; }
+.set-onboarding-language { --cut: 16px; }
+.set-onboarding-language > .section-head { margin-bottom: 12px; }
+.set-onboarding-language .field { max-width: 560px; }
 
 /* The former stacked groups now live under page-level tabs (same underline
    idiom as the World Editor's .we-tab strip). Hidden panels stay mounted

@@ -488,7 +488,7 @@ UPLOADS_DIR=./data/uploads
 CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 
 # Default LLM provider (seeds the initial settings row only)
-LLM_BASE_URL=http://localhost:1234/v1
+LLM_BASE_URL=                       # blank until configured in Settings
 LLM_API_KEY=lm-studio            # optional / dummy for local servers
 LLM_MODEL=local-model
 LLM_VISION_MODEL=                # optional; blank reuses the main model

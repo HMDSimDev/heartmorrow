@@ -90,6 +90,7 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   llmDefaults: buildEnvLlmDefaults(),
+  llmConfiguredFromEnvironment: typeof process.env.LLM_BASE_URL === 'string' && process.env.LLM_BASE_URL.trim().length > 0,
 } as const;
 
 /** Ensure data + uploads directories exist. Safe to call repeatedly. */

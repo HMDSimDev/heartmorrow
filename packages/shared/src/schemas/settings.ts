@@ -128,10 +128,7 @@ export type LlmModelInfo = z.infer<typeof LlmModelInfoSchema>;
  * — they are global, never per-role.
  */
 const llmConnectionShape = {
-  baseUrl: z
-    .string()
-    .url('Base URL must be a valid URL, e.g. http://localhost:1234/v1')
-    .default('http://localhost:1234/v1'),
+  baseUrl: z.string().url('Base URL must be a valid URL, e.g. http://localhost:1234/v1').or(z.literal('')).default(''),
   apiKey: z.string().default(''),
   model: z.string().min(1, 'Model name is required').default('local-model'),
   temperature: z.number().min(0).max(2).default(0.8),
@@ -339,6 +336,9 @@ export function resolveLlmRole(settings: LlmSettings, role: LlmRole): LlmSetting
  */
 export type RedactedLlmSettings = LlmSettings & {
   apiKeySet: boolean;
+  /** True after the main model connection has been explicitly saved, or when a
+   *  pre-marker installation contains a connection that differs from defaults. */
+  configured: boolean;
   roleApiKeySet: Record<'evaluator' | 'vision', boolean>;
 };
 

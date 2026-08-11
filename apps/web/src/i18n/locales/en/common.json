@@ -199,6 +199,18 @@
     "discordHint": "Support, updates & community",
     "github": "Source on GitHub",
     "githubHint": "Code, releases & issues",
+    "modelStatus": {
+      "notConfigured": "Model not configured",
+      "checking": "Checking {provider}...",
+      "connected": "{provider} Connected",
+      "disconnected": "{provider} Disconnected",
+      "providers": {
+        "lmstudio": "LM Studio",
+        "ollama": "Ollama",
+        "koboldcpp": "KoboldCpp",
+        "generic": "LLM Provider"
+      }
+    },
     "versionTitle": "Heartmorrow {version} · build {commit}"
   },
   "phase": {

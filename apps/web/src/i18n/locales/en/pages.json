@@ -551,6 +551,12 @@
     "settingsTitle": "Settings",
     "settingsSub": "Set your language, accent, and the model endpoint Heartmorrow talks to. These apply to every world.",
     "backToWorlds": "Back to worlds",
+    "modelSetupKicker": "Before the story begins",
+    "modelSetupTitle": "Connect your model",
+    "modelSetupSub": "Heartmorrow uses your language model for dialogue, texts, and the world around you. Choose the provider, endpoint, and model below, then save; the connection check runs automatically.",
+    "enterWithoutModel": "Set up later",
+    "retestModel": "Test again",
+    "continueToWorld": "Continue to world",
     "exportWorlds": "Export worlds…",
     "nSelected": "{count} selected",
     "exportN": "Export {count}…",
@@ -577,7 +583,7 @@
     "deleteWorld": "Delete world"
   },
   "worldOnboarding": {
-    "stepOf": "New world · step {step} of 4",
+    "stepOf": "New world · step {step} of {total}",
     "welcome": "Welcome to {name}",
     "yourWorldFallback": "your world",
     "nounNewWorld": "new world",
@@ -586,7 +592,8 @@
       "setScene": "Set the scene",
       "whoAreYou": "Who are you here?",
       "bringPeople": "Bring people in",
-      "howItWorks": "How it works"
+      "howItWorks": "How it works",
+      "connectModel": "Connect your model"
     },
     "nameRequired": "Give your world a name to continue.",
     "chooseSource": "Choose a world to start from.",
@@ -656,6 +663,7 @@
     "blankPageCreator": "This world is a blank page — no one lives here yet. Once you step inside, head to People to create the characters who call it home.",
     "blankPagePlayer": "This world is a blank page — no one lives here yet. Turn on Creator mode in the phone's Settings to populate it with people to meet.",
     "enterWorld": "Enter {name}",
+    "enterWithoutModel": "Enter {name} without a model",
     "howToPlay": {
       "date": "Spend your days meeting people — dates and shared activities each cost a little energy.",
       "people": "Talk, and they remember. Relationships warm or cool over time, and drift if you neglect them.",
@@ -1101,6 +1109,11 @@
       "kicker": "The control desk",
       "title": "Settings",
       "blurb": "Configure various settings used by the game, including locale, appearance, and LLM endpoint and model settings."
+    },
+    "modelSetup": {
+      "languageKicker": "Story language",
+      "languageTitle": "What language should the story use?",
+      "outputLanguageHint": "Sets the language for new dialogue, texts, descriptions, and other model-generated prose. Automatic follows the prompt and character context. You can change this later in Settings."
     },
     "groups": {
       "difficulty": "Difficulty",

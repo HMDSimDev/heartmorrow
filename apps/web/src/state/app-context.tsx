@@ -1,7 +1,7 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
-import type { ActiveDate, Asset, OutputLanguage, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
+import type { ActiveDate, Asset, EndpointMode, OutputLanguage, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
 import { deriveCalendar } from '@dsim/shared';
 import { api } from '../lib/api';
 import { idbGet, idbSet, idbDel } from '../lib/idb-kv';
@@ -20,6 +20,8 @@ const ADVANCED_KEY = 'dsim.advancedMode';
 // A blob: URL is ~50 chars, so it sidesteps both.
 const THEME_KEY = 'dsim.theme';
 const WALLPAPER_IDB_KEY = 'phoneWallpaper';
+
+export type ModelConnectionStatus = 'checking' | 'connected' | 'disconnected' | 'not_configured';
 
 /** How the phone wallpaper is scaled to the screen — mirrors a desktop OS's
  *  wallpaper options. `fit` = whole image, letterboxed (the safe default). */
@@ -120,6 +122,12 @@ interface AppData {
    *  failed). The wake loop below is already retrying — UI should read this as
    *  "the emptiness is temporary", never as an empty save. */
   serverWaking: boolean;
+  /** Live status of the main language-model endpoint. Checked automatically at
+   *  launch and refreshed whenever the connection settings are saved. */
+  modelConnectionStatus: ModelConnectionStatus;
+  modelConnectionMessage: string | null;
+  modelProviderMode: EndpointMode;
+  checkModelConnection: () => Promise<ModelConnectionStatus>;
   // Total reset
   resetProgress: () => Promise<void>;
 }
@@ -145,6 +153,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [unreadTexts, setUnreadTexts] = useState(0);
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
   const [activeDateLoaded, setActiveDateLoaded] = useState(false);
+  const [modelConnectionStatus, setModelConnectionStatus] = useState<ModelConnectionStatus>('checking');
+  const [modelConnectionMessage, setModelConnectionMessage] = useState<string | null>(null);
+  const [modelProviderMode, setModelProviderMode] = useState<EndpointMode>('chat_completions');
+  const modelCheckRef = useRef<Promise<ModelConnectionStatus> | null>(null);
 
   // The world the app is CURRENTLY on, readable synchronously by async callbacks.
   // Every world-keyed refresh below captures activeWorldId at call time and drops
@@ -226,18 +238,45 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     void reloadWorlds();
   }, [reloadPlayer, reloadAssets, reloadWorlds]);
 
-  useEffect(() => {
-    let live = true;
-    void api
-      .getSettings()
-      .then((settings) => {
-        if (live) setOutputLanguageState(settings.outputLanguage);
-      })
-      .catch(() => undefined);
-    return () => {
-      live = false;
-    };
+  const checkModelConnection = useCallback((): Promise<ModelConnectionStatus> => {
+    if (modelCheckRef.current) return modelCheckRef.current;
+    const check = (async (): Promise<ModelConnectionStatus> => {
+      setModelConnectionStatus('checking');
+      setModelConnectionMessage(null);
+      try {
+        const settings = await api.getSettings();
+        setOutputLanguageState(settings.outputLanguage);
+        setModelProviderMode(settings.endpointMode);
+        if (!settings.configured) {
+          setModelConnectionStatus('not_configured');
+          return 'not_configured';
+        }
+        const health = await api.testLlm();
+        setModelConnectionMessage(health.message);
+        if (health.ok) {
+          setModelConnectionStatus('connected');
+          return 'connected';
+        }
+        setModelConnectionStatus('disconnected');
+        return 'disconnected';
+      } catch (error) {
+        let message = 'Could not test the model endpoint.';
+        if (error instanceof Error && error.message) message = error.message;
+        setModelConnectionMessage(message);
+        setModelConnectionStatus('disconnected');
+        return 'disconnected';
+      }
+    })();
+    modelCheckRef.current = check;
+    void check.finally(() => {
+      if (modelCheckRef.current === check) modelCheckRef.current = null;
+    });
+    return check;
   }, []);
+
+  useEffect(() => {
+    void checkModelConnection();
+  }, [checkModelConnection]);
 
   // Poll the unread-text count so the sidebar badge stays current (texts can
   // arrive in the background as the world clock advances).
@@ -313,10 +352,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         refreshWorldState(),
         refreshActiveDate(),
         refreshInbox(),
-        api
-          .getSettings()
-          .then((s) => setOutputLanguageState(s.outputLanguage))
-          .catch(() => undefined),
+        checkModelConnection(),
       ]).finally(() => {
         if (!cancelled) setWakeAttempt((a) => a + 1); // re-arm if still failing
       });
@@ -325,7 +361,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [worldsLoaded, worldsFetchedOk, wakeAttempt, reloadWorlds, reloadPlayer, reloadAssets, refreshWorldState, refreshActiveDate, refreshInbox]);
+  }, [worldsLoaded, worldsFetchedOk, wakeAttempt, reloadWorlds, reloadPlayer, reloadAssets, refreshWorldState, refreshActiveDate, refreshInbox, checkModelConnection]);
 
   // When the server transitions unreachable → reachable, bump dayTick: it is the
   // established "refetch your world-derived data" signal, so every page keyed on
@@ -554,9 +590,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       activeDateLoaded,
       refreshActiveDate,
       serverWaking,
+      modelConnectionStatus,
+      modelConnectionMessage,
+      modelProviderMode,
+      checkModelConnection,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, serverWaking, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, serverWaking, modelConnectionStatus, modelConnectionMessage, modelProviderMode, checkModelConnection, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
