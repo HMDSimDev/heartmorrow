@@ -33,6 +33,7 @@
   "toast": {
     "wallpaperTooLarge": "Image too large — pick one under 20 MB.",
     "wallpaperSet": "Wallpaper set.",
+    "wallpaperRemoved": "Wallpaper removed.",
     "progressReset": "Progress reset. Back to Day 1."
   }
 }

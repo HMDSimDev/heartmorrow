@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   PHASE_ICONS,
   GENDER_LABELS,
@@ -21,6 +21,7 @@ import { useAppData } from '../state/app-context';
 import { phaseLabel, genderLabel, sexualityLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { Icon, type IconName } from '../components/Icon';
+import { ModelConnectionStatus } from '../components/ModelConnectionStatus';
 import { Banner, ConfirmDialog, Field, Spinner } from '../components/ui';
 import { ShareImportButton, ShareExportDialog } from '../components/ShareTools';
 import { DraftRestoreBar, UnsavedPill } from '../components/DraftBar';
@@ -33,7 +34,7 @@ import './worldselect.page.css';
  *  via the "Switch world" link, and the app's entry point when no world is active. */
 export function WorldSelector() {
   const { t } = useTranslation(['pages', 'common']);
-  const { worlds, worldsLoaded, activeWorldId, setActiveWorld, reloadWorlds, creatorMode } = useAppData();
+  const { worlds, worldsLoaded, activeWorldId, setActiveWorld, reloadWorlds, creatorMode, modelConnectionStatus, checkModelConnection } = useAppData();
   const navigate = useNavigate();
   const [pendingDelete, setPendingDelete] = useState<World | null>(null);
   const [deleteChars, setDeleteChars] = useState(false);
@@ -44,7 +45,13 @@ export function WorldSelector() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
 
-  const enter = (id: string) => {
+  const enter = async (id: string) => {
+    let status = modelConnectionStatus;
+    if (status === 'checking') status = await checkModelConnection();
+    if (status === 'not_configured') {
+      navigate(`/worlds/model-setup?worldId=${encodeURIComponent(id)}`);
+      return;
+    }
     setActiveWorld(id);
     navigate('/');
   };
@@ -348,6 +355,76 @@ export function WorldSelectorSettings() {
   );
 }
 
+/** First-world gate for an installation whose seeded/default model connection has
+ *  never been saved and could not pass the launch health check. */
+export function WorldModelSetup() {
+  const { t } = useTranslation(['pages', 'common']);
+  const { worlds, setActiveWorld } = useAppData();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const worldId = searchParams.get('worldId');
+  const world = worlds.find((candidate) => candidate.id === worldId);
+
+  const enterWorld = () => {
+    if (!world) {
+      navigate('/worlds');
+      return;
+    }
+    setActiveWorld(world.id);
+    navigate('/');
+  };
+
+  return (
+    <div className="wsel wsel-model-setup">
+      <div className="wsel-atmosphere" aria-hidden="true" />
+      <header className="wsel-head">
+        <button className="btn ghost wsel-back" type="button" onClick={() => navigate('/worlds')}>
+          <Icon name="worlds" size={16} /> {t('pages:worldSelector.backToWorlds')}
+        </button>
+        <div className="kicker">{t('pages:worldSelector.modelSetupKicker')}</div>
+        <h1 className="wsel-title">{t('pages:worldSelector.modelSetupTitle')}</h1>
+        <p className="wsel-sub">{t('pages:worldSelector.modelSetupSub')}</p>
+      </header>
+
+      <ModelSetupBody onEnter={enterWorld} skipLabel={t('pages:worldSelector.enterWithoutModel')} continueLabel={t('pages:worldSelector.continueToWorld')} />
+    </div>
+  );
+}
+
+function ModelSetupBody({ onBack, onEnter, backLabel, skipLabel, continueLabel }: { onBack?: () => void; onEnter: () => void; backLabel?: string; skipLabel: string; continueLabel: string }) {
+  const { t } = useTranslation(['pages', 'common']);
+  const { modelConnectionStatus, checkModelConnection } = useAppData();
+
+  const retest = () => {
+    void checkModelConnection();
+  };
+
+  return (
+    <div className="model-setup-body">
+      <ModelConnectionStatus detailed />
+      <Settings embedded modelSetup />
+      <div className="wsel-model-actions">
+        {onBack && (
+          <button className="btn ghost" type="button" onClick={onBack}>
+            {backLabel}
+          </button>
+        )}
+        <button className="btn ghost" type="button" onClick={onEnter}>
+          {skipLabel}
+        </button>
+        {modelConnectionStatus === 'disconnected' && (
+          <button className="btn" type="button" onClick={retest}>
+            <Icon name="refresh" size={15} /> {t('pages:worldSelector.retestModel')}
+          </button>
+        )}
+        <button className="btn primary" type="button" onClick={onEnter} disabled={modelConnectionStatus !== 'connected'}>
+          {continueLabel} <Icon name="chevronRight" size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- New-world onboarding ---------------------------------------------------
 
 const PRONOUN_OPTIONS = ['she/her', 'he/him', 'they/them'];
@@ -361,7 +438,7 @@ const HOW_TO_PLAY: { icon: IconName; key: string }[] = [
   { icon: 'worlds', key: 'howToPlay.worlds' },
 ];
 
-const STEP_TITLE_KEYS = ['stepTitles.setScene', 'stepTitles.whoAreYou', 'stepTitles.bringPeople', 'stepTitles.howItWorks'];
+const STEP_TITLE_KEYS = ['stepTitles.setScene', 'stepTitles.whoAreYou', 'stepTitles.bringPeople', 'stepTitles.howItWorks', 'stepTitles.connectModel'];
 
 /** Only step 1's pre-commit choices are a true unsaved draft — past step 1 the
  *  world is created server-side and lives in the world list. */
@@ -380,7 +457,7 @@ const ONBOARDING_EMPTY: OnboardingDraft = {
  *  set up your persona, import people from other worlds, then a how-to-play welcome. */
 export function WorldOnboarding() {
   const { t } = useTranslation(['pages', 'common']);
-  const { worlds, reloadWorlds, setActiveWorld } = useAppData();
+  const { worlds, reloadWorlds, setActiveWorld, modelConnectionStatus, checkModelConnection } = useAppData();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState<'blank' | 'clone'>('blank');
@@ -580,7 +657,7 @@ export function WorldOnboarding() {
       return next;
     });
 
-  const finish = () => {
+  const enterCreatedWorld = () => {
     if (!world) return;
     // No manual reloadPlayer() here: this callback still closes over the PREVIOUS
     // world, so calling it fired a fetch for that world racing the new one. The
@@ -589,24 +666,40 @@ export function WorldOnboarding() {
     navigate('/');
   };
 
+  const continueFromWelcome = async () => {
+    if (!world) return;
+    let status = modelConnectionStatus;
+    if (status === 'checking') status = await checkModelConnection();
+    if (status === 'not_configured') {
+      setStep(5);
+      return;
+    }
+    enterCreatedWorld();
+  };
+
+  let totalSteps = 4;
+  if (step === 5 || modelConnectionStatus === 'not_configured') totalSteps = 5;
+  let onboardingTitle = t(`pages:worldOnboarding.${STEP_TITLE_KEYS[step - 1]}` as 'pages:worldOnboarding.stepTitles.setScene');
+  if (step === 4) onboardingTitle = t('pages:worldOnboarding.welcome', { name: world?.name ?? t('pages:worldOnboarding.yourWorldFallback') });
+  let panelClassName = 'framed wonb-panel';
+  if (step === 5) panelClassName = 'wonb-panel wonb-model-panel';
+  let welcomeEntersWorld = true;
+  if (modelConnectionStatus === 'checking' || modelConnectionStatus === 'not_configured') welcomeEntersWorld = false;
+
   return (
     <div className="wsel wonb">
       <div className="wsel-atmosphere" aria-hidden="true" />
       <header className="wsel-head">
-        <div className="kicker">{t('pages:worldOnboarding.stepOf', { step })}</div>
-        <h1 className="wsel-title">
-          {step === 4
-            ? t('pages:worldOnboarding.welcome', {
-                name: world?.name ?? t('pages:worldOnboarding.yourWorldFallback'),
-              })
-            : t(`pages:worldOnboarding.${STEP_TITLE_KEYS[step - 1]}` as 'pages:worldOnboarding.stepTitles.setScene')}
-        </h1>
+        <div className="kicker">{t('pages:worldOnboarding.stepOf', { step, total: totalSteps })}</div>
+        <h1 className="wsel-title">{onboardingTitle}</h1>
       </header>
 
       <div className="wonb-steps" aria-hidden="true">
-        {[1, 2, 3, 4].map((n) => (
-          <span key={n} className={`wonb-pip${n <= step ? ' on' : ''}`} />
-        ))}
+        {Array.from({ length: totalSteps }, (_, index) => index + 1).map((n) => {
+          let className = 'wonb-pip';
+          if (n <= step) className += ' on';
+          return <span key={n} className={className} />;
+        })}
       </div>
 
       {error && <Banner kind="error">{error}</Banner>}
@@ -628,7 +721,7 @@ export function WorldOnboarding() {
         />
       )}
 
-      <div className="framed wonb-panel">
+      <div className={panelClassName}>
         {step === 1 && (
           <>
             {canClone && (
@@ -932,7 +1025,8 @@ export function WorldOnboarding() {
           />
         )}
 
-        {step === 4 && world && <OnboardWelcome world={world} persona={persona.name.trim() || 'You'} onEnter={finish} />}
+        {step === 4 && world && <OnboardWelcome world={world} persona={persona.name.trim() || 'You'} onContinue={continueFromWelcome} entersWorld={welcomeEntersWorld} />}
+        {step === 5 && world && <ModelSetupBody onBack={() => setStep(4)} onEnter={enterCreatedWorld} backLabel={t('pages:worldOnboarding.back')} skipLabel={t('pages:worldOnboarding.enterWithoutModel', { name: world.name })} continueLabel={t('pages:worldOnboarding.enterWorld', { name: world.name })} />}
       </div>
     </div>
   );
@@ -1034,12 +1128,14 @@ function ImportPeopleStep({
   );
 }
 
-/** The final onboarding beat: how-to-play + a preview of who lives in this world. */
-function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: string; onEnter: () => void }) {
+/** The welcome beat: how-to-play + a preview of who lives in this world. */
+function OnboardWelcome({ world, persona, onContinue, entersWorld }: { world: World; persona: string; onContinue: () => void; entersWorld: boolean }) {
   const { t } = useTranslation('pages');
   const { creatorMode } = useAppData();
   const cast = useAsync(() => api.listCharacters(world.id), [world.id]);
   const people = cast.data ?? [];
+  let actionLabel = t('worldOnboarding.continue');
+  if (entersWorld) actionLabel = t('worldOnboarding.enterWorld', { name: world.name });
 
   return (
     <>
@@ -1089,8 +1185,8 @@ function OnboardWelcome({ world, persona, onEnter }: { world: World; persona: st
       )}
 
       <div className="row end wonb-actions">
-        <button className="btn primary lg" onClick={onEnter}>
-          {t('worldOnboarding.enterWorld', { name: world.name })} <Icon name="chevronRight" size={18} />
+        <button className="btn primary lg" onClick={onContinue}>
+          {actionLabel} <Icon name="chevronRight" size={18} />
         </button>
       </div>
     </>

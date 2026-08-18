@@ -79,6 +79,8 @@ import type {
   PlayerProfile,
   PlayerUpdate,
   Relationship,
+  RelationshipCheckRecovery,
+  RelationshipCheckRecoveryResponse,
   SessionWithMessages,
   ShopItem,
   ShopItemCreate,
@@ -117,6 +119,7 @@ import type {
   WorldNoteUpdate,
   WorldUpdate,
 } from '@dsim/shared';
+import { APP_REQUEST_HEADER } from '@dsim/shared';
 
 const BASE = '/api';
 
@@ -150,6 +153,21 @@ async function parseErrorBody(res: Response, fallback: string): Promise<{ messag
   return { message: message || fallback, details };
 }
 
+/**
+ * Attach the app's mutation header (see {@link APP_REQUEST_HEADER}) to a fetch
+ * init — the server refuses mutating requests without it as cross-site. GETs are
+ * left bare: they mutate nothing, and a custom header on them would force a CORS
+ * preflight per read in two-process dev for no protection gained.
+ */
+function withAppHeader(init: RequestInit): RequestInit {
+  const method = (init.method ?? 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return init;
+  return {
+    ...init,
+    headers: { ...(init.headers as Record<string, string> | undefined), [APP_REQUEST_HEADER]: '1' },
+  };
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers as Record<string, string> | undefined) };
   // Only declare a JSON content-type when we actually send a JSON body. A POST
@@ -158,7 +176,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (options.body != null && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${path}`, withAppHeader({ ...options, headers }));
   if (!res.ok) {
     const { message, details } = await parseErrorBody(res, `Request failed (${res.status}).`);
     throw new ApiError(message, res.status, details);
@@ -197,7 +215,7 @@ export function assetThumbUrl(relativePath: string): string {
  * server's Content-Disposition filename, falling back to a supplied name.
  */
 async function downloadShareFile(path: string, init: RequestInit, fallbackName: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, init);
+  const res = await fetch(`${BASE}${path}`, withAppHeader(init));
   if (!res.ok) {
     const { message } = await parseErrorBody(res, `Download failed (${res.status}).`);
     throw new ApiError(message, res.status);
@@ -228,7 +246,7 @@ async function downloadShareFile(path: string, init: RequestInit, fallbackName: 
 async function postShareFile<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append('file', file);
-  const res = await fetch(`${BASE}${path}`, { method: 'POST', body: form });
+  const res = await fetch(`${BASE}${path}`, withAppHeader({ method: 'POST', body: form }));
   if (!res.ok) {
     const { message, details } = await parseErrorBody(res, `Upload failed (${res.status}).`);
     throw new ApiError(message, res.status, details);
@@ -260,6 +278,8 @@ export interface StreamHandlers {
   /** The player wound the date down to a natural close; the character said
    *  goodbye. The client should run the normal end-and-evaluate flow. */
   onFarewell?: (message: Message, expression?: string, characterId?: string, terminal?: boolean) => void;
+  /** Durable progress for the relationship checks attached to a saved player turn. */
+  onRelationshipChecks?: (messageId: string, state: RelationshipCheckRecovery) => void;
 }
 
 /** Stream a chat reply via SSE (POST + ReadableStream reader). */
@@ -271,12 +291,15 @@ export async function streamChat(
   intent?: Intent,
   targetCharacterId?: string,
 ): Promise<void> {
-  const res = await fetch(`${BASE}/conversations/${sessionId}/stream`, {
+  const body: { text: string; intent?: Intent; targetCharacterId?: string } = { text };
+  if (intent) body.intent = intent;
+  if (targetCharacterId) body.targetCharacterId = targetCharacterId;
+  const res = await fetch(`${BASE}/conversations/${sessionId}/stream`, withAppHeader({
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, ...(intent ? { intent } : {}), ...(targetCharacterId ? { targetCharacterId } : {}) }),
+    body: JSON.stringify(body),
     signal,
-  });
+  }));
   if (!res.ok || !res.body) {
     const { message } = await parseErrorBody(res, `The server couldn’t start the reply (${res.status}).`);
     handlers.onError?.(message);
@@ -296,10 +319,10 @@ export async function streamRetry(
   handlers: StreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${BASE}/conversations/${sessionId}/retry-stream`, {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/retry-stream`, withAppHeader({
     method: 'POST',
     signal,
-  });
+  }));
   if (!res.ok || !res.body) {
     const { message } = await parseErrorBody(res, `The server couldn’t start the reply (${res.status}).`);
     handlers.onError?.(message);
@@ -319,12 +342,23 @@ export async function streamRegenerate(
   handlers: StreamHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
-  const res = await fetch(`${BASE}/conversations/${sessionId}/regenerate-stream`, {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/regenerate-stream`, withAppHeader({
     method: 'POST',
     signal,
-  });
+  }));
   if (!res.ok || !res.body) {
     const { message } = await parseErrorBody(res, `The server couldn’t start the reply (${res.status}).`);
+    handlers.onError?.(message);
+    return;
+  }
+  await pumpSse(res, handlers);
+}
+
+/** Resume the unfinished relationship checks for one already-saved player turn. */
+export async function streamRelationshipChecks(sessionId: string, messageId: string, handlers: StreamHandlers, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/relationship-checks/retry`, withAppHeader({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId }), signal }));
+  if (!res.ok || !res.body) {
+    const { message } = await parseErrorBody(res, `The server couldn’t retry this turn (${res.status}).`);
     handlers.onError?.(message);
     return;
   }
@@ -397,6 +431,11 @@ async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
       case 'farewell': {
         const p = payload as { message: Message; expression?: string; characterId?: string; terminal?: boolean };
         handlers.onFarewell?.(p.message, p.expression, p.characterId, p.terminal);
+        break;
+      }
+      case 'relationship_checks': {
+        const p = payload as RelationshipCheckRecoveryResponse;
+        handlers.onRelationshipChecks?.(p.messageId, p.state);
         break;
       }
     }
@@ -542,7 +581,7 @@ export const api = {
     if (altText) form.append('altText', altText);
     if (tags) form.append('tags', tags);
     form.append('file', file);
-    const res = await fetch(`${BASE}/assets`, { method: 'POST', body: form });
+    const res = await fetch(`${BASE}/assets`, withAppHeader({ method: 'POST', body: form }));
     if (!res.ok) {
       const { message } = await parseErrorBody(res, `Upload failed (${res.status}).`);
       throw new ApiError(message, res.status);
@@ -554,7 +593,7 @@ export const api = {
   replaceAssetFile: async (id: string, file: File): Promise<Asset> => {
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(`${BASE}/assets/${id}/file`, { method: 'POST', body: form });
+    const res = await fetch(`${BASE}/assets/${id}/file`, withAppHeader({ method: 'POST', body: form }));
     if (!res.ok) {
       const { message } = await parseErrorBody(res, `Replace failed (${res.status}).`);
       throw new ApiError(message, res.status);
@@ -567,7 +606,7 @@ export const api = {
 
   // conversations
   listConversations: () => get<ConversationSession[]>('/conversations'),
-  createConversation: (input: ConversationCreate) => post<ConversationSession>('/conversations', input),
+  createConversation: (input: ConversationCreate) => post<ConversationSession & { openingFailed: boolean }>('/conversations', input),
   getConversation: (id: string) => get<SessionWithMessages>(`/conversations/${id}`),
   getConversationContextEstimate: (id: string) =>
     get<ConversationContextEstimate>(`/conversations/${id}/context-estimate`),
@@ -576,12 +615,17 @@ export const api = {
   summarize: (id: string) => post<ConversationSession>(`/conversations/${id}/summarize`),
   endSession: (id: string) => post<EndSessionResponse>(`/conversations/${id}/end`),
   markDateResultSeen: (id: string) => post<{ ok: true }>(`/conversations/${id}/result-seen`),
-  defineRelationship: (id: string, characterId?: string) =>
-    post<DtrResponse>(`/conversations/${id}/dtr`, characterId ? { characterId } : undefined),
+  defineRelationship: (id: string, characterId?: string) => {
+    if (characterId) return post<DtrResponse>(`/conversations/${id}/dtr`, { characterId });
+    return post<DtrResponse>(`/conversations/${id}/dtr`);
+  },
   giftOnDate: (id: string, inventoryItemId: string, characterId?: string) =>
     post<GiftReactionResponse>(`/conversations/${id}/gift`, { inventoryItemId, characterId: characterId ?? null }),
-  confirmBreakup: (id: string, characterId?: string) =>
-    post<PlayerBreakupResponse>(`/conversations/${id}/breakup`, characterId ? { characterId } : undefined),
+  confirmBreakup: (id: string, characterId?: string) => {
+    if (characterId) return post<PlayerBreakupResponse>(`/conversations/${id}/breakup`, { characterId });
+    return post<PlayerBreakupResponse>(`/conversations/${id}/breakup`);
+  },
+  skipRelationshipChecks: (id: string, messageId: string) => post<RelationshipCheckRecoveryResponse>(`/conversations/${id}/relationship-checks/skip`, { messageId }),
 
   // shop + inventory
   listShopItems: () => get<ShopItem[]>('/shop/items'),
@@ -685,7 +729,7 @@ export const api = {
       reply: TextMessage | null;
       error: string | null;
       relationshipDelta: Partial<Record<string, number>>;
-      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string; giftsToday: number } | null;
     }>(`/phone/threads/${characterId}/send`, { text, imageAssetId, giftId }),
   /** Regenerate a reply when a prior send saved the player's text but the model
    *  failed to answer — no new player message is created. Same shape as phoneSend. */
@@ -695,7 +739,7 @@ export const api = {
       reply: TextMessage | null;
       error: string | null;
       relationshipDelta: Partial<Record<string, number>>;
-      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string; giftsToday: number } | null;
     }>(`/phone/threads/${characterId}/retry-reply`),
   /** Regenerate the character's last text reply (a bad/looping line). Rewrites the
    *  prose only — the relationship judge does NOT re-run. Same shape as phoneSend. */
@@ -705,7 +749,7 @@ export const api = {
       reply: TextMessage | null;
       error: string | null;
       relationshipDelta: Partial<Record<string, number>>;
-      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string } | null;
+      giftReaction?: { line: string; expression: string; sentiment: 'positive' | 'neutral' | 'negative'; itemName: string; giftsToday: number } | null;
     }>(`/phone/threads/${characterId}/regenerate-reply`),
   phoneClaimGift: (textId: string) =>
     post<{ item: ShopItem; inventoryItem: InventoryItem }>(`/phone/messages/${textId}/claim-gift`),

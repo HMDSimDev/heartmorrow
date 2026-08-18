@@ -24,7 +24,28 @@ import { ResultCard, type ResultTone } from '../ResultCard';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PursePill } from './PursePill';
+import { OnboardingSteps, shouldAutoOpenOnboarding, type OnboardingStep } from '../OnboardingSteps';
 import './phone-property.css';
+
+/** Seen-flag for the first-commitment property walkthrough (client-global). */
+export const PROPERTY_ONBOARDING_KEY = 'dsim.propertyOnboardingSeen';
+
+const ONB_STEPS = [
+  { icon: 'coin', titleKey: 'phone:property.onb.rent.title', bodyKey: 'phone:property.onb.rent.body' },
+  { icon: 'phone', titleKey: 'phone:property.onb.eviction.title', bodyKey: 'phone:property.onb.eviction.body' },
+  { icon: 'date', titleKey: 'phone:property.onb.venue.title', bodyKey: 'phone:property.onb.venue.body' },
+] as const satisfies ReadonlyArray<OnboardingStep>;
+
+function PropertyOnboarding({ onClose }: { onClose: () => void }) {
+  return (
+    <OnboardingSteps
+      steps={ONB_STEPS}
+      kickerKey="phone:property.onb.kicker"
+      doneKey="phone:property.onb.done"
+      onClose={onClose}
+    />
+  );
+}
 
 const PROPERTY_CATEGORIES: PropertyCategory[] = ['residence', 'retreat', 'social', 'estate', 'land'];
 const RENT_CADENCES: RentCadence[] = ['daily', 'weekly', 'monthly'];
@@ -110,11 +131,25 @@ export function PropertyApp() {
   };
 
   // ——— Player actions ——————————————————————————————————————————————————
+  // First lease/buy EVER: the rent/eviction rules otherwise only surface once
+  // you're already in trouble (the overdue card, the landlord's notice), so the
+  // walkthrough runs at the moment of commitment. The pending action is stashed
+  // and fired when the walkthrough closes (done OR skip) — nobody clicks twice.
+  const [onboarding, setOnboarding] = useState<{ run: () => void } | null>(null);
+  const withOnboarding = (run: () => void) => {
+    if (!shouldAutoOpenOnboarding(PROPERTY_ONBOARDING_KEY)) {
+      run();
+      return;
+    }
+    setOnboarding({ run });
+  };
+
   const buy = (pv: PropertyView) =>
-    withBusy(pv.property.id, async () => {
-      await api.buyProperty(activeWorldId!, pv.property.id);
-      setNote({ tone: 'sage', seal: '✦', kicker: t('property.resultOwned'), text: t('property.toast.bought', { name: pv.property.name }) });
-    });
+    withOnboarding(() =>
+      void withBusy(pv.property.id, async () => {
+        await api.buyProperty(activeWorldId!, pv.property.id);
+        setNote({ tone: 'sage', seal: '✦', kicker: t('property.resultOwned'), text: t('property.toast.bought', { name: pv.property.name }) });
+      }));
 
   const sell = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
@@ -123,10 +158,11 @@ export function PropertyApp() {
     });
 
   const startLease = (pv: PropertyView) =>
-    withBusy(pv.property.id, async () => {
-      await api.leaseProperty(activeWorldId!, pv.property.id);
-      setNote({ tone: 'moon', seal: '☾', kicker: t('property.resultLease'), text: t('property.toast.leasing', { name: pv.property.name }) });
-    });
+    withOnboarding(() =>
+      void withBusy(pv.property.id, async () => {
+        await api.leaseProperty(activeWorldId!, pv.property.id);
+        setNote({ tone: 'moon', seal: '☾', kicker: t('property.resultLease'), text: t('property.toast.leasing', { name: pv.property.name }) });
+      }));
 
   const payRent = (pv: PropertyView) =>
     withBusy(pv.property.id, async () => {
@@ -853,6 +889,16 @@ export function PropertyApp() {
           busy={busyId === pendingEndLease.property.id}
           onConfirm={() => doEndLease(pendingEndLease)}
           onCancel={() => setPendingEndLease(null)}
+        />
+      )}
+
+      {onboarding && (
+        <PropertyOnboarding
+          onClose={() => {
+            const { run } = onboarding;
+            setOnboarding(null);
+            run();
+          }}
         />
       )}
 

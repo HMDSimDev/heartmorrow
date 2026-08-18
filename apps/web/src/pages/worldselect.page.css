@@ -60,6 +60,19 @@
   width: 100%; max-width: 880px; margin-inline: auto; text-align: left;
 }
 
+/* First-run model setup: a single connection instrument between the status lamp
+   and the decision to enter. It keeps the selector's quiet centered frame while
+   the technical controls remain left-aligned and readable. */
+.wsel-model-setup .wsel-head { display: flex; flex-direction: column; align-items: center; }
+.wsel-model-setup .set-page { width: 100%; max-width: 880px; margin-inline: auto; text-align: left; }
+.model-setup-body { width: 100%; display: flex; flex-direction: column; gap: 18px; }
+.wsel-model-setup > .model-setup-body { max-width: 880px; margin-inline: auto; }
+.wsel-model-actions { width: 100%; max-width: 880px; margin-inline: auto; display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding-top: 4px; border-top: 1px solid var(--border-soft); }
+@media (max-width: 600px) {
+  .wsel-model-actions { align-items: stretch; flex-direction: column-reverse; }
+  .wsel-model-actions .btn { justify-content: center; width: 100%; }
+}
+
 .wsel-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(310px, 100%), 1fr));
@@ -248,6 +261,7 @@
   flex-direction: column;
   gap: 6px;
 }
+.wonb-model-panel { max-width: 880px; padding: 0; gap: 18px; }
 .wonb .wsel-head {
   margin-bottom: 0;
 }

@@ -21,6 +21,7 @@ import {
 import { getMinigameModule, listMinigameInfo } from '../minigames/index';
 import { buildMinigameReaction, favoriteMinigameFor, FAVORITE_BONUS, FLOP_PENALTY } from '../minigames/reactions';
 import { worldsRepo, worldNotesRepo, minigameResultsRepo } from '../db/repositories';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
 import { getLlmSettings } from './settings-service';
@@ -236,8 +237,8 @@ export function finishMinigame(input: MinigameFinish): MinigameFinishResponse {
     if (beforeRel) {
       try {
         milestone = detectMilestoneCrossing(characterId, beforeRel, getRelationship(characterId), { day, mode: 'minigame' });
-      } catch {
-        /* milestone detection is best-effort */
+      } catch (error) {
+        reportOperationFailure('minigame_milestone_failed', 'The minigame result was saved, but relationship milestone progression could not be completed.', error, { characterId, day, minigameId: run.minigameId });
       }
     }
 
@@ -253,21 +254,21 @@ export function finishMinigame(input: MinigameFinish): MinigameFinishResponse {
           [{ text: memoryText, importance: resolved.grade === 'S' ? 4 : 3, tags: ['minigame'] }],
           result.id,
         );
-      } catch {
-        /* memory write is best-effort; never break the finish contract */
+      } catch (error) {
+        reportOperationFailure('minigame_memory_save_failed', 'The minigame result was saved, but its relationship memory could not be saved.', error, { characterId, day, minigameId: run.minigameId });
       }
       // A chronicle line so it surfaces in their history (no date-tally bump).
       try {
         const flavor = reaction ? ` ${reaction.line.replace(/"/g, '')}` : '';
         appendChronicleLine(characterId, day, 'minigame', `${title} together — ${resolved.grade} (${resolved.score}).${flavor}`, { bumpSession: false });
-      } catch {
-        /* chronicle is best-effort */
+      } catch (error) {
+        reportOperationFailure('minigame_chronicle_save_failed', 'The minigame result was saved, but its relationship-history entry could not be saved.', error, { characterId, day, minigameId: run.minigameId });
       }
       if (isNewBest) {
         try {
           appendChronicleLine(characterId, day, 'minigame', `🏆 A new personal best at ${title}: ${resolved.score}.`, { bumpSession: false });
-        } catch {
-          /* best-effort */
+        } catch (error) {
+          reportOperationFailure('minigame_best_chronicle_save_failed', 'The new minigame high score was saved, but its relationship-history entry could not be saved.', error, { characterId, day, minigameId: run.minigameId });
         }
       }
     }

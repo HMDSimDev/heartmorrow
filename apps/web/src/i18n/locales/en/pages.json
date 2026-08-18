@@ -11,6 +11,16 @@
     "sendFailed": "Your message didn't send.",
     "replyFailed": "They didn't reply — something went wrong.",
     "replyDropped": "The reply didn't come through.",
+    "relationshipInterruptedKicker": "Turn interrupted",
+    "relationshipInterruptedTitle": "This moment is unresolved.",
+    "relationshipInterruptedBody": "The reply arrived, but this turn has not fully affected the date. Retry it before continuing, or leave the remaining effects unapplied.",
+    "relationshipRetry": "Retry this turn",
+    "relationshipRetrying": "Reconnecting…",
+    "relationshipContinue": "Continue without it",
+    "relationshipRetryFailed": "This turn still could not be fully applied. Nothing was duplicated, and you can retry again.",
+    "relationshipRetryDropped": "The retry did not finish. Your progress is safe; try it again.",
+    "relationshipRecovered": "This turn is fully applied now.",
+    "relationshipSkipped": "Continued without the unfinished relationship effects.",
     "evalFailed": "Couldn't score that — the model may be unavailable. It's still open; try ending it again.",
     "tonightsPlan": "Tonight's plan",
     "todaysPlan": "Today's plan",
@@ -68,6 +78,12 @@
     "availBanner": "{name} {reason} — pick someone else or come back tomorrow.",
     "outOfEnergy": "You're out of energy for today — End the day from the menu to rest, then come back tomorrow.",
     "settingScene": "Setting the scene…",
+    "openingSceneFailed": "The model couldn't create the opening scene. The date is still open, so you can begin the conversation yourself. Check the model server if replies also fail.",
+    "openingSceneLoadFailed": "The date started, but its opening scene couldn't be loaded: {error}",
+    "partialDateFailure": "The date ended, but some relationship updates did not finish:",
+    "retryCheckFailed": "Couldn't verify whether your message was saved, so it was not resent: {error} Try again.",
+    "draftNotSaved": "This draft could not be saved in the browser. Keep this tab open until you send it.",
+    "recapAckFailed": "The recap was shown, but it could not be marked as seen: {error} It may appear again after a refresh.",
     "begin": "Begin",
     "beginHangout": "Head out",
     "hangoutBadge": "Hangout",
@@ -181,7 +197,6 @@
     "newDateTitle": "Start a fresh date with someone else",
     "newHangout": "New hangout",
     "newHangoutTitle": "Start fresh with someone else",
-    "recap": "Recap",
     "evaluating": "Evaluating…",
     "endEvaluate": "End & evaluate",
     "endHangout": "End hangout",
@@ -286,12 +301,49 @@
     "needsSpaceBadge": "Needs space",
     "openBadge": "Open to reconciling",
     "onTheRocksBadge": "On the rocks",
+    "warmthAria": "Warmth: {value} out of {max}, {stage}",
+    "warmthSummary": {
+      "near-strangers": "Just getting to know each other.",
+      "acquaintances": "Familiar faces, still finding your footing.",
+      "warming-up": "A connection is beginning to take shape.",
+      "getting-close": "Comfort and trust are settling in.",
+      "close": "A close bond, openly warm and familiar.",
+      "sweethearts": "Deeply connected and openly affectionate."
+    },
     "chats": "chats",
     "dates": "dates",
     "memoriesShort": "memories",
     "sectionsAria": "Profile sections",
     "betweenYou": "Between you two",
     "yourRelationship": "Your relationship",
+    "datingProfile": "Dating profile",
+    "datingProfileLede": "The traits that shape how {name} spends time with you, plays, and speaks on dates.",
+    "datingStatAria": "{stat}: {value} out of 100",
+    "baseValue": "{value} base",
+    "sessionsLeft": "{count} sessions left",
+    "atAGlance": "At a glance",
+    "traitProfile": "Trait profile",
+    "datingRadarAria": "Dating trait profile for {name}",
+    "inPlay": "In play",
+    "whatStatsInfluence": "What these traits affect",
+    "togetherFitTitle": "Time Together",
+    "togetherFitBody": "Each casual activity favors specific base traits. A better fit can produce stronger relationship gains and fewer awkward outcomes.",
+    "favoriteGameTitle": "Favorite minigame",
+    "favoriteGameBody": "{name}'s strongest base trait is {stat}, making {game} their favorite.",
+    "dateVoiceTitle": "Date conversation",
+    "dateVoiceBody": "Effective traits, including temporary buffs, are passed into date conversations to shape how the character speaks and responds.",
+    "realActivityFit": "Real activity fit",
+    "timeTogether": "Where they shine",
+    "timeTogetherLede": "Fit uses the same base traits as the Together system.",
+    "free": "Free",
+    "cost": "◈ {value}",
+    "nurtures": "Nurtures {stat}",
+    "fit": {
+      "great": "Great fit · {value}",
+      "ok": "Okay fit · {value}",
+      "poor": "Poor fit · {value}"
+    },
+    "currentContext": "Current context",
     "activeBuffs": "Active buffs",
     "buffLeft": "· {remaining} left",
     "yourStory": "Your story",
@@ -414,6 +466,7 @@
     "kicker": "The Arcade Almanac",
     "title": "Minigames",
     "blurb": "Play together to grow closer — and earn a little money.",
+    "theirFavorite": "✦ {name}'s favorite — playing it lands warmer",
     "errOnDate": "You're on a date with {name} — finish it on the Date tab first.",
     "errOnHangout": "You're hanging out with {name} — finish it on the Date tab first.",
     "outOfEnergy": "You're out of energy for today — end the day to play again tomorrow.",
@@ -570,6 +623,12 @@
     "settingsTitle": "Settings",
     "settingsSub": "Set your language, accent, and the model endpoint Heartmorrow talks to. These apply to every world.",
     "backToWorlds": "Back to worlds",
+    "modelSetupKicker": "Before the story begins",
+    "modelSetupTitle": "Connect your model",
+    "modelSetupSub": "Heartmorrow uses your language model for dialogue, texts, and the world around you. Choose the provider, endpoint, and model below, then save; the connection check runs automatically.",
+    "enterWithoutModel": "Set up later",
+    "retestModel": "Test again",
+    "continueToWorld": "Continue to world",
     "exportWorlds": "Export worlds…",
     "nSelected": "{count} selected",
     "exportN": "Export {count}…",
@@ -596,7 +655,7 @@
     "deleteWorld": "Delete world"
   },
   "worldOnboarding": {
-    "stepOf": "New world · step {step} of 4",
+    "stepOf": "New world · step {step} of {total}",
     "welcome": "Welcome to {name}",
     "yourWorldFallback": "your world",
     "nounNewWorld": "new world",
@@ -605,7 +664,8 @@
       "setScene": "Set the scene",
       "whoAreYou": "Who are you here?",
       "bringPeople": "Bring people in",
-      "howItWorks": "How it works"
+      "howItWorks": "How it works",
+      "connectModel": "Connect your model"
     },
     "nameRequired": "Give your world a name to continue.",
     "chooseSource": "Choose a world to start from.",
@@ -675,6 +735,7 @@
     "blankPageCreator": "This world is a blank page — no one lives here yet. Once you step inside, head to People to create the characters who call it home.",
     "blankPagePlayer": "This world is a blank page — no one lives here yet. Turn on Creator mode in the phone's Settings to populate it with people to meet.",
     "enterWorld": "Enter {name}",
+    "enterWithoutModel": "Enter {name} without a model",
     "howToPlay": {
       "date": "Spend your days meeting people — dates and shared activities each cost a little energy.",
       "people": "Talk, and they remember. Relationships warm or cool over time, and drift if you neglect them.",
@@ -879,15 +940,19 @@
     "globalNotes": "Global notes",
     "lore": "Lore",
     "rulesInFiction": "Rules (in-fiction)",
-    "featuresNote": "Optional world systems. Turn these off where they wouldn't fit — their controls disappear and authored content simply lies dormant.",
+    "featuresNote": "Per-world systems. Money systems and group outings are off unless you turn them on; Mail and Faces are on unless you turn them off. A disabled system's controls disappear, it generates nothing, and authored content lies dormant.",
     "featurePropertyName": "Property",
-    "featurePropertyDesc": "Rent or buy places, collect rent, and date there for a buff.",
+    "featurePropertyDesc": "Rent or buy places and date there for a relationship buff.",
     "featureStockName": "Stock market",
     "featureStockDesc": "Invest in fictional in-world companies.",
     "featureCasinoName": "Casino",
     "featureCasinoDesc": "Wager money on slots, blackjack, roulette & video poker.",
     "featureGroupDatesName": "Group outings",
     "featureGroupDatesDesc": "Invite a second person to one shared date or hangout.",
+    "featureEmailName": "Mail",
+    "featureEmailDesc": "In-world letters and away-postcards. Off: no Mail app, no email generation.",
+    "featureFacesName": "Faces",
+    "featureFacesDesc": "The cast's social feed. Off: no Faces app, no posts or comments generated.",
     "casinoLimits": "Casino limits",
     "maxBet": "Max bet (◈)",
     "maxBetHint": "Flat per-bet cap · up to {max}",
@@ -1119,6 +1184,11 @@
       "title": "Settings",
       "blurb": "Configure various settings used by the game, including locale, appearance, and LLM endpoint and model settings."
     },
+    "modelSetup": {
+      "languageKicker": "Story language",
+      "languageTitle": "What language should the story use?",
+      "outputLanguageHint": "Sets the language for new dialogue, texts, descriptions, and other model-generated prose. Automatic follows the prompt and character context. You can change this later in Settings."
+    },
     "groups": {
       "difficulty": "Difficulty",
       "appearance": "Appearance",
@@ -1162,7 +1232,36 @@
       "head": "Appearance",
       "lede": "How Heartmorrow looks and reads — these apply across the whole app, not just your phone.",
       "language": "Interface language",
-      "languageHint": "The language of the interface. Conversations and stories still play out in English, unless the character's profile specifically instructs them to speak another language.",
+      "languageHint": "The language of menus and controls. This does not translate existing story content.",
+      "outputLanguage": "Output in language",
+      "outputLanguageHint": "Forces all new model-generated dialogue, stories, messages, descriptions, and other prose into this language. Existing content and the interface are unchanged. Automatic follows the prompt and character context. <0>Language quality varies by model. Smaller models in particular may produce awkward, ungrammatical, or inaccurate text in languages they support less well.</0> If results are poor, try a larger or different model.",
+      "outputLanguageSaving": "Saving generated output language…",
+      "outputLanguageOptions": {
+        "auto": "Automatic (follow context)",
+        "en": "English",
+        "zh-Hans": "Chinese (Simplified)",
+        "zh-Hant": "Chinese (Traditional)",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "es": "Spanish",
+        "fr": "French",
+        "de": "German",
+        "pt-BR": "Portuguese (Brazil)",
+        "it": "Italian",
+        "ru": "Russian",
+        "pl": "Polish",
+        "nl": "Dutch",
+        "tr": "Turkish",
+        "ar": "Arabic",
+        "he": "Hebrew",
+        "fa": "Persian (Farsi)",
+        "ur": "Urdu",
+        "hi": "Hindi",
+        "id": "Indonesian",
+        "vi": "Vietnamese",
+        "th": "Thai",
+        "uk": "Ukrainian"
+      },
       "accent": "Accent color",
       "accentHint": "Tints highlights, buttons, and romance cues throughout the app.",
       "accentCustom": "Custom tint",
@@ -1495,7 +1594,7 @@
       "getting-started": {
         "label": "Getting started",
         "title": "Getting started",
-        "overview": "Heartmorrow is a single-player dating sim you run on your own machine. You pick a world, meet the people who live there, and grow relationships by going on dates, texting, and calling them on an in-game phone. Before any of that works you connect a language model in Settings, because the model is what brings every character to life. Each in-game day gives you a small pool of energy to spend; when it runs out, you sleep to begin the next day.",
+        "overview": "Heartmorrow is a single-player dating sim you run on your own machine. You pick a world, meet the people who live there, and grow relationships by going on dates and texting them on an in-game phone. Before any of that works you connect a language model in Settings, because the model is what brings every character to life. Each in-game day gives you a small pool of energy to spend; when it runs out, you sleep to begin the next day.",
         "sections": [
           {
             "heading": "Connect a model first",
@@ -1511,7 +1610,7 @@
               "KoboldCpp: its own native connection. Because it's a raw text engine, pick the Instruction template that matches your loaded model (Alpaca, ChatML, Llama 3, and so on).",
               "Anthropic: a hosted service that needs an API key.",
               "Local models usually need no key; hosted services do.",
-              "There's a separate option for generating character portraits, but it's optional and not needed to play."
+              "You may also spot a separate image-model connection in Settings — nothing in the game uses it yet, so it's safe to ignore."
             ]
           },
           {
@@ -1526,12 +1625,12 @@
             "heading": "The daily loop",
             "body": [
               "A day in Heartmorrow is a small, deliberate budget of energy. Going on a date or playing a minigame each spends one point, and you start each day with three. Spend them however you like: one big date, a few lighter activities, or a mix. Weekend days give you one extra point, for four.",
-              "As you spend energy, the clock visibly moves through the day, from morning to afternoon to evening, and finally to night once your energy is gone. Texting and calling people on your phone are always available, with no energy cost, so you can keep in touch between the bigger moments.",
+              "As you spend energy, the clock visibly moves through the day, from morning to afternoon to evening, and finally to night once your energy is gone. Texting people on your phone is always available, with no energy cost, so you can keep in touch between the bigger moments.",
               "When you're ready to move on, press the day button in the status bar. It reads \"End day\" while you still have energy and \"Sleep\" once you've spent it all; either way it carries you into the next morning, refills your energy, and shows a short recap of how the day went and what happened around town. One catch: you can't end the day in the middle of an active date, so wrap up or leave the date first."
             ],
             "bullets": [
               "Meet the people in your world and start a date with someone.",
-              "Text or call anyone, anytime, from the phone, at no energy cost.",
+              "Text anyone, anytime, from the phone, at no energy cost.",
               "Spend your daily energy on dates and activities.",
               "End the day to advance to the next morning and refresh your energy."
             ]
@@ -1759,14 +1858,14 @@
       "phone": {
         "label": "Your phone",
         "title": "Your phone",
-        "overview": "Your phone is one tab on the bottom bar, and opening it drops you onto a home screen of apps — like a real phone, complete with the in-world day and time, a warm greeting that shifts with the hour, and a \"battery\" that quietly tracks how much energy you have left today. Each app is its own little tool: some keep you close to people, others run your life and your money. A few of the money apps only appear if the world you're playing was built to include them.",
+        "overview": "Your phone is one tab on the bottom bar, and opening it drops you onto a home screen of apps — like a real phone, complete with the in-world day and time, a warm greeting that shifts with the hour, and a \"battery\" that quietly tracks how much energy you have left today. Each app is its own little tool: some keep you close to people, others run your life and your money. A few of the money apps only appear if the world you're playing was built to include them — and a world can also switch off Mail or Faces entirely.",
         "sections": [
           {
             "heading": "How the home screen works",
             "body": [
               "At the top, the phone always shows the current in-world day and time of day, plus a battery that fills green when you're rested and drains toward red as you spend energy across the day. The greeting under the clock changes with the time — morning, afternoon, evening, or night.",
               "Apps sit in a grid, with four kept in the dock along the bottom: Messages, Mail, Moments, and Settings. A small number badge on an app means something is waiting for you — unread texts, unread mail, or new posts on Faces. Tap any app to open it; the round button below the screen takes you back home.",
-              "Three of the money apps — Property, Market, and Casino — only show up when the world you're in was set up to use them. In a world that doesn't, they simply aren't on your home screen."
+              "Three of the money apps — Property, Market, and Casino — only show up when the world you're in was set up to use them. Mail and Faces work the other way: every world starts with them, but a creator can switch either off, and it vanishes from the home screen the same way. A missing app simply isn't part of this world."
             ]
           },
           {
@@ -1782,7 +1881,7 @@
               "Constellation — A star-map of every relationship in the world, with you at the warm center and threads out to everyone you've met. Thread colours group the kind of tie (a key sits along the bottom of the map). Switch to the list to search and filter by the kind of connection, and tap anyone to open their full profile — their circle, their recent life, and what they've heard about you through the grapevine.",
               "Endings — A gallery of keepsake epilogues for relationships you've seen all the way through. It stays empty until you complete a character's story.",
               "Almanac — A calendar of every day you've lived, with its weather, what happened, and a recap of the day. Tap a past day to read its full story. Days you haven't reached yet are locked.",
-              "Weather — Today's sky, a week-ahead forecast, and how each character feels about it. Every row lists the weather that person likes and avoids, so you can plan a date for a day that suits them."
+              "Weather — Today's sky, a five-day forecast, and how each character feels about it. Every row lists the weather that person likes and avoids, so you can plan a date for a day that suits them."
             ]
           },
           {
@@ -1792,7 +1891,7 @@
               "The three wealth apps — Property, Market, and Casino — only appear in worlds that enable them, and they all spend and earn the same money you carry everywhere."
             ],
             "bullets": [
-              "Together — Spend low-key time with someone through small outings, like a coffee or a walk. Pick a person and a way to hang out, and it nudges where you stand with them. It costs energy and is paused while you're on a date.",
+              "Together — Spend low-key time with someone through small outings, like a quiet night in or a run together. Pick a person and a way to hang out, and it nudges where you stand with them. It costs energy and is paused while you're on a date.",
               "Work — Take shifts for money. Some are simple jobs (each costs a set amount of energy, shown as a minus number), and some are graded skill shifts you actually play through. Your career skills level up the more you work them, and higher levels pay more. Keep an eye on your energy readout — you can't work with none left, or while you're on a date.",
               "Market — A stock market that reacts to the world around you. Buy and sell shares, read the market news, and track your portfolio's value and your cash. Some companies pay dividends, which are the only truly hands-off income in the game.",
               "Property — Browse places to rent or buy. Renting means keeping up with the rent — if it falls overdue, you'll get landlord notices in Messages — while buying makes a place yours outright. Some places give a small relationship boost when you bring a date there.",
@@ -1808,19 +1907,19 @@
       "life-money": {
         "label": "Energy & money",
         "title": "Energy, money & activities",
-        "overview": "Each in-world day gives you a small pool of energy to spend on real meetings -- dates, casual time together, and minigames. Texting and calling are always free. You start with an empty wallet and no allowance, so spending money comes from working jobs and playing the money-paying minigames; you spend it in the Shop, mostly on gifts. Where a world turns them on, you can also grow -- or gamble away -- your money through the stock market, property, and the casino.",
+        "overview": "Each in-world day gives you a small pool of energy to spend on real meetings -- dates, casual time together, and minigames. Texting is always free. You start with an empty wallet and no allowance, so spending money comes from working jobs and playing the money-paying minigames; you spend it in the Shop, mostly on gifts. Where a world turns them on, you can also grow -- or gamble away -- your money through the stock market, property, and the casino.",
         "sections": [
           {
             "heading": "Your daily energy",
             "body": [
               "Every day starts with a small pool of energy: 3 actions on a normal day, and one extra on weekends, for 4. Anything that's a real, in-person meeting spends energy. A date, an afternoon spent together with someone, and a minigame each cost one action. A heavier job can cost more.",
-              "Texting and calling people on your phone is always free -- it never touches your energy, so you can keep a conversation going as long as you like. When your energy runs out for the day, you can't start another date or work shift; tap Sleep to move to the next day, which fully refills your energy.",
+              "Texting people on your phone is always free -- it never touches your energy, so you can keep a conversation going as long as you like. When your energy runs out for the day, you can't start another date or work shift; tap Sleep to move to the next day, which fully refills your energy.",
               "Because energy is the real limit on your day, spend it with intent. A heavy outdoor work shift, for instance, uses two of your three weekday actions, leaving room for just one more thing before bed."
             ],
             "bullets": [
               "A date, time spent together, or a minigame: 1 action each.",
               "The heavy outdoor day-labor shift: 2 actions.",
-              "Texting and calling: free and unlimited.",
+              "Texting: free and unlimited.",
               "Sleep to begin a new day and refill your energy (3 on weekdays, 4 on weekends)."
             ]
           },
@@ -1828,7 +1927,7 @@
             "heading": "Earning money",
             "body": [
               "You start with nothing, and there's no daily allowance -- money comes from work. Open the work options and pick the shift that fits your day. The more you repeat a kind of work, the better you get at it: your skill in that trade levels up and slowly raises its pay. No single shift can ever pay a runaway amount, so steady work is the honest road to a full wallet.",
-              "Two jobs are played as quick skill games -- the Woodlot (felling logs) and the Copy Desk (transcribing the day's news). They pay you purely for how well you play, up to a solid flat payout, and a good run there is as good as it gets for one shift.",
+              "Three jobs are played as quick skill games -- the Woodlot (felling logs), the Copy Desk (transcribing the day's news), and the Flip (haggling scrounged goods at a market stall). They pay you purely for how well you play, up to a solid flat payout, and a good run there is as good as it gets for one shift. At the Flip, you pocket only the margin: each piece has a street value, and only what a buyer pays above that worth is yours to keep. The buyer's two tells honestly hint at the most they'd pay -- price under that hidden limit and they pay your asking price, push past it and they walk -- and an accepted deal can be pressed for a richer cut at the risk of losing the whole sale.",
               "Beyond work, the only money that arrives on its own is dividends from any stocks you're holding, in worlds that have a stock market. Nothing pays you just for sleeping.",
               "When you end the day, the morning summary keeps the money story on its own Ledger tab — work, casino results, shopping, overnight rent and dividends, and the market's biggest moves, itemized exactly. The written recap sticks to what actually happened between people."
             ],
@@ -1836,7 +1935,7 @@
               "Work a shift -- steady, dependable pay with no surprises; builds your Service skill.",
               "Hustle odd jobs -- the same pay on average but a wide swing, great on a good day and thin on a bad one; builds your Hustle skill.",
               "Day-labor outdoors -- the biggest single payday, but it takes two actions and the weather sets the price (storms pay best, fair days least); unlocks once you've built up your Craft skill.",
-              "The Woodlot and the Copy Desk -- minigame jobs that pay you for how well you play."
+              "The Woodlot, the Copy Desk, and the Flip -- minigame jobs that pay you for how well you play."
             ]
           },
           {
@@ -1852,7 +1951,7 @@
             "body": [
               "Some worlds switch on extra wealth systems. They're optional, and a world that leaves them off simply won't show them.",
               "The stock market lets you buy and sell shares in the world's fictional companies. Prices drift from day to day and can react to big relationship moments in your world, so a portfolio is a gamble, not a guarantee. Some companies pay a small dividend each day on shares you've held at least a full day -- the one bit of money that arrives without you working for it.",
-              "Property lets you lease a place -- paying rent on a set schedule, whether daily, weekly, or monthly -- or buy one outright. Owning or leasing a place lets you take dates there, and a date at a place you own gives a warmer boost than one you've only rented for the night. Watch your rent: miss a payment and you'll get a landlord warning and three days' grace before you're evicted. Selling a place you own simply refunds what you paid for it.",
+              "Property lets you lease a place -- rent pays itself from your purse on a set schedule, whether daily, weekly, or monthly -- or buy one outright. Owning or leasing a place lets you take dates there, and a date at a place you own gives a warmer boost than one you only lease. Watch your purse: if it can't cover a rent day you'll get a landlord warning and three days' grace to settle up before you're evicted. Selling a place you own simply refunds what you paid for it.",
               "The casino, where enabled, offers slots, blackjack, roulette, and video poker. The house always has an edge, so treat it as risk and flavor, never an income plan. Each bet has a minimum (5) and a cap, and there's a limit on how much you can wager in a single day, so a bad streak can't wipe you out in one sitting."
             ]
           }
@@ -1911,11 +2010,11 @@
             "body": [
               "The world workbench has a sidebar listing your worlds (with a \"New world\" button) and a detail pane for the one you've selected. Here you set the world's name, summary, tone, lore, in-fiction rules, and global notes. You can also add World Notes — scoped reference entries (global, location, faction, lore, rule, character, or misc) that are fed to the AI as background.",
               "Locations are the venues your dates happen in. Each has a name, description, tags, an indoor/outdoor setting, an optional photo, and a \"cost to date there\" price tier. You can add them by hand or use \"Generate with AI,\" which drafts a batch (1 to 8 at a time) from your world's lore plus a free-form prompt. Generated locations drop straight into the editor for you to review and tweak — they're only kept once you click \"Save world.\"",
-              "Each world can turn three optional systems on or off independently, under \"Game features\": Property (rent or buy places), the Stock Market, and the Casino. All three are off by default, and the setting is enforced per world — if a world has a feature off, those screens simply aren't available there. When you enable the Casino, you can also set its betting limits.",
+              "Each world can turn five systems on or off independently, under \"Game features\". The three money systems — Property (rent or buy places), the Stock Market, and the Casino — are off by default. Mail and Faces are on by default, and switching either off removes the app and stops its generation for that world (letters, postcards, feed posts — none are written, and none of their model calls happen). Every setting is enforced per world — if a world has a feature off, those screens simply aren't available there. When you enable the Casino, you can also set its betting limits.",
               "Worlds are also where shop stock comes from: open the Shop in Creator mode and use \"Generate items\" to draft themed gifts and goods (your world's setting is woven in automatically), then keep the ones you like."
             ],
             "bullets": [
-              "Property, Stock Market, and Casino are per-world toggles, all off by default.",
+              "Property, Stock Market, and Casino are per-world toggles, all off by default; Mail and Faces are per-world toggles too, on by default.",
               "Casino limits you can set: a maximum single bet (up to 1,000) and a daily wager cap (up to 10,000), with a minimum bet of 5.",
               "A location's price tier sets how much a date there costs; the \"Free\" tier costs nothing.",
               "Deleting a world offers an optional checkbox to also delete its characters — leave it unchecked to keep the cast."
@@ -1934,7 +2033,7 @@
             "body": [
               "The adult-content toggle lives in Settings and is off by default. Turning it on requires confirming a short acknowledgment, including that you're of age. With it on, intimate scenes can unfold on dates once a relationship is genuinely close and not too tense — the game still gates intimacy by how warm and settled the bond is, so it never happens out of nowhere. With it off, characters keep things tasteful and will set a boundary if you push too far too soon. There's also an opt-in \"tragic outcomes\" sub-toggle (available only once adult content is on) that allows darker story endings; it shows support resources before you enable it.",
               "Keep in mind that adult content is a global preference, and the kind of writing you actually get also depends on the AI model you've connected.",
-              "Finally, the \"Danger zone\" in your phone's Settings app has a reset that wipes your playthrough — relationships, memories, conversations, texts, emails, and inventory — and sends you back to Day 1 with your starting money. Crucially, it keeps everything you authored: your worlds, characters, world notes, shop items, and uploaded images all survive. A reset is a clean slate for playing, not for building."
+              "Finally, the \"Danger zone\" in your phone's Settings app has a reset that wipes your playthrough — relationships, memories, conversations, texts, emails, and inventory — and sends you back to Day 1 with an empty wallet, ready to earn again. Crucially, it keeps everything you authored: your worlds, characters, world notes, shop items, and uploaded images all survive. A reset is a clean slate for playing, not for building."
             ]
           }
         ]
@@ -1959,7 +2058,7 @@
               "Learn the person. Their likes, dislikes, and boundaries shape how the night is judged, so play to what they care about and steer clear of what they don't.",
               "Time your gifts. A gift is a small, thoughtful nudge, not a shortcut — the first one a day lands in full, a second lands at about half, and more do nothing.",
               "Tend your commitments. The closer you are, the sooner neglect stings — a live-in partner starts to feel ignored after only a few days.",
-              "Stay in touch. Texting and calling are free and never cost energy, so keep the conversation going between dates."
+              "Stay in touch. Texting is free and never costs energy, so keep the conversation going between dates."
             ]
           },
           {
@@ -1970,7 +2069,7 @@
               "Nobody texts me — you only hear from people you've already been on a date with. Someone you dated and then neglected may send a wistful message; people you've never met never text.",
               "I can't sleep or end the day — you have a date in progress. Finish it with \"End & evaluate,\" or leave it, and the day button unlocks.",
               "I'm out of money — there's no allowance. Open the Work app and take a shift; that's how you earn.",
-              "An app is missing from my phone — Property, Market, and Casino only appear in worlds that switch them on (a per-world setting in Creator mode).",
+              "An app is missing from my phone — Property, Market, and Casino only appear in worlds that switch them on, and a world can also switch Mail or Faces off (both are per-world settings in the World editor's Game features).",
               "They keep walking out on me — walkouts happen only for hostile or cruel behavior, or coming on strong with someone you're not close to yet. Ease off and let the vibe recover.",
               "My ask to define the relationship failed — you need enough warmth and good timing. After any ask they want a few days before you bring it up again, so try again after a good date.",
               "A character treats an old plan as if it is still on — texts can go stale; the game flags when a plan is days old, but smaller models occasionally miss it."
@@ -1979,7 +2078,7 @@
           {
             "heading": "Starting over",
             "body": [
-              "Want a clean slate? The Danger zone in your phone's Settings app resets your playthrough — relationships, memories, conversations, texts, emails, and inventory all clear, and you return to Day 1 with your starting money. Everything you authored survives: your worlds, characters, notes, shop items, and images are all kept. A reset is a fresh start for playing, not for building."
+              "Want a clean slate? The Danger zone in your phone's Settings app resets your playthrough — relationships, memories, conversations, texts, emails, and inventory all clear, and you return to Day 1 with an empty wallet, ready to earn again. Everything you authored survives: your worlds, characters, notes, shop items, and images are all kept. A reset is a fresh start for playing, not for building."
             ]
           }
         ]

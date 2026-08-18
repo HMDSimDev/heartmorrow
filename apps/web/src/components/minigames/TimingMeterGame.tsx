@@ -54,7 +54,10 @@ export function TimingMeterGame({
 
   const stop = () => {
     if (round >= totalRounds) return;
-    const distance = Math.abs(posRef.current - center);
+    // Judge against the needle the player can SEE — the last-RENDERED position —
+    // never the live rAF ref, which has already advanced past the painted frame
+    // (~1–2 frames ahead; at late-round speeds that gap out-measures the zone).
+    const distance = Math.abs(pos - center);
     const accuracy = distance <= halfWidth ? 1 - (distance / halfWidth) * 0.4 : 0;
     setLast(accuracy);
     const nextResults = [...results, { accuracy }];
@@ -91,7 +94,18 @@ export function TimingMeterGame({
           />
           <div className="meter-needle" style={{ left: `${pos * 100}%` }} />
         </div>
-        <button className="btn primary block" onClick={stop} disabled={round >= totalRounds}>
+        {/* Stop on PRESS (pointerdown), not on click — click waits for the release.
+            The click handler survives only as the keyboard path (detail 0). */}
+        <button
+          className="btn primary block"
+          onPointerDown={(e) => {
+            if (e.button === 0) stop();
+          }}
+          onClick={(e) => {
+            if (e.detail === 0) stop();
+          }}
+          disabled={round >= totalRounds}
+        >
           {round >= totalRounds ? t('minigame.done') : t('minigame.stopInZone')}
         </button>
       </div>

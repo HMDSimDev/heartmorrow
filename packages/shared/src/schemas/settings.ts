@@ -55,6 +55,51 @@ export const KoboldTemplateSchema = z.enum(['alpaca', 'chatml', 'llama3', 'vicun
 export type KoboldTemplate = z.infer<typeof KoboldTemplateSchema>;
 
 /**
+ * Language forced onto every new piece of model-generated, player-visible prose.
+ * Values are BCP-47 language tags so they can also be reused by future UI-locale
+ * and per-world language work. `auto` preserves the model's existing behavior and
+ * adds no instruction. Chinese is split by script because "Mandarin" alone does
+ * not tell a text model whether the player expects simplified or traditional text.
+ */
+export const OUTPUT_LANGUAGES = [
+  'auto',
+  'en',
+  'zh-Hans',
+  'zh-Hant',
+  'ja',
+  'ko',
+  'es',
+  'fr',
+  'de',
+  'pt-BR',
+  'it',
+  'ru',
+  'pl',
+  'nl',
+  'tr',
+  'ar',
+  'he',
+  'fa',
+  'ur',
+  'hi',
+  'id',
+  'vi',
+  'th',
+  'uk',
+] as const;
+export const OutputLanguageSchema = z.enum(OUTPUT_LANGUAGES);
+export type OutputLanguage = z.infer<typeof OutputLanguageSchema>;
+
+/** Direction used for model-generated prose. `auto` lets each text block infer
+ * direction from its first strong character when no language has been forced. */
+export type OutputTextDirection = 'auto' | 'ltr' | 'rtl';
+const RTL_OUTPUT_LANGUAGES = new Set<OutputLanguage>(['ar', 'he', 'fa', 'ur']);
+export function outputLanguageDirection(language: OutputLanguage): OutputTextDirection {
+  if (language === 'auto') return 'auto';
+  return RTL_OUTPUT_LANGUAGES.has(language) ? 'rtl' : 'ltr';
+}
+
+/**
  * One model advertised by the endpoint's listing. `id` is always present; the
  * remaining fields are best-effort enrichment only LM Studio's native
  * `/api/v0/models` provides (OpenAI-compatible and Anthropic listings return
@@ -83,10 +128,7 @@ export type LlmModelInfo = z.infer<typeof LlmModelInfoSchema>;
  * — they are global, never per-role.
  */
 const llmConnectionShape = {
-  baseUrl: z
-    .string()
-    .url('Base URL must be a valid URL, e.g. http://localhost:1234/v1')
-    .default('http://localhost:1234/v1'),
+  baseUrl: z.string().url('Base URL must be a valid URL, e.g. http://localhost:1234/v1').or(z.literal('')).default(''),
   apiKey: z.string().default(''),
   model: z.string().min(1, 'Model name is required').default('local-model'),
   temperature: z.number().min(0).max(2).default(0.8),
@@ -204,6 +246,12 @@ export type ImageGenSettings = z.infer<typeof ImageGenSettingsSchema>;
 export const LlmSettingsSchema = z.object({
   ...llmConnectionShape,
   /**
+   * Global language for generated prose. This deliberately lives outside the
+   * connection shape: switching the evaluator or vision endpoint must never make
+   * part of a world drift into a different language. `auto` is backward-compatible.
+   */
+  outputLanguage: OutputLanguageSchema.default('auto'),
+  /**
    * Optional vision-capable model used for image-based generation (e.g. building a
    * character template from a portrait) when no full `vision` role override is
    * enabled. Reuses the base baseUrl + apiKey + endpoint. When blank, image calls
@@ -288,6 +336,9 @@ export function resolveLlmRole(settings: LlmSettings, role: LlmRole): LlmSetting
  */
 export type RedactedLlmSettings = LlmSettings & {
   apiKeySet: boolean;
+  /** True after the main model connection has been explicitly saved, or when a
+   *  pre-marker installation contains a connection that differs from defaults. */
+  configured: boolean;
   roleApiKeySet: Record<'evaluator' | 'vision', boolean>;
 };
 

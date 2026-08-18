@@ -330,9 +330,18 @@
   background: var(--border-soft);
 }
 
-.pcom-msg { display: flex; flex-direction: column; max-width: 80%; }
+.pcom-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 80%;
+  text-align: start;
+  unicode-bidi: isolate;
+}
 .pcom-msg.player { align-self: flex-end; align-items: flex-end; }
 .pcom-msg.character { align-self: flex-start; align-items: flex-start; }
+.pcom-msg:dir(rtl) { font-family: var(--font-rtl); }
+.pcom-msg.player:dir(rtl) { align-self: flex-start; align-items: flex-start; }
+.pcom-msg.character:dir(rtl) { align-self: flex-end; align-items: flex-end; }
 .pcom-bubble {
   padding: 9px 13px;
   border-radius: 16px;
@@ -348,11 +357,19 @@
   border-bottom-right-radius: 5px;
   box-shadow: var(--glow-rose);
 }
+.pcom-msg.player:dir(rtl) .pcom-bubble {
+  border-bottom-right-radius: 16px;
+  border-bottom-left-radius: 5px;
+}
 .pcom-msg.character .pcom-bubble {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-bottom-left-radius: 5px;
   box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+.pcom-msg.character:dir(rtl) .pcom-bubble {
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 5px;
 }
 
 /* "Regenerate this reply" — a small, quiet control under the character's last text.
@@ -402,7 +419,7 @@
   border: 1px solid rgba(230, 177, 94, 0.5);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   transition: transform 0.1s ease, box-shadow 0.15s ease;
 }
 .pcom-gift:hover:not(:disabled) { box-shadow: var(--glow-warm); }
@@ -470,7 +487,9 @@
   border: 1px solid var(--border);
   color: var(--text);
   font-size: 0.9rem;
+  text-align: start;
 }
+.pcom-compose input:dir(rtl) { font-family: var(--font-rtl); }
 .pcom-compose input:focus {
   outline: none;
   border-color: var(--brass-dim);
@@ -518,6 +537,14 @@
 }
 .pcom-msg.player .pcom-image { border-bottom-right-radius: 5px; }
 .pcom-msg.character .pcom-image { border-bottom-left-radius: 5px; }
+.pcom-msg.player:dir(rtl) .pcom-image {
+  border-bottom-right-radius: 16px;
+  border-bottom-left-radius: 5px;
+}
+.pcom-msg.character:dir(rtl) .pcom-image {
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 5px;
+}
 .pcom-image + .pcom-bubble { margin-top: 4px; }
 
 /* Staged-attachment preview above the compose bar. */

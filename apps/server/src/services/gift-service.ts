@@ -16,6 +16,7 @@ import {
 import { inventoryRepo, messagesRepo, sessionParticipantsRepo, sessionsRepo } from '../db/repositories';
 import { getDb } from '../db/index';
 import { badRequest, notFound } from '../lib/errors';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
@@ -53,6 +54,10 @@ export interface ReactToGiftResult {
   item: ShopItem;
   inventoryItem: InventoryItem;
   memoryWritten: boolean;
+  /** Same-day gifts to this character BEFORE this one (0 = first of the day) —
+   *  the UI reads it to say out loud that repeat gifts land lighter/not at all,
+   *  so the anti-grind scale never feels like a silent bug. */
+  giftsToday: number;
 }
 
 /**
@@ -170,8 +175,8 @@ export async function reactToGift(args: {
         `🎁 ${reaction.memory?.text ?? `${playerName} gave me ${item.name}.`}`,
         { bumpSession: false },
       );
-    } catch {
-      /* chronicle is best-effort; never block the gift */
+    } catch (error) {
+      reportOperationFailure('gift_chronicle_save_failed', 'The gift was given, but its relationship-history entry could not be saved.', error, { characterId, itemId: item.id, day });
     }
 
     return {
@@ -182,6 +187,7 @@ export async function reactToGift(args: {
       item,
       inventoryItem,
       memoryWritten,
+      giftsToday,
     };
   });
 }
@@ -261,5 +267,6 @@ export async function giveGiftOnDate(
     relationship: r.relationship,
     item: r.item,
     memoryWritten: r.memoryWritten,
+    giftsToday: r.giftsToday,
   };
 }

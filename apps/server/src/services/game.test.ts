@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { CharacterCreateSchema, LumberjackConfigSchema, WriterConfigSchema, type ShopItemCreate } from '@dsim/shared';
+import { CharacterCreateSchema, FlipConfigSchema, LumberjackConfigSchema, WriterConfigSchema, type ShopItemCreate } from '@dsim/shared';
 import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
 import { playerIdForWorld } from '../lib/ids';
 import { setAdapterOverride } from '../llm/provider';
@@ -280,6 +280,103 @@ describe('lumberjack — a money-only skill job', () => {
     const rel = getRelationship(character.id);
     expect(rel.comfort).toBe(comfortBefore); // no FLOP_PENALTY
     expect(rel.tension).toBe(tensionBefore);
+  });
+});
+
+describe('the flip — a hidden-ceiling haggling job (pay = cleared margin)', () => {
+  it('perfect reads (every ceiling quoted exactly) pay the full margin and cost a daily action', async () => {
+    const { world, character } = seedWorldAndCharacter();
+    const wallet = playerIdForWorld(world.id);
+    const beforeMoney = getOrCreatePlayer(wallet).money;
+    const beforeComfort = getRelationship(character.id).comfort;
+    const beforeStamina = ensureWorldState(world.id).stamina;
+
+    const start = await startMinigame({ minigameId: 'flip', characterId: null, worldId: world.id });
+    const config = FlipConfigSchema.parse(start.config);
+    // The test client reads the ceilings from the config the way a cheater could —
+    // resolve must derive the SAME margin from its own state, so this lands an S.
+    const deals = config.buyers.map((b) => ({ quote: b.ceiling, pressed: false }));
+    const res = finishMinigame({ runId: start.runId, submission: { minigameId: 'flip', submission: { deals } } });
+
+    // The payout is the queue's whole possible margin, flat-capped — a lean draw
+    // pays lean even when read perfectly (Hustle's swing), never a fixed 100.
+    const maxProfit = config.buyers.reduce((n, b) => n + (b.ceiling - b.baseValue), 0);
+    expect(res.result.score).toBe(100);
+    expect(res.result.grade).toBe('S');
+    expect(res.result.reward.money).toBe(Math.min(100, maxProfit));
+    expect(getOrCreatePlayer(wallet).money).toBe(beforeMoney + res.result.reward.money);
+    // Impersonal job: no reaction, no bond movement — but it spends the action.
+    expect(res.reaction).toBeNull();
+    expect(getRelationship(character.id).comfort).toBe(beforeComfort);
+    expect(ensureWorldState(world.id).stamina).toBe(beforeStamina - 1);
+  });
+
+  it('overquoting every buyer sells nothing (grade F, no pay)', async () => {
+    const { world } = seedWorldAndCharacter();
+    const start = await startMinigame({ minigameId: 'flip', characterId: null, worldId: world.id });
+    const config = FlipConfigSchema.parse(start.config);
+    const deals = config.buyers.map((b) => ({ quote: b.ceiling + 500, pressed: false }));
+    const res = finishMinigame({ runId: start.runId, submission: { minigameId: 'flip', submission: { deals } } });
+    expect(res.result.score).toBe(0);
+    expect(res.result.grade).toBe('F');
+    expect(res.result.reward.money).toBe(0);
+  });
+
+  it('selling everything at bare street value clears nothing — only the margin pays', async () => {
+    const { world } = seedWorldAndCharacter();
+    const start = await startMinigame({ minigameId: 'flip', characterId: null, worldId: world.id });
+    const config = FlipConfigSchema.parse(start.config);
+    // Every quote sells (ceiling is always at least worth+1), yet none clears a coin.
+    const deals = config.buyers.map((b) => ({ quote: b.baseValue, pressed: false }));
+    const res = finishMinigame({ runId: start.runId, submission: { minigameId: 'flip', submission: { deals } } });
+    expect(res.result.score).toBe(0);
+    expect(res.result.grade).toBe('F');
+    expect(res.result.reward.money).toBe(0);
+  });
+
+  it('a safe press pays the raised margin; a greedy press kills the whole sale', async () => {
+    const { world } = seedWorldAndCharacter();
+    const start = await startMinigame({ minigameId: 'flip', characterId: null, worldId: world.id });
+    const config = FlipConfigSchema.parse(start.config);
+    // Buyer 0: quote the ceiling then press past it — the deal must die outright.
+    // The rest: quote low enough that the pressed price still clears the ceiling.
+    const deals = config.buyers.map((b, i) =>
+      i === 0
+        ? { quote: b.ceiling, pressed: true }
+        : { quote: Math.floor(b.ceiling / 1.3), pressed: true },
+    );
+    const res = finishMinigame({ runId: start.runId, submission: { minigameId: 'flip', submission: { deals } } });
+
+    const maxProfit = config.buyers.reduce((n, b) => n + (b.ceiling - b.baseValue), 0);
+    const profit = config.buyers
+      .slice(1)
+      .reduce(
+        (n, b) =>
+          n + Math.max(0, Math.round(Math.floor(b.ceiling / 1.3) * config.pressMult) - b.baseValue),
+        0,
+      );
+    expect(res.result.score).toBe(Math.round((profit / maxProfit) * 100));
+    expect(res.result.reward.money).toBe(Math.min(100, profit));
+  });
+
+  it('buyers vary within and across runs (guards the FNV seed-shape mistake)', async () => {
+    // FNV-1a barely diffuses a change in a seed's FINAL character, so seeding with
+    // `…|tier|${i}` once dealt every buyer in a run the same tier/tells. Pool three
+    // runs (18 buyers) and require at least two ceiling tiers — with honest mixing
+    // the odds of one tier across 18 draws are ~(1/3)^17, so this never flakes.
+    const { world } = seedWorldAndCharacter();
+    const ratios: number[] = [];
+    const fingerprints = new Set<string>();
+    for (let run = 0; run < 3; run += 1) {
+      const start = await startMinigame({ minigameId: 'flip', characterId: null, worldId: world.id });
+      const config = FlipConfigSchema.parse(start.config);
+      for (const b of config.buyers) ratios.push(b.ceiling / b.baseValue);
+      fingerprints.add(config.buyers.map((b) => `${b.item}:${b.ceiling}`).join('|'));
+    }
+    const tiers = new Set(ratios.map((r) => (r < 1.3 ? 'cold' : r < 1.6 ? 'warm' : 'eager')));
+    expect(tiers.size).toBeGreaterThanOrEqual(2);
+    // Per-run seeding: three runs must not deal an identical queue.
+    expect(fingerprints.size).toBeGreaterThan(1);
   });
 });
 

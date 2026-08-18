@@ -27,16 +27,16 @@ REM --- Node.js ----------------------------------------------------------------
 where node >nul 2>&1
 if errorlevel 1 (
   echo [X] Node.js is not installed or not on PATH.
-  echo     Fix: install Node 20+ from https://nodejs.org/ ^(LTS^), then reopen this terminal.
+  echo     Fix: install Node 24+ from https://nodejs.org/ ^(LTS^), then reopen this terminal.
   set /a PROBLEMS+=1
 ) else (
   for /f "tokens=*" %%v in ('node -v') do set "NODE_VER=%%v"
   REM Strip leading "v" then take the major version number.
   set "NODE_NUM=!NODE_VER:v=!"
   for /f "tokens=1 delims=." %%m in ("!NODE_NUM!") do set "NODE_MAJOR=%%m"
-  if !NODE_MAJOR! LSS 20 (
-    echo [X] Node.js !NODE_VER! is too old ^(need ^>=20^).
-    echo     Fix: install Node 20+ from https://nodejs.org/ ^(LTS recommended^).
+  if !NODE_MAJOR! LSS 24 (
+    echo [X] Node.js !NODE_VER! is too old ^(need ^>=24 for node:sqlite^).
+    echo     Fix: install Node 24+ from https://nodejs.org/ ^(LTS recommended^).
     set /a PROBLEMS+=1
   ) else (
     echo [OK] Node.js !NODE_VER!

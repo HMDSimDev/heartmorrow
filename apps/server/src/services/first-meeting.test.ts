@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ConversationSessionSchema, MessageSchema } from '@dsim/shared';
-import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
+import { APP_REQUEST_HEADER, ConversationSessionSchema, MessageSchema } from '@dsim/shared';
+import { resetDb, seedWorldAndCharacter, FailingAdapter, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { sessionsRepo, messagesRepo } from '../db/repositories';
 import { newId } from '../lib/ids';
+import { buildApp } from '../app';
 import { addPlayerMessage, createSession, openConversation, previewSessionPrompt } from './conversation-service';
 import { hasDated } from './text-message-service';
 
@@ -98,5 +99,20 @@ describe('first date: the character takes the first turn', () => {
 
     const chat = createSession({ characterId: character.id, mode: 'chat', locationId: null });
     expect(await openConversation(chat.id)).toBeNull();
+  });
+
+  it('reports an opening failure without abandoning the newly created date', async () => {
+    const app = await buildApp({ logger: false });
+    try {
+      const { character } = seedWorldAndCharacter();
+      setAdapterOverride(new FailingAdapter());
+      const response = await app.inject({ method: 'POST', url: '/api/conversations', payload: { characterId: character.id, mode: 'date', locationId: null }, headers: { [APP_REQUEST_HEADER]: '1' } });
+      expect(response.statusCode).toBe(201);
+      expect(response.json().openingFailed).toBe(true);
+      expect(response.json().id).toBeTruthy();
+      expect(messagesRepo.listBySession(response.json().id)).toHaveLength(0);
+    } finally {
+      await app.close();
+    }
   });
 });

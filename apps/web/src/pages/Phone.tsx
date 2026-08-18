@@ -4,10 +4,12 @@ import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { PHASE_ICONS } from '@dsim/shared';
 import { api } from '../lib/api';
+import { errorMessage } from '../lib/hooks';
 import './phone.page.css';
 import { useAppData } from '../state/app-context';
 import { phaseLabel } from '../i18n/labels';
 import { Icon } from '../components/Icon';
+import { Banner } from '../components/ui';
 import { MessagesApp } from '../components/phone/MessagesApp';
 import { FacesApp } from '../components/phone/FacesApp';
 import { EmailApp } from '../components/phone/EmailApp';
@@ -109,15 +111,19 @@ export function Phone() {
     [setParams],
   );
   const [inbox, setInbox] = useState({ unreadTexts: 0, unreadEmails: 0, feedUnread: 0, landlordUnread: 0 });
+  const [inboxError, setInboxError] = useState<string>();
 
   useEffect(() => {
     // `live` drops a superseded fetch so a world switch mid-flight can't paint the
     // previous world's badge counts.
     let live = true;
+    setInboxError(undefined);
     api
       .phoneInbox(activeWorldId ?? undefined)
       .then((r) => live && setInbox(r))
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setInboxError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -133,6 +139,9 @@ export function Phone() {
     if (app === 'property' && !activeWorld?.featureFlags?.property) setApp('home', { replace: true });
     if (app === 'market' && !activeWorld?.featureFlags?.stockMarket) setApp('home', { replace: true });
     if (app === 'gambling' && !activeWorld?.featureFlags?.gambling) setApp('home', { replace: true });
+    // Mail/Faces are on-by-default (`?? true` guards the no-world moment).
+    if (app === 'email' && !(activeWorld?.featureFlags?.email ?? true)) setApp('home', { replace: true });
+    if (app === 'faces' && !(activeWorld?.featureFlags?.faces ?? true)) setApp('home', { replace: true });
   }, [app, activeWorld, worldsLoaded, setApp]);
 
   const badgeFor = (id: AppId) =>
@@ -161,15 +170,22 @@ export function Phone() {
     );
   };
 
-  // Per-world feature toggles: hide the wealth apps a world has disabled.
-  const featureOk = (id: AppDef['id']): boolean => {
+  // Per-world feature toggles: hide the apps a world has disabled. The wealth
+  // apps are opt-IN (off unless enabled); Mail and Faces are opt-OUT (on unless
+  // a world switched them off — `?? true` keeps them present with no world).
+  const featureOk = (id: AppId): boolean => {
     if (id === 'property') return !!activeWorld?.featureFlags?.property;
     if (id === 'market') return !!activeWorld?.featureFlags?.stockMarket;
     if (id === 'gambling') return !!activeWorld?.featureFlags?.gambling;
+    if (id === 'email') return activeWorld?.featureFlags?.email ?? true;
+    if (id === 'faces') return activeWorld?.featureFlags?.faces ?? true;
     return true;
   };
   const gridApps = ALL_APPS.filter((a) => !DOCK_IDS.includes(a.id) && featureOk(a.id));
-  const dockApps = DOCK_IDS.map((id) => ALL_APPS.find((a) => a.id === id)!).filter(Boolean);
+  // Mail lives in the DOCK, so the dock must respect the toggles too.
+  const dockApps = DOCK_IDS.map((id) => ALL_APPS.find((a) => a.id === id)!)
+    .filter(Boolean)
+    .filter((a) => featureOk(a.id));
 
   const phaseTxt = worldState ? phaseLabel(worldState.phase) : t('phone.twilight');
   const phaseIcon = worldState ? PHASE_ICONS[worldState.phase] : '🌙';
@@ -182,7 +198,9 @@ export function Phone() {
     { id: 'messages' as AppId, count: inbox.unreadTexts + inbox.landlordUnread, key: 'phone.waiting.texts' },
     { id: 'email' as AppId, count: inbox.unreadEmails, key: 'phone.waiting.letters' },
     { id: 'faces' as AppId, count: inbox.feedUnread, key: 'phone.waiting.posts' },
-  ].filter((p) => p.count > 0);
+    // A hint must never point at an app this world has hidden (stale unread
+    // counts can outlive a toggle-off).
+  ].filter((p) => p.count > 0 && featureOk(p.id));
   const lowEnergy = batteryPct <= 30;
   const homeHint = lowEnergy ? t('phone.hintLowEnergy') : t('phone.hintAmbient');
 
@@ -214,6 +232,7 @@ export function Phone() {
             <>
               <div className={`phone-home${theme.wallpaper ? ' has-wallpaper' : ''}`}>
                 <div className="ph-home">
+                  {inboxError && <Banner kind="error">{inboxError}</Banner>}
                   <div className="ph-greeting">
                     <div className="ph-greeting-eyebrow">
                       Pocket <span className="ph-amp">&</span> Lamplight · {phaseTxt}

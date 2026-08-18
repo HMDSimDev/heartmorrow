@@ -3,11 +3,16 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   RELATIONSHIP_STAT_KEYS,
+  RelationshipCheckRecoverySchema,
   currentStatus,
   isBrokenUp,
   nextDtrRung,
   DTR_COOLDOWN_DAYS,
   warmthBand,
+  warmthOf,
+  mutualAttraction,
+  incompatibleWarmthCap,
+  INCOMPATIBLE_MAX_BAND,
   bandIndex,
   deriveCalendar,
   PHASE_ICONS,
@@ -18,6 +23,7 @@ import {
   startingRapport,
   RAPPORT_LEAVE_FLOOR,
   INTENT_ICONS,
+  outputLanguageDirection,
   type Intent,
   type InventoryItem,
   type ShopItem,
@@ -30,21 +36,25 @@ import {
   type EndSessionResponse,
   type Message,
   type Relationship,
+  type RelationshipCheckRecovery,
   type RelationshipStatKey,
   type World,
   type PropertyView,
   type ActiveDate,
   type ConversationParticipant,
 } from '@dsim/shared';
-import { api, streamChat, streamRetry, streamRegenerate, assetUrl } from '../lib/api';
-import { errorMessage } from '../lib/hooks';
+import { api, streamChat, streamRelationshipChecks, streamRetry, streamRegenerate, assetUrl, type StreamHandlers } from '../lib/api';
+import { useAsync, errorMessage } from '../lib/hooks';
 import { activeDateParticipantNames } from '../lib/active-date';
 import { contextUsagePercent, contextUsageTone } from '../lib/context-window';
+import { loadWorldPlayer } from '../lib/world-player';
 import { useAppData } from '../state/app-context';
-import { intentLabel, intentTip, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
+import { intentLabel, intentTip, phaseLabel, relationshipStatusLabel, seasonLabel, warmthBandLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { DateOnboarding, DATE_ONBOARDING_KEY } from '../components/DateOnboarding';
+import { shouldAutoOpenOnboarding } from '../components/OnboardingSteps';
 import { Icon } from '../components/Icon';
+import { WarmthBridge, type WarmthBridgePath } from '../components/WarmthBridge';
 import { RelationshipBars } from '../components/StatBars';
 import { RichLine } from '../components/RichText';
 import { Banner, Empty, Field, Spinner } from '../components/ui';
@@ -63,6 +73,64 @@ import './date.page.css';
  */
 /** Single-slot unsent-message draft (one live date at a time). */
 const DATE_DRAFT_KEY = 'dsim.dateDraft';
+
+type PendingRelationshipRecovery = { messageId: string; state: RelationshipCheckRecovery };
+
+function pendingRelationshipRecovery(messages: Message[]): PendingRelationshipRecovery | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role !== 'player') continue;
+    const parsed = RelationshipCheckRecoverySchema.safeParse(message.metadata?.relationshipChecks);
+    if (!parsed.success || parsed.data.next === null) return null;
+    return { messageId: message.id, state: parsed.data };
+  }
+  return null;
+}
+
+function replaceRelationshipCheckState(messages: Message[], messageId: string, state: RelationshipCheckRecovery): Message[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) return message;
+    return { ...message, metadata: { ...message.metadata, relationshipChecks: state } };
+  });
+}
+
+function appendMessageOnce(messages: Message[], message: Message): Message[] {
+  if (messages.some((candidate) => candidate.id === message.id)) return messages;
+  return [...messages, message];
+}
+
+function replaceMessageEngagement(messages: Message[], messageId: string, engagement: number, characterId?: string, primaryCharacterId?: string): Message[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) return message;
+    const metadata: Record<string, unknown> = { ...message.metadata };
+    if (characterId) {
+      const prior = message.metadata.engagementByCharacter;
+      let engagementByCharacter: Record<string, unknown> = { [characterId]: engagement };
+      if (prior && typeof prior === 'object' && !Array.isArray(prior)) engagementByCharacter = { ...(prior as Record<string, unknown>), [characterId]: engagement };
+      metadata.engagementByCharacter = engagementByCharacter;
+    }
+    if (!characterId || characterId === primaryCharacterId) metadata.engagement = engagement;
+    return { ...message, metadata };
+  });
+}
+
+function replaceParticipantRead(participants: ConversationParticipant[], characterId: string, vibe: string, expression: string, rapport: number): ConversationParticipant[] {
+  return participants.map((participant) => {
+    if (participant.characterId !== characterId) return participant;
+    const updated: ConversationParticipant = { ...participant, vibe, rapport, judged: true };
+    if (expression) updated.expression = expression;
+    return updated;
+  });
+}
+
+function replaceParticipantState(participants: ConversationParticipant[], characterId: string, state: ConversationParticipant['state'], expression = ''): ConversationParticipant[] {
+  return participants.map((participant) => {
+    if (participant.characterId !== characterId) return participant;
+    const updated: ConversationParticipant = { ...participant, state };
+    if (expression) updated.expression = expression;
+    return updated;
+  });
+}
 
 /** Reaction-chip copy, indexed by judged engagement + 3 (−3 … +3). */
 const REACTION_KEYS = [
@@ -164,8 +232,10 @@ function DateTrajectory({
 export function Chat() {
   const { t } = useTranslation(['pages', 'common']);
   const [params] = useSearchParams();
-  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, assetById } =
+  const { player, reloadPlayer, refreshWorldState, activeWorldId, worldState, dayTick, activeDate, activeDateLoaded, refreshActiveDate, assetById, outputLanguage } =
     useAppData();
+  const conversationDirection = outputLanguageDirection(outputLanguage);
+  const conversationLanguage = outputLanguage === 'auto' ? undefined : outputLanguage;
   const [availability, setAvailability] = useState<Record<string, { available: boolean; reason: string | null }>>({});
   // The wallet of the SELECTED character's world (may differ from the active
   // world when arriving via a deep link); falls back to the context player.
@@ -198,6 +268,7 @@ export function Chat() {
   const [participantCharacters, setParticipantCharacters] = useState<Character[]>([]);
   /** Relationship-specific actions on a group date are addressed to this person. */
   const [actionTargetId, setActionTargetId] = useState<string | null>(null);
+  const dateWorldPlayer = useAsync(() => loadWorldPlayer(character?.worldId), [character?.worldId]);
   const [relationship, setRelationship] = useState<Relationship | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [contextEstimate, setContextEstimate] = useState<ConversationContextEstimate | null>(null);
@@ -244,6 +315,7 @@ export function Chat() {
     reaction: 'accept' | 'hurt' | 'plead';
     characterId: string;
   } | null>(null);
+  const [relationshipRetrying, setRelationshipRetrying] = useState(false);
   const [brokeUp, setBrokeUp] = useState(false);
   // A resumed transcript ended on a walkout/leave/farewell line the live SSE
   // handlers never got to act on (tab closed mid-turn) — conclude the date as
@@ -288,8 +360,7 @@ export function Chat() {
   // player glimpsed card one — the rail's "How dating works" button is the
   // deliberate way back in.
   useEffect(() => {
-    if (session?.mode === 'date' && localStorage.getItem(DATE_ONBOARDING_KEY) !== '1') {
-      localStorage.setItem(DATE_ONBOARDING_KEY, '1');
+    if (session?.mode === 'date' && shouldAutoOpenOnboarding(DATE_ONBOARDING_KEY)) {
       setOnboardingOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -320,7 +391,7 @@ export function Chat() {
       if (input.trim()) localStorage.setItem(DATE_DRAFT_KEY, JSON.stringify({ sessionId: session.id, text: input }));
       else localStorage.removeItem(DATE_DRAFT_KEY);
     } catch {
-      /* storage full — losing a draft is acceptable */
+      setNotice(t('chat.draftNotSaved'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, session?.id]);
@@ -342,7 +413,9 @@ export function Chat() {
         for (const a of list) map[a.characterId] = { available: a.available, reason: a.reason };
         setAvailability((prev) => ({ ...prev, ...map }));
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -403,8 +476,11 @@ export function Chat() {
         } else {
           setSetupMoney(null);
         }
-      } catch {
-        if (live) setSetupWorld(null);
+      } catch (cause) {
+        if (live) {
+          setSetupWorld(null);
+          setError(errorMessage(cause));
+        }
       }
     })();
     // Their private room unlocks once you're "getting close". Fetching it also
@@ -415,9 +491,13 @@ export function Chat() {
         if (!live) return;
         const unlocked = bandIndex(warmthBand(rel)) >= bandIndex('getting-close');
         setRoomUnlocked(unlocked);
-        if (unlocked) void api.getRoom(cid).catch(() => undefined);
+        if (unlocked) void api.getRoom(cid).catch((cause) => { if (live) setError(errorMessage(cause)); });
       })
-      .catch(() => live && setRoomUnlocked(false));
+      .catch((cause) => {
+        if (!live) return;
+        setRoomUnlocked(false);
+        setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -449,7 +529,9 @@ export function Chat() {
           ),
         });
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -695,8 +777,8 @@ export function Chat() {
         setEvalResult(result);
         setMilestone(result.milestone ?? null);
         if (result.expression) setExpression(result.expression);
-      } catch {
-        /* replay is best-effort — the plan-a-date screen is a fine fallback */
+      } catch (cause) {
+        if (live) setError(errorMessage(cause));
       }
     })();
     return () => {
@@ -743,6 +825,7 @@ export function Chat() {
       setSession(created);
       setCharacter(c);
       setActionTargetId(c.id);
+      if (created.openingFailed) setError(t('chat.openingSceneFailed'));
       // A date is now open server-side — engage the world's "date underway" lock
       // (Sleep / Work / Minigames) and light the Date-tab badge.
       void refreshActiveDate();
@@ -754,8 +837,10 @@ export function Chat() {
         setParticipants(sm.participants);
         setParticipantCharacters(await loadParticipantCharacters(sm.participants, [c]));
         setMessages(sm.messages);
-      } catch {
+        if (sm.messages.length === 0 && !created.openingFailed) setError(t('chat.openingSceneFailed'));
+      } catch (e) {
         setMessages([]);
+        setError(t('chat.openingSceneLoadFailed', { error: errorMessage(e) }));
       }
       setExpression(null);
       // Load the at-a-glance scene context (time/weather/mood) for this character's world.
@@ -784,6 +869,11 @@ export function Chat() {
     }
   };
 
+  const receiveRelationshipCheckState = (messageId: string, state: RelationshipCheckRecovery): void => {
+    setMessages((current) => replaceRelationshipCheckState(current, messageId, state));
+    if (state.failedCheck !== null) setError(t('chat.relationshipRetryFailed'));
+  };
+
   // `resend` carries a preserved payload for a retry; a normal send reads the live
   // composer. `playerPersisted` tracks whether the server saved the player turn
   // (the `player` event fired) so a failure can pick the right recovery: regenerate
@@ -791,6 +881,7 @@ export function Chat() {
   const send = async (resend?: { text: string; intent?: Intent; targetCharacterId?: string }) => {
     const text = (resend?.text ?? input).trim();
     if (!text || !session || streaming.active || busy) return;
+    if (pendingRelationshipRecovery(messages)) return;
     const chosenIntent = resend ? resend.intent : intent ?? undefined;
     const chosenTarget = resend?.targetCharacterId ?? selectedActionTargetId ?? undefined;
     if (!resend) {
@@ -849,14 +940,8 @@ export function Chat() {
           },
           onNotice: (msg) => setNotice(msg),
           onWalkout: (m, reason, characterId, terminal = true) => {
-            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-            if (characterId) {
-              setParticipants((prev) =>
-                prev.map((participant) =>
-                  participant.characterId === characterId ? { ...participant, state: 'walked_out' } : participant,
-                ),
-              );
-            }
+            setMessages((prev) => appendMessageOnce(prev, m));
+            if (characterId) setParticipants((prev) => replaceParticipantState(prev, characterId, 'walked_out'));
             if (terminal) {
               settled = true;
               setStreaming({ active: false, text: '' });
@@ -867,20 +952,14 @@ export function Chat() {
           },
           onBreakupIntent: (m, reaction, characterId) => {
             settled = true;
-            setMessages((prev) => [...prev, m]);
+            setMessages((prev) => appendMessageOnce(prev, m));
             setStreaming({ active: false, text: '' });
             setStreamingCharacterId(null);
             setBreakupPending({ reaction, characterId: characterId ?? session.characterId });
           },
           onRapport: (label, expr, rap, delta, engagement, messageId, characterId) => {
             const targetId = characterId ?? session.characterId;
-            setParticipants((prev) =>
-              prev.map((participant) =>
-                participant.characterId === targetId
-                  ? { ...participant, vibe: label, expression: expr || participant.expression, rapport: rap, judged: true }
-                  : participant,
-              ),
-            );
+            setParticipants((prev) => replaceParticipantRead(prev, targetId, label, expr, rap));
             if (targetId === session.characterId) {
               setVibe(label);
               if (expr) setExpression(expr);
@@ -888,42 +967,16 @@ export function Chat() {
             }
             if (delta) {
               setRapportPulse((p) => ({ delta, key: (p?.key ?? 0) + 1 }));
-              setParticipantPulses((prev) => ({
-                ...prev,
-                [targetId]: { delta, key: (prev[targetId]?.key ?? 0) + 1 },
-              }));
+              setParticipantPulses((prev) => ({ ...prev, [targetId]: { delta, key: (prev[targetId]?.key ?? 0) + 1 } }));
             }
             // Mirror the server's metadata stamp so the reaction chip appears live.
             if (engagement !== undefined && messageId) {
-              setMessages((prev) =>
-                prev.map((m) => {
-                  if (m.id !== messageId) return m;
-                  const prior = m.metadata.engagementByCharacter;
-                  const engagementByCharacter =
-                    prior && typeof prior === 'object' && !Array.isArray(prior)
-                      ? { ...(prior as Record<string, unknown>), [targetId]: engagement }
-                      : { [targetId]: engagement };
-                  return {
-                    ...m,
-                    metadata: {
-                      ...m.metadata,
-                      engagementByCharacter,
-                      ...(targetId === session.characterId ? { engagement } : {}),
-                    },
-                  };
-                }),
-              );
+              setMessages((prev) => replaceMessageEngagement(prev, messageId, engagement, targetId, session.characterId));
             }
           },
           onLeft: (m, _reason, characterId, terminal = true) => {
-            setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
-            if (characterId) {
-              setParticipants((prev) =>
-                prev.map((participant) =>
-                  participant.characterId === characterId ? { ...participant, state: 'left_early' } : participant,
-                ),
-              );
-            }
+            setMessages((prev) => appendMessageOnce(prev, m));
+            if (characterId) setParticipants((prev) => replaceParticipantState(prev, characterId, 'left_early'));
             if (terminal) {
               settled = true;
               setStreaming({ active: false, text: '' });
@@ -938,21 +991,16 @@ export function Chat() {
             // character's send-off, then run the normal end-and-evaluate flow so the
             // date is scored in full — no need to click "End & evaluate".
             settled = true;
-            setMessages((prev) => (prev.some((entry) => entry.id === m.id) ? prev : [...prev, m]));
+            setMessages((prev) => appendMessageOnce(prev, m));
             setStreaming({ active: false, text: '' });
             setStreamingCharacterId(null);
             if (characterId) {
-              setParticipants((prev) =>
-                prev.map((participant) =>
-                  participant.characterId === characterId
-                    ? { ...participant, state: 'departed', expression: expr || participant.expression }
-                    : participant,
-                ),
-              );
+              setParticipants((prev) => replaceParticipantState(prev, characterId, 'departed', expr));
               if (characterId === session.characterId && expr) setExpression(expr);
             }
             if (terminal) void endDate();
           },
+          onRelationshipChecks: receiveRelationshipCheckState,
         },
         controller.signal,
         chosenIntent,
@@ -974,6 +1022,102 @@ export function Chat() {
       }
       setStreaming({ active: false, text: '' });
       setStreamingCharacterId(null);
+    }
+  };
+
+  const retryRelationshipEffects = async (recovery: PendingRelationshipRecovery): Promise<void> => {
+    if (!session || streaming.active || busy || relationshipRetrying) return;
+    const activeSession = session;
+    setRelationshipRetrying(true);
+    setError(undefined);
+    setNotice(undefined);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let completed = false;
+    let terminal = false;
+    let failedAgain = false;
+    function handleState(messageId: string, state: RelationshipCheckRecovery): void {
+      receiveRelationshipCheckState(messageId, state);
+      if (state.failedCheck !== null) failedAgain = true;
+      if (state.next === null) completed = true;
+    }
+    function handleRapport(label: string, expr: string, rap: number, delta: number, engagement?: number, messageId?: string, characterId?: string): void {
+      const targetId = characterId ?? activeSession.characterId;
+      setParticipants((current) => replaceParticipantRead(current, targetId, label, expr, rap));
+      if (targetId === activeSession.characterId) {
+        setVibe(label);
+        if (expr) setExpression(expr);
+        setRapport(rap);
+      }
+      if (delta) {
+        setRapportPulse((current) => ({ delta, key: (current?.key ?? 0) + 1 }));
+        setParticipantPulses((current) => ({ ...current, [targetId]: { delta, key: (current[targetId]?.key ?? 0) + 1 } }));
+      }
+      if (engagement !== undefined && messageId) setMessages((current) => replaceMessageEngagement(current, messageId, engagement, targetId, activeSession.characterId));
+    }
+    function handleWalkout(message: Message, reason: string, characterId?: string, terminalEvent = true): void {
+      setMessages((current) => appendMessageOnce(current, message));
+      if (characterId) setParticipants((current) => replaceParticipantState(current, characterId, 'walked_out'));
+      if (terminalEvent) {
+        terminal = true;
+        setWalkout(reason || t('chat.walkoutDefault'));
+        void endDate();
+      }
+    }
+    function handleBreakup(message: Message, reaction: 'accept' | 'hurt' | 'plead', characterId?: string): void {
+      terminal = true;
+      setMessages((current) => appendMessageOnce(current, message));
+      setBreakupPending({ reaction, characterId: characterId ?? activeSession.characterId });
+    }
+    function handleFarewell(message: Message, expr?: string, characterId?: string, terminalEvent = true): void {
+      setMessages((current) => appendMessageOnce(current, message));
+      if (characterId) {
+        setParticipants((current) => replaceParticipantState(current, characterId, 'departed', expr));
+        if (characterId === activeSession.characterId && expr) setExpression(expr);
+      }
+      if (terminalEvent) {
+        terminal = true;
+        void endDate();
+      }
+    }
+    function handleLeft(message: Message, _reason: string, characterId?: string, terminalEvent = true): void {
+      setMessages((current) => appendMessageOnce(current, message));
+      if (characterId) setParticipants((current) => replaceParticipantState(current, characterId, 'left_early'));
+      if (terminalEvent) {
+        terminal = true;
+        setLeftEarly(true);
+        setVibe(null);
+        void endDate();
+      }
+    }
+    function handleError(message: string): void {
+      failedAgain = true;
+      setError(message);
+    }
+    const handlers: StreamHandlers = { onRelationshipChecks: handleState, onRapport: handleRapport, onWalkout: handleWalkout, onBreakupIntent: handleBreakup, onFarewell: handleFarewell, onLeft: handleLeft, onError: handleError };
+    try {
+      await streamRelationshipChecks(activeSession.id, recovery.messageId, handlers, controller.signal);
+      if (completed && !terminal && !failedAgain) setNotice(t('chat.relationshipRecovered'));
+      if (!completed && !terminal && !failedAgain && !controller.signal.aborted) setError(t('chat.relationshipRetryDropped'));
+    } catch (cause) {
+      if (!controller.signal.aborted) setError(errorMessage(cause));
+    } finally {
+      setRelationshipRetrying(false);
+    }
+  };
+
+  const continueWithoutRelationshipEffects = async (recovery: PendingRelationshipRecovery): Promise<void> => {
+    if (!session || streaming.active || busy || relationshipRetrying) return;
+    setRelationshipRetrying(true);
+    setError(undefined);
+    try {
+      const result = await api.skipRelationshipChecks(session.id, recovery.messageId);
+      receiveRelationshipCheckState(result.messageId, result.state);
+      setNotice(t('chat.relationshipSkipped'));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setRelationshipRetrying(false);
     }
   };
 
@@ -1005,8 +1149,9 @@ export function Chat() {
         } else {
           action = 'send'; // genuinely not saved → resend
         }
-      } catch {
+      } catch (cause) {
         action = 'abort'; // couldn't verify — keep the retry, don't risk a dup
+        setError(t('chat.retryCheckFailed', { error: errorMessage(cause) }));
       } finally {
         setBusy(false);
       }
@@ -1125,7 +1270,7 @@ export function Chat() {
         .then((sm) => {
           if (sessionIdRef.current === sid) setMessages(sm.messages);
         })
-        .catch(() => undefined); // keep the optimistic view — the retry affordance still recovers
+        .catch((cause) => setError(errorMessage(cause)));
     setError(undefined);
     setNotice(undefined);
     setFailed(null);
@@ -1301,6 +1446,11 @@ export function Chat() {
       if (res.characterId === session.characterId && res.expression) setExpression(res.expression);
       setDeltas(res.deltas);
       setTimeout(() => setDeltas(null), 1800);
+      // Say the anti-grind out loud: repeat gifts the same day land lighter (1)
+      // or not at all (2+) — silent scaling read as a bug.
+      if (res.giftsToday >= 1) {
+        setNotice(t(res.giftsToday === 1 ? 'common:gift.second' : 'common:gift.dry'));
+      }
       setGiftPicker(false);
       // Reflect the consumed unit so a second gift this date reads correctly.
       setGiftItems((items) =>
@@ -1390,10 +1540,8 @@ export function Chat() {
       // one arrived, and deferring the ack to a button the player may never press
       // made the recap replay on Date-tab visits for days afterwards.
       seenResultsRef.current.add(sid);
-      void api.markDateResultSeen(sid).catch(() => undefined);
-      const selectedResult = result.participantResults.find(
-        (entry) => entry.characterId === selectedActionTargetId,
-      );
+      void api.markDateResultSeen(sid).catch((cause) => setNotice(t('chat.recapAckFailed', { error: errorMessage(cause) })));
+      const selectedResult = result.participantResults.find((entry) => entry.characterId === selectedActionTargetId);
       const resultRelationship = selectedResult?.relationship ?? result.relationship;
       if (resultRelationship) {
         // Surface the date's net change as floating chips, then clear them so the
@@ -1431,21 +1579,6 @@ export function Chat() {
     void endDate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoEnd, session, busy]);
-
-  const summarize = async () => {
-    if (!session) return;
-    const sid = session.id;
-    setBusy(true);
-    try {
-      const updated = await api.summarize(sid);
-      if (sessionIdRef.current !== sid) return; // player abandoned this date
-      setSession(updated);
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
 
   // --- setup screen ---
   if (!session || !character) {
@@ -1829,6 +1962,27 @@ export function Chat() {
     : selectedTargetName;
   const status = relationship ? currentStatus(relationship) : 'none';
   const rung = relationship ? nextDtrRung(relationship) : null;
+  let relationshipWarmthPath: WarmthBridgePath = 'romance';
+  let relationshipWarmthMax = 100;
+  if (character && dateWorldPlayer.data && dateWorldPlayer.data.worldId === character.worldId) {
+    const compatibility = mutualAttraction({ gender: dateWorldPlayer.data.profile.gender, sexuality: dateWorldPlayer.data.profile.sexuality }, { gender: character.gender, sexuality: character.sexuality });
+    if (!compatibility.mutual) {
+      relationshipWarmthPath = 'friendship';
+      relationshipWarmthMax = incompatibleWarmthCap();
+    }
+  }
+  let relationshipWarmth = 0;
+  let relationshipWarmthDisplay = 0;
+  let relationshipWarmthStage = '';
+  let relationshipWarmthAria = '';
+  if (relationship) {
+    relationshipWarmth = Math.max(0, Math.min(100, warmthOf(relationship)));
+    relationshipWarmthDisplay = Number(Math.min(relationshipWarmth, relationshipWarmthMax).toFixed(1));
+    let relationshipWarmthStageKey = warmthBand(relationship);
+    if (relationshipWarmthPath === 'friendship' && relationshipWarmth > relationshipWarmthMax) relationshipWarmthStageKey = INCOMPATIBLE_MAX_BAND;
+    relationshipWarmthStage = warmthBandLabel(relationshipWarmthStageKey);
+    relationshipWarmthAria = t('profile.warmthAria', { value: relationshipWarmthDisplay, max: relationshipWarmthMax, stage: relationshipWarmthStage });
+  }
   const spokeThisSession = messages.some((m) => m.role === 'player');
   // The server enforces a same-day cooldown after any DTR attempt (a deflect sets
   // `dtr:lastAttemptDay`). Mirror it here so the commit button hides instead of staying
@@ -1840,12 +1994,15 @@ export function Chat() {
   // The date is over (evaluated or any terminal path) → no more composing, and the
   // actions collapse to "New date". Mirrors dateConcluded so the lock clears in step.
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
-  const contextWindowKnown =
-    contextEstimate?.contextWindowSource === 'model' && contextEstimate.contextWindowTokens != null;
-  const contextPercent = contextWindowKnown
-    ? contextUsagePercent(contextEstimate.estimatedPromptTokens, contextEstimate.contextWindowTokens!)
-    : null;
-  const contextTone = contextPercent == null ? 'normal' : contextUsageTone(contextPercent);
+  const contextWindowKnown = contextEstimate?.contextWindowSource === 'model' && contextEstimate.contextWindowTokens != null;
+  let contextPercent: number | null = null;
+  if (contextWindowKnown) contextPercent = contextUsagePercent(contextEstimate.estimatedPromptTokens, contextEstimate.contextWindowTokens!);
+  let contextTone = 'normal';
+  if (contextPercent !== null) contextTone = contextUsageTone(contextPercent);
+  const relationshipRecovery = pendingRelationshipRecovery(messages);
+  const relationshipRecoveryVisible = relationshipRecovery !== null && !streaming.active;
+  let relationshipRecoveryClassName = 'relationship-recovery';
+  if (relationshipRetrying) relationshipRecoveryClassName += ' is-retrying';
   // The id of the trailing character reply, when it's a plain line the player may
   // regenerate (not a consequence-bearing walkout/farewell/etc, and not mid-stream
   // or mid-recovery). Drives the small "rewrite this reply" button on that bubble.
@@ -1866,7 +2023,8 @@ export function Chat() {
     !streaming.active &&
     !busy &&
     !failed &&
-    !breakupPending
+    !breakupPending &&
+    !relationshipRecovery
       ? lastMsg.id
       : null;
   const locationName = session.locationId
@@ -1944,7 +2102,7 @@ export function Chat() {
             <div className="date-moment-kicker">{t(hangout ? 'chat.recapKickerHangout' : 'chat.recapKicker')}</div>
             {evalResult.mood && <span className="date-recap-mood">{evalResult.mood}</span>}
           </div>
-          {evalResult.summaryLine && <p className="date-recap-summary">{evalResult.summaryLine}</p>}
+          {evalResult.summaryLine && <p className="date-recap-summary" dir="auto">{evalResult.summaryLine}</p>}
           {evalResult.bestLine && (
             <blockquote className={`date-recap-line ${evalResult.bestLine.engagement > 0 ? 'warm' : 'cool'}`}>
               <span className="date-recap-line-kicker">
@@ -1981,7 +2139,7 @@ export function Chat() {
           <div className="date-moment-seal" aria-hidden="true">✦</div>
           <div className="date-moment-kicker">{t('chat.endingKicker')}</div>
           <div className="date-moment-title">{t('chat.endingTitle', { title: evalResult.ending.title })}</div>
-          <p className="date-moment-body">{evalResult.ending.epilogue}</p>
+          <p className="date-moment-body" dir="auto">{evalResult.ending.epilogue}</p>
           <p className="date-moment-note">
             {t('chat.endingNote')}
           </p>
@@ -2091,6 +2249,7 @@ export function Chat() {
     <div className="stack">
       {error && <Banner kind="error">{error}</Banner>}
       {notice && <Banner kind="info">{notice}</Banner>}
+      {evalResult && (evalResult.warnings?.length ?? 0) > 0 && <Banner kind="error"><strong>{t('chat.partialDateFailure')}</strong><ul>{evalResult.warnings.map((warning) => <li key={warning.code}>{warning.message}</li>)}</ul></Banner>}
       <div className="chat-wrap date-wrap">
         <aside className="chat-side date-dossier">
           {/* Portrait-led identity plate: the group shares two equal columns, while
@@ -2226,6 +2385,10 @@ export function Chat() {
                     <span className="badge accent">{relationshipStatusLabel(status)}</span>
                   ) : null}
               </div>
+              <div className="date-warmth-readout">
+                <div className="date-warmth-meta"><span>{relationshipWarmthStage}</span><strong>{relationshipWarmthDisplay}<small>/{relationshipWarmthMax}</small></strong></div>
+                <WarmthBridge value={relationshipWarmth} maxValue={relationshipWarmthMax} path={relationshipWarmthPath} ariaLabel={relationshipWarmthAria} compact />
+              </div>
               <RelationshipBars relationship={relationship} deltas={deltas ?? undefined} />
                 {groupDate && !locked && (
                   <div className="date-bond-actions">
@@ -2268,7 +2431,7 @@ export function Chat() {
           )}
           <div className="card date-actions">
             {!groupDate && dtrReady && !locked && (
-              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active} title={t('chat.dtrTitleFor', { name: selectedTargetName })}>
+              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active || relationshipRecovery !== null} title={t('chat.dtrTitleFor', { name: selectedTargetName })}>
                 <Icon name="commit" size={16} /> {rung!.rung.label}
               </button>
             )}
@@ -2276,7 +2439,7 @@ export function Chat() {
               <button
                 className="btn ghost block date-gift-btn"
                 onClick={() => (giftPicker ? setGiftPicker(false) : void openGiftPicker())}
-                disabled={busy || streaming.active}
+                disabled={busy || streaming.active || relationshipRecovery !== null}
                 title={t('chat.giveSomething')}
               >
                 <Icon name="gift" size={15} /> {giftPicker ? t('chat.neverMind') : t('chat.giveGift')}
@@ -2292,7 +2455,7 @@ export function Chat() {
                       key={e.inventoryItem.id}
                       className="date-gift-item"
                       onClick={() => void giveGift(e.inventoryItem.id)}
-                      disabled={busy || streaming.active}
+                      disabled={busy || streaming.active || relationshipRecovery !== null}
                     >
                       <span className="date-gift-item-name">{e.item.name}</span>
                       <span className="date-gift-item-qty">×{e.inventoryItem.quantity}</span>
@@ -2314,14 +2477,9 @@ export function Chat() {
                 <Icon name="recap" size={14} /> {t(hangout ? 'chat.newHangout' : 'chat.newDate')}
               </button>
             ) : spokeThisSession ? (
-              <>
-                <button className="btn sm block" onClick={summarize} disabled={busy || streaming.active}>
-                  <Icon name="recap" size={14} /> {t('chat.recap')}
-                </button>
-                <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active}>
-                  {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t(hangout ? 'chat.endHangout' : 'chat.endEvaluate')}</>}
-                </button>
-              </>
+              <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active || relationshipRecovery !== null}>
+                {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t(hangout ? 'chat.endHangout' : 'chat.endEvaluate')}</>}
+              </button>
             ) : (
               <button className="btn ghost block date-end-btn" onClick={cancelDate} disabled={busy || streaming.active}>
                 {busy ? t('chat.leaving') : <><Icon name="leave" size={14} /> {t(hangout ? 'chat.cancelHangout' : 'chat.cancelDate')}</>}
@@ -2445,6 +2603,8 @@ export function Chat() {
                 <Fragment key={m.id}>
                   <div
                     className={`date-msg ${m.role}${m.role === 'narrator' && m.metadata?.venueFlavor === true ? ' venue-flavor' : ''}`}
+                    dir={conversationDirection}
+                    lang={conversationLanguage}
                   >
                     {groupDate && m.role === 'character' && (
                       <span className="date-msg-speaker">{participantName(m.characterId)}</span>
@@ -2480,6 +2640,7 @@ export function Chat() {
                   ) : engagement !== null && (
                     <span
                       className={`date-react ${engagement > 0 ? 'warm' : engagement < 0 ? 'cool' : 'flat'}`}
+                      dir={conversationDirection}
                       title={t('chat.reactionTitle')}
                     >
                       <span className="date-react-pip" aria-hidden="true">◆</span>
@@ -2490,7 +2651,7 @@ export function Chat() {
               );
             })}
             {streaming.active && (
-              <div className="date-msg character">
+              <div className="date-msg character" dir={conversationDirection} lang={conversationLanguage}>
                 {groupDate && streamingCharacterId && (
                   <span className="date-msg-speaker">{participantName(streamingCharacterId)}</span>
                 )}
@@ -2571,6 +2732,26 @@ export function Chat() {
               </div>
             </div>
           ) : (
+            <>
+            {relationshipRecoveryVisible && relationshipRecovery && (
+              <div className={relationshipRecoveryClassName} role="alert" aria-live="assertive">
+                <div className="relationship-recovery-thread" aria-hidden="true"><span /><i /><span /></div>
+                <div className="relationship-recovery-copy">
+                  <span className="relationship-recovery-kicker">{t('chat.relationshipInterruptedKicker')}</span>
+                  <strong>{t('chat.relationshipInterruptedTitle')}</strong>
+                  <p>{t('chat.relationshipInterruptedBody')}</p>
+                </div>
+                <div className="relationship-recovery-actions">
+                  <button className="btn primary" onClick={() => void retryRelationshipEffects(relationshipRecovery)} disabled={relationshipRetrying || busy}>
+                    <Icon name="refresh" size={14} />
+                    {relationshipRetrying && t('chat.relationshipRetrying')}
+                    {!relationshipRetrying && t('chat.relationshipRetry')}
+                  </button>
+                  <button className="btn ghost" onClick={() => void continueWithoutRelationshipEffects(relationshipRecovery)} disabled={relationshipRetrying || busy}>{t('chat.relationshipContinue')}</button>
+                </div>
+              </div>
+            )}
+            {!relationshipRecoveryVisible && (
             <div className="date-input-wrap">
               {/* One instrument: the message box with the intent moves docked
                   inside it. An intent is a claim over your NEXT line — the
@@ -2579,6 +2760,8 @@ export function Chat() {
               <div className="chat-input date-composer">
                 <textarea
                   value={input}
+                  dir={conversationDirection}
+                  lang={conversationLanguage}
                   placeholder={intent ? t('chat.composerIntent', { intent: intentLabel(intent), name: composerTargetName }) : t('chat.composerPlain', { name: composerTargetName })}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
@@ -2659,6 +2842,8 @@ export function Chat() {
                 </div>
               )}
             </div>
+            )}
+            </>
           )}
           </div>
         </section>

@@ -82,6 +82,7 @@
   --font-display: 'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-body: 'Hanken Grotesk Variable', 'Hanken Grotesk', ui-sans-serif, system-ui,
     -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-rtl: 'Noto Sans Arabic', 'Noto Sans Hebrew', 'Segoe UI', Tahoma, Arial, sans-serif;
   --font-mono: 'Spline Sans Mono Variable', 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   font-family: var(--font-body);
@@ -126,6 +127,17 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   transition: background-color 1.2s ease;
+}
+
+/* Model/user-authored content may use a different script direction than the UI.
+   `dir=auto` gives each prose block its own bidi paragraph and keeps it isolated
+   from neighboring English labels, dates, icons, and numbers. */
+[dir='auto'] {
+  unicode-bidi: isolate;
+  text-align: start;
+}
+[dir='auto']:dir(rtl) {
+  font-family: var(--font-rtl);
 }
 a { color: var(--moon); text-decoration: none; }
 a:hover { color: #c2d6f1; }
@@ -286,6 +298,22 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
 /* Sidebar (desktop) */
 .sidebar { display: none; }
 
+/* The model link reads like a tiny hardware telltale: one lamp, one plain status
+   line. The detailed first-run variant expands to include the endpoint response. */
+.model-connection-status { display: flex; align-items: flex-start; gap: 9px; min-width: 0; color: var(--text-dim); }
+.model-connection-lamp { width: 8px; height: 8px; margin-top: 0.42em; flex: none; border-radius: 50%; background: var(--text-mute); box-shadow: 0 0 0 2px color-mix(in oklab, var(--text-mute) 18%, transparent); }
+.model-connection-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.model-connection-label { font-size: 0.78rem; font-weight: 650; line-height: 1.35; }
+.model-connection-copy small { max-width: 70ch; color: var(--text-mute); font-size: 0.76rem; line-height: 1.45; overflow-wrap: anywhere; }
+.model-connection-status.is-connected .model-connection-lamp { background: var(--sage); box-shadow: 0 0 9px color-mix(in oklab, var(--sage) 60%, transparent); }
+.model-connection-status.is-disconnected .model-connection-lamp { background: var(--ember); box-shadow: 0 0 8px color-mix(in oklab, var(--ember) 45%, transparent); }
+.model-connection-status.is-not_configured .model-connection-lamp { background: var(--brass); box-shadow: 0 0 8px color-mix(in oklab, var(--brass) 40%, transparent); }
+.model-connection-status.is-checking .model-connection-lamp { background: var(--moon); animation: model-connection-pulse 1.35s ease-in-out infinite; }
+.model-connection-status.is-detailed { padding: 13px 15px; border: 1px solid var(--border-soft); border-radius: var(--radius-sm); background: color-mix(in oklab, var(--ink-2) 76%, transparent); }
+.model-connection-status.is-detailed .model-connection-label { color: var(--text); font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; }
+@keyframes model-connection-pulse { 0%, 100% { opacity: 0.4; transform: scale(0.82); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .model-connection-status.is-checking .model-connection-lamp { animation: none; } }
+
 /* Bottom nav (mobile) */
 .bottomnav {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
@@ -442,6 +470,7 @@ code { font-family: var(--font-mono); font-size: 0.86em; color: var(--moon); }
     border: 1px solid transparent;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
+  .sidebar-foot .model-connection-status { padding: 3px 11px 5px; }
   .sidebar-foot .support-link .ico {
     width: 22px; text-align: center; opacity: 0.9; flex-shrink: 0;
   }
@@ -693,7 +722,7 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 /* --- Stat bars — segmented HUD gauges ------------------------------------ */
 .statbar { margin-bottom: 11px; }
 .statbar .label { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 4px; }
-.statbar .label > span:first-child { color: var(--text-dim); }
+.statbar .label-text { color: var(--text-dim); }
 .statbar .label .v { color: var(--text); font-weight: 700; position: relative; font-family: var(--font-mono); }
 .statbar .track {
   height: 9px; border-radius: 3px; background: var(--ink-2); overflow: hidden;
@@ -1862,4 +1891,45 @@ select {
     transition-duration: 0.001ms !important;
   }
   .app-main { animation: none; }
+}
+
+/* --- Server-waking pill (see components/ServerWakingNotice.tsx) ------------
+   Shown while the API server is unreachable and the app-context wake loop is
+   retrying — the boot race with run.bat, or a mid-session server restart. The
+   global reduced-motion clamp above already stills the dot's pulse. */
+.server-waking {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border: 1px solid rgba(157, 184, 222, 0.35);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+}
+.server-waking-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--moon);
+  animation: server-waking-pulse 1.4s ease-in-out infinite;
+}
+.server-waking.is-error {
+  border-color: color-mix(in srgb, var(--bad) 55%, transparent);
+  color: var(--bad);
+}
+.server-waking.is-error .server-waking-dot {
+  background: var(--bad);
+}
+@keyframes server-waking-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1); }
 }

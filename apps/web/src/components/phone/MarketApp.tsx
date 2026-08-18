@@ -81,8 +81,13 @@ function CompanyRow({
       <div className="mkt-company-name">{company.name}</div>
       {company.description && <p className="mkt-desc">{company.description}</p>}
       <div className="mkt-row-meta">
+        {/* The hold-a-full-day rule rides the chip as a tooltip — without it,
+            buying at night and waking to no dividend reads as a bug. */}
         {company.dividendPerShare > 0 && (
-          <span className="mkt-dividend">{t('market.row.dividend', { amount: company.dividendPerShare })}</span>
+          <span className="mkt-dividend" title={t('market.row.dividendHold')}>
+            {t('market.row.dividend', { amount: company.dividendPerShare })}
+            <span className="mkt-dividend-note">{t('market.row.dividendHoldShort')}</span>
+          </span>
         )}
         {shares > 0 && (
           <span className="mkt-held">{t('market.row.held', { count: shares })}</span>

@@ -19,6 +19,7 @@ import { callStructuredLlm } from '../llm/structured';
 import { buildPostcardMessages } from '../prompt/prompt-builder';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { recordEvent } from './event-service';
+import { featureEnabled } from './world-feature-service';
 
 /**
  * Postcards: when someone you've dated is away (unavailable) for a stretch of
@@ -97,6 +98,8 @@ export async function generatePostcardsForDay(
   day: number,
   playerId: string = DEFAULT_PLAYER_ID,
 ): Promise<void> {
+  // Postcards land in the Mail app, so they ride the same per-world toggle.
+  if (!featureEnabled(worldId, 'email')) return;
   const settings = getLlmSettings();
   const player = getOrCreatePlayer(playerIdForWorldOrDefault(worldId));
 

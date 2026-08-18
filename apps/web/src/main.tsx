@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import App from './App';
 import { AppDataProvider } from './state/app-context';
+import { ServerWakingNotice } from './components/ServerWakingNotice';
 import { ErrorBoundary, RouteErrorPage } from './components/ErrorBoundary';
 // Nocturne type system, bundled locally (no CDN) to keep the app offline-first.
 import '@fontsource-variable/fraunces';
@@ -23,6 +24,7 @@ const router = createBrowserRouter([
     element: (
       <AppDataProvider>
         <App />
+        <ServerWakingNotice />
       </AppDataProvider>
     ),
     // Render errors thrown inside the route show the crash screen, not the router's

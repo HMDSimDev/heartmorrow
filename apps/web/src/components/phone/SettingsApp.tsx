@@ -18,7 +18,7 @@ export function SettingsApp() {
   const [confirmReset, setConfirmReset] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const onWallpaper = (file: File) => {
+  const onWallpaper = async (file: File): Promise<void> => {
     setError(undefined);
     if (file.size > MAX_WALLPAPER_BYTES) {
       setError(t('toast.wallpaperTooLarge'));
@@ -27,10 +27,20 @@ export function SettingsApp() {
     try {
       // Hand the image Blob straight to the store — it's persisted in IndexedDB
       // and surfaced as a short blob: URL (no megabyte data URL anywhere).
-      setWallpaper(file);
+      await setWallpaper(file);
       setNote(t('toast.wallpaperSet'));
     } catch (e) {
       setError(errorMessage(e));
+    }
+  };
+
+  const removeWallpaper = async (): Promise<void> => {
+    setError(undefined);
+    try {
+      await setWallpaper(null);
+      setNote(t('toast.wallpaperRemoved'));
+    } catch (cause) {
+      setError(errorMessage(cause));
     }
   };
 
@@ -90,13 +100,13 @@ export function SettingsApp() {
                       hidden
                       onChange={(e) => {
                         const f = e.target.files?.[0];
-                        if (f) onWallpaper(f);
+                        if (f) void onWallpaper(f);
                         if (fileRef.current) fileRef.current.value = '';
                       }}
                     />
                   </label>
                   {theme.wallpaper && (
-                    <button className="btn sm ghost" onClick={() => setWallpaper(null)}>
+                    <button className="btn sm ghost" onClick={() => { void removeWallpaper(); }}>
                       {t('common:remove')}
                     </button>
                   )}

@@ -7,7 +7,9 @@ import {
   RhythmSerenadeConfigSchema,
   LumberjackConfigSchema,
   WriterConfigSchema,
+  FlipConfigSchema,
   type Character,
+  type FlipSubmission,
   type LoreQuizSubmission,
   type LumberjackSubmission,
   type MemoryMatchSubmission,
@@ -27,6 +29,7 @@ import { TwoTruthsGame } from './TwoTruthsGame';
 import { RhythmSerenade } from './RhythmSerenade';
 import { LumberjackGame } from './LumberjackGame';
 import { WriterGame } from './WriterGame';
+import { FlipGame } from './FlipGame';
 
 /** An in-flight minigame run: the id, the server run handle, and the opaque config. */
 export interface ActiveGame {
@@ -105,6 +108,13 @@ export function GameView({
         <WriterGame
           config={WriterConfigSchema.parse(active.config)}
           onComplete={(submission: WriterSubmission) => onComplete({ minigameId: 'writer', submission })}
+        />
+      );
+    case 'flip':
+      return (
+        <FlipGame
+          config={FlipConfigSchema.parse(active.config)}
+          onComplete={(submission: FlipSubmission) => onComplete({ minigameId: 'flip', submission })}
         />
       );
     default:

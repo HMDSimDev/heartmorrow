@@ -53,7 +53,7 @@ export interface ActivityDef {
   amount?: number;
   /** Together: the outing's mood (drives the tile glyph + copy). */
   angle?: TogetherAngle;
-  /** Together: a diegetic emoji glyph for the tile. */
+  /** A diegetic emoji glyph for the tile (Work postings and Together outings). */
   icon?: string;
   /** Together: which character traits make this outing land well. */
   fitStats?: readonly DatingStatKey[];
@@ -74,6 +74,7 @@ export const ACTIVITIES: readonly ActivityDef[] = [
     kind: 'work',
     label: 'Work a shift',
     description: 'Steady hours for steady pay. No surprises — and you get a little better at the work each time.',
+    icon: '🛎️',
     money: 50,
     skill: 'service',
     skillXp: 30,
@@ -86,6 +87,7 @@ export const ACTIVITIES: readonly ActivityDef[] = [
     kind: 'work',
     label: 'Hustle odd jobs',
     description: 'Grittier work, an uneven cut — clean up on a good day, scrape by on a bad one.',
+    icon: '🧰',
     money: 50,
     moneyVariance: 0.6,
     skill: 'hustle',
@@ -99,6 +101,7 @@ export const ACTIVITIES: readonly ActivityDef[] = [
     kind: 'work',
     label: 'Day-labor outdoors',
     description: 'Hard graft the almanac prices by the sky — storms pay best, fair days least. Costs two actions.',
+    icon: '⛈️',
     money: 140,
     moneyVariance: 0.3,
     staminaCost: 2,

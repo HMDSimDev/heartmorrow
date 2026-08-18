@@ -14,8 +14,8 @@ services:
 
     environment:
       HOST: 0.0.0.0
-      # you can also set this up in the Heartmorrow settings, for more control
-      LLM_BASE_URL: http://host.docker.internal:1234/v1
+      # Set this in Heartmorrow Settings, or uncomment it here for a container default.
+      # LLM_BASE_URL: http://host.docker.internal:1234/v1
       # LLM_API_KEY: lm-studio
       # LLM_MODEL: local-model
 

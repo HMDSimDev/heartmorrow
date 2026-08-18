@@ -61,7 +61,11 @@ export function LumberjackGame({
 
   const swing = () => {
     if (log >= totalLogs) return;
-    const distance = Math.abs(posRef.current - center);
+    // Judge against the needle the player can SEE — the last-RENDERED position —
+    // never the live rAF ref. posRef has already advanced past the painted frame
+    // (~1–2 frames ahead), which at the later logs' speeds is wider than the whole
+    // grain zone: a visually-perfect swing was scoring as a miss.
+    const distance = Math.abs(pos - center);
     const accuracy = distance <= halfWidth ? 1 - (distance / halfWidth) * 0.4 : 0;
     if (accuracy >= CLEAN) {
       comboRef.current += 1;
@@ -116,7 +120,20 @@ export function LumberjackGame({
           <div className="meter-needle" style={{ left: `${pos * 100}%` }} />
           {chip > 0 && <span key={chip} className="mga-chip" style={{ left: `${pos * 100}%` }} aria-hidden />}
         </div>
-        <button className="btn primary block" onClick={swing} disabled={log >= totalLogs}>
+        {/* Swing on PRESS (pointerdown), not on click — click waits for the release,
+            and that extra beat is real distance at swing speed. The click handler
+            survives only as the keyboard path: Space/Enter activations arrive as
+            clicks with detail 0, while a pointer press has already swung. */}
+        <button
+          className="btn primary block"
+          onPointerDown={(e) => {
+            if (e.button === 0) swing();
+          }}
+          onClick={(e) => {
+            if (e.detail === 0) swing();
+          }}
+          disabled={log >= totalLogs}
+        >
           {log >= totalLogs ? t('minigame.timber') : t('minigame.swing')}
         </button>
       </div>

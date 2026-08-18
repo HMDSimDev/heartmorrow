@@ -1,10 +1,11 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
-import type { ActiveDate, Asset, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
+import type { ActiveDate, Asset, EndpointMode, OutputLanguage, PlayerProfile, SleepResponse, World, WorldState } from '@dsim/shared';
 import { deriveCalendar } from '@dsim/shared';
 import { api } from '../lib/api';
 import { idbGet, idbSet, idbDel } from '../lib/idb-kv';
+import { errorMessage } from '../lib/hooks';
 
 const ACTIVE_WORLD_KEY = 'dsim.activeWorldId';
 const CREATOR_KEY = 'dsim.creatorMode';
@@ -20,6 +21,8 @@ const ADVANCED_KEY = 'dsim.advancedMode';
 // A blob: URL is ~50 chars, so it sidesteps both.
 const THEME_KEY = 'dsim.theme';
 const WALLPAPER_IDB_KEY = 'phoneWallpaper';
+
+export type ModelConnectionStatus = 'checking' | 'connected' | 'disconnected' | 'not_configured';
 
 /** How the phone wallpaper is scaled to the screen — mirrors a desktop OS's
  *  wallpaper options. `fit` = whole image, letterboxed (the safe default). */
@@ -94,11 +97,16 @@ interface AppData {
    *  Client-only UI gating, persisted to localStorage; the server enforces nothing. */
   advancedMode: boolean;
   setAdvancedMode: (on: boolean) => void;
+  /** Language selected for model-generated prose. Kept in app state so every
+   * generated-content surface can apply the correct bidi direction independently
+   * of the interface locale. */
+  outputLanguage: OutputLanguage;
+  setOutputLanguage: (language: OutputLanguage) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
   /** Set (or clear, with null) the phone wallpaper from an image Blob/File. The
    *  Blob is persisted to IndexedDB and exposed as a blob: URL on `theme.wallpaper`. */
-  setWallpaper: (image: Blob | null) => void;
+  setWallpaper: (image: Blob | null) => Promise<void>;
   // Phone: unread incoming TEXTS (not emails), for the sidebar badge
   unreadTexts: number;
   refreshInbox: () => Promise<void>;
@@ -111,6 +119,18 @@ interface AppData {
    *  before it knows whether a date is already underway. */
   activeDateLoaded: boolean;
   refreshActiveDate: () => Promise<ActiveDate | null>;
+  /** True while the API server is unreachable (the latest world-list fetch
+   *  failed). The wake loop below is already retrying — UI should read this as
+   *  "the emptiness is temporary", never as an empty save. */
+  serverWaking: boolean;
+  /** A nonfatal app-data refresh or browser-persistence failure that needs the player's attention. */
+  syncWarning: string | null;
+  /** Live status of the main language-model endpoint. Checked automatically at
+   *  launch and refreshed whenever the connection settings are saved. */
+  modelConnectionStatus: ModelConnectionStatus;
+  modelConnectionMessage: string | null;
+  modelProviderMode: EndpointMode;
+  checkModelConnection: () => Promise<ModelConnectionStatus>;
   // Total reset
   resetProgress: () => Promise<void>;
 }
@@ -131,10 +151,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [dayTick, setDayTick] = useState(0);
   const [creatorMode, setCreatorModeState] = useState<boolean>(() => localStorage.getItem(CREATOR_KEY) !== 'false');
   const [advancedMode, setAdvancedModeState] = useState<boolean>(() => localStorage.getItem(ADVANCED_KEY) === 'true');
+  const [outputLanguage, setOutputLanguageState] = useState<OutputLanguage>('auto');
   const [theme, setThemeState] = useState<Theme>(loadThemeMeta);
   const [unreadTexts, setUnreadTexts] = useState(0);
   const [activeDate, setActiveDate] = useState<ActiveDate | null>(null);
   const [activeDateLoaded, setActiveDateLoaded] = useState(false);
+  const [modelConnectionStatus, setModelConnectionStatus] = useState<ModelConnectionStatus>('checking');
+  const [modelConnectionMessage, setModelConnectionMessage] = useState<string | null>(null);
+  const [modelProviderMode, setModelProviderMode] = useState<EndpointMode>('chat_completions');
+  const modelCheckRef = useRef<Promise<ModelConnectionStatus> | null>(null);
+  const [syncFailures, setSyncFailures] = useState<Record<string, string>>({});
+  const clearSyncFailure = useCallback((key: string): void => {
+    setSyncFailures((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+  const reportSyncFailure = useCallback((key: string, cause: unknown): void => {
+    setSyncFailures((current) => ({ ...current, [key]: errorMessage(cause) }));
+  }, []);
 
   // The world the app is CURRENTLY on, readable synchronously by async callbacks.
   // Every world-keyed refresh below captures activeWorldId at call time and drops
@@ -152,18 +189,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       // The player profile (money + persona) is per-world; fetch the active world's.
       const p = await api.getPlayer(forWorld ?? undefined);
-      if (worldRef.current === forWorld) setPlayer(p);
-    } catch {
-      /* server may not be up yet */
+      if (worldRef.current === forWorld) {
+        setPlayer(p);
+        clearSyncFailure('player');
+      }
+    } catch (cause) {
+      if (worldRef.current === forWorld) reportSyncFailure('player', cause);
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
   const reloadAssets = useCallback(async () => {
     try {
       setAssets(await api.listAssets());
-    } catch {
-      /* ignore */
+      clearSyncFailure('assets');
+    } catch (cause) {
+      reportSyncFailure('assets', cause);
     }
-  }, []);
+  }, [clearSyncFailure, reportSyncFailure]);
   const reloadWorlds = useCallback(async () => {
     try {
       setWorlds(await api.listWorlds());
@@ -180,11 +221,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const forWorld = activeWorldId;
     try {
       const inbox = await api.phoneInbox(forWorld ?? undefined);
-      if (worldRef.current === forWorld) setUnreadTexts(inbox.unreadTexts);
-    } catch {
-      /* server may not be up yet */
+      if (worldRef.current === forWorld) {
+        setUnreadTexts(inbox.unreadTexts);
+        clearSyncFailure('inbox');
+      }
+    } catch (cause) {
+      if (worldRef.current === forWorld) reportSyncFailure('inbox', cause);
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
   // The active world's in-progress date, the single source of truth for resume +
   // action-locking. Refetched on world change; the Date page also drives explicit
   // refreshes as a date starts and ends.
@@ -193,6 +237,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     if (!forWorld) {
       setActiveDate(null);
       setActiveDateLoaded(true);
+      clearSyncFailure('activeDate');
       return null;
     }
     try {
@@ -201,20 +246,61 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // Work/Minigames locks and the Date-tab auto-resume — drop it hard.
       if (worldRef.current !== forWorld) return null;
       setActiveDate(date);
+      clearSyncFailure('activeDate');
       return date;
-    } catch {
-      /* leave the last-known value on a transient error */
+    } catch (cause) {
+      if (worldRef.current === forWorld) reportSyncFailure('activeDate', cause);
       return null;
     } finally {
       if (worldRef.current === forWorld) setActiveDateLoaded(true);
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
 
   useEffect(() => {
     void reloadPlayer();
     void reloadAssets();
     void reloadWorlds();
   }, [reloadPlayer, reloadAssets, reloadWorlds]);
+
+  const checkModelConnection = useCallback((): Promise<ModelConnectionStatus> => {
+    if (modelCheckRef.current) return modelCheckRef.current;
+    const check = (async (): Promise<ModelConnectionStatus> => {
+      setModelConnectionStatus('checking');
+      setModelConnectionMessage(null);
+      try {
+        const settings = await api.getSettings();
+        setOutputLanguageState(settings.outputLanguage);
+        setModelProviderMode(settings.endpointMode);
+        if (!settings.configured) {
+          setModelConnectionStatus('not_configured');
+          return 'not_configured';
+        }
+        const health = await api.testLlm();
+        setModelConnectionMessage(health.message);
+        if (health.ok) {
+          setModelConnectionStatus('connected');
+          return 'connected';
+        }
+        setModelConnectionStatus('disconnected');
+        return 'disconnected';
+      } catch (error) {
+        let message = 'Could not test the model endpoint.';
+        if (error instanceof Error && error.message) message = error.message;
+        setModelConnectionMessage(message);
+        setModelConnectionStatus('disconnected');
+        return 'disconnected';
+      }
+    })();
+    modelCheckRef.current = check;
+    void check.finally(() => {
+      if (modelCheckRef.current === check) modelCheckRef.current = null;
+    });
+    return check;
+  }, []);
+
+  useEffect(() => {
+    void checkModelConnection();
+  }, [checkModelConnection]);
 
   // Poll the unread-text count so the sidebar badge stays current (texts can
   // arrive in the background as the world clock advances).
@@ -247,15 +333,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const forWorld = activeWorldId;
     if (!forWorld) {
       setWorldState(null);
+      clearSyncFailure('worldState');
       return;
     }
     try {
       const state = await api.getWorldState(forWorld);
-      if (worldRef.current === forWorld) setWorldState(state);
-    } catch {
-      if (worldRef.current === forWorld) setWorldState(null);
+      if (worldRef.current === forWorld) {
+        setWorldState(state);
+        clearSyncFailure('worldState');
+      }
+    } catch (cause) {
+      if (worldRef.current === forWorld) {
+        setWorldState(null);
+        reportSyncFailure('worldState', cause);
+      }
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
 
   useEffect(() => {
     void refreshWorldState();
@@ -267,6 +360,56 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refreshActiveDate();
   }, [refreshActiveDate]);
+
+  // --- Boot resilience -------------------------------------------------------
+  // run.bat (and the future desktop shell) start the web and API halves in
+  // PARALLEL, so the app's first fetches can race a server that is still
+  // transpiling / opening its database. Every boot loader above swallows that
+  // failure ("server may not be up yet") — which used to leave a convincing,
+  // permanently EMPTY world until a manual refresh. Instead: while the latest
+  // world-list fetch has failed, keep knocking with a gentle backoff (0.5s →
+  // 4s cap) and re-run every boot-time load once the door opens. The same loop
+  // quietly re-syncs the app after a mid-session server restart.
+  const [wakeAttempt, setWakeAttempt] = useState(0);
+  useEffect(() => {
+    if (!worldsLoaded || worldsFetchedOk) return; // first try in flight, or reachable
+    let cancelled = false;
+    const delay = Math.min(4000, 500 * 2 ** Math.min(wakeAttempt, 3));
+    const timer = setTimeout(() => {
+      void Promise.all([
+        reloadWorlds(), // success flips worldsFetchedOk, which ends this loop
+        reloadPlayer(),
+        reloadAssets(),
+        refreshWorldState(),
+        refreshActiveDate(),
+        refreshInbox(),
+        checkModelConnection(),
+      ]).finally(() => {
+        if (!cancelled) setWakeAttempt((a) => a + 1); // re-arm if still failing
+      });
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [worldsLoaded, worldsFetchedOk, wakeAttempt, reloadWorlds, reloadPlayer, reloadAssets, refreshWorldState, refreshActiveDate, refreshInbox, checkModelConnection]);
+
+  // When the server transitions unreachable → reachable, bump dayTick: it is the
+  // established "refetch your world-derived data" signal, so every page keyed on
+  // it (characters, feeds, recaps, …) heals itself without a manual refresh. The
+  // loads above only fix app-context's own globals — page-local fetches that ran
+  // against the dead server would otherwise stay empty until navigation.
+  const wasWakingRef = useRef(false);
+  useEffect(() => {
+    if (worldsLoaded && !worldsFetchedOk) {
+      wasWakingRef.current = true;
+      return;
+    }
+    if (worldsFetchedOk && wasWakingRef.current) {
+      wasWakingRef.current = false;
+      setDayTick((t) => t + 1);
+    }
+  }, [worldsLoaded, worldsFetchedOk]);
 
   const sleep = useCallback(async (expectedDay?: number): Promise<SleepResponse | null> => {
     if (!activeWorldId) return null;
@@ -287,6 +430,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setAdvancedModeState(on);
   }, []);
 
+  const setOutputLanguage = useCallback((language: OutputLanguage) => {
+    setOutputLanguageState(language);
+  }, []);
+
   const setTheme = useCallback((t: Theme) => {
     // Accents + wallpaper-fit are persisted here (small, to localStorage). The
     // wallpaper is a blob: URL carried through in state; its Blob is persisted by
@@ -296,11 +443,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         THEME_KEY,
         JSON.stringify({ accent: t.accent, accent2: t.accent2, wallpaperFit: t.wallpaperFit }),
       );
-    } catch {
-      /* ignore */
+      clearSyncFailure('theme');
+    } catch (cause) {
+      reportSyncFailure('theme', cause);
     }
     setThemeState(t);
-  }, []);
+  }, [clearSyncFailure, reportSyncFailure]);
 
   // The live blob: object URL for the wallpaper, tracked so we revoke the old one
   // when it's replaced (object URLs leak until revoked).
@@ -313,12 +461,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setWallpaper = useCallback(
-    (image: Blob | null) => {
-      if (image) void idbSet(WALLPAPER_IDB_KEY, image).catch(() => undefined);
-      else void idbDel(WALLPAPER_IDB_KEY).catch(() => undefined);
+    async (image: Blob | null): Promise<void> => {
+      if (image) await idbSet(WALLPAPER_IDB_KEY, image);
+      else await idbDel(WALLPAPER_IDB_KEY);
+      clearSyncFailure('wallpaper');
       applyWallpaperBlob(image);
     },
-    [applyWallpaperBlob],
+    [applyWallpaperBlob, clearSyncFailure],
   );
 
   // Hydrate the wallpaper Blob from IndexedDB after mount (it's too big for the
@@ -342,8 +491,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             }),
           );
         }
-      } catch {
-        /* ignore */
+        if (!cancelled) clearSyncFailure('wallpaperMigration');
+      } catch (cause) {
+        reportSyncFailure('wallpaperMigration', cause);
       }
       try {
         let stored = await idbGet<Blob | string>(WALLPAPER_IDB_KEY);
@@ -364,14 +514,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             return { ...cur, wallpaper: url };
           });
         }
-      } catch {
-        /* ignore */
+        if (!cancelled) clearSyncFailure('wallpaper');
+      } catch (cause) {
+        reportSyncFailure('wallpaper', cause);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clearSyncFailure, reportSyncFailure]);
 
   // Apply theme to CSS variables.
   useEffect(() => {
@@ -411,19 +562,25 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     if (!activeWorldId) {
       delete root.dataset.weather;
+      clearSyncFailure('weather');
       return;
     }
     let cancelled = false;
     void api
       .worldWeather(activeWorldId)
       .then((w) => {
-        if (!cancelled) root.dataset.weather = w.today.kind;
+        if (!cancelled) {
+          root.dataset.weather = w.today.kind;
+          clearSyncFailure('weather');
+        }
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (!cancelled) reportSyncFailure('weather', cause);
+      });
     return () => {
       cancelled = true;
     };
-  }, [activeWorldId, worldState?.day]);
+  }, [activeWorldId, worldState?.day, clearSyncFailure, reportSyncFailure]);
 
   const resetProgress = useCallback(async () => {
     await api.resetData();
@@ -438,6 +595,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     [assetMap],
   );
   const activeWorld = useMemo(() => worlds.find((w) => w.id === activeWorldId) ?? null, [worlds, activeWorldId]);
+
+  // Unreachable = the latest world-list fetch failed; the wake loop is retrying.
+  const serverWaking = worldsLoaded && !worldsFetchedOk;
+  const syncWarning = Object.values(syncFailures)[0] ?? null;
 
   const value = useMemo<AppData>(
     () => ({
@@ -460,6 +621,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setCreatorMode,
       advancedMode,
       setAdvancedMode,
+      outputLanguage,
+      setOutputLanguage,
       theme,
       setTheme,
       setWallpaper,
@@ -468,9 +631,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       activeDate,
       activeDateLoaded,
       refreshActiveDate,
+      serverWaking,
+      syncWarning,
+      modelConnectionStatus,
+      modelConnectionMessage,
+      modelProviderMode,
+      checkModelConnection,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, serverWaking, syncWarning, modelConnectionStatus, modelConnectionMessage, modelProviderMode, checkModelConnection, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

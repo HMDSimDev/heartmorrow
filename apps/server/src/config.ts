@@ -66,6 +66,7 @@ function buildEnvLlmDefaults(): LlmSettings {
     ollamaThink: process.env.LLM_OLLAMA_THINK,
     koboldTemplate: process.env.LLM_KOBOLD_TEMPLATE,
     maxRetries: process.env.LLM_MAX_RETRIES ? Number(process.env.LLM_MAX_RETRIES) : undefined,
+    outputLanguage: process.env.LLM_OUTPUT_LANGUAGE,
   };
   // Drop undefined keys so schema defaults take over.
   const cleaned = Object.fromEntries(
@@ -89,6 +90,7 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   llmDefaults: buildEnvLlmDefaults(),
+  llmConfiguredFromEnvironment: typeof process.env.LLM_BASE_URL === 'string' && process.env.LLM_BASE_URL.trim().length > 0,
 } as const;
 
 /** Ensure data + uploads directories exist. Safe to call repeatedly. */

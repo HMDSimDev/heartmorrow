@@ -218,6 +218,11 @@
   color: var(--brass-dim, var(--brass));
   letter-spacing: 0.04em;
 }
+/* The hold-a-full-day qualifier riding the dividend chip. */
+.mkt-dividend-note {
+  margin-left: 6px;
+  color: var(--text-mute);
+}
 
 .mkt-held {
   font-family: var(--font-mono);

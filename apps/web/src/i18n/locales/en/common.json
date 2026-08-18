@@ -120,6 +120,12 @@
     "craft": "Craft",
     "knowledge": "Knowledge"
   },
+  "careerSkillBlurb": {
+    "service": "steady shifts and counter work",
+    "hustle": "gigs, odd jobs, and side cuts",
+    "craft": "trades and hard, hands-on labor",
+    "knowledge": "writing, records, and know-how"
+  },
   "videoPokerRank": {
     "none": "No pay",
     "jacksOrBetter": "Jacks or Better",
@@ -137,6 +143,35 @@
     "blackjack": "Beat the dealer to 21. Hit, stand, or double down.",
     "roulette": "One green zero. Place your chips and watch the wheel.",
     "videoPoker": "Jacks or better pays. Hold the keepers, draw the rest."
+  },
+  "shell": {
+    "serverWaking": "Connecting to the server — your world will appear in a moment…",
+    "syncWarning": "Some game data could not refresh: {error}"
+  },
+  "onboarding": {
+    "back": "Back",
+    "skip": "Skip",
+    "next": "Next"
+  },
+  "gift": {
+    "second": "A second gift in one day lands lighter.",
+    "dry": "Gifts have run dry with them for today — tomorrow starts fresh."
+  },
+  "dayOnb": {
+    "kicker": "How your days work · {n} of {total}",
+    "actions": {
+      "title": "A day is a few good hours",
+      "body": "Every morning you wake with a small pool of energy — three actions on a weekday, four on a weekend. A date, an afternoon spent together, a shift of work, or a minigame each spend one; heavy jobs take two. Spend them with intent."
+    },
+    "talk": {
+      "title": "Texting is always free",
+      "body": "Texting on your phone never touches your energy. Keep a conversation going all day if you like — it's showing up in person that costs you the hours."
+    },
+    "sleep": {
+      "title": "Sleep turns the page",
+      "body": "When the day is spent, End day. The world lives on without you for a while — people cross paths and talk among themselves — and the morning brings a recap of it all, fresh energy, and a new sky."
+    },
+    "done": "Start the day"
   },
   "nav": {
     "home": "Home",
@@ -165,6 +200,18 @@
     "discordHint": "Support, updates & community",
     "github": "Source on GitHub",
     "githubHint": "Code, releases & issues",
+    "modelStatus": {
+      "notConfigured": "Model not configured",
+      "checking": "Checking {provider}...",
+      "connected": "{provider} Connected",
+      "disconnected": "{provider} Disconnected",
+      "providers": {
+        "lmstudio": "LM Studio",
+        "ollama": "Ollama",
+        "koboldcpp": "KoboldCpp",
+        "generic": "LLM Provider"
+      }
+    },
     "versionTitle": "Heartmorrow {version} · build {commit}"
   },
   "phase": {
@@ -232,6 +279,7 @@
     "loreLead": "{name} leans in, eyes glinting. \"Let's see how well you know me…\"",
     "sweetAndSour": "Sweet & Sour",
     "readBetween": "Read Between the Lines",
+    "rhythmSerenade": "Rhythm Serenade",
     "twoTruthsLead": "They lean in. \"Two of these are true. One's a bluff…\"",
     "callIt": "Call it",
     "pickBluff": "Pick the bluff",
@@ -257,7 +305,41 @@
     "go": "Go!",
     "combo": "combo",
     "tapToBeat": "Tap to the beat",
-    "pressSpace": "(or press Space)"
+    "pressSpace": "(or press Space)",
+    "theFlip": "The Flip",
+    "flipWorth": "worth about ◈{value}",
+    "flipLower": "Lower the price by {n}",
+    "flipRaise": "Raise the price by {n}",
+    "flipOffer": "Ask ◈{q}",
+    "flipMargin": "◈{m} above its worth — yours if they bite",
+    "flipNoMargin": "asking its bare worth — a sale, but nothing cleared",
+    "flipBite": "They bite — ◈{q} is on the table.",
+    "flipShake": "Shake on it",
+    "flipPress": "Press for ◈{p}",
+    "flipSold": "Sold for ◈{n} — ◈{m} cleared.",
+    "flipPressWin": "They wince, grumble — and pay ◈{n}. ◈{m} cleared.",
+    "flipPressLose": "Too greedy. The deal dies on the table.",
+    "flipWalked": "They scoff at the price and walk off.",
+    "flipNext": "Next buyer",
+    "flipPack": "Pack up the stall",
+    "flipPouch": "◈{n} cleared",
+    "flipHowTo": "How the stall works",
+    "flipOnb": {
+      "kicker": "How the stall works · {n} of {total}",
+      "margin": {
+        "title": "You keep the margin",
+        "body": "Every piece on your table has a street value — what it's honestly worth. A sale at that price earns you nothing. Whatever a buyer pays above the mark is yours, and that cleared margin is exactly the coin this shift pays out."
+      },
+      "read": {
+        "title": "Read the buyer",
+        "body": "Two tells, every time: the first says how badly they want the piece, the second how deep their purse runs. Together they whisper the most they'd ever pay. Ask under that hidden limit and they pay your price — ask past it and they walk with nothing."
+      },
+      "press": {
+        "title": "Know when to press",
+        "body": "When a buyer bites you can shake on it and bank the deal — or press for a fifth more. If their limit can bear the raise, they grumble and pay. If it can't, the whole sale dies on the table. Greed pays, right up until it doesn't."
+      },
+      "done": "Set up the stall"
+    }
   },
   "weather": {
     "sunny": "sunny",
@@ -402,6 +484,7 @@
   "recap": {
     "newDay": "A new day dawns",
     "recapError": "(Couldn't generate a recap: {error})",
+    "partialFailure": "The new day began, but some updates did not finish:",
     "rested": "You rest and wake refreshed.",
     "weekendBadgeSuffix": " · weekend ⚡",
     "mastEyebrow": "The almanac · morning of day {day}",

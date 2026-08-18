@@ -872,7 +872,10 @@
   word-break: break-word;
   box-shadow: 0 2px 8px rgba(8, 10, 22, 0.22);
   animation: date-bubble-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  text-align: start;
+  unicode-bidi: isolate;
 }
+.date-msg:dir(rtl) { font-family: var(--font-rtl); }
 @keyframes date-bubble-in {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
@@ -883,6 +886,10 @@
   color: var(--on-accent);
   border-radius: 12px 12px 4px 12px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 3px 9px rgba(232, 138, 166, 0.16);
+}
+.date-msg.player:dir(rtl) {
+  align-self: flex-start;
+  border-radius: 16px 16px 16px 5px;
 }
 .date-msg.character {
   align-self: flex-start;
@@ -899,10 +906,14 @@
   line-height: 1.42;
   color: var(--text);
 }
+.date-msg.character:dir(rtl) {
+  align-self: flex-end;
+  border-radius: 16px 16px 5px 16px;
+}
 /* A small lamplit tick on the character's voice bubble. */
 .date-msg.character::before {
   content: '';
-  position: absolute; left: 10px; top: -1px; width: 22px; height: 1px;
+  position: absolute; inset-inline-start: 13px; top: -1px; width: 26px; height: 1px;
   background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.5), transparent);
 }
 .date-msg-speaker {
@@ -917,7 +928,7 @@
    most recent line. Rewrites the prose without re-scoring the turn. */
 .date-regen-btn {
   position: absolute;
-  right: 8px;
+  inset-inline-end: 8px;
   bottom: -11px;
   display: inline-flex;
   align-items: center;
@@ -964,8 +975,8 @@
 .date-msg.narrator.venue-flavor {
   align-self: stretch;
   max-width: 100%;
-  text-align: left;
-  padding: 8px 11px;
+  text-align: start;
+  padding: 12px 16px;
   font-family: var(--font-display);
   font-style: italic;
   font-size: 0.86rem;
@@ -974,7 +985,7 @@
   color: var(--text-mute);
   background: linear-gradient(180deg, rgba(230, 177, 94, 0.07), rgba(230, 177, 94, 0.02));
   border: 1px solid rgba(230, 177, 94, 0.16);
-  border-left: 2px solid var(--brass);
+  border-inline-start: 2px solid var(--brass);
   border-radius: 10px;
 }
 .date-msg.narrator.venue-flavor .date-rt-dialogue {
@@ -986,6 +997,11 @@
   font-style: italic;
   color: var(--text-mute);
 }
+.date-msg.player:dir(rtl),
+.date-msg.character:dir(rtl),
+.date-msg.narrator.venue-flavor:dir(rtl) {
+  font-family: var(--font-rtl);
+}
 
 /* Inline roleplay styling inside a character bubble: physical actions / narration
    the model wraps in *asterisks* read as quiet italic stage-direction (the same
@@ -994,6 +1010,11 @@
 .date-msg.character .date-rt-action {
   font-style: italic;
   color: var(--text-mute);
+}
+.date-rt-action,
+.date-rt-scene,
+.date-rt-dialogue {
+  unicode-bidi: isolate;
 }
 
 /* The per-turn judge's read, hanging under the player's bubble: a qualitative
@@ -1014,6 +1035,10 @@
   border: 1px solid var(--border-soft);
   background: var(--ink-2);
   animation: date-react-in 0.3s ease both;
+}
+.date-react:dir(rtl) {
+  align-self: flex-start;
+  margin: -7px 0 0 8px;
 }
 .date-react-pip { font-size: 0.5rem; line-height: 1; }
 .date-react.warm { color: var(--brass); border-color: color-mix(in srgb, var(--brass) 45%, transparent); }
@@ -1141,6 +1166,109 @@
 .date-retry-msg { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
 .date-retry-msg svg { flex-shrink: 0; color: var(--ember); }
 .date-retry-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; }
+
+/* A saved turn whose relationship effects stopped part-way through. */
+.relationship-recovery {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px 18px;
+  padding: 14px 16px 15px;
+  overflow: hidden;
+  border: 1px solid rgba(230, 177, 94, 0.38);
+  border-radius: var(--radius-sm);
+  background: radial-gradient(360px 100px at 15% 0%, rgba(224, 122, 130, 0.11), transparent 70%), linear-gradient(180deg, rgba(230, 177, 94, 0.055), rgba(9, 15, 35, 0.62));
+  box-shadow: inset 0 1px 0 rgba(255, 232, 188, 0.08), 0 8px 24px rgba(3, 7, 20, 0.18);
+}
+.relationship-recovery::after {
+  position: absolute;
+  right: -24px;
+  bottom: -37px;
+  width: 110px;
+  height: 78px;
+  border: 1px solid rgba(230, 177, 94, 0.08);
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+.relationship-recovery-thread {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 8px;
+}
+.relationship-recovery-thread span {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(230, 177, 94, 0.72));
+}
+.relationship-recovery-thread span:last-child {
+  background: linear-gradient(90deg, rgba(224, 122, 130, 0.72), transparent);
+}
+.relationship-recovery-thread i {
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--ember);
+  transform: rotate(45deg);
+  box-shadow: 0 0 0 3px rgba(224, 122, 130, 0.08);
+}
+.relationship-recovery-copy {
+  min-width: 0;
+}
+.relationship-recovery-kicker {
+  display: block;
+  margin-bottom: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  color: var(--ember);
+  text-transform: uppercase;
+}
+.relationship-recovery-copy strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--text);
+}
+.relationship-recovery-copy p {
+  max-width: 640px;
+  margin: 3px 0 0;
+  color: var(--text-dim);
+  font-size: 0.79rem;
+  line-height: 1.45;
+}
+.relationship-recovery-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.relationship-recovery-actions .btn {
+  white-space: nowrap;
+}
+.relationship-recovery.is-retrying .relationship-recovery-thread i {
+  border-color: var(--brass);
+  background: var(--brass);
+  animation: relationship-thread-reconnect 900ms ease-in-out infinite alternate;
+}
+.relationship-recovery.is-retrying .relationship-recovery-thread span {
+  box-shadow: 0 0 7px rgba(230, 177, 94, 0.4);
+}
+@keyframes relationship-thread-reconnect {
+  from { opacity: 0.45; transform: rotate(45deg) scale(0.72); }
+  to { opacity: 1; transform: rotate(45deg) scale(1); }
+}
+@media (max-width: 680px) {
+  .relationship-recovery { grid-template-columns: 1fr; }
+  .relationship-recovery-actions { align-items: stretch; flex-direction: column; }
+  .relationship-recovery-actions .btn { justify-content: center; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .relationship-recovery.is-retrying .relationship-recovery-thread i { animation: none; }
+}
 
 /* Bespoke emotional-moment card — a "keepsake" vellum surface for the big beats.
    Used for endings, milestones, breakups, walkouts. */
@@ -1779,6 +1907,35 @@
 .date-gauges-head .trail {
   flex: 1; height: 1px; min-width: 18px;
   background: linear-gradient(90deg, var(--border-bright), transparent);
+}
+.date-warmth-readout {
+  margin: 0 0 15px;
+  padding: 1px 3px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.date-warmth-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+.date-warmth-meta > span {
+  font-family: var(--font-display);
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: var(--brass);
+}
+.date-warmth-meta > strong {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.date-warmth-meta small {
+  margin-left: 2px;
+  font-size: 0.56rem;
+  font-weight: 500;
+  color: var(--text-mute);
 }
 
 /* A shared date keeps two relationship leaves in one dossier. The portrait tabs

@@ -19,9 +19,11 @@ export type RichSeg = { kind: 'action' | 'scene' | 'text'; text: string };
  * genuine stray character and should render literally.
  */
 export function parseRichLine(input: string, opts?: { open?: boolean; sceneLead?: boolean }): RichSeg[] {
-  // Collapse **double** / *** runs (a stray markdown-bold habit) to a single * so
-  // they read as one clean action span instead of leaving orphan asterisks behind.
-  const src = input.replace(/\*{2,}/g, '*');
+  // Japanese-capable models sometimes use the full-width/small asterisk produced
+  // by an IME instead of Markdown's ASCII delimiter. Normalize only the marker
+  // characters (not the prose itself), then collapse **double** / *** runs so a
+  // stray markdown-bold habit reads as one clean action span.
+  const src = input.replace(/[＊﹡∗⁎]/gu, '*').replace(/\*{2,}/g, '*');
   const segs: RichSeg[] = [];
   const action = /\*([^*\n]+?)\*/g; // balanced, single-line, non-greedy
   let last = 0;
@@ -42,10 +44,11 @@ export function parseRichLine(input: string, opts?: { open?: boolean; sceneLead?
   }
   if (!opts?.sceneLead) return segs;
 
-  // Venue openers begin with plain third-person scene prose. If the model then
-  // continues into roleplay, the first *action* is the reliable boundary: plain
-  // text before it remains scene-setting, while plain text after it is dialogue.
-  // A correctly scene-only opener has no action and stays subdued throughout.
+  // Venue openers are requested as plain third-person narration, but a model may
+  // continue into an *action* and spoken greeting anyway. The first action is the
+  // language-independent boundary: preceding plain prose is scene-setting and
+  // following plain prose is dialogue. A compliant scene-only opener has no
+  // action, so all of it remains scene prose.
   const firstAction = segs.findIndex((seg) => seg.kind === 'action');
   const sceneEnd = firstAction === -1 ? segs.length : firstAction;
   return segs.map((seg, index) =>

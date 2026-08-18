@@ -1,5 +1,4 @@
 import {
-  DATING_STAT_KEYS,
   type Character,
   type Grade,
   type MinigameId,
@@ -17,29 +16,9 @@ import { hashFloat } from '../lib/seeded-random';
 
 type Tone = MinigameReaction['tone'];
 
-/** Each character's strongest trait maps to the kind of game they love most. */
-const FAVORITE_BY_STAT: Record<(typeof DATING_STAT_KEYS)[number], MinigameId> = {
-  charm: 'timing_meter',
-  empathy: 'sweet_and_sour',
-  humor: 'two_truths_a_lie',
-  confidence: 'rhythm_serenade',
-  intellect: 'lore_quiz',
-  style: 'memory_match',
-};
-
-/** The game this character enjoys most, from their highest innate stat. */
-export function favoriteMinigameFor(character: Character): MinigameId {
-  let bestKey: (typeof DATING_STAT_KEYS)[number] = DATING_STAT_KEYS[0];
-  let bestVal = -Infinity;
-  for (const k of DATING_STAT_KEYS) {
-    const v = character.datingStats[k];
-    if (v > bestVal) {
-      bestVal = v;
-      bestKey = k;
-    }
-  }
-  return FAVORITE_BY_STAT[bestKey];
-}
+// Moved to @dsim/shared so the Arcade can SHOW a partner's favorite up front;
+// re-exported here so server-side consumers keep their import path.
+export { favoriteMinigameFor } from '@dsim/shared';
 
 /** A genuine flop with someone isn't free — a small, real letdown (bounded later). */
 export const FLOP_PENALTY: Partial<Record<RelationshipStatKey, number>> = { comfort: -2, tension: 2 };

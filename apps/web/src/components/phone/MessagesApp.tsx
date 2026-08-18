@@ -6,6 +6,7 @@ import {
   ALLOWED_IMAGE_LABEL,
   IMAGE_UPLOAD_ACCEPT,
   isGiftableItem,
+  outputLanguageDirection,
   type Character,
   type InventoryItem,
   type LandlordNotice,
@@ -166,7 +167,9 @@ function ThreadList({
         const latest = res.notices[0];
         setLandlordPreview(latest ? latest.body.split('\n')[0] ?? null : null);
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -257,7 +260,7 @@ function ThreadList({
                      same as the picker) instead of the message-preview style. */
                   <span className="pcom-busy">{th.unavailableReason ?? t('messages.isUnavailableToday')}</span>
                 ) : th.lastBody ? (
-                  <span className="pcom-preview">
+                  <span className="pcom-preview" dir="auto">
                     {th.lastFromPlayer && <span className="pcom-preview-you">{t('messages.list.you')}</span>}
                     {th.lastBody}
                   </span>
@@ -280,12 +283,17 @@ function NewMessage({ onPick, onBack }: { onPick: (id: string) => void; onBack: 
     Array<{ id: string; name: string; portraitAssetId: string | null; available: boolean; unavailableReason: string | null }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
   useEffect(() => {
     let live = true;
+    setLoading(true);
+    setError(undefined);
     api
       .phoneContacts(activeWorldId ?? undefined)
       .then((c) => live && setContacts(c))
-      .catch(() => undefined)
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      })
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
@@ -302,15 +310,16 @@ function NewMessage({ onPick, onBack }: { onPick: (id: string) => void; onBack: 
           </button>
         }
       />
-      {loading ? (
-        <Spinner />
-      ) : contacts.length === 0 ? (
+      {loading && <Spinner />}
+      {!loading && error && <Banner kind="error">{error}</Banner>}
+      {!loading && !error && contacts.length === 0 && (
         <div className="pcom-empty">
           <span className="pcom-empty-icon"><Icon name="people" size={32} /></span>
           <span className="pcom-empty-title">{t('messages.new.emptyTitle')}</span>
           <p>{t('messages.new.emptyBody')}</p>
         </div>
-      ) : (
+      )}
+      {!loading && !error && contacts.length > 0 && (
         <div className="pcom-rows">
           <div className="pcom-pick-head">{t('messages.new.chooseSomeone')}</div>
           {contacts.map((c) => (
@@ -342,7 +351,9 @@ function NewMessage({ onPick, onBack }: { onPick: (id: string) => void; onBack: 
 
 function ThreadView({ characterId, onBack }: { characterId: string; onBack: () => void }) {
   const { t } = useTranslation(['phone', 'common']);
-  const { reloadPlayer, refreshInbox, assets, reloadAssets, dayTick } = useAppData();
+  const { reloadPlayer, refreshInbox, assets, reloadAssets, dayTick, outputLanguage } = useAppData();
+  const conversationDirection = outputLanguageDirection(outputLanguage);
+  const conversationLanguage = outputLanguage === 'auto' ? undefined : outputLanguage;
   const [character, setCharacter] = useState<Character | null>(null);
   const [availability, setAvailability] = useState<{ available: boolean; reason: string | null }>({
     available: true,
@@ -352,6 +363,8 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
+  // Transient "repeat gifts land lighter" note — the anti-grind said out loud.
+  const [giftNote, setGiftNote] = useState<string>();
   // A send that didn't land, with how to recover it. 'reply' = your text saved but
   // the reply failed → regenerate it (no duplicate text). 'send' = nothing saved
   // (network/blocked) → resend the original payload, which we keep here.
@@ -536,6 +549,10 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
       await load();
       // A gift was consumed from the bag — keep the held-money/inventory in sync.
       if (gift) await reloadPlayer();
+      // Say the anti-grind out loud: a repeat gift the same day lands lighter (1)
+      // or not at all (2+) — silent scaling read as a bug.
+      const repeat = res.giftReaction?.giftsToday ?? 0;
+      setGiftNote(repeat >= 1 ? t(repeat === 1 ? 'common:gift.second' : 'common:gift.dry') : undefined);
       if (res.error) {
         // Your text saved, but the reply failed — offer to regenerate it.
         setError(t('messages.thread.noReply', { error: res.error }));
@@ -697,6 +714,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
         }
       />
       {error && !failed && <Banner kind="error">{error}</Banner>}
+      {giftNote && <Banner kind="info">{giftNote}</Banner>}
       <div className="pcom-thread">
         {messages.map((m, i) => {
           const label = dayLabel(m);
@@ -709,7 +727,11 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
           return (
             <Fragment key={m.id}>
               {showDivider && <div className="pcom-day">{label}</div>}
-              <div className={`pcom-msg ${m.sender}`}>
+              <div
+                className={`pcom-msg ${m.sender}`}
+                dir={conversationDirection}
+                lang={conversationLanguage}
+              >
                 {imgSrc && (
                   <a className="pcom-image-link" href={imgSrc} target="_blank" rel="noreferrer" title={t('messages.thread.openFullSize')}>
                     <img className="pcom-image" src={imgSrc} alt={t('messages.thread.sentPhoto')} loading="lazy" />
@@ -753,7 +775,7 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
           );
         })}
         {sending && (
-          <div className="pcom-msg character">
+          <div className="pcom-msg character" dir={conversationDirection} lang={conversationLanguage}>
             <div className="pcom-bubble">
               <span className="typing">
                 <span />
@@ -861,6 +883,8 @@ function ThreadView({ characterId, onBack }: { characterId: string; onBack: () =
         </button>
         <input
           value={input}
+          dir={conversationDirection}
+          lang={conversationLanguage}
           disabled={!availability.available}
           placeholder={
             !availability.available

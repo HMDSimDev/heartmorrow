@@ -66,6 +66,7 @@ import {
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { hashFloat, type SeededRandom } from '../lib/seeded-random';
 import { recordEvent } from './event-service';
+import { featureEnabled, requireFeature } from './world-feature-service';
 
 /**
  * "Faces" — the in-world social feed. NARRATIVE ONLY: every function here READS
@@ -118,6 +119,9 @@ export async function generateFeedForDay(
   playerId: string = DEFAULT_PLAYER_ID,
   rng: SeededRandom = hashFloat,
 ): Promise<void> {
+  // Guard at the SERVICE so every caller — day-start hook, dev route — respects
+  // a world that turned Faces off: no posts, no comments, no model calls.
+  if (!featureEnabled(worldId, 'faces')) return;
   const yesterday = day - 1;
   const settings = getLlmSettings();
   const playerName = getOrCreatePlayer(playerIdForWorldOrDefault(worldId)).name;
@@ -611,6 +615,7 @@ export async function createPlayerPost(
   input: { body: string; worldId: string },
   playerId: string = DEFAULT_PLAYER_ID,
 ): Promise<CreateFeedPostResponse> {
+  requireFeature(input.worldId, 'faces');
   const state = ensureWorldState(input.worldId);
   const now = Date.now();
   const post = feedPostsRepo.insert(
@@ -761,7 +766,9 @@ export function reactToPost(
 ): FeedPostView {
   // Validate BEFORE writing: an unknown postId used to hit the reactions table's
   // foreign key and surface as a 500 instead of this 404.
-  if (!feedPostsRepo.get(postId)) throw notFound(`Post ${postId} not found.`);
+  const target = feedPostsRepo.get(postId);
+  if (!target) throw notFound(`Post ${postId} not found.`);
+  requireFeature(target.worldId, 'faces');
   const existing = feedReactionsRepo.getByActor(postId, playerId);
   if (existing && existing.kind === kind) {
     feedReactionsRepo.delete(postId, playerId);
@@ -793,6 +800,7 @@ export async function commentOnPost(
   // Validate BEFORE writing (mirrors reactToPost): inserting first turned an
   // unknown postId into an FK 500 instead of a 404.
   if (!post) throw notFound(`Post ${postId} not found.`);
+  requireFeature(post.worldId, 'faces');
   feedCommentsRepo.insert(
     FeedCommentSchema.parse({
       id: newId('fcmt'),

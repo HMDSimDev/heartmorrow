@@ -316,6 +316,40 @@ export const SendMessageSchema = z.object({
 });
 export type SendMessage = z.infer<typeof SendMessageSchema>;
 
+export const RelationshipCheckKeySchema = z.enum(['walkout', 'breakup', 'farewell', 'rapport', 'lostInterest']);
+export type RelationshipCheckKey = z.infer<typeof RelationshipCheckKeySchema>;
+
+export const RelationshipCheckTaskSchema = z.object({
+  key: RelationshipCheckKeySchema,
+  characterId: z.string().min(1),
+});
+export type RelationshipCheckTask = z.infer<typeof RelationshipCheckTaskSchema>;
+
+/** Durable progress for the ordered relationship reads attached to one player turn. */
+export const RelationshipCheckRecoverySchema = z.object({
+  version: z.literal(1),
+  next: RelationshipCheckKeySchema.nullable(),
+  failedCheck: RelationshipCheckKeySchema.nullable(),
+  failedCharacterId: z.string().min(1).nullable().default(null),
+  failureCode: z.string().nullable(),
+  attempts: z.number().int().min(0),
+  skipped: z.boolean(),
+  tasks: z.array(RelationshipCheckTaskSchema).default([]),
+  taskIndex: z.number().int().min(0).default(0),
+});
+export type RelationshipCheckRecovery = z.infer<typeof RelationshipCheckRecoverySchema>;
+
+export const RelationshipCheckRecoveryRequestSchema = z.object({
+  messageId: z.string().min(1),
+});
+export type RelationshipCheckRecoveryRequest = z.infer<typeof RelationshipCheckRecoveryRequestSchema>;
+
+export const RelationshipCheckRecoveryResponseSchema = z.object({
+  messageId: z.string().min(1),
+  state: RelationshipCheckRecoverySchema,
+});
+export type RelationshipCheckRecoveryResponse = z.infer<typeof RelationshipCheckRecoveryResponseSchema>;
+
 /**
  * The world's single live, in-progress date — surfaced so the client can RESUME it
  * after a navigation or refresh (the date lives server-side, not just in component
@@ -919,6 +953,13 @@ export const DateParticipantResultSchema = z.object({
 });
 export type DateParticipantResult = z.infer<typeof DateParticipantResultSchema>;
 
+/** A non-fatal failure: the primary action completed, but a named secondary system did not. */
+export const OperationWarningSchema = z.object({
+  code: z.string().min(1),
+  message: z.string().min(1),
+});
+export type OperationWarning = z.infer<typeof OperationWarningSchema>;
+
 export const EndSessionResponseSchema = z.object({
   session: ConversationSessionSchema,
   evaluated: z.boolean(),
@@ -947,6 +988,8 @@ export const EndSessionResponseSchema = z.object({
   /** Independent reports for a shared date or hangout, in stable seat order. Empty for
    *  legacy and solo results; the singular fields above remain the seat-0 view. */
   participantResults: z.array(DateParticipantResultSchema).default([]),
+  /** Non-fatal secondary failures that occurred while concluding the date. */
+  warnings: z.array(OperationWarningSchema).default([]),
 });
 export type EndSessionResponse = z.infer<typeof EndSessionResponseSchema>;
 
@@ -1005,6 +1048,10 @@ export const GiftReactionResponseSchema = z.object({
   relationship: RelationshipSchema,
   item: ShopItemSchema,
   memoryWritten: z.boolean().default(false),
+  /** Same-day gifts to this character BEFORE this one (0 = first of the day).
+   *  Lets the UI say that repeat gifts land lighter (1) or not at all (2+)
+   *  instead of the anti-grind scale reading as a silent bug. */
+  giftsToday: z.number().int().min(0).default(0),
 });
 export type GiftReactionResponse = z.infer<typeof GiftReactionResponseSchema>;
 
@@ -1208,6 +1255,8 @@ export const SleepResponseSchema = z.object({
    * client should skip the recap popup for a no-op.
    */
   advanced: z.boolean().default(true),
+  /** Non-fatal secondary failures that occurred after the new day was committed. */
+  warnings: z.array(OperationWarningSchema).default([]),
 });
 export type SleepResponse = z.infer<typeof SleepResponseSchema>;
 

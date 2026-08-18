@@ -62,8 +62,13 @@ import {
   type JealousyOutcome,
   type Location,
   type Message,
+  type OperationWarning,
   type PlayerBreakupResponse,
   type Relationship,
+  RelationshipCheckRecoverySchema,
+  type RelationshipCheckKey,
+  type RelationshipCheckRecovery,
+  type RelationshipCheckTask,
   type RelationshipStatus,
   type SessionParticipant,
   type SessionWithMessages,
@@ -86,6 +91,7 @@ import { getCharacterAvailability } from './availability-service';
 import { romanticCompatFor } from './compatibility-service';
 import { requireFeature } from './world-feature-service';
 import { recordEvent } from './event-service';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { getLlmSettings } from './settings-service';
 import { appendSessionToChronicle } from './chronicle-service';
 import { detectMilestoneCrossing } from './milestone-service';
@@ -449,8 +455,163 @@ function touchSession(session: ConversationSession): ConversationSession {
   return sessionsRepo.update(ConversationSessionSchema.parse({ ...session, updatedAt: Date.now() }));
 }
 
+const RELATIONSHIP_CHECK_METADATA_KEY = 'relationshipChecks';
+export const RELATIONSHIP_CHECK_ORDER: readonly RelationshipCheckKey[] = ['walkout', 'breakup', 'farewell', 'rapport', 'lostInterest'];
+
+function relationshipCheckTasks(participantIds: string[], targetCharacterId: string | null): RelationshipCheckTask[] {
+  const tasks: RelationshipCheckTask[] = [];
+  for (const characterId of participantIds) tasks.push({ key: 'walkout', characterId });
+  if (participantIds.length === 1) tasks.push({ key: 'breakup', characterId: participantIds[0]! });
+  if (participantIds.length > 1 && targetCharacterId) tasks.push({ key: 'breakup', characterId: targetCharacterId });
+  if (targetCharacterId) {
+    tasks.push({ key: 'farewell', characterId: targetCharacterId });
+  } else {
+    for (const characterId of participantIds) tasks.push({ key: 'farewell', characterId });
+  }
+  for (const characterId of participantIds) tasks.push({ key: 'rapport', characterId });
+  for (const characterId of participantIds) tasks.push({ key: 'lostInterest', characterId });
+  return tasks;
+}
+
+function initialRelationshipCheckRecovery(tasks: RelationshipCheckTask[]): RelationshipCheckRecovery {
+  let next: RelationshipCheckKey | null = null;
+  if (tasks.length > 0) next = tasks[0]!.key;
+  return { version: 1, next, failedCheck: null, failedCharacterId: null, failureCode: null, attempts: 0, skipped: false, tasks, taskIndex: 0 };
+}
+
+export function beginRelationshipChecks(messageId: string, participantIds?: string[], targetCharacterId: string | null = null): Message {
+  const message = messagesRepo.get(messageId);
+  if (!message || message.role !== 'player') throw badRequest('The player turn for these relationship checks no longer exists.');
+  const session = getSession(message.sessionId);
+  let resolvedParticipantIds = participantIds;
+  if (!resolvedParticipantIds || resolvedParticipantIds.length === 0) resolvedParticipantIds = [session.characterId];
+  if (targetCharacterId && !resolvedParticipantIds.includes(targetCharacterId)) throw badRequest('Choose someone who is still at this date.');
+  const tasks = relationshipCheckTasks(resolvedParticipantIds, targetCharacterId);
+  saveRelationshipCheckRecovery(messageId, initialRelationshipCheckRecovery(tasks));
+  const updated = messagesRepo.get(messageId);
+  if (!updated) throw badRequest('The player turn for these relationship checks no longer exists.');
+  return updated;
+}
+
+export function getRelationshipCheckRecovery(message: Message): RelationshipCheckRecovery | null {
+  const parsed = RelationshipCheckRecoverySchema.safeParse(message.metadata?.[RELATIONSHIP_CHECK_METADATA_KEY]);
+  if (!parsed.success) return null;
+  return parsed.data;
+}
+
+function saveRelationshipCheckRecovery(messageId: string, state: RelationshipCheckRecovery): RelationshipCheckRecovery {
+  messagesRepo.mergeMetadata(messageId, { [RELATIONSHIP_CHECK_METADATA_KEY]: state });
+  return state;
+}
+
+function recoveryMessage(sessionId: string, messageId: string): Message {
+  const message = messagesRepo.get(messageId);
+  if (!message || message.sessionId !== sessionId || message.role !== 'player') throw badRequest('That interrupted relationship read is no longer available.');
+  const latestPlayer = [...messagesRepo.listBySession(sessionId)].reverse().find((candidate) => candidate.role === 'player');
+  if (!latestPlayer || latestPlayer.id !== messageId) throw badRequest('Only the latest turn can retry relationship checks.');
+  return message;
+}
+
+export function requireRelationshipCheckRecovery(sessionId: string, messageId: string): { message: Message; state: RelationshipCheckRecovery } {
+  const message = recoveryMessage(sessionId, messageId);
+  const state = getRelationshipCheckRecovery(message);
+  if (!state || state.next === null) throw badRequest('This turn has no relationship checks waiting to be retried.');
+  return { message, state };
+}
+
+export function advanceRelationshipCheck(messageId: string, key: RelationshipCheckKey): RelationshipCheckRecovery {
+  const message = messagesRepo.get(messageId);
+  if (!message) throw badRequest('The player turn for this relationship read no longer exists.');
+  const state = getRelationshipCheckRecovery(message);
+  if (!state) throw badRequest('This turn has no relationship-check state.');
+  if (state.next !== key) return state;
+  if (state.tasks.length > 0) {
+    const taskIndex = Math.min(state.taskIndex + 1, state.tasks.length);
+    let next: RelationshipCheckKey | null = null;
+    if (taskIndex < state.tasks.length) next = state.tasks[taskIndex]!.key;
+    return saveRelationshipCheckRecovery(messageId, { ...state, next, taskIndex, failedCheck: null, failedCharacterId: null, failureCode: null });
+  }
+  const index = RELATIONSHIP_CHECK_ORDER.indexOf(key);
+  let next: RelationshipCheckKey | null = null;
+  if (index >= 0 && index + 1 < RELATIONSHIP_CHECK_ORDER.length) next = RELATIONSHIP_CHECK_ORDER[index + 1]!;
+  return saveRelationshipCheckRecovery(messageId, { ...state, next, failedCheck: null, failedCharacterId: null, failureCode: null });
+}
+
+export function failRelationshipCheck(messageId: string, key: RelationshipCheckKey, failureCode: string, characterId: string | null = null): RelationshipCheckRecovery {
+  const message = messagesRepo.get(messageId);
+  if (!message) throw badRequest('The player turn for this relationship read no longer exists.');
+  const state = getRelationshipCheckRecovery(message);
+  if (!state) throw badRequest('This turn has no relationship-check state.');
+  return saveRelationshipCheckRecovery(messageId, { ...state, next: key, failedCheck: key, failedCharacterId: characterId, failureCode, attempts: state.attempts + 1 });
+}
+
+export function resolveRelationshipChecks(messageId: string): RelationshipCheckRecovery {
+  const message = messagesRepo.get(messageId);
+  if (!message) throw badRequest('The player turn for this relationship read no longer exists.');
+  const state = getRelationshipCheckRecovery(message);
+  if (!state) throw badRequest('This turn has no relationship-check state.');
+  return saveRelationshipCheckRecovery(messageId, { ...state, next: null, taskIndex: state.tasks.length, failedCheck: null, failedCharacterId: null, failureCode: null });
+}
+
+export function skipRelationshipChecks(sessionId: string, messageId: string): RelationshipCheckRecovery {
+  const { state } = requireRelationshipCheckRecovery(sessionId, messageId);
+  return saveRelationshipCheckRecovery(messageId, { ...state, next: null, taskIndex: state.tasks.length, failedCheck: null, failedCharacterId: null, failureCode: null, skipped: true });
+}
+
+export function currentRelationshipCheckTask(state: RelationshipCheckRecovery, fallbackCharacterId: string): RelationshipCheckTask | null {
+  if (state.tasks.length > 0 && state.taskIndex < state.tasks.length) return state.tasks[state.taskIndex]!;
+  if (state.next === null) return null;
+  return { key: state.next, characterId: fallbackCharacterId };
+}
+
+export type RelationshipCheckTerminalOutcome =
+  | { kind: 'walkout'; message: Message; reason: string }
+  | { kind: 'breakup'; message: Message; reaction: 'accept' | 'hurt' | 'plead' }
+  | { kind: 'farewell'; message: Message; expression: string }
+  | { kind: 'left'; message: Message; reason: string };
+
+export function relationshipCheckTerminalOutcome(sessionId: string, sourceMessageId: string, key?: RelationshipCheckKey, characterId?: string): RelationshipCheckTerminalOutcome | null {
+  const messages = [...messagesRepo.listBySession(sessionId)].reverse();
+  for (const message of messages) {
+    if (message.role !== 'character' || message.metadata?.sourcePlayerMessageId !== sourceMessageId) continue;
+    const messageCharacterId = message.characterId ?? getSession(sessionId).characterId;
+    if (characterId && messageCharacterId !== characterId) continue;
+    if ((!key || key === 'walkout') && message.metadata.walkout === true) {
+      let reason = '';
+      if (typeof message.metadata.walkoutReason === 'string') reason = message.metadata.walkoutReason;
+      return { kind: 'walkout', message, reason };
+    }
+    if ((!key || key === 'breakup') && message.metadata.breakupIntent === true) {
+      const reaction = message.metadata.breakupReaction;
+      if (reaction === 'accept' || reaction === 'hurt' || reaction === 'plead') return { kind: 'breakup', message, reaction };
+    }
+    if ((!key || key === 'farewell') && message.metadata.farewell === true) {
+      let expression = '';
+      if (typeof message.metadata.farewellExpression === 'string') expression = message.metadata.farewellExpression;
+      return { kind: 'farewell', message, expression };
+    }
+    if ((!key || key === 'lostInterest') && message.metadata.left === true) return { kind: 'left', message, reason: 'lost_interest' };
+  }
+  return null;
+}
+
+function unresolvedRelationshipCheck(sessionId: string): { message: Message; state: RelationshipCheckRecovery } | null {
+  const latestPlayer = [...messagesRepo.listBySession(sessionId)].reverse().find((message) => message.role === 'player');
+  if (!latestPlayer) return null;
+  const state = getRelationshipCheckRecovery(latestPlayer);
+  if (!state || state.next === null) return null;
+  return { message: latestPlayer, state };
+}
+
+export function assertNoUnresolvedRelationshipCheck(sessionId: string, action: string): void {
+  if (unresolvedRelationshipCheck(sessionId)) throw badRequest(`Retry the interrupted relationship read, or continue without it, before ${action}.`);
+}
+
 export function addPlayerMessage(sessionId: string, text: string, intent?: Intent): Message {
   const session = getSession(sessionId);
+  if (isDateMode(session.mode)) assertNoUnresolvedRelationshipCheck(sessionId, 'sending another message');
+  const metadata: Record<string, unknown> = {};
+  if (intent) metadata.intent = intent;
   const message = MessageSchema.parse({
     id: newId('msg'),
     sessionId: session.id,
@@ -458,7 +619,7 @@ export function addPlayerMessage(sessionId: string, text: string, intent?: Inten
     text,
     // The intent chip (if any) rides on metadata — read back by the prompt
     // builder to frame the line for the character and grade it for the judges.
-    metadata: intent ? { intent } : {},
+    metadata,
     createdAt: Date.now(),
   });
   const saved = messagesRepo.insert(message);
@@ -1266,6 +1427,8 @@ export interface WalkoutOutcome {
   characterId: string;
 }
 
+type EvaluationFailureReporter = (code: string, error: unknown) => void;
+
 /**
  * If the player's latest message is egregious, ask the model (structured) whether
  * the character ends the date and walks out. Applies the walkout's special penalty,
@@ -1275,12 +1438,7 @@ export interface WalkoutOutcome {
  * like a date the player ended deliberately. Returns the farewell message + reason,
  * or null. Rare by design; fails safe (no walkout).
  */
-export async function attemptWalkout(
-  sessionId: string,
-  playerText: string,
-  signal?: AbortSignal,
-  characterId?: string,
-): Promise<WalkoutOutcome | null> {
+export async function attemptWalkout(sessionId: string, playerText: string, signal?: AbortSignal, onFailure?: EvaluationFailureReporter, sourceMessageId?: string, characterId?: string): Promise<WalkoutOutcome | null> {
   const session = getSession(sessionId);
   // Date machinery only — a hangout has no rapport to judge, nobody storms out of
   // one, and there is no date to break up or say goodnight to.
@@ -1313,7 +1471,11 @@ export async function attemptWalkout(
     }),
     { settings, role: 'evaluator', task: 'Decide whether the character ends the date now.', schemaName: 'WalkoutReaction', signal },
   );
-  if (!result.ok || !result.data.walkout) return null;
+  if (!result.ok) {
+    onFailure?.('walkout_read_failed', result.error);
+    return null;
+  }
+  if (!result.data.walkout) return null;
 
   // Apply the walkout's SPECIAL consequences — the things the normal date evaluator
   // can't infer: the penalty for egregious behavior, the carried-forward grievance
@@ -1323,6 +1485,7 @@ export async function attemptWalkout(
   // normal end-and-evaluate flow, so the blown-up date is still scored IN FULL —
   // stamina spent, evaluator deltas/memories, milestones, strain. endSession is told
   // (via the farewell's metadata) not to "air out" the offense it was the eval for.
+  return getDb().transaction(() => {
   applyRelationshipChange(character.id, { ...WALKOUT_PENALTY }, { source: 'walkout', detail: { reason: result.data.reason } });
   setRelationshipFlag(character.id, 'state:offended', true, { source: 'walkout' });
   const walkoutDay = character.worldId ? ensureWorldState(character.worldId).day : 0;
@@ -1332,16 +1495,13 @@ export async function attemptWalkout(
     // the despair spiral — no-op unless enabled AND they were close to you.
     try {
       adjustDespair(character.id, DESPAIR.hostility, 'hostility', walkoutDay);
-    } catch {
-      /* best-effort */
+    } catch (error) {
+      reportOperationFailure('walkout_crisis_update_failed', 'A serious relationship-state update could not be completed after the walkout.', error, { sessionId, characterId: session.characterId });
     }
   }
-  const message = addCharacterMessage(
-    sessionId,
-    result.data.farewellLine.trim(),
-    { walkout: true, walkoutReason: result.data.reason },
-    character.id,
-  );
+  const messageMetadata: Record<string, unknown> = { walkout: true, walkoutReason: result.data.reason };
+  if (sourceMessageId) messageMetadata.sourcePlayerMessageId = sourceMessageId;
+  const message = addCharacterMessage(sessionId, result.data.farewellLine.trim(), messageMetadata, character.id);
   sessionParticipantsRepo.setState(sessionId, character.id, 'walked_out', Date.now());
   const walkoutEvent = recordEvent('walkout', {
     characterId: character.id,
@@ -1363,10 +1523,11 @@ export async function attemptWalkout(
       walkoutEvent.id,
       session.mode,
     );
-  } catch {
-    /* best-effort: remembering the blow-up must never block the farewell */
+  } catch (error) {
+    reportOperationFailure('walkout_memory_save_failed', 'The walkout happened, but its relationship memory could not be saved.', error, { sessionId, characterId: session.characterId });
   }
   return { message, reason: result.data.reason, characterId: character.id };
+  });
 }
 
 // --- Live date dynamics (per-turn rapport) ----------------------------------
@@ -1423,11 +1584,7 @@ export function recordTurnReaction(messageId: string, engagement: number, charac
   });
 }
 
-export async function judgeTurn(
-  sessionId: string,
-  signal?: AbortSignal,
-  characterId?: string,
-): Promise<TurnReadout | null> {
+export async function judgeTurn(sessionId: string, signal?: AbortSignal, onFailure?: EvaluationFailureReporter, sourceMessageId?: string, characterId?: string): Promise<TurnReadout | null> {
   let session: ConversationSession;
   try {
     session = getSession(sessionId);
@@ -1492,30 +1649,24 @@ export async function judgeTurn(
     // under the evaluator role's small maxTokens (truncation → parse fail → no rapport change).
     { settings, role: 'evaluator', minMaxTokens: 512, task: 'Judge how the last message landed on this date.', schemaName: 'TurnReaction', signal },
   );
-  if (!result.ok) return null; // fail-safe — no rapport change
+  if (!result.ok) {
+    onFailure?.('rapport_read_failed', result.error);
+    return null;
+  }
 
-  const { rapport, delta } = host
-    ? applyTurnEngagement(sessionId, result.data.engagement, character.guardedness, settings.difficulty)
-    : applyParticipantTurnEngagement(
-        sessionId,
-        character.id,
-        result.data.engagement,
-        character.guardedness,
-        settings.difficulty,
-      );
-  if (host) sessionParticipantsRepo.setRapport(sessionId, character.id, rapport, Date.now(), true);
-  // Persist the mood next to rapport so a resumed date restores the portrait + chip.
-  if (host) setLastExpression(sessionId, result.data.expression);
-  setParticipantLastExpression(sessionId, character.id, result.data.expression);
-  return {
-    characterId: character.id,
-    label: rapportLabel(rapport),
-    expression: result.data.expression.trim(),
-    rapport,
-    delta,
-    engagement: result.data.engagement,
-    note: result.data.note.trim(),
-  };
+  return getDb().transaction(() => {
+    let engagementResult: { rapport: number; delta: number };
+    if (host) {
+      engagementResult = applyTurnEngagement(sessionId, result.data.engagement, character.guardedness, settings.difficulty);
+      sessionParticipantsRepo.setRapport(sessionId, character.id, engagementResult.rapport, Date.now(), true);
+      setLastExpression(sessionId, result.data.expression);
+    } else {
+      engagementResult = applyParticipantTurnEngagement(sessionId, character.id, result.data.engagement, character.guardedness, settings.difficulty);
+    }
+    setParticipantLastExpression(sessionId, character.id, result.data.expression);
+    if (sourceMessageId) recordTurnReaction(sourceMessageId, result.data.engagement, character.id);
+    return { characterId: character.id, label: rapportLabel(engagementResult.rapport), expression: result.data.expression.trim(), rapport: engagementResult.rapport, delta: engagementResult.delta, engagement: result.data.engagement, note: result.data.note.trim() };
+  });
 }
 
 export interface LeaveOutcome {
@@ -1534,11 +1685,7 @@ export interface LeaveOutcome {
  * (stamina, deltas, memories, milestones, strain). Returns the farewell, or null.
  * Fails safe (no early exit on error).
  */
-export async function maybeLeaveForLostInterest(
-  sessionId: string,
-  signal?: AbortSignal,
-  characterId?: string,
-): Promise<LeaveOutcome | null> {
+export async function maybeLeaveForLostInterest(sessionId: string, signal?: AbortSignal, sourceMessageId?: string, characterId?: string): Promise<LeaveOutcome | null> {
   const session = getSession(sessionId);
   // Date machinery only — a hangout has no rapport to judge, nobody storms out of
   // one, and there is no date to break up or say goodnight to.
@@ -1586,7 +1733,8 @@ export async function maybeLeaveForLostInterest(
     const adapter = getAdapter(settings);
     const res = await adapter.chat({ messages, temperature: settings.temperature, maxTokens: 300 }, signal);
     line = stripThink(res.content).trim();
-  } catch {
+  } catch (error) {
+    reportOperationFailure('lost_interest_line_generation_failed', 'The character left the date, but a custom farewell could not be generated.', error, { sessionId, characterId: session.characterId });
     line = '';
   }
   if (!line) line = `Hey — it's been a long week and I'm pretty wiped. I think I'm gonna head out. Take care, okay?`;
@@ -1596,8 +1744,11 @@ export async function maybeLeaveForLostInterest(
   // end-and-evaluate flow next, so the flat date is scored in full (stamina, evaluator
   // deltas/memories, the cratered-rapport consequence, milestones, strain). Rapport is
   // left intact on purpose so endSession's low-rapport effect still lands.
+  return getDb().transaction(() => {
   applyRelationshipChange(character.id, { ...RAPPORT_LEAVE_PENALTY }, { source: 'rapport', detail: { reason: 'lost_interest' } });
-  const message = addCharacterMessage(sessionId, line, { left: true }, character.id);
+  const messageMetadata: Record<string, unknown> = { left: true };
+  if (sourceMessageId) messageMetadata.sourcePlayerMessageId = sourceMessageId;
+  const message = addCharacterMessage(sessionId, line, messageMetadata, character.id);
   sessionParticipantsRepo.setState(sessionId, character.id, 'left_early', Date.now());
   const leftEvent = recordEvent('date_left', { characterId: character.id, reason: 'lost_interest' });
   // Remember the fizzle so a run of flat dates registers (the evaluator may add its own).
@@ -1615,10 +1766,11 @@ export async function maybeLeaveForLostInterest(
       leftEvent.id,
       session.mode,
     );
-  } catch {
-    /* best-effort */
+  } catch (error) {
+    reportOperationFailure('lost_interest_memory_save_failed', 'The date ended from lost interest, but its relationship memory could not be saved.', error, { sessionId, characterId: session.characterId });
   }
   return { message, reason: 'lost_interest', characterId: character.id };
+  });
 }
 
 // --- Player-initiated breakup -----------------------------------------------
@@ -1642,12 +1794,7 @@ export interface BreakupIntentOutcome {
  * (→ fall through to a normal reply) when there's no breakup intent, the model
  * judges it non-genuine, or the structured call fails.
  */
-export async function attemptPlayerBreakupIntent(
-  sessionId: string,
-  playerText: string,
-  signal?: AbortSignal,
-  characterId?: string,
-): Promise<BreakupIntentOutcome | null> {
+export async function attemptPlayerBreakupIntent(sessionId: string, playerText: string, signal?: AbortSignal, onFailure?: EvaluationFailureReporter, sourceMessageId?: string, characterId?: string): Promise<BreakupIntentOutcome | null> {
   const session = getSession(sessionId);
   // Date machinery only — a hangout has no rapport to judge, nobody storms out of
   // one, and there is no date to break up or say goodnight to.
@@ -1676,15 +1823,20 @@ export async function attemptPlayerBreakupIntent(
     { settings, role: 'evaluator', task: 'Decide whether the player is genuinely breaking up, and react in character.', schemaName: 'PlayerBreakupReaction', signal },
   );
   // Not genuine (joking/hypothetical/opposite) or a failed call → normal reply.
-  if (!result.ok || !result.data.genuine) return null;
+  if (!result.ok) {
+    onFailure?.('breakup_intent_read_failed', result.error);
+    return null;
+  }
+  if (!result.data.genuine) return null;
 
   // The reaction rides in the metadata so a resume can re-derive the confirm prompt
   // (the SSE event carrying it is lost if the tab closes before it arrives).
-  const message = addCharacterMessage(sessionId, result.data.line.trim(), {
-    breakupIntent: true,
-    breakupReaction: result.data.reaction,
-  }, character.id);
-  return { message, reaction: result.data.reaction, characterId: character.id };
+  return getDb().transaction(() => {
+    const messageMetadata: Record<string, unknown> = { breakupIntent: true, breakupReaction: result.data.reaction };
+    if (sourceMessageId) messageMetadata.sourcePlayerMessageId = sourceMessageId;
+    const message = addCharacterMessage(sessionId, result.data.line.trim(), messageMetadata, character.id);
+    return { message, reaction: result.data.reaction, characterId: character.id };
+  });
 }
 
 // --- Player-initiated farewell (natural end of date) ------------------------
@@ -1715,12 +1867,7 @@ export interface FarewellOutcome {
  * intent, the model judges it non-genuine (a bathroom break, proposing the next
  * thing, just musing about the time), or the structured call fails.
  */
-export async function attemptPlayerFarewell(
-  sessionId: string,
-  playerText: string,
-  signal?: AbortSignal,
-  characterId?: string,
-): Promise<FarewellOutcome | null> {
+export async function attemptPlayerFarewell(sessionId: string, playerText: string, signal?: AbortSignal, onFailure?: EvaluationFailureReporter, sourceMessageId?: string, characterId?: string): Promise<FarewellOutcome | null> {
   const session = getSession(sessionId);
   // Date machinery only — a hangout has no rapport to judge, nobody storms out of
   // one, and there is no date to break up or say goodnight to.
@@ -1750,20 +1897,23 @@ export async function attemptPlayerFarewell(
     { settings, role: 'evaluator', task: 'Decide whether the player is ending the date, and voice the goodbye.', schemaName: 'PlayerFarewellReaction', signal },
   );
   // Not genuine (stepping away / proposing more / musing) or a failed call → normal reply.
-  if (!result.ok || !result.data.ending) return null;
+  if (!result.ok) {
+    onFailure?.('farewell_intent_read_failed', result.error);
+    return null;
+  }
+  if (!result.data.ending) return null;
 
-  const message = addCharacterMessage(
-    sessionId,
-    result.data.farewellLine.trim(),
-    { farewell: true },
-    character.id,
-  );
-  setParticipantLastExpression(sessionId, character.id, result.data.expression.trim());
-  const groupDate = sessionParticipantsRepo.listBySession(sessionId).length > 1;
-  if (groupDate) sessionParticipantsRepo.setState(sessionId, character.id, 'departed', Date.now());
-  const terminal = !groupDate
-    || sessionParticipantsRepo.listBySession(sessionId).every((entry) => entry.state !== 'present');
-  return { message, expression: result.data.expression.trim(), characterId: character.id, terminal };
+  return getDb().transaction(() => {
+    const messageMetadata: Record<string, unknown> = { farewell: true, farewellExpression: result.data.expression.trim() };
+    if (sourceMessageId) messageMetadata.sourcePlayerMessageId = sourceMessageId;
+    const message = addCharacterMessage(sessionId, result.data.farewellLine.trim(), messageMetadata, character.id);
+    setParticipantLastExpression(sessionId, character.id, result.data.expression.trim());
+    const groupDate = sessionParticipantsRepo.listBySession(sessionId).length > 1;
+    if (groupDate) sessionParticipantsRepo.setState(sessionId, character.id, 'departed', Date.now());
+    let terminal = true;
+    if (groupDate) terminal = sessionParticipantsRepo.listBySession(sessionId).every((entry) => entry.state !== 'present');
+    return { message, expression: result.data.expression.trim(), characterId: character.id, terminal };
+  });
 }
 
 /**
@@ -1905,8 +2055,8 @@ export function maybeRollJealousy(character: Character, rng: () => number = Math
   if (committed) {
     try {
       adjustDespair(character.id, DESPAIR.cheatHit, 'cheating', day);
-    } catch {
-      /* best-effort */
+    } catch (error) {
+      reportOperationFailure('jealousy_crisis_update_failed', 'A serious relationship-state update could not be completed after jealousy was triggered.', error, { characterId: character.id, day });
     }
   }
   addMemoriesFromEvaluation(
@@ -1968,8 +2118,8 @@ export async function maybeAutoSummarize(sessionId: string): Promise<void> {
   if (count > 0 && count % PROMPT_LIMITS.summarizeEveryMessages === 0) {
     try {
       await summarizeSession(sessionId);
-    } catch {
-      // Summaries are best-effort; never block the chat loop on them.
+    } catch (error) {
+      reportOperationFailure('conversation_summary_failed', 'A background conversation summary could not be completed.', error, { sessionId });
     }
   }
 }
@@ -1991,15 +2141,16 @@ export async function maybeAutoSummarize(sessionId: string): Promise<void> {
  * and nothing at stake. The stored payload carries its `session.mode`, so the
  * replayed recap knows whether to read as a date or a hangout.
  */
-function persistDateResult(response: EndSessionResponse): void {
+function persistDateResult(response: EndSessionResponse): OperationWarning | null {
   const s = response.session;
-  if (!isMeetingMode(s.mode)) return;
+  if (!isMeetingMode(s.mode)) return null;
   try {
     const worldId = charactersRepo.get(s.characterId)?.worldId;
-    if (!worldId) return;
+    if (!worldId) return null;
     dateResultsRepo.put(s.id, worldId, JSON.stringify(response), Date.now());
-  } catch {
-    /* the report card is best-effort; never block ending a date */
+    return null;
+  } catch (error) {
+    return reportOperationFailure('date_report_save_failed', 'The date ended, but its recap could not be saved for recovery after a refresh.', error, { sessionId: s.id, characterId: s.characterId });
   }
 }
 
@@ -2009,8 +2160,9 @@ function getPersistedDateResult(sessionId: string): EndSessionResponse | null {
   if (!row) return null;
   try {
     return EndSessionResponseSchema.parse(JSON.parse(row.payload));
-  } catch {
+  } catch (error) {
     // A malformed/outdated payload should not be returned on retries or replayed.
+    reportOperationFailure('date_report_read_failed', 'A saved date recap was unreadable and could not be recovered.', error, { sessionId });
     dateResultsRepo.markSeen(sessionId);
     return null;
   }
@@ -2192,6 +2344,7 @@ async function endGroupMeeting(
   session: ConversationSession,
   messages: Message[],
   roster: SessionParticipant[],
+  warnings: OperationWarning[],
 ): Promise<EndSessionResponse> {
   const settings = getLlmSettings();
   const forcedEnd = roster.every((participant) => participant.state !== 'present');
@@ -2287,6 +2440,7 @@ async function endGroupMeeting(
       ending: null,
       bestLine: null,
       participantResults,
+      warnings,
     };
   }
 
@@ -2511,8 +2665,10 @@ async function endGroupMeeting(
     ending: host.ending,
     bestLine: host.bestLine,
     participantResults,
+    warnings,
   };
-  persistDateResult(response);
+  const persistenceWarning = persistDateResult(response);
+  if (persistenceWarning) response.warnings.push(persistenceWarning);
   return response;
 }
 
@@ -2528,6 +2684,8 @@ export async function endSession(sessionId: string): Promise<EndSessionResponse>
 async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   const session = getSession(sessionId);
   const messages = messagesRepo.listBySession(sessionId);
+  const warnings: OperationWarning[] = [];
+  if (!session.ended && isDateMode(session.mode)) assertNoUnresolvedRelationshipCheck(sessionId, 'ending the date');
 
   // Already over (e.g. the character walked out, or a double end-request).
   // Do NOT re-run the evaluator/jealousy — that would double-apply deltas.
@@ -2555,6 +2713,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       ending: null,
       bestLine: null,
       participantResults: [],
+      warnings,
     };
   }
 
@@ -2587,12 +2746,14 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       ending: null,
       bestLine,
       participantResults: [],
+      warnings: [...warnings],
       ...extra,
     };
     // Persist the report so a client that lost this HTTP response (tab closed or
     // refreshed during the evaluator) can replay it on its next visit — the costs
     // and consequences above are already committed either way.
-    persistDateResult(response);
+    const persistenceWarning = persistDateResult(response);
+    if (persistenceWarning) response.warnings.push(persistenceWarning);
     return response;
   };
 
@@ -2624,12 +2785,13 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       ending: null,
       bestLine: null,
       participantResults: [],
+      warnings,
     };
   }
 
   const groupRoster = sessionParticipantsRepo.listBySession(session.id);
   if (groupRoster.length > 1) {
-    return endGroupMeeting(session, messages, groupRoster);
+    return endGroupMeeting(session, messages, groupRoster, warnings);
   }
 
   // A real date occurred.
@@ -2736,6 +2898,7 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       ending: null,
       bestLine: null,
       participantResults: [],
+      warnings,
     };
   }
 
@@ -2909,8 +3072,8 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   if (actor.worldId && isMeetingMode(session.mode) && !endedInWalkout) {
     try {
       adjustDespair(session.characterId, -DESPAIR.dateHeal, 'time_together', chronDay);
-    } catch {
-      /* best-effort */
+    } catch (error) {
+      warnings.push(reportOperationFailure('relationship_recovery_failed', 'The date ended, but one relationship recovery update could not be completed.', error, { sessionId, characterId: session.characterId }));
     }
   }
 
@@ -2921,8 +3084,8 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // Heavily gated (usually zero LLM); writes to canon_facts, never the authored row.
   try {
     await maybeExtractExFacts(session, messages, actor, chronDay);
-  } catch {
-    /* ex-canon is best-effort; never block ending a date */
+  } catch (error) {
+    warnings.push(reportOperationFailure('character_fact_save_failed', 'The date ended, but a character-history detail could not be saved.', error, { sessionId, characterId: session.characterId }));
   }
 
   // Once you're actually seeing this person, the things YOU shared about yourself
@@ -2930,8 +3093,8 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   // their social web ("Mara's seeing a chef, apparently"). Gated + best-effort.
   try {
     await maybeExtractPlayerFacts(session, messages, actor, chronDay);
-  } catch {
-    /* player-fact capture is best-effort; never block ending a date */
+  } catch (error) {
+    warnings.push(reportOperationFailure('player_fact_save_failed', 'The date ended, but something you shared could not be added to the character\'s knowledge.', error, { sessionId, characterId: session.characterId }));
   }
 
   // A relationship-stage milestone may have been crossed (best-effort).
@@ -2941,15 +3104,15 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       day: chronDay,
       mode: session.mode,
     });
-  } catch {
-    /* milestone detection is best-effort; never block ending a date */
+  } catch (error) {
+    warnings.push(reportOperationFailure('milestone_processing_failed', 'The relationship changed, but a newly reached milestone could not be recorded.', error, { sessionId, characterId: session.characterId }));
   }
 
   // Fold this date's highlight into the cross-date chronicle (best-effort).
   try {
     appendSessionToChronicle(session.characterId, evaluation.summaryLine, session.mode, chronDay);
-  } catch {
-    /* chronicle is best-effort; never block ending a date */
+  } catch (error) {
+    warnings.push(reportOperationFailure('chronicle_save_failed', 'The date ended, but its Chronicle entry could not be saved.', error, { sessionId, characterId: session.characterId }));
   }
 
   // Carry the date's emotional register forward briefly: stamp the evaluator's mood
@@ -2973,8 +3136,8 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
       if (outcome.kind === 'broke_up') breakup = { fromStatus: outcome.fromStatus!, line: outcome.line ?? '' };
       else if (outcome.kind === 'on_the_rocks') onTheRocks = true;
       else if (outcome.kind === 'reconciled') reconciled = true;
-    } catch {
-      /* strain is best-effort; never block ending a date */
+    } catch (error) {
+      warnings.push(reportOperationFailure('relationship_strain_failed', 'The date ended, but breakup or reconciliation progression could not be completed.', error, { sessionId, characterId: session.characterId }));
     }
   }
   const strainChanged = breakup != null || onTheRocks || reconciled;
@@ -2984,9 +3147,10 @@ async function endSessionInner(sessionId: string): Promise<EndSessionResponse> {
   let ending: EndSessionResponse['ending'] = null;
   if (actor.worldId && isDateMode(session.mode) && !strainChanged) {
     try {
-      ending = await maybeReachEnding(session.characterId, { day: chronDay, mode: session.mode });
-    } catch {
-      /* ending is best-effort; never block ending a date */
+      const collectEndingWarning = (warning: OperationWarning): void => { warnings.push(warning); };
+      ending = await maybeReachEnding(session.characterId, { day: chronDay, mode: session.mode, onWarning: collectEndingWarning });
+    } catch (error) {
+      warnings.push(reportOperationFailure('ending_processing_failed', 'The date ended, but happy-ending progression could not be completed.', error, { sessionId, characterId: session.characterId }));
     }
   }
 

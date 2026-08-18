@@ -36,13 +36,13 @@ echo
 # --- Node.js ----------------------------------------------------------------
 if ! command -v node >/dev/null 2>&1; then
   err "Node.js is not installed or not on PATH."
-  hint "Fix: install Node 20+ from https://nodejs.org/ (or via nvm/brew), then reopen this terminal."
+  hint "Fix: install Node 24+ from https://nodejs.org/ (or via nvm/brew), then reopen this terminal."
 else
-  NODE_VER="$(node -v)"                 # e.g. v20.11.0
+  NODE_VER="$(node -v)"                 # e.g. v24.17.0
   NODE_MAJOR="${NODE_VER#v}"; NODE_MAJOR="${NODE_MAJOR%%.*}"
-  if [ "$NODE_MAJOR" -lt 20 ] 2>/dev/null; then
-    err "Node.js $NODE_VER is too old (need >=20)."
-    hint "Fix: install Node 20+ (nvm install 20, or 'brew install node')."
+  if [ "$NODE_MAJOR" -lt 24 ] 2>/dev/null; then
+    err "Node.js $NODE_VER is too old (need >=24 for node:sqlite)."
+    hint "Fix: install Node 24+ (nvm install 24, or 'brew install node')."
   else
     ok "Node.js $NODE_VER"
   fi
@@ -51,7 +51,7 @@ fi
 # --- pnpm -------------------------------------------------------------------
 if ! command -v pnpm >/dev/null 2>&1; then
   err "pnpm is not installed or not on PATH."
-  hint "Fix: 'corepack enable' (Node 20+), or 'npm i -g pnpm'."
+  hint "Fix: 'corepack enable' (bundled with Node), or 'npm i -g pnpm'."
 else
   ok "pnpm $(pnpm -v)"
 fi

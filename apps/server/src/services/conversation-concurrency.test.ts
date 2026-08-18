@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { APP_REQUEST_HEADER } from '@dsim/shared';
 import { resetDb, seedWorldAndCharacter, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import { sessionsRepo, worldStatesRepo } from '../db/repositories';
@@ -247,8 +248,8 @@ describe('duplicate Sleep requests (route-level)', () => {
       // Two tabs click Sleep at once. The loser must get the clean advanced:false
       // no-op `expectedDay` exists for — not a 400 from the rollover claim.
       const [a, b] = await Promise.all([
-        app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day } }),
-        app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day } }),
+        app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day }, headers: { [APP_REQUEST_HEADER]: '1' } }),
+        app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day }, headers: { [APP_REQUEST_HEADER]: '1' } }),
       ]);
       expect(a.statusCode).toBe(200);
       expect(b.statusCode).toBe(200);
@@ -268,7 +269,7 @@ describe('duplicate Sleep requests (route-level)', () => {
     try {
       const { world } = seedWorldAndCharacter();
       const day = ensureWorldState(world.id).day;
-      const res = await app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep` });
+      const res = await app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, headers: { [APP_REQUEST_HEADER]: '1' } });
       expect(res.statusCode).toBe(200);
       expect(res.json().advanced).toBe(true);
       expect(ensureWorldState(world.id).day).toBe(day + 1);
@@ -282,7 +283,7 @@ describe('duplicate Sleep requests (route-level)', () => {
     try {
       const { world, character } = seedWorldAndCharacter();
       const day = ensureWorldState(world.id).day;
-      const first = await app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day } });
+      const first = await app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day }, headers: { [APP_REQUEST_HEADER]: '1' } });
       expect(first.json().advanced).toBe(true);
 
       // A date opens after the rollover…
@@ -291,7 +292,7 @@ describe('duplicate Sleep requests (route-level)', () => {
 
       // …and the old day's straggler retry must read as the no-op it is, not a
       // spurious "you're on a date" error (staleness is checked before the gate).
-      const dup = await app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day } });
+      const dup = await app.inject({ method: 'POST', url: `/api/worlds/${world.id}/sleep`, payload: { expectedDay: day }, headers: { [APP_REQUEST_HEADER]: '1' } });
       expect(dup.statusCode).toBe(200);
       expect(dup.json().advanced).toBe(false);
     } finally {

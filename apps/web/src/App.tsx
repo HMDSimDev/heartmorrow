@@ -1,17 +1,20 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { ParseKeys } from 'i18next';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAppData } from './state/app-context';
 import { DayHud } from './components/DayHud';
+import { DayOnboarding, DAY_ONBOARDING_KEY } from './components/DayOnboarding';
+import { shouldAutoOpenOnboarding } from './components/OnboardingSteps';
 import { Icon, type IconName } from './components/Icon';
+import { ModelConnectionStatus } from './components/ModelConnectionStatus';
 import { Dashboard } from './pages/Dashboard';
 import { Characters } from './pages/Characters';
 import { CharacterProfile } from './pages/CharacterProfile';
 import { CharacterEditor } from './pages/CharacterEditor';
 import { WorldEditor } from './pages/WorldEditor';
 import { ImageLibrary } from './pages/ImageLibrary';
-import { WorldSelector, WorldOnboarding, WorldSelectorSettings } from './pages/WorldSelector';
+import { WorldSelector, WorldModelSetup, WorldOnboarding, WorldSelectorSettings } from './pages/WorldSelector';
 import { Chat } from './pages/Chat';
 import { Shop } from './pages/Shop';
 import { Inventory } from './pages/Inventory';
@@ -78,6 +81,18 @@ export default function App() {
   const { creatorMode, unreadTexts, activeWorldId, activeDate } = useAppData();
   const location = useLocation();
 
+  // First time ever ENTERING a world: explain the day loop — the energy economy
+  // gates every other mechanic, and nothing else pushes it at a new player.
+  // Marked seen immediately (the Chat.tsx pattern) so a mid-walkthrough refresh
+  // doesn't greet every later session; Help → "Your daily energy" is the way
+  // back to the details.
+  const [dayOnboardingOpen, setDayOnboardingOpen] = useState(false);
+  useEffect(() => {
+    if (activeWorldId && shouldAutoOpenOnboarding(DAY_ONBOARDING_KEY)) {
+      setDayOnboardingOpen(true);
+    }
+  }, [activeWorldId]);
+
   // The world selector + onboarding are a full-screen experience OUTSIDE the
   // in-world shell — you haven't "entered" a world yet, so there's no sidebar/HUD.
   if (location.pathname.startsWith('/worlds')) {
@@ -85,6 +100,7 @@ export default function App() {
       <Routes>
         <Route path="/worlds" element={<WorldSelector />} />
         <Route path="/worlds/new" element={<WorldOnboarding />} />
+        <Route path="/worlds/model-setup" element={<WorldModelSetup />} />
         <Route path="/worlds/settings" element={<WorldSelectorSettings />} />
         <Route path="*" element={<Navigate to="/worlds" replace />} />
       </Routes>
@@ -119,6 +135,7 @@ export default function App() {
   return (
     <div className="app" data-route={routeKey(location.pathname)}>
       <div className="atmosphere" aria-hidden="true" />
+      {dayOnboardingOpen && <DayOnboarding onClose={() => setDayOnboardingOpen(false)} />}
 
       <aside className="sidebar">
         <div className="sidebar-inner">
@@ -140,6 +157,7 @@ export default function App() {
               plus the exact build so bug reports can name a version. On phones the
               sidebar is hidden, so the same link lives in Help → Support instead. */}
           <div className="sidebar-foot">
+            <ModelConnectionStatus />
             <a
               className="support-link discord-link"
               href={DISCORD_URL}

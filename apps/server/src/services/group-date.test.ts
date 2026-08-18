@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { DEFAULT_DATING_STATS, isBrokenUp, type ShopItemCreate } from '@dsim/shared';
+import { APP_REQUEST_HEADER, DEFAULT_DATING_STATS, isBrokenUp, type ShopItemCreate } from '@dsim/shared';
 import { resetDb, seedWorldAndCharacter, seedGroupWorld, ScriptedAdapter } from '../test/helpers';
 import { setAdapterOverride } from '../llm/provider';
 import {
@@ -10,6 +10,7 @@ import {
   endSession,
   estimateNextTurnContext,
   generateReply,
+  getRelationshipCheckRecovery,
   getRecordedGroupSpeakerIds,
   getActiveDateForWorld,
   getSessionWithMessages,
@@ -27,7 +28,7 @@ import { createCharacter, updateCharacter } from './character-service';
 import { getWorldAvailability } from './availability-service';
 import { ensureWorldState } from './world-clock-service';
 import { exportAll, importAll } from './data-service';
-import { sessionParticipantsRepo, sessionsRepo, worldStatesRepo } from '../db/repositories';
+import { messagesRepo, sessionParticipantsRepo, sessionsRepo, worldStatesRepo } from '../db/repositories';
 import { buildApp } from '../app';
 import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
@@ -38,7 +39,7 @@ import { listMemories } from './memory-service';
 import { playerIdForWorld } from '../lib/ids';
 import { updatePlayer } from './player-service';
 import { updateLlmSettings } from './settings-service';
-import type { ChatRequest, ChatResult, LlmModelInfo } from '../llm/types';
+import type { ChatAdapter, ChatRequest, ChatResult, LlmModelInfo } from '../llm/types';
 
 class CapturingScriptedAdapter extends ScriptedAdapter {
   readonly requests: ChatRequest[] = [];
@@ -52,6 +53,31 @@ class CapturingScriptedAdapter extends ScriptedAdapter {
 class ContextReportingAdapter extends ScriptedAdapter {
   override async listModels(): Promise<LlmModelInfo[]> {
     return [{ id: 'test-model', loaded: true, contextLength: 32_000 }];
+  }
+}
+
+class RecoveringGroupTurnAdapter implements ChatAdapter {
+  readonly name = 'recovering-group-turn';
+  chatCalls = 0;
+  streamCalls = 0;
+
+  async chat(_request: ChatRequest): Promise<ChatResult> {
+    this.chatCalls += 1;
+    if (this.chatCalls === 1) return { content: JSON.stringify({ engagement: 1, expression: 'smiling', note: 'Avery appreciated the question.' }) };
+    if (this.chatCalls === 2) throw new Error('Model server returned 500.');
+    if (this.chatCalls === 3) return { content: JSON.stringify({ speakerSeats: [0, 1], reason: 'Both attendees can answer.' }) };
+    return { content: JSON.stringify({ engagement: 2, expression: 'happy', note: 'Bo appreciated the question on retry.' }) };
+  }
+
+  async streamChat(_request: ChatRequest, onDelta: (text: string) => void): Promise<ChatResult> {
+    this.streamCalls += 1;
+    const content = `Reply ${this.streamCalls}.`;
+    onDelta(content);
+    return { content };
+  }
+
+  async listModels(): Promise<LlmModelInfo[]> {
+    return [];
   }
 }
 
@@ -566,8 +592,8 @@ describe('group-date live turn loop (Phase 2)', () => {
     addPlayerMessage(session.id, 'What should we all do?');
     const replyAdapter = new ScriptedAdapter(['Avery suggests a walk.', 'Bo agrees and picks a route.']);
     setAdapterOverride(replyAdapter);
-    expect(await judgeTurn(session.id, undefined, a.id)).toBeNull();
-    expect(await judgeTurn(session.id, undefined, b.id)).toBeNull();
+    expect(await judgeTurn(session.id, undefined, undefined, undefined, a.id)).toBeNull();
+    expect(await judgeTurn(session.id, undefined, undefined, undefined, b.id)).toBeNull();
     await generateReply(session.id, a.id);
     await generateReply(session.id, b.id);
 
@@ -594,6 +620,7 @@ describe('group-date live turn loop (Phase 2)', () => {
       const response = await app.inject({
         method: 'POST',
         url: `/api/conversations/${session.id}/stream`,
+        headers: { [APP_REQUEST_HEADER]: '1' },
         payload: { text: 'How is everyone doing?' },
       });
       expect(response.statusCode).toBe(200);
@@ -633,6 +660,7 @@ describe('group-date live turn loop (Phase 2)', () => {
       const response = await app.inject({
         method: 'POST',
         url: `/api/conversations/${session.id}/stream`,
+        headers: { [APP_REQUEST_HEADER]: '1' },
         payload: { text: 'Bo, what would you rather do?' },
       });
       expect(response.statusCode).toBe(200);
@@ -678,6 +706,7 @@ describe('group-date live turn loop (Phase 2)', () => {
       const response = await app.inject({
         method: 'POST',
         url: `/api/conversations/${session.id}/retry-stream`,
+        headers: { [APP_REQUEST_HEADER]: '1' },
       });
       const events = response.body
         .trim()
@@ -709,7 +738,7 @@ describe('group-date live turn loop (Phase 2)', () => {
     setAdapterOverride(adapter);
     const app = await buildApp({ logger: false });
     try {
-      const response = await app.inject({ method: 'POST', url: `/api/conversations/${session.id}/retry-stream` });
+      const response = await app.inject({ method: 'POST', url: `/api/conversations/${session.id}/retry-stream`, headers: { [APP_REQUEST_HEADER]: '1' } });
       const events = response.body
         .trim()
         .split('\n\n')
@@ -761,8 +790,8 @@ describe('group-date live turn loop (Phase 2)', () => {
       ]),
     );
 
-    const aRead = await judgeTurn(session.id, undefined, a.id);
-    const bRead = await judgeTurn(session.id, undefined, b.id);
+    const aRead = await judgeTurn(session.id, undefined, undefined, undefined, a.id);
+    const bRead = await judgeTurn(session.id, undefined, undefined, undefined, b.id);
     expect(aRead).toMatchObject({ characterId: a.id, engagement: 3, expression: 'excited' });
     expect(bRead).toMatchObject({ characterId: b.id, engagement: -2, expression: 'annoyed' });
     expect(aRead!.rapport).toBeGreaterThan(bRead!.rapport);
@@ -774,17 +803,67 @@ describe('group-date live turn loop (Phase 2)', () => {
     ]);
   });
 
+  it('retries only the attendee whose relationship read failed', async () => {
+    const { a, b, session } = startGroupDate();
+    updateLlmSettings({ maxRetries: 0 });
+    const adapter = new RecoveringGroupTurnAdapter();
+    setAdapterOverride(adapter);
+    const app = await buildApp({ logger: false });
+    try {
+      const first = await app.inject({ method: 'POST', url: `/api/conversations/${session.id}/stream`, headers: { [APP_REQUEST_HEADER]: '1' }, payload: { text: 'What did each of you enjoy today?' } });
+      expect(first.statusCode).toBe(200);
+      const playerMessage = messagesRepo.listBySession(session.id).find((message) => message.role === 'player');
+      expect(playerMessage).toBeDefined();
+      const failedState = getRelationshipCheckRecovery(playerMessage!);
+      expect(failedState).toMatchObject({ next: 'rapport', failedCheck: 'rapport', failedCharacterId: b.id });
+      expect((messagesRepo.get(playerMessage!.id)?.metadata.engagementByCharacter as Record<string, unknown>)[a.id]).toBe(1);
+      expect((messagesRepo.get(playerMessage!.id)?.metadata.engagementByCharacter as Record<string, unknown>)[b.id]).toBeUndefined();
+      const aRapportBeforeRetry = sessionParticipantsRepo.get(session.id, a.id)?.rapport;
+      const retried = await app.inject({ method: 'POST', url: `/api/conversations/${session.id}/relationship-checks/retry`, headers: { [APP_REQUEST_HEADER]: '1' }, payload: { messageId: playerMessage!.id } });
+      expect(retried.statusCode).toBe(200);
+      expect(retried.body).toContain('"next":null');
+      const recoveredMessage = messagesRepo.get(playerMessage!.id)!;
+      expect((recoveredMessage.metadata.engagementByCharacter as Record<string, unknown>)[a.id]).toBe(1);
+      expect((recoveredMessage.metadata.engagementByCharacter as Record<string, unknown>)[b.id]).toBe(2);
+      expect(sessionParticipantsRepo.get(session.id, a.id)?.rapport).toBe(aRapportBeforeRetry);
+      expect(getRelationshipCheckRecovery(recoveredMessage)?.next).toBeNull();
+      expect(adapter.chatCalls).toBe(4);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('keeps the shared turn going when only the addressed attendee says goodnight', async () => {
+    const { a, b, session } = startGroupDate();
+    setAdapterOverride(new ScriptedAdapter([JSON.stringify({ ending: true, expression: 'tender', farewellLine: 'Good night. Get home safe.' }), JSON.stringify({ engagement: 1, expression: 'thoughtful', note: 'Avery understands the goodbye was for Bo.' }), 'Avery watches Bo leave, then turns back to you.']));
+    const app = await buildApp({ logger: false });
+    try {
+      const response = await app.inject({ method: 'POST', url: `/api/conversations/${session.id}/stream`, headers: { [APP_REQUEST_HEADER]: '1' }, payload: { text: 'Bo, I should get going. Good night.', targetCharacterId: b.id } });
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toContain('event: farewell');
+      expect(response.body).toContain(`"characterId":"${b.id}"`);
+      expect(response.body).toContain('"terminal":false');
+      expect(response.body).toContain('event: done');
+      expect(response.body).toContain(`"characterId":"${a.id}"`);
+      expect(sessionParticipantsRepo.get(session.id, a.id)?.state).toBe('present');
+      expect(sessionParticipantsRepo.get(session.id, b.id)?.state).toBe('departed');
+      expect(sessionsRepo.get(session.id)?.ended).toBe(false);
+    } finally {
+      await app.close();
+    }
+  });
+
   it('lets one attendee leave without ending the other attendee\'s turn', async () => {
     const { a, b, session } = startGroupDate();
     sessionParticipantsRepo.setRapport(session.id, b.id, 0, Date.now(), true);
     setAdapterOverride(new ScriptedAdapter([`I think I'm going to call it a night.`]));
 
-    const left = await maybeLeaveForLostInterest(session.id, undefined, b.id);
+    const left = await maybeLeaveForLostInterest(session.id, undefined, undefined, b.id);
     expect(left).toMatchObject({ characterId: b.id, reason: 'lost_interest' });
     expect(left!.message).toMatchObject({ characterId: b.id, metadata: { left: true } });
     expect(sessionParticipantsRepo.get(session.id, a.id)?.state).toBe('present');
     expect(sessionParticipantsRepo.get(session.id, b.id)?.state).toBe('left_early');
-    expect(await maybeLeaveForLostInterest(session.id, undefined, b.id)).toBeNull();
+    expect(await maybeLeaveForLostInterest(session.id, undefined, undefined, b.id)).toBeNull();
   });
 });
 
@@ -940,7 +1019,7 @@ describe('group-date outcomes and targeted actions (Phase 3)', () => {
       ]),
     );
 
-    const farewell = await attemptPlayerFarewell(session.id, 'Bo, I should get going. Good night.', undefined, b.id);
+    const farewell = await attemptPlayerFarewell(session.id, 'Bo, I should get going. Good night.', undefined, undefined, undefined, b.id);
     expect(farewell).toMatchObject({ characterId: b.id, expression: 'tender', terminal: false });
     expect(farewell?.message.characterId).toBe(b.id);
     expect(sessionParticipantsRepo.get(session.id, a.id)?.state).toBe('present');

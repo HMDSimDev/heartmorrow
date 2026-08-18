@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { ConversationCreateSchema, GiftOnDateSchema, SendMessageSchema } from '@dsim/shared';
+import { ConversationCreateSchema, GiftOnDateSchema, RelationshipCheckRecoveryRequestSchema, SendMessageSchema, isDateMode, type Message, type RelationshipCheckKey, type RelationshipCheckRecovery } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
 import {
   addPlayerMessage,
+  advanceRelationshipCheck,
+  assertNoUnresolvedRelationshipCheck,
+  beginRelationshipChecks,
   attemptPlayerBreakupIntent,
   attemptPlayerFarewell,
   attemptWalkout,
@@ -15,7 +18,7 @@ import {
   getSessionWithMessages,
   getRecordedGroupSpeakerIds,
   judgeTurn,
-  recordTurnReaction,
+  currentRelationshipCheckTask,
   recordGroupSpeakerPlan,
   selectGroupSpeakers,
   listSessions,
@@ -25,6 +28,11 @@ import {
   openConversation,
   persistStreamedReply,
   previewSessionPrompt,
+  failRelationshipCheck,
+  relationshipCheckTerminalOutcome,
+  requireRelationshipCheckRecovery,
+  resolveRelationshipChecks,
+  skipRelationshipChecks,
   streamReply,
   summarizeSession,
 } from '../services/conversation-service';
@@ -33,6 +41,154 @@ import { giveGiftOnDate } from '../services/gift-service';
 import { docSchema } from '../lib/openapi-schema';
 import { withKeyedLock } from '../lib/keyed-lock';
 import { badRequest } from '../lib/errors';
+import { reportOperationFailure } from '../lib/operation-warning';
+
+type RelationshipCheckEventSender = (event: string, data: unknown) => void;
+type TurnRead = NonNullable<Awaited<ReturnType<typeof judgeTurn>>>;
+type RelationshipCheckRunResult = { terminal: boolean; turnReads: Map<string, TurnRead> };
+
+function sendRelationshipCheckState(send: RelationshipCheckEventSender, messageId: string, state: RelationshipCheckRecovery): void {
+  send('relationship_checks', { messageId, state });
+}
+
+function sendRelationshipTerminal(send: RelationshipCheckEventSender, outcome: NonNullable<ReturnType<typeof relationshipCheckTerminalOutcome>>, terminal: boolean): void {
+  const characterId = outcome.message.characterId ?? undefined;
+  if (outcome.kind === 'walkout') send('walkout', { message: outcome.message, reason: outcome.reason, characterId, terminal });
+  if (outcome.kind === 'breakup') send('breakup_intent', { message: outcome.message, reaction: outcome.reaction, characterId });
+  if (outcome.kind === 'farewell') send('farewell', { message: outcome.message, expression: outcome.expression, characterId, terminal });
+  if (outcome.kind === 'left') send('left', { message: outcome.message, reason: outcome.reason, characterId, terminal });
+}
+
+async function runRelationshipChecks(sessionId: string, playerMessage: Message, signal: AbortSignal, send: RelationshipCheckEventSender): Promise<RelationshipCheckRunResult> {
+  let { state } = requireRelationshipCheckRecovery(sessionId, playerMessage.id);
+  const { session } = getSessionWithMessages(sessionId);
+  const turnReads = new Map<string, TurnRead>();
+  while (state.next !== null) {
+    const task = currentRelationshipCheckTask(state, session.characterId);
+    if (!task) break;
+    const key = task.key;
+    const characterId = task.characterId;
+    const present = getSessionWithMessages(sessionId).participants.filter((participant) => participant.state === 'present');
+    const participantPresent = present.some((participant) => participant.characterId === characterId);
+    const existingOutcome = relationshipCheckTerminalOutcome(sessionId, playerMessage.id, key, characterId);
+    if (existingOutcome) {
+      state = advanceRelationshipCheck(playerMessage.id, key);
+      const currentParticipants = getSessionWithMessages(sessionId).participants;
+      const remaining = currentParticipants.filter((participant) => participant.state === 'present');
+      let terminal = remaining.length === 0 || existingOutcome.kind === 'breakup';
+      if (existingOutcome.kind === 'farewell' && currentParticipants.length === 1) terminal = true;
+      sendRelationshipTerminal(send, existingOutcome, terminal);
+      if (existingOutcome.kind === 'breakup' || terminal) {
+        state = resolveRelationshipChecks(playerMessage.id);
+        sendRelationshipCheckState(send, playerMessage.id, state);
+        return { terminal: true, turnReads };
+      }
+      continue;
+    }
+    if (present.length === 0) {
+      state = resolveRelationshipChecks(playerMessage.id);
+      sendRelationshipCheckState(send, playerMessage.id, state);
+      return { terminal: true, turnReads };
+    }
+    if (!participantPresent) {
+      state = advanceRelationshipCheck(playerMessage.id, key);
+      continue;
+    }
+    let reportedFailure: { code: string; error: unknown } | null = null;
+    const captureFailure = (code: string, error: unknown): void => { reportedFailure = { code, error }; };
+    try {
+      if (key === 'walkout') {
+        const walkout = await attemptWalkout(sessionId, playerMessage.text, signal, captureFailure, playerMessage.id, characterId);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, characterId, reportedFailure, send, turnReads);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (walkout) {
+          const remaining = getSessionWithMessages(sessionId).participants.filter((participant) => participant.state === 'present');
+          const terminal = remaining.length === 0;
+          send('walkout', { message: walkout.message, reason: walkout.reason, characterId: walkout.characterId, terminal });
+          if (terminal) {
+            state = resolveRelationshipChecks(playerMessage.id);
+            sendRelationshipCheckState(send, playerMessage.id, state);
+            return { terminal: true, turnReads };
+          }
+        }
+        continue;
+      }
+      if (key === 'breakup') {
+        const breakupIntent = await attemptPlayerBreakupIntent(sessionId, playerMessage.text, signal, captureFailure, playerMessage.id, characterId);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, characterId, reportedFailure, send, turnReads);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (breakupIntent) {
+          state = resolveRelationshipChecks(playerMessage.id);
+          sendRelationshipCheckState(send, playerMessage.id, state);
+          send('breakup_intent', { message: breakupIntent.message, reaction: breakupIntent.reaction, characterId: breakupIntent.characterId });
+          return { terminal: true, turnReads };
+        }
+        continue;
+      }
+      if (key === 'farewell') {
+        const farewell = await attemptPlayerFarewell(sessionId, playerMessage.text, signal, captureFailure, playerMessage.id, characterId);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, characterId, reportedFailure, send, turnReads);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (farewell) {
+          send('farewell', { message: farewell.message, expression: farewell.expression, characterId: farewell.characterId, terminal: farewell.terminal });
+          if (farewell.terminal) {
+            state = resolveRelationshipChecks(playerMessage.id);
+            sendRelationshipCheckState(send, playerMessage.id, state);
+            return { terminal: true, turnReads };
+          }
+        }
+        continue;
+      }
+      if (key === 'rapport') {
+        const freshMessage = requireRelationshipCheckRecovery(sessionId, playerMessage.id).message;
+        const existingReads = freshMessage.metadata.engagementByCharacter;
+        const legacyReadExists = characterId === session.characterId && typeof freshMessage.metadata.engagement === 'number';
+        if (legacyReadExists) {
+          state = advanceRelationshipCheck(playerMessage.id, key);
+          continue;
+        }
+        if (existingReads && typeof existingReads === 'object' && !Array.isArray(existingReads) && typeof (existingReads as Record<string, unknown>)[characterId] === 'number') {
+          state = advanceRelationshipCheck(playerMessage.id, key);
+          continue;
+        }
+        const turnRead = await judgeTurn(sessionId, signal, captureFailure, playerMessage.id, characterId);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, characterId, reportedFailure, send, turnReads);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (turnRead) {
+          turnReads.set(characterId, turnRead);
+          send('rapport', { characterId, label: turnRead.label, expression: turnRead.expression, rapport: turnRead.rapport, delta: turnRead.delta, engagement: turnRead.engagement, messageId: playerMessage.id });
+        }
+        continue;
+      }
+      if (key === 'lostInterest') {
+        const left = await maybeLeaveForLostInterest(sessionId, signal, playerMessage.id, characterId);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (left) {
+          const remaining = getSessionWithMessages(sessionId).participants.filter((participant) => participant.state === 'present');
+          const terminal = remaining.length === 0;
+          send('left', { message: left.message, reason: left.reason, characterId: left.characterId, terminal });
+          if (terminal) {
+            state = resolveRelationshipChecks(playerMessage.id);
+            sendRelationshipCheckState(send, playerMessage.id, state);
+            return { terminal: true, turnReads };
+          }
+        }
+        continue;
+      }
+    } catch (error) {
+      return failRelationshipCheckRun(sessionId, playerMessage.id, key, characterId, { code: `${key}_check_failed`, error }, send, turnReads);
+    }
+  }
+  sendRelationshipCheckState(send, playerMessage.id, state);
+  return { terminal: false, turnReads };
+}
+
+function failRelationshipCheckRun(sessionId: string, messageId: string, key: RelationshipCheckKey, characterId: string, failure: { code: string; error: unknown }, send: RelationshipCheckEventSender, turnReads: Map<string, TurnRead>): RelationshipCheckRunResult {
+  reportOperationFailure(failure.code, 'A relationship read failed during the date turn.', failure.error, { sessionId, messageId, check: key, characterId });
+  const state = failRelationshipCheck(messageId, key, failure.code, characterId);
+  sendRelationshipCheckState(send, messageId, state);
+  return { terminal: false, turnReads };
+}
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'Create a conversation session', body: ConversationCreateSchema }) }, async (req, reply) => {
@@ -42,9 +198,12 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     // first date the character breaks the ice, on a repeat date we lay down a short
     // third-person "venue flavor" beat. The line is persisted; the client loads it
     // via GET /conversations/:id.
-    await openConversation(session.id);
+    const opening = await openConversation(session.id);
+    let openingFailed = false;
+    if (input.mode !== 'chat' && !opening) openingFailed = true;
+    if (openingFailed) req.log.warn({ sessionId: session.id, characterId: session.characterId, mode: session.mode }, 'The model failed to generate the opening scene; the player will be asked to open the conversation.');
     reply.code(201);
-    return session;
+    return { ...session, openingFailed };
   });
 
   app.get('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'List conversation sessions' }) }, async () => listSessions());
@@ -137,134 +296,39 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
         // player turn no one is listening for.
         if (ac.signal.aborted) return;
 
-        const playerMessage = addPlayerMessage(id, text, intent);
+        let playerMessage = addPlayerMessage(id, text, intent);
+        const initialPresent = participants.filter((participant) => participant.state === 'present');
+        if (isDateMode(session.mode)) playerMessage = beginRelationshipChecks(playerMessage.id, initialPresent.map((participant) => participant.characterId), targetCharacterId);
         send('player', playerMessage);
 
         const groupDate = participants.length > 1;
         let present = participants.filter((participant) => participant.state === 'present');
-
-        // Each attendee makes their own walkout decision. One person leaving a group
-        // date does not end the shared session while somebody else is still present.
-        for (const participant of [...present]) {
-          try {
-            const walkout = await attemptWalkout(id, text, ac.signal, participant.characterId);
-            if (walkout) {
-              present = getSessionWithMessages(id).participants.filter((entry) => entry.state === 'present');
-              send('walkout', {
-                message: walkout.message,
-                reason: walkout.reason,
-                characterId: walkout.characterId,
-                terminal: present.length === 0,
-              });
-            }
-          } catch {
-            /* walkout checks are best-effort; remaining attendees still get a turn */
-          }
+        const readsByCharacter = new Map<string, TurnRead>();
+        if (isDateMode(session.mode)) {
+          const relationshipChecks = await runRelationshipChecks(id, playerMessage, ac.signal, send);
+          if (relationshipChecks.terminal) return;
+          for (const [characterId, turnRead] of relationshipChecks.turnReads) readsByCharacter.set(characterId, turnRead);
+          present = getSessionWithMessages(id).participants.filter((participant) => participant.state === 'present');
         }
         if (present.length === 0) return;
 
         // The player may be trying to break up. If so, surface the character's
         // reaction and ask the client to confirm — do NOT end the relationship yet.
-        // A group breakup is relationship-specific, so an untargeted line falls
-        // through as ordinary table talk rather than guessing who the player meant.
-        if (!groupDate || targetCharacterId) {
-          try {
-            const breakupIntent = await attemptPlayerBreakupIntent(
-              id,
-              text,
-              ac.signal,
-              targetCharacterId ?? undefined,
-            );
-            if (breakupIntent) {
-              send('breakup_intent', {
-                message: breakupIntent.message,
-                reaction: breakupIntent.reaction,
-                characterId: breakupIntent.characterId,
-              });
-              return;
-            }
-          } catch {
-            /* breakup-intent check is best-effort; fall through to a normal reply */
-          }
-        }
 
         // The player may be winding the date down to a natural close ("I should get
         // going"). If so, voice the character's goodbye and tell the client to run the
         // normal end-and-evaluate flow — the date is scored in full, exactly as if the
         // player had clicked "End & evaluate". Best-effort: falls through on any miss.
-        let hadFarewell = false;
-        const farewellTargets = groupDate && !targetCharacterId
-          ? present.map((entry) => entry.characterId)
-          : [targetCharacterId ?? present[0]!.characterId];
-        for (const farewellTarget of farewellTargets) {
-          try {
-            const farewell = await attemptPlayerFarewell(id, text, ac.signal, farewellTarget);
-            if (farewell) {
-              hadFarewell = true;
-              send('farewell', {
-                message: farewell.message,
-                expression: farewell.expression,
-                characterId: farewell.characterId,
-                terminal: farewell.terminal,
-              });
-            }
-          } catch {
-            /* farewell checks are best-effort; remaining attendees still get a turn */
-          }
-        }
-        if (hadFarewell) return;
 
         // Judge how the player's LATEST message landed BEFORE writing the reply, so the
         // character's tone can honestly reflect it (no more "judge says dismissive while
         // the character gushes"). The live 'rapport' read is emitted up front — the
         // trajectory bar + portrait react during the typing indicator, then the reply
         // lands in that register. Best-effort: a failed/skipped read = no verdict this turn.
-        const reads = await Promise.all(
-          present.map(async (participant) => {
-            try {
-              return await judgeTurn(id, ac.signal, participant.characterId);
-            } catch {
-              return null;
-            }
-          }),
-        );
-        const readsByCharacter = new Map(
-          reads.filter((read): read is NonNullable<typeof read> => read != null).map((read) => [read.characterId, read]),
-        );
-        for (const turnRead of readsByCharacter.values()) {
-          // Stamp each independent read onto the player's message; the seat-0 host
-          // also keeps the legacy scalar engagement field for solo clients.
-          recordTurnReaction(playerMessage.id, turnRead.engagement, turnRead.characterId);
-          send('rapport', {
-            characterId: turnRead.characterId,
-            label: turnRead.label,
-            expression: turnRead.expression,
-            rapport: turnRead.rapport,
-            delta: turnRead.delta,
-            engagement: turnRead.engagement,
-            messageId: playerMessage.id,
-          });
-        }
 
         // If rapport has cratered (now INCLUDING this turn), the character loses interest
         // and ends the evening early (a soft exit, NOT a walkout) rather than replying —
         // so a final-straw message makes them leave instead of gamely replying. Real cost.
-        for (const participant of [...present]) {
-          try {
-            const left = await maybeLeaveForLostInterest(id, ac.signal, participant.characterId);
-            if (left) {
-              present = getSessionWithMessages(id).participants.filter((entry) => entry.state === 'present');
-              send('left', {
-                message: left.message,
-                reason: left.reason,
-                characterId: left.characterId,
-                terminal: present.length === 0,
-              });
-            }
-          } catch {
-            /* lost-interest checks are best-effort; remaining attendees still reply */
-          }
-        }
         if (present.length === 0) return;
 
         // The per-character judges above still let everyone privately hear/react to
@@ -293,7 +357,7 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
             .filter((participant): participant is NonNullable<typeof participant> => participant != null);
           // A participant can leave between earlier checks only through this locked
           // flow; still fail safe to somebody answering if a future exit path grows.
-          speakers = selected.length > 0 ? selected : present;
+          if (selected.length > 0) speakers = selected;
         }
 
         for (let index = 0; index < speakers.length; index += 1) {
@@ -333,6 +397,47 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     } finally {
       finish();
     }
+  });
+
+  app.post('/conversations/:id/relationship-checks/retry', { schema: docSchema({ tags: ['conversations'], summary: 'Retry interrupted relationship checks', body: RelationshipCheckRecoveryRequestSchema }) }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { messageId } = parseInput(RelationshipCheckRecoveryRequestSchema, req.body);
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    const send = (event: string, data: unknown): void => { raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    const ac = new AbortController();
+    let finished = false;
+    const onClose = (): void => { if (!finished) ac.abort(); };
+    raw.on('close', onClose);
+    const finish = (): void => { finished = true; raw.off('close', onClose); raw.end(); };
+    try {
+      await withKeyedLock(`conv-reply:${id}`, async () => {
+        const { session } = getSessionWithMessages(id);
+        if (session.ended) {
+          send('error', { message: 'This date has already ended.' });
+          return;
+        }
+        if (ac.signal.aborted) return;
+        const { message } = requireRelationshipCheckRecovery(id, messageId);
+        await runRelationshipChecks(id, message, ac.signal, send);
+      });
+    } catch (error) {
+      if (!ac.signal.aborted) send('error', { message: (error as Error).message || 'The relationship checks could not be retried.' });
+    } finally {
+      finish();
+    }
+  });
+
+  app.post('/conversations/:id/relationship-checks/skip', { schema: docSchema({ tags: ['conversations'], summary: 'Continue without interrupted relationship checks', body: RelationshipCheckRecoveryRequestSchema }) }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { messageId } = parseInput(RelationshipCheckRecoveryRequestSchema, req.body);
+    return withKeyedLock(`conv-reply:${id}`, async () => {
+      const { session } = getSessionWithMessages(id);
+      if (session.ended) throw badRequest('This date has already ended.');
+      const state = skipRelationshipChecks(id, messageId);
+      return { messageId, state };
+    });
   });
 
   // Retry the character's reply via SSE when a prior turn saved the player's
@@ -559,7 +664,10 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     // request would wait out the first and run a full second attempt instead of
     // being rejected as an overlap (see assertNoDtrInFlight).
     assertNoDtrInFlight(id);
-    return withKeyedLock(`conv-reply:${id}`, () => attemptDtr(id, undefined, characterId));
+    return withKeyedLock(`conv-reply:${id}`, () => {
+      assertNoUnresolvedRelationshipCheck(id, 'defining the relationship');
+      return attemptDtr(id, undefined, characterId);
+    });
   });
 
   // Give a held item to your date in-session — triggers a structured gift reaction.
@@ -570,9 +678,10 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations/:id/gift', { schema: docSchema({ tags: ['conversations'], summary: 'Give a held item to your date', body: GiftOnDateSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { inventoryItemId, characterId } = parseInput(GiftOnDateSchema, req.body);
-    return withKeyedLock(`conv-reply:${id}`, () =>
-      giveGiftOnDate(id, inventoryItemId, undefined, characterId ?? undefined),
-    );
+    return withKeyedLock(`conv-reply:${id}`, () => {
+      assertNoUnresolvedRelationshipCheck(id, 'giving a gift');
+      return giveGiftOnDate(id, inventoryItemId, undefined, characterId ?? undefined);
+    });
   });
 
   // Confirm a player-initiated breakup (the client first sees the reaction via

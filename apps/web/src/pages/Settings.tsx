@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import {
   DIFFICULTIES,
   GENDER_LABELS,
+  OUTPUT_LANGUAGES,
   SEXUALITY_LABELS,
   turnRapportDelta,
   type Gender,
@@ -12,6 +13,7 @@ import {
   type LlmHealthResult,
   type LlmModelInfo,
   type LlmRoleConnection,
+  type OutputLanguage,
   type ImageGenSettings,
   type EndpointMode,
 } from '@dsim/shared';
@@ -60,6 +62,7 @@ type PageTab = (typeof PAGE_TABS)[number];
 /** The base config: a connection (shared with the role consoles) plus the
  *  game-level toggles, the per-role overrides, and the image endpoint. */
 type Form = ConnectionForm & {
+  outputLanguage: OutputLanguage;
   nsfwEnabled: boolean;
   rapportCadence: 'every' | 'periodic';
   difficulty: Difficulty;
@@ -105,11 +108,16 @@ interface PlayerForm {
   personaNotes: string;
 }
 
+interface SettingsProps {
+  embedded?: boolean;
+  modelSetup?: boolean;
+}
+
 /** `embedded` drops the page's own header — used when the world selector renders
  *  Settings under its own "Settings" heading, so the title isn't shown twice. */
-export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
+export function Settings({ embedded = false, modelSetup = false }: SettingsProps = {}) {
   const { t, i18n } = useTranslation(['pages', 'common']);
-  const { reloadPlayer, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, activeWorldId, theme, setTheme } = useAppData();
+  const { reloadPlayer, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, activeWorldId, setOutputLanguage, theme, setTheme, checkModelConnection } = useAppData();
   const [player, setPlayer] = useState<PlayerForm | null>(null);
   const [playerSaved, setPlayerSaved] = useState(false);
   const [playerSaving, setPlayerSaving] = useState(false);
@@ -127,11 +135,15 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   const [tab, setTab] = useState<TabKey>('base');
   // Which page-level tab is showing. Hidden panels stay MOUNTED (display:none)
   // so unsaved edits — a typed API key, a half-filled persona — survive switching.
-  const [pageTab, setPageTab] = useState<PageTab>('difficulty');
+  const [pageTab, setPageTab] = useState<PageTab>(() => {
+    if (modelSetup) return 'model';
+    return 'difficulty';
+  });
   const [health, setHealth] = useState<LlmHealthResult | null>(null);
   const [error, setError] = useState<string>();
   const [savedNote, setSavedNote] = useState<string>();
   const [saving, setSaving] = useState(false);
+  const [outputLanguageSaving, setOutputLanguageSaving] = useState(false);
   const [nsfwModalOpen, setNsfwModalOpen] = useState(false);
   const [ackContent, setAckContent] = useState(false);
   const [ackAge, setAckAge] = useState(false);
@@ -158,6 +170,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
         const s = await api.getSettings();
         if (cancelled) return;
         setApiKeySet({ base: s.apiKeySet, evaluator: s.roleApiKeySet.evaluator, vision: s.roleApiKeySet.vision });
+        setOutputLanguage(s.outputLanguage);
         setForm({
           baseUrl: s.baseUrl,
           apiKey: '',
@@ -177,6 +190,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           ollamaThink: s.ollamaThink,
           koboldTemplate: s.koboldTemplate,
           maxRetries: s.maxRetries,
+          outputLanguage: s.outputLanguage,
           nsfwEnabled: s.nsfwEnabled,
           rapportCadence: s.rapportCadence,
           difficulty: s.difficulty,
@@ -216,6 +230,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
   // both role overrides whole (a blank role key is preserved server-side).
   const buildUpdate = (): Record<string, unknown> => ({
     ...connectionPatch(form),
+    outputLanguage: form.outputLanguage,
     nsfwEnabled: form.nsfwEnabled,
     rapportCadence: form.rapportCadence,
     difficulty: form.difficulty,
@@ -245,6 +260,7 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
           : f,
       );
       setSavedNote(t('settings.toast.saved'));
+      void checkModelConnection();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -361,6 +377,25 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
     });
   };
 
+  const persistOutputLanguage = async (outputLanguage: OutputLanguage) => {
+    const previous = form.outputLanguage;
+    setForm((f) => (f ? { ...f, outputLanguage } : f));
+    setOutputLanguage(outputLanguage);
+    setOutputLanguageSaving(true);
+    setError(undefined);
+    try {
+      const s = await api.updateSettings({ outputLanguage });
+      setForm((f) => (f ? { ...f, outputLanguage: s.outputLanguage } : f));
+      setOutputLanguage(s.outputLanguage);
+    } catch (e) {
+      setForm((f) => (f ? { ...f, outputLanguage: previous } : f));
+      setOutputLanguage(previous);
+      setError(errorMessage(e));
+    } finally {
+      setOutputLanguageSaving(false);
+    }
+  };
+
   const closeNsfwModal = () => {
     setNsfwModalOpen(false);
     setAckContent(false);
@@ -412,9 +447,13 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
     }
   };
 
+  let pageClassName = 'stack set-page';
+  if (modelSetup) pageClassName += ' is-model-setup';
+  let onboardingLanguageHint = t('settings.modelSetup.outputLanguageHint');
+  if (outputLanguageSaving) onboardingLanguageHint = t('settings.appearance.outputLanguageSaving');
 
   return (
-    <div className="stack set-page">
+    <div className={pageClassName}>
       {!embedded && (
         <div className="page-head">
           <div className="kicker">{t('settings.head.kicker')}</div>
@@ -424,6 +463,27 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
       )}
       {error && <Banner kind="error">{error}</Banner>}
       {savedNote && <Banner kind="ok">{savedNote}</Banner>}
+
+      {modelSetup && (
+        <div className="framed set-section set-onboarding-language">
+          <div className="section-head">
+            <div className="titles">
+              <div className="kicker">{t('settings.modelSetup.languageKicker')}</div>
+              <h2>{t('settings.modelSetup.languageTitle')}</h2>
+            </div>
+            <div className="trail" />
+          </div>
+          <Field label={t('settings.appearance.outputLanguage')} hint={onboardingLanguageHint}>
+            <select value={form.outputLanguage} disabled={outputLanguageSaving} onChange={(e) => { void persistOutputLanguage(e.target.value as OutputLanguage); }}>
+              {OUTPUT_LANGUAGES.map((language) => (
+                <option key={language} value={language}>
+                  {t(`settings.appearance.outputLanguageOptions.${language}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      )}
 
       {!embedded && (
         <Link to="/help" className="set-bench-card framed">
@@ -573,6 +633,33 @@ export function Settings({ embedded = false }: { embedded?: boolean } = {}) {
             >
               {SUPPORTED_LOCALES.map((loc) => (
                 <option key={loc.code} value={loc.code}>{loc.label}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field
+            label={t('settings.appearance.outputLanguage')}
+            hint={
+              outputLanguageSaving
+                ? t('settings.appearance.outputLanguageSaving')
+                : (
+                  <Trans
+                    i18nKey="settings.appearance.outputLanguageHint"
+                    ns="pages"
+                    components={[<strong />]}
+                  />
+                )
+            }
+          >
+            <select
+              value={form.outputLanguage}
+              disabled={outputLanguageSaving}
+              onChange={(e) => { void persistOutputLanguage(e.target.value as OutputLanguage); }}
+            >
+              {OUTPUT_LANGUAGES.map((language) => (
+                <option key={language} value={language}>
+                  {t(`settings.appearance.outputLanguageOptions.${language}`)}
+                </option>
               ))}
             </select>
           </Field>
