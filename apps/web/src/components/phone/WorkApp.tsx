@@ -20,7 +20,7 @@ import { careerSkillBlurb, careerSkillLabel, phaseLabel, weatherLabel } from '..
 import { Icon, type IconName } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { ResultCard, ResultPill, type ResultTone } from '../ResultCard';
-import { Banner } from '../ui';
+import { Banner, Spinner } from '../ui';
 import { GameView, type ActiveGame } from '../minigames/GameView';
 import './phone-life.css';
 
@@ -54,6 +54,8 @@ export function WorkApp() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<WorkNote | null>(null);
   const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string>();
   // A skill-work shift can only be finished once even if the game fires twice.
   const finishingRef = useRef(false);
 
@@ -65,15 +67,28 @@ export function WorkApp() {
     // A new day ends any half-finished shift left on screen.
     setActive(null);
     finishingRef.current = false;
-    api.listActivities().then(setActivities).catch(() => undefined);
-    // Job games (paid skill work) live HERE, not the dating arcade.
-    api.listMinigames().then((g) => setJobGames(g.filter((x) => x.mode === 'job'))).catch(() => undefined);
-    // Today's sky, so the plate can price the day (weather-priced day labor).
-    if (activeWorldId) {
-      api.worldWeather(activeWorldId).then((w) => setWeather(w.today)).catch(() => setWeather(null));
-    } else {
-      setWeather(null);
-    }
+    let live = true;
+    setLoading(true);
+    setLoadError(undefined);
+    let weatherRequest = Promise.resolve<DayWeather | null>(null);
+    if (activeWorldId) weatherRequest = api.worldWeather(activeWorldId).then((result) => result.today);
+    const load = async (): Promise<void> => {
+      try {
+        const [nextActivities, nextGames, nextWeather] = await Promise.all([api.listActivities(), api.listMinigames(), weatherRequest]);
+        if (!live) return;
+        setActivities(nextActivities);
+        setJobGames(nextGames.filter((game) => game.mode === 'job'));
+        setWeather(nextWeather);
+      } catch (cause) {
+        if (live) setLoadError(errorMessage(cause));
+      } finally {
+        if (live) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      live = false;
+    };
   }, [dayTick, activeWorldId]);
 
   // A world switch must not leave a previous world's run on screen — finishing it would
@@ -86,6 +101,24 @@ export function WorkApp() {
     setActive(null);
     finishingRef.current = false;
   }, [activeWorldId]);
+
+  if (loading) {
+    return (
+      <div className="phone-app">
+        <PhoneAppBar title={t('work.title')} kicker={t('work.daysShifts')} icon="work" />
+        <div className="phone-embed pl-work-embed"><Spinner /></div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="phone-app">
+        <PhoneAppBar title={t('work.title')} kicker={t('work.daysShifts')} icon="work" />
+        <div className="phone-embed pl-work-embed"><Banner kind="error">{loadError}</Banner></div>
+      </div>
+    );
+  }
 
   /** This world's level in a career skill (0 if never worked it). */
   const lvl = (skill?: string): number =>

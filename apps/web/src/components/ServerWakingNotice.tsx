@@ -8,12 +8,20 @@ import { useAppData } from '../state/app-context';
  *  so it covers every route including the world selector. */
 export function ServerWakingNotice() {
   const { t } = useTranslation();
-  const { serverWaking } = useAppData();
-  if (!serverWaking) return null;
+  const { serverWaking, syncWarning } = useAppData();
+  if (!serverWaking && !syncWarning) return null;
+  let className = 'server-waking';
+  let role: 'status' | 'alert' = 'status';
+  let message = t('shell.serverWaking');
+  if (!serverWaking && syncWarning) {
+    className += ' is-error';
+    role = 'alert';
+    message = t('shell.syncWarning', { error: syncWarning });
+  }
   return (
-    <div className="server-waking" role="status">
+    <div className={className} role={role}>
       <span className="server-waking-dot" aria-hidden />
-      {t('shell.serverWaking')}
+      {message}
     </div>
   );
 }

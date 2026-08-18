@@ -10,7 +10,7 @@ import {
   type RelationshipStatKey,
 } from '@dsim/shared';
 import { hashFloat } from '../lib/seeded-random';
-import { sessionRapportRepo } from '../db/repositories';
+import { sessionParticipantsRepo, sessionRapportRepo } from '../db/repositories';
 
 /**
  * Live date "rapport": a per-session value (0..100) that rises and falls with how
@@ -60,6 +60,66 @@ export function clearRapport(sessionId: string): void {
   sessionExpression.delete(sessionId);
   sessionJudged.delete(sessionId);
   sessionRapportRepo.delete(sessionId); // one row holds both; the delete drops the mood too
+  sessionParticipantsRepo.clearRapport(sessionId);
+}
+
+// --- Per-attendee rapport (group dates) ------------------------------------
+
+/** The durable live rapport for one attendee, or null before their first seed. */
+export function peekParticipantRapport(sessionId: string, characterId: string): number | null {
+  return sessionParticipantsRepo.get(sessionId, characterId)?.rapport ?? null;
+}
+
+export function getParticipantRapport(sessionId: string, characterId: string): number {
+  return peekParticipantRapport(sessionId, characterId) ?? RAPPORT_START;
+}
+
+/** Seed an attendee independently at their guarded opening temperature. */
+export function ensureParticipantRapportSeeded(
+  sessionId: string,
+  characterId: string,
+  guardedness = 0,
+): number {
+  const existing = peekParticipantRapport(sessionId, characterId);
+  if (existing != null) return existing;
+  const seeded = startingRapport(guardedness);
+  sessionParticipantsRepo.setRapport(sessionId, characterId, seeded, Date.now(), false);
+  return seeded;
+}
+
+/** Apply one judged player line to one attendee's independent rapport track. */
+export function applyParticipantTurnEngagement(
+  sessionId: string,
+  characterId: string,
+  engagement: number,
+  guardedness = 0,
+  difficulty: Difficulty = 'normal',
+): RapportStep {
+  const prev = peekParticipantRapport(sessionId, characterId) ?? startingRapport(guardedness);
+  const rapport = Math.max(
+    0,
+    Math.min(100, Math.round(prev + turnRapportDelta(engagement, { guardedness, difficulty }))),
+  );
+  sessionParticipantsRepo.setRapport(sessionId, characterId, rapport, Date.now(), true);
+  return { rapport, delta: rapport - prev };
+}
+
+export function setParticipantLastExpression(sessionId: string, characterId: string, expression: string): void {
+  const value = expression.trim();
+  if (!value) return;
+  sessionParticipantsRepo.setExpression(sessionId, characterId, value, Date.now());
+}
+
+export function hasParticipantJudgedTurn(sessionId: string, characterId: string): boolean {
+  return sessionParticipantsRepo.get(sessionId, characterId)?.judged ?? false;
+}
+
+export function participantHasLostInterest(
+  sessionId: string,
+  characterId: string,
+  difficulty: Difficulty = 'normal',
+): boolean {
+  return getParticipantRapport(sessionId, characterId) <= DIFFICULTY[difficulty].leaveFloor;
 }
 
 /** Remember the character's latest expression (portrait mood) for this date, so a

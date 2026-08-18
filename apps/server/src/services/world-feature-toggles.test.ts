@@ -20,12 +20,14 @@ describe('per-world Mail/Faces toggles', () => {
       property: false,
       stockMarket: false,
       gambling: false,
+      groupDates: false,
       email: true,
       faces: true,
     });
     const { world } = seedWorldAndCharacter();
     expect(featureEnabled(world.id, 'email')).toBe(true);
     expect(featureEnabled(world.id, 'faces')).toBe(true);
+    expect(featureEnabled(world.id, 'groupDates')).toBe(false);
   });
 
   it('turning them off stops all generation — zero model calls, zero rows', async () => {

@@ -23,6 +23,7 @@ import { getOrCreatePlayer } from './player-service';
 import { callStructuredLlm } from '../llm/structured';
 import { buildDespairTextMessages, buildFriendConcernMessages } from '../prompt/prompt-builder';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { recordEvent } from './event-service';
 
 export { isMemorialized };
@@ -171,8 +172,8 @@ export function memorialize(characterId: string, day: number): void {
   );
   try {
     appendChronicleLine(characterId, day, 'date', `🕯️ In memoriam — ${c.name}.`, { bumpSession: false });
-  } catch {
-    /* best-effort */
+  } catch (error) {
+    reportOperationFailure('memorial_chronicle_save_failed', 'The memorial state was saved, but its relationship-history entry could not be saved.', error, { characterId, day });
   }
   recordEvent('tragic_outcome', { characterId, day });
   if (c.worldId) queueMemorialNotice(c, day);

@@ -14,6 +14,7 @@ import { addMemoriesFromEvaluation } from './memory-service';
 import { appendChronicleLine } from './chronicle-service';
 import { rippleSocialVouch } from './social-ripple-service';
 import { recordEvent } from './event-service';
+import { reportOperationFailure } from '../lib/operation-warning';
 
 /**
  * Milestone copy per celebrated warmth band. `line` is the player-facing banner;
@@ -73,15 +74,15 @@ export function detectMilestoneCrossing(
   addMemoriesFromEvaluation(characterId, [{ text: copy.memory, importance: 5, tags: ['milestone'] }], null);
   try {
     appendChronicleLine(characterId, ctx.day, ctx.mode, `💞 ${copy.memory}`, { bumpSession: false });
-  } catch {
-    /* chronicle is best-effort; never block ending a date */
+  } catch (error) {
+    reportOperationFailure('milestone_chronicle_save_failed', 'A relationship milestone was reached, but its history entry could not be saved.', error, { characterId, day: ctx.day, band: top });
   }
   recordEvent('milestone_reached', { characterId, band: top, label, day: ctx.day });
   // Word gets around: ripple the news through this character's social web.
   try {
     rippleSocialVouch(characterId);
-  } catch {
-    /* ripple is best-effort */
+  } catch (error) {
+    reportOperationFailure('milestone_social_ripple_failed', 'A relationship milestone was reached, but its effect on mutual connections could not be completed.', error, { characterId, day: ctx.day, band: top });
   }
   return { band: top, label, line: copy.line };
 }

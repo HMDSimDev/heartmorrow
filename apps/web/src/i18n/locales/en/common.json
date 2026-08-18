@@ -145,7 +145,8 @@
     "videoPoker": "Jacks or better pays. Hold the keepers, draw the rest."
   },
   "shell": {
-    "serverWaking": "Connecting to the server — your world will appear in a moment…"
+    "serverWaking": "Connecting to the server — your world will appear in a moment…",
+    "syncWarning": "Some game data could not refresh: {error}"
   },
   "onboarding": {
     "back": "Back",
@@ -278,6 +279,7 @@
     "loreLead": "{name} leans in, eyes glinting. \"Let's see how well you know me…\"",
     "sweetAndSour": "Sweet & Sour",
     "readBetween": "Read Between the Lines",
+    "rhythmSerenade": "Rhythm Serenade",
     "twoTruthsLead": "They lean in. \"Two of these are true. One's a bluff…\"",
     "callIt": "Call it",
     "pickBluff": "Pick the bluff",
@@ -482,6 +484,7 @@
   "recap": {
     "newDay": "A new day dawns",
     "recapError": "(Couldn't generate a recap: {error})",
+    "partialFailure": "The new day began, but some updates did not finish:",
     "rested": "You rest and wake refreshed.",
     "weekendBadgeSuffix": " · weekend ⚡",
     "mastEyebrow": "The almanac · morning of day {day}",

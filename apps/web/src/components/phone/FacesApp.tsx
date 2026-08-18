@@ -63,6 +63,7 @@ export function FacesApp() {
     }
     let cancelled = false;
     setLoading(true);
+    setError(undefined);
     api
       .facesFeed(activeWorldId)
       .then((feed) => {
@@ -75,7 +76,7 @@ export function FacesApp() {
         if (!cancelled) setLoading(false);
       });
     // Mark the feed seen so the home-screen badge clears.
-    void api.facesSeen(activeWorldId).catch(() => undefined);
+    void api.facesSeen(activeWorldId).catch((cause) => { if (!cancelled) setError(errorMessage(cause)); });
     return () => {
       cancelled = true;
     };
@@ -178,16 +179,18 @@ function PostCard({
 }) {
   const { t } = useTranslation(['phone', 'common']);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string>();
   const hint = KIND_HINT[post.kind];
   const isNpc = post.authorType === 'character';
 
   const react = async (kind: ReactionKind) => {
     if (busy) return;
     setBusy(true);
+    setActionError(undefined);
     try {
       onUpdate(await api.facesReact(post.id, kind));
-    } catch {
-      /* reactions are narrative-only; a failed tap is harmless */
+    } catch (cause) {
+      setActionError(errorMessage(cause));
     } finally {
       setBusy(false);
     }
@@ -214,6 +217,7 @@ function PostCard({
       <p className="fcs-body" dir="auto">{post.body}</p>
       {post.mood && <div className="fcs-mood" dir="auto">— {post.mood}</div>}
 
+      {actionError && <Banner kind="error">{actionError}</Banner>}
       <ReactionSummary post={post} />
 
       <div className="fcs-react-bar">
@@ -282,16 +286,18 @@ function CommentList({
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [error, setError] = useState<string>();
 
   const submit = async () => {
     const body = text.trim();
     if (!body || sending) return;
     setSending(true);
+    setError(undefined);
     try {
       onUpdate(await api.facesComment(post.id, body));
       setText('');
-    } catch {
-      /* narrative-only; a dropped comment is harmless */
+    } catch (cause) {
+      setError(errorMessage(cause));
     } finally {
       setSending(false);
     }
@@ -306,6 +312,7 @@ function CommentList({
 
   return (
     <div className="fcs-comments">
+      {error && <Banner kind="error">{error}</Banner>}
       {hidden > 0 && (
         <button className="fcs-comments-more" onClick={() => setExpanded(true)}>
           {t('faces.viewAllComments', { count: post.comments.length })}

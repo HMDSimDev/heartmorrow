@@ -2,6 +2,7 @@ import {
   DEFAULT_PLAYER_ID,
   DEFAULT_STARTING_MONEY,
   ExportBundleSchema,
+  SessionParticipantSchema,
   type ExportBundle,
 } from '@dsim/shared';
 import { getDb } from '../db/index';
@@ -25,6 +26,7 @@ import {
   endingsRepo,
   dayRecordsRepo,
   sessionsRepo,
+  sessionParticipantsRepo,
   messagesRepo,
   feedPostsRepo,
   feedCommentsRepo,
@@ -72,6 +74,7 @@ export function exportAll(opts: { kind?: 'authoring' | 'savegame' } = {}): Expor
       .map((c) => relationshipsRepo.getByCharacter(c.id, DEFAULT_PLAYER_ID))
       .filter((r): r is NonNullable<typeof r> => Boolean(r)),
     conversationSessions,
+    sessionParticipants: sessionParticipantsRepo.list(),
     messages: conversationSessions.flatMap((s) => messagesRepo.listBySession(s.id)),
     // Wallets/personas AND inventory are keyed PER WORLD (player:<worldId>) after the
     // player-identity migration, so export EVERY row — exporting only the legacy
@@ -199,8 +202,32 @@ export function importAll(bundle: ExportBundle): { imported: true } {
       if (importWorldIds.has(f.worldId) && importCharIds.has(f.subjectId)) canonFactsRepo.insert(f);
       else prunedDerived += 1;
     });
-    // Conversation history: sessions reference characters; messages reference sessions.
+    // Conversation history: sessions reference characters; participant rosters and
+    // messages reference sessions. Older bundles have no roster array, so synthesize
+    // their seat-0 host row after importing the sessions.
     data.conversationSessions.forEach((s) => sessionsRepo.insert(s));
+    const importedSessionIds = new Set(data.conversationSessions.map((s) => s.id));
+    data.sessionParticipants.forEach((participant) => {
+      if (importedSessionIds.has(participant.sessionId) && importCharIds.has(participant.characterId)) {
+        sessionParticipantsRepo.upsert(participant);
+      } else {
+        prunedDerived += 1;
+      }
+    });
+    data.conversationSessions.forEach((session) => {
+      if (sessionParticipantsRepo.listBySession(session.id).length > 0) return;
+      sessionParticipantsRepo.upsert(
+        SessionParticipantSchema.parse({
+          sessionId: session.id,
+          characterId: session.characterId,
+          seat: 0,
+          role: 'romance',
+          state: 'present',
+          rapport: null,
+          updatedAt: session.updatedAt,
+        }),
+      );
+    });
     data.messages.forEach((m) => messagesRepo.insert(m));
     data.messageThreads.forEach((t) => threadsRepo.insert(t));
     data.textMessages.forEach((m) => textMessagesRepo.insert(m));

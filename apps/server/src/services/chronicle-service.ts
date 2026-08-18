@@ -14,6 +14,7 @@ import { callStructuredLlm } from '../llm/structured';
 import { buildChronicleFoldMessages } from '../prompt/prompt-builder';
 import { recordEvent } from './event-service';
 import { playerIdForWorldOrDefault } from '../lib/ids';
+import { reportOperationFailure } from '../lib/operation-warning';
 
 /** Get (or lazily create) the running chronicle of history with a character. */
 export function getChronicle(characterId: string, playerId: string = DEFAULT_PLAYER_ID): CharacterChronicle {
@@ -68,7 +69,7 @@ export function appendChronicleLine(
   );
   recordEvent('chronicle_appended', { characterId });
   if (recentLines.length >= CHRONICLE_FOLD_EVERY) {
-    void foldChronicle(characterId, playerId).catch(() => undefined); // background; fail-safe
+    void foldChronicle(characterId, playerId).catch((error) => { reportOperationFailure('chronicle_fold_failed', 'Relationship history could not be compressed in the background.', error, { characterId, playerId }); });
   }
 }
 

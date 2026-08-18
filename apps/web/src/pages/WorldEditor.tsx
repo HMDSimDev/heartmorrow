@@ -470,6 +470,13 @@ export function WorldEditor() {
                         onChange={(v) => setFeature('gambling', v)}
                       />
                       <FeatureToggle
+                        icon="date"
+                        name={t('pages:worldEditor.featureGroupDatesName')}
+                        desc={t('pages:worldEditor.featureGroupDatesDesc')}
+                        checked={world.featureFlags.groupDates}
+                        onChange={(v) => setFeature('groupDates', v)}
+                      />
+                      <FeatureToggle
                         icon="mail"
                         name={t('pages:worldEditor.featureEmailName')}
                         desc={t('pages:worldEditor.featureEmailDesc')}

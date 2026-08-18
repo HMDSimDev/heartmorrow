@@ -36,6 +36,7 @@ const FIX_TS = 1_700_000_000_000;
 export const BENCH_PLAYER_ID = 'bench-player';
 export const BENCH_WORLD_ID = 'bench-world';
 export const BENCH_CHARACTER_ID = 'bench-mara';
+export const BENCH_GROUP_CHARACTER_ID = 'bench-tess';
 const BENCH_SESSION_ID = 'bench-session';
 
 /** The sample world the bench characters live in. */
@@ -106,6 +107,38 @@ export const benchMara: Character = CharacterSchema.parse({
   updatedAt: FIX_TS,
 });
 
+/** The second attendee used to exercise the shared-scene speaker director. */
+export const benchTess: Character = CharacterSchema.parse({
+  id: BENCH_GROUP_CHARACTER_ID,
+  worldId: BENCH_WORLD_ID,
+  name: 'Tess',
+  age: 29,
+  pronouns: 'she/her',
+  gender: 'female',
+  sexuality: 'bisexual',
+  shortDescription: 'A quick-witted harbor photographer who fills silences easily and sometimes misses when a joke has cut too close.',
+  personality: 'Outgoing, observant, playful, and comfortable taking the conversational lead; gets awkward when made the center of a conflict.',
+  speechStyle: 'Quick, warm, lightly teasing; backs off rather than escalating genuine hurt.',
+  likes: ['street photography', 'harbor gossip', 'night markets'],
+  dislikes: ['being used to make someone jealous', 'needless cruelty'],
+  boundaries: ['do not drag her into relationship fights'],
+  goals: ['publish a photo book about Lanternford after dark'],
+  guardedness: 24,
+  relationshipPreferences: 'Open to affection, but refuses to be treated like leverage against somebody else.',
+  relationshipStyle: 'polyamorous',
+  quirks: ['frames imaginary photographs with her fingers', 'laughs before delivering the punchline'],
+  links: [{ targetId: BENCH_CHARACTER_ID, kind: 'rival' }],
+  datingStats: { charm: 72, empathy: 58, humor: 78, confidence: 74, intellect: 60, style: 76 },
+  createdAt: FIX_TS,
+  updatedAt: FIX_TS,
+});
+
+/** Mara as she appears in the group-director fixture: Tess is a social rival. */
+export const benchMaraGroup: Character = CharacterSchema.parse({
+  ...benchMara,
+  links: [{ targetId: BENCH_GROUP_CHARACTER_ID, kind: 'rival' }],
+});
+
 /** A few of Mara's memories of Robin, for prompts that fold in shared history. */
 export const benchMemories: CharacterMemory[] = [
   CharacterMemorySchema.parse({
@@ -163,13 +196,59 @@ export const relCommitted: Relationship = rel({
   flags: { status: 'exclusive' },
 });
 
+/** A committed, actively jealous Mara who has felt sidelined during this outing. */
+export const relMaraGroupJealous: Relationship = rel({
+  affection: 68,
+  trust: 52,
+  chemistry: 64,
+  comfort: 38,
+  respect: 55,
+  curiosity: 18,
+  tension: 58,
+  flags: { status: 'exclusive', 'state:jealous': true },
+});
+
+/** Mara immediately after discovering a second monogamous partner at the date. */
+export const relMaraGroupCollision: Relationship = rel({
+  affection: 40,
+  trust: 36,
+  chemistry: 48,
+  comfort: 37,
+  respect: 50,
+  curiosity: 30,
+  tension: 16,
+  flags: { status: 'dating', 'state:jealous': true, 'state:offended': true },
+});
+
+/** Tess likes Robin, but the latest comparison has made the room uncomfortable. */
+export const relTessGroup: Relationship = RelationshipSchema.parse({
+  id: 'bench-rel-tess',
+  characterId: BENCH_GROUP_CHARACTER_ID,
+  playerId: BENCH_PLAYER_ID,
+  affection: 38,
+  trust: 34,
+  chemistry: 44,
+  comfort: 40,
+  respect: 42,
+  curiosity: 36,
+  tension: 12,
+  flags: {},
+  updatedAt: FIX_TS,
+});
+
 let msgSeq = 0;
-function msg(role: Message['role'], text: string, meta: Record<string, unknown> = {}): Message {
+function msg(
+  role: Message['role'],
+  text: string,
+  meta: Record<string, unknown> = {},
+  characterId?: string,
+): Message {
   msgSeq += 1;
   return MessageSchema.parse({
     id: `bench-msg-${msgSeq}`,
     sessionId: BENCH_SESSION_ID,
     role,
+    characterId,
     text,
     metadata: meta,
     createdAt: FIX_TS + msgSeq,
@@ -269,6 +348,24 @@ export const farewellTranscript: Message[] = [
   msg('player', 'Same. But I should head home — early start at the shop for me tomorrow. Tonight was really lovely, Mara.', { intent: 'farewell' }),
 ];
 
+/**
+ * A deliberately charged group-date turn for the speaker director. Robin directly
+ * addresses Tess, but does so by humiliating an exclusive, already-jealous Mara;
+ * Mara has a strong reason to interrupt before Tess answers the actual question.
+ */
+export const groupJealousSpeakerTranscript: Message[] = [
+  msg('narrator', 'A corner table at the Foghorn Café. Three cups, rain on the window, and a silence that has started to feel pointed.'),
+  msg('character', 'I did suggest the quiet table. Apparently that was optimistic.', {}, BENCH_CHARACTER_ID),
+  msg('player', 'It is fine. Tess was just telling me about the night market.', { intent: 'redirect' }),
+  msg('character', 'Only because you asked. I can stop monopolizing the room.', {}, BENCH_GROUP_CHARACTER_ID),
+  msg('character', 'You are not the one doing that.', {}, BENCH_CHARACTER_ID),
+  msg(
+    'player',
+    "Tess, you're the only person here who actually knows how to have fun. Tell me what happened after the lights went out.",
+    { intent: 'flirt' },
+  ),
+];
+
 /** Recent SMS thread — a warm, attentive player text (for the text judge: should land well). */
 export const warmTextThread: Array<{ sender: 'player' | 'character'; body: string; day: number }> = [
   { sender: 'character', body: 'made it home. the fog ate the whole pier on the walk back', day: 4 },
@@ -310,6 +407,8 @@ export interface FixtureContextOptions {
   turnVerdict?: PromptContext['turnVerdict'];
   firstMeeting?: boolean;
   nsfwEnabled?: boolean;
+  coAttendees?: PromptContext['coAttendees'];
+  participantNames?: PromptContext['participantNames'];
 }
 
 /**
@@ -336,6 +435,8 @@ export function fixtureContext(opts: FixtureContextOptions = {}): PromptContext 
     world: benchWorld,
     worldNotes: [],
     character,
+    coAttendees: opts.coAttendees ?? [],
+    participantNames: opts.participantNames ?? { [character.id]: character.name },
     relationship,
     acquaintances: [],
     npcKnowledge: [],

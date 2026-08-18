@@ -4,10 +4,12 @@ import type { ParseKeys } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { PHASE_ICONS } from '@dsim/shared';
 import { api } from '../lib/api';
+import { errorMessage } from '../lib/hooks';
 import './phone.page.css';
 import { useAppData } from '../state/app-context';
 import { phaseLabel } from '../i18n/labels';
 import { Icon } from '../components/Icon';
+import { Banner } from '../components/ui';
 import { MessagesApp } from '../components/phone/MessagesApp';
 import { FacesApp } from '../components/phone/FacesApp';
 import { EmailApp } from '../components/phone/EmailApp';
@@ -109,15 +111,19 @@ export function Phone() {
     [setParams],
   );
   const [inbox, setInbox] = useState({ unreadTexts: 0, unreadEmails: 0, feedUnread: 0, landlordUnread: 0 });
+  const [inboxError, setInboxError] = useState<string>();
 
   useEffect(() => {
     // `live` drops a superseded fetch so a world switch mid-flight can't paint the
     // previous world's badge counts.
     let live = true;
+    setInboxError(undefined);
     api
       .phoneInbox(activeWorldId ?? undefined)
       .then((r) => live && setInbox(r))
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setInboxError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -226,6 +232,7 @@ export function Phone() {
             <>
               <div className={`phone-home${theme.wallpaper ? ' has-wallpaper' : ''}`}>
                 <div className="ph-home">
+                  {inboxError && <Banner kind="error">{inboxError}</Banner>}
                   <div className="ph-greeting">
                     <div className="ph-greeting-eyebrow">
                       Pocket <span className="ph-amp">&</span> Lamplight · {phaseTxt}

@@ -13,6 +13,7 @@ import {
   type DayRecap,
   type GameEvent,
   type NeglectedCharacter,
+  type OperationWarning,
   type Phase,
   type WorldState,
   type WorldSimResult,
@@ -31,6 +32,7 @@ import { getLlmSettings } from './settings-service';
 import { callStructuredLlm } from '../llm/structured';
 import { buildDayRecapMessages } from '../prompt/prompt-builder';
 import { buildDayLedger, formatEventsForRecap } from '../lib/day-events';
+import { reportOperationFailure } from '../lib/operation-warning';
 
 /**
  * Sole owner of the per-world game clock: day, time-of-day phase, stamina, and
@@ -119,8 +121,8 @@ export function spendStamina(worldId: string, cost: number = ACTION_STAMINA_COST
   recordEvent('stamina_spent', { worldId, cost, remaining: stamina, phase });
   try {
     onPhaseAdvancedHook?.(worldId, next.day, next.phase);
-  } catch {
-    /* phone delivery is best-effort */
+  } catch (error) {
+    reportOperationFailure('phase_phone_delivery_failed', 'Phone updates for the new time-of-day phase could not be delivered.', error, { worldId, day: next.day, phase: next.phase });
   }
   return next;
 }
@@ -142,6 +144,7 @@ export interface SleepResult {
   ledger: DayLedger | null;
   /** False when a stale `expectedDay` made this a no-op (the day already advanced). */
   advanced: boolean;
+  warnings: OperationWarning[];
 }
 
 /**
@@ -170,8 +173,10 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
       income: 0,
       ledger: null,
       advanced: false,
+      warnings: [],
     };
   }
+  const warnings: OperationWarning[] = [];
   const simDay = state.day; // the day that is ENDING — what we simulate + recap
 
   // 1. Capture THIS WORLD's events for the ending day BEFORE anything new is
@@ -182,7 +187,7 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
 
   // 2. Advance the clock + apply neglect decay as of the new day.
   const newDay = state.day + 1;
-  const decayed = applyWorldNeglect(worldId, newDay);
+  const decayed = applyWorldNeglect(worldId, newDay, warnings);
   const cal = deriveCalendar(newDay);
   const weather = weatherForDay(worldId, newDay);
 
@@ -219,8 +224,8 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
   try {
     wealth = runDailyWealth(worldId, newDay, events);
     income += wealth.dividends;
-  } catch {
-    /* wealth is best-effort; never block the day rollover */
+  } catch (error) {
+    warnings.push(reportOperationFailure('wealth_processing_failed', 'Money, rent, or market updates could not be completed for the new day.', error, { worldId, day: newDay }));
   }
 
   // 3. SYNCHRONOUS world-sim for the day that just ended — the ONE awaited extra
@@ -229,8 +234,8 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
   let worldSim: WorldSimResult | null = null;
   try {
     worldSim = (await onWorldSimHook?.(worldId, simDay)) ?? null;
-  } catch {
-    /* world-sim is best-effort; the day still advances with no "around town" beats */
+  } catch (error) {
+    warnings.push(reportOperationFailure('world_sim_failed', 'Around-town events could not be completed for the day that ended.', error, { worldId, day: simDay }));
   }
 
   // 4. Recap LAST, fed the world-sim beats so the narrator can weave "Around town"
@@ -244,15 +249,15 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
   //     their own beats — so a recorded day carries no passive-income line.
   try {
     recordDay(worldId, simDay, { recap, worldSim, income: 0, events });
-  } catch {
-    /* almanac persistence is best-effort */
+  } catch (error) {
+    warnings.push(reportOperationFailure('almanac_save_failed', 'The day advanced, but its Calendar history could not be saved.', error, { worldId, day: simDay }));
   }
 
   recordEvent('day_advanced', { worldId, day: newDay, recapped: recap != null });
   try {
     onDayStartedHook?.(worldId, newDay); // fire-and-forget daily text/email/gossip/feed
-  } catch {
-    /* phone generation is best-effort */
+  } catch (error) {
+    warnings.push(reportOperationFailure('phone_dispatch_failed', 'The new day started, but its phone updates could not be scheduled.', error, { worldId, day: newDay }));
   }
 
   return {
@@ -274,6 +279,7 @@ export async function advanceDay(worldId: string, expectedDay?: number): Promise
     // ledger-only events entirely, so the LLM's job stays the day's actual story.
     ledger: buildDayLedger(events, wealth),
     advanced: true,
+    warnings,
   };
 }
 
@@ -311,7 +317,7 @@ async function generateDayRecap(
   return { recap: null, recapError: result.error };
 }
 
-function applyWorldNeglect(worldId: string, currentDay: number): NeglectedCharacter[] {
+function applyWorldNeglect(worldId: string, currentDay: number, warnings: OperationWarning[]): NeglectedCharacter[] {
   const decayed: NeglectedCharacter[] = [];
   for (const c of charactersRepo.listByWorld(worldId)) {
     const rel = ensureRelationship(c.id);
@@ -329,15 +335,15 @@ function applyWorldNeglect(worldId: string, currentDay: number): NeglectedCharac
     // can go on the rocks and ultimately break up; a broken-up one may reconcile.
     try {
       evaluateRelationshipStrain(c.id, { day: currentDay, trigger: 'neglect' });
-    } catch {
-      /* strain is best-effort; never block the day rollover */
+    } catch (error) {
+      warnings.push(reportOperationFailure('relationship_strain_failed', `Relationship progression for ${c.name} could not be completed during the day change.`, error, { worldId, day: currentDay, characterId: c.id }));
     }
     // (Opt-in) advance the despair spiral: heal, escalate warnings, or — only after
     // a sustained crisis with continued harm — reach the memorial outcome.
     try {
       evaluateDespairArc(c.id, { day: currentDay });
-    } catch {
-      /* best-effort; never block the day rollover */
+    } catch (error) {
+      warnings.push(reportOperationFailure('relationship_crisis_failed', `A serious relationship-state update for ${c.name} could not be completed during the day change.`, error, { worldId, day: currentDay, characterId: c.id }));
     }
   }
   return decayed;

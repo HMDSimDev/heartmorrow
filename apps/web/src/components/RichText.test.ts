@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { parseRichLine } from './RichText';
 
 describe('parseRichLine', () => {
+  it('separates a venue scene lead from actions and dialogue', () => {
+    expect(parseRichLine(
+      'Rain taps against the glass.\n\n*She looks up.*\n\nYou made it.',
+      { sceneLead: true },
+    )).toEqual([
+      { kind: 'scene', text: 'Rain taps against the glass.\n\n' },
+      { kind: 'action', text: 'She looks up.' },
+      { kind: 'text', text: '\n\nYou made it.' },
+    ]);
+  });
+
   it('separates Japanese scene prose, an action, and dialogue in a venue opener', () => {
     const text =
       'ゼニス・ガーデンの高層テラスでは、雨上がりの空気が微かに漂っている。\n\n' +

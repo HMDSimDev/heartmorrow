@@ -36,6 +36,23 @@ export class ScriptedAdapter implements ChatAdapter {
   }
 }
 
+/** Adapter that behaves like a model server returning an HTTP 500. */
+export class FailingAdapter implements ChatAdapter {
+  readonly name = 'failing';
+
+  async chat(_req: ChatRequest): Promise<ChatResult> {
+    throw new Error('Model server returned 500.');
+  }
+
+  async streamChat(_req: ChatRequest, _onDelta: (t: string) => void): Promise<ChatResult> {
+    throw new Error('Model server returned 500.');
+  }
+
+  async listModels(): Promise<LlmModelInfo[]> {
+    return [];
+  }
+}
+
 export function seedWorldAndCharacter() {
   const world = createWorld({ name: 'Test World' });
   const character = createCharacter({
@@ -45,4 +62,15 @@ export function seedWorldAndCharacter() {
     datingStats: { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 },
   });
   return { world, character };
+}
+
+const STATS = { charm: 50, empathy: 50, humor: 50, confidence: 50, intellect: 50, style: 50 };
+
+/** A world with group outings enabled + two available characters (the host `a` and
+ *  co-attendee `b`), for exercising the shared-session data spine and turn loop. */
+export function seedGroupWorld() {
+  const world = createWorld({ name: 'Group World', featureFlags: { groupDates: true } });
+  const a = createCharacter({ worldId: world.id, name: 'Avery', age: 27, datingStats: STATS });
+  const b = createCharacter({ worldId: world.id, name: 'Bo', age: 29, datingStats: STATS });
+  return { world, a, b };
 }

@@ -1,0 +1,143 @@
+.warmth-bridge {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  width: 100%;
+  margin: 2px 0 14px;
+}
+.warmth-seal {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(230, 177, 94, 0.72);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(230, 177, 94, 0.13), var(--panel-2) 64%);
+  color: var(--brass);
+  box-shadow: 0 0 0 3px var(--panel), 0 0 0 4px rgba(230, 177, 94, 0.3), inset 0 0 13px rgba(230, 177, 94, 0.09);
+}
+.warmth-seal::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-top: 1px solid rgba(230, 177, 94, 0.42);
+  border-bottom: 1px solid rgba(230, 177, 94, 0.42);
+  border-radius: 50%;
+  transform: rotate(-18deg);
+}
+.warmth-seal::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  border: 1px solid var(--brass);
+  background: var(--panel);
+  transform: translateY(-50%) rotate(45deg);
+}
+.warmth-person::after {
+  right: -12px;
+}
+.warmth-goal {
+  color: var(--rose);
+  background: radial-gradient(circle, rgba(232, 138, 166, 0.18), var(--panel-2) 64%);
+  box-shadow: 0 0 0 3px var(--panel), 0 0 0 4px rgba(230, 177, 94, 0.3), inset 0 0 13px rgba(232, 138, 166, 0.12);
+}
+.warmth-goal::after {
+  left: -12px;
+}
+.warmth-track {
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: 9px;
+  padding-inline: 10px;
+  border-top: 1px solid rgba(230, 177, 94, 0.32);
+  border-bottom: 1px solid rgba(230, 177, 94, 0.32);
+  border-radius: 2px;
+  background-color: var(--ink-2);
+  background-image: repeating-linear-gradient(90deg, transparent 0 calc(14.285% - 1px), rgba(230, 177, 94, 0.2) calc(14.285% - 1px) 14.285%);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+.warmth-track::before, .warmth-track::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(230, 177, 94, 0.48), transparent 18%, transparent 82%, rgba(230, 177, 94, 0.48));
+}
+.warmth-track::before {
+  top: -6px;
+}
+.warmth-track::after {
+  bottom: -6px;
+}
+.warmth-fill {
+  position: relative;
+  z-index: 2;
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--rose), var(--brass));
+  box-shadow: 0 0 12px rgba(232, 138, 166, 0.38);
+  transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.warmth-fill::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(243, 236, 221, 0.82);
+  border-radius: 50%;
+  background: var(--brass);
+  box-shadow: 0 0 8px 2px rgba(230, 177, 94, 0.48);
+  transform: translateY(-50%);
+}
+.warmth-bridge[data-empty='true'] .warmth-fill::after {
+  display: none;
+}
+.warmth-bridge-friendship .warmth-goal {
+  color: var(--moon);
+  background: radial-gradient(circle, rgba(157, 184, 222, 0.18), var(--panel-2) 64%);
+  box-shadow: 0 0 0 3px var(--panel), 0 0 0 4px rgba(230, 177, 94, 0.3), inset 0 0 13px rgba(157, 184, 222, 0.14);
+}
+.warmth-bridge-friendship .warmth-fill {
+  background: linear-gradient(90deg, var(--moon), var(--brass));
+  box-shadow: 0 0 12px rgba(157, 184, 222, 0.32);
+}
+.warmth-bridge-compact {
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  margin: 0;
+}
+.warmth-bridge-compact .warmth-seal {
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px rgba(230, 177, 94, 0.26), inset 0 0 10px rgba(230, 177, 94, 0.08);
+}
+.warmth-bridge-compact .warmth-seal::before {
+  inset: -5px;
+}
+.warmth-bridge-compact .warmth-seal svg {
+  width: 16px;
+  height: 16px;
+}
+.warmth-bridge-compact .warmth-person::after {
+  right: -9px;
+}
+.warmth-bridge-compact .warmth-goal::after {
+  left: -9px;
+}
+.warmth-bridge-compact .warmth-track {
+  height: 8px;
+  padding-inline: 8px;
+}
+.warmth-bridge-compact .warmth-track::before, .warmth-bridge-compact .warmth-track::after {
+  display: none;
+}

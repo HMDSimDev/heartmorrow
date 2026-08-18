@@ -31,6 +31,7 @@ import { detectMilestoneCrossing } from './milestone-service';
 import { recordEvent } from './event-service';
 import { hashFloat } from '../lib/seeded-random';
 import { playerIdForWorld } from '../lib/ids';
+import { reportOperationFailure } from '../lib/operation-warning';
 
 export function listActivities(): readonly ActivityDef[] {
   return ACTIVITIES;
@@ -238,13 +239,13 @@ function performTogether(
         [{ text: `We had a lovely time together — ${moment}.`, importance: 3, tags: ['sweet'] }],
         null,
       );
-    } catch {
-      /* memory write is best-effort; never break the activity */
+    } catch (error) {
+      reportOperationFailure('activity_memory_save_failed', 'Time together was completed, but its relationship memory could not be saved.', error, { worldId, characterId: character.id, activityId: activity.id, day });
     }
     try {
       appendChronicleLine(character.id, day, 'event', `✨ A lovely time together — ${moment}.`, { bumpSession: false });
-    } catch {
-      /* chronicle is best-effort */
+    } catch (error) {
+      reportOperationFailure('activity_chronicle_save_failed', 'Time together was completed, but its relationship-history entry could not be saved.', error, { worldId, characterId: character.id, activityId: activity.id, day });
     }
   }
 
@@ -252,8 +253,8 @@ function performTogether(
   // near the ceiling) — but if it ever does, celebrate it like any other crossing.
   try {
     detectMilestoneCrossing(character.id, before, relationship, { day, mode: 'event' });
-  } catch {
-    /* milestone detection is best-effort */
+  } catch (error) {
+    reportOperationFailure('activity_milestone_failed', 'Time together was completed, but relationship milestone progression could not be completed.', error, { worldId, characterId: character.id, activityId: activity.id, day });
   }
 
   return { relationship, together: result };

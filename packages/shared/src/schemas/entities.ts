@@ -61,6 +61,9 @@ export const FeatureFlagsSchema = z.object({
   /** The casino: wager money on slots/blackjack/roulette/video poker, behind a
    *  flat per-bet cap and a per-day wager cap so it never becomes a money engine. */
   gambling: z.boolean().default(false),
+  /** Group outings: invite a second person to a date or hangout. Dates keep a
+   *  per-seat rapport track; hangouts share the conversation without live scoring. */
+  groupDates: z.boolean().default(false),
   /** The Mail app: daily in-world letters + away-postcards. ON by default (a core
    *  phone surface, unlike the opt-in money systems above — the default keeps
    *  every existing world unchanged); off hides the app and stops email
@@ -356,11 +359,41 @@ export const MessageSchema = z.object({
   id,
   sessionId: id,
   role: MessageRoleSchema,
+  /** Speaker identity for character dialogue. Null for player/narrator/system rows
+   *  and legacy character messages (which resolve to the session's seat-0 host). */
+  characterId: id.nullable().default(null),
   text: z.string(),
   metadata: MetadataSchema.default({}),
   createdAt: ts,
 });
 export type Message = z.infer<typeof MessageSchema>;
+
+/** Whether an attendee is still at a shared outing, or left it early. */
+export const SessionParticipantStateSchema = z.enum(['present', 'left_early', 'walked_out', 'departed']);
+export type SessionParticipantState = z.infer<typeof SessionParticipantStateSchema>;
+
+/**
+ * One attendee of a conversation session. A solo outing has a single row (seat 0 =
+ * the session's `characterId`); a group outing adds a row per co-attendee. Dates use
+ * per-seat live rapport (0..100); hangout rapport stays unseeded.
+ */
+export const SessionParticipantSchema = z.object({
+  sessionId: id,
+  characterId: id,
+  /** Stable render/turn order; 0 = host (= ConversationSession.characterId). */
+  seat: z.number().int().nonnegative(),
+  /** Reserved for later date formats (romance / guest / wing_a / wing_b). */
+  role: z.string().default('romance'),
+  state: SessionParticipantStateSchema.default('present'),
+  /** Live per-seat rapport 0..100; null until the first judged turn seeds it. */
+  rapport: z.number().int().min(0).max(100).nullable().default(null),
+  /** Last live portrait expression for this attendee. */
+  expression: z.string().nullable().default(null),
+  /** The seed alone is not a player-facing read; true after a real judge result. */
+  judged: z.boolean().default(false),
+  updatedAt: ts,
+});
+export type SessionParticipant = z.infer<typeof SessionParticipantSchema>;
 
 // --- Shop / Inventory -------------------------------------------------------
 

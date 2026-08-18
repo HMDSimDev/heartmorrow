@@ -29,6 +29,7 @@ export function requireFeature(worldId: string, key: FeatureKey): void {
       property: 'Property ownership is not enabled for this world.',
       gambling: 'The casino is not enabled for this world.',
       stockMarket: 'The stock market is not enabled for this world.',
+      groupDates: 'Group outings are not enabled for this world.',
       email: 'The Mail app is not enabled for this world.',
       faces: 'The Faces feed is not enabled for this world.',
     };

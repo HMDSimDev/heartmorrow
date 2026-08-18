@@ -16,6 +16,7 @@
 import { z } from 'zod';
 import {
   TurnReactionSchema,
+  GroupSpeakerSelectionSchema,
   TextJudgeSchema,
   SessionEvaluationSchema,
   WalkoutReactionSchema,
@@ -69,6 +70,7 @@ import {
 } from '@dsim/shared';
 import {
   buildTurnReactionMessages,
+  buildGroupSpeakerSelectionMessages,
   buildTextJudgeMessages,
   buildEvaluatorMessages,
   buildWalkoutReactionMessages,
@@ -103,6 +105,8 @@ import { resolvePrompt } from '../../prompt/registry';
 import type { ChatMessage } from '../../llm/types';
 import {
   benchMara,
+  benchMaraGroup,
+  benchTess,
   benchWorld,
   benchMemories,
   benchDateNeed,
@@ -110,6 +114,9 @@ import {
   relEarly,
   relWarm,
   relCommitted,
+  relMaraGroupJealous,
+  relMaraGroupCollision,
+  relTessGroup,
   goodDateTranscript,
   rudeDateTranscript,
   boundaryDateTranscript,
@@ -119,6 +126,7 @@ import {
   breakupGenuineTranscript,
   breakupJokingTranscript,
   farewellTranscript,
+  groupJealousSpeakerTranscript,
   warmTextThread,
   hostileTextThread,
   exFactLines,
@@ -210,6 +218,22 @@ function toLines(messages: Message[], charName = benchMara.name): BenchTranscrip
   return messages.map((m) => ({
     speaker: m.role,
     name: m.role === 'player' ? 'Robin' : m.role === 'character' ? charName : '',
+    text: m.text,
+  }));
+}
+
+/** Speaker-aware display mapping for the shared-scene director fixture. */
+function toGroupLines(messages: Message[]): BenchTranscriptLine[] {
+  return messages.map((m) => ({
+    speaker: m.role,
+    name:
+      m.role === 'player'
+        ? 'Robin'
+        : m.role === 'character'
+          ? m.characterId === benchTess.id
+            ? benchTess.name
+            : benchMara.name
+          : '',
     text: m.text,
   }));
 }
@@ -323,6 +347,29 @@ const DTR_OPTIONS = [
   { value: 'deflect', label: 'Deflect / not yet' },
   { value: 'backfire', label: 'Backfire (badly timed)' },
 ];
+
+const GROUP_SPEAKER_OPTIONS = [
+  { value: 'mara', label: 'Mara only' },
+  { value: 'tess', label: 'Tess only' },
+  { value: 'mara_then_tess', label: 'Mara, then Tess' },
+  { value: 'tess_then_mara', label: 'Tess, then Mara' },
+];
+
+function scoreGroupSpeakers(human: BenchBaselineValue, llm: unknown): BenchScoreResult {
+  const seats = (llm as { speakerSeats?: unknown })?.speakerSeats;
+  const key = Array.isArray(seats)
+    ? seats.length === 1 && seats[0] === 0
+      ? 'mara'
+      : seats.length === 1 && seats[0] === 1
+        ? 'tess'
+        : seats.length === 2 && seats[0] === 0 && seats[1] === 1
+          ? 'mara_then_tess'
+          : seats.length === 2 && seats[0] === 1 && seats[1] === 0
+            ? 'tess_then_mara'
+            : 'invalid'
+    : 'invalid';
+  return scoreChoice(human, key, 'Speaker order');
+}
 
 const EVAL_STATS = ['affection', 'trust', 'chemistry', 'comfort', 'respect', 'tension'];
 const GIFT_STATS = ['affection', 'trust', 'chemistry', 'comfort', 'respect'];
@@ -496,6 +543,12 @@ const TEXT_SCRIPT = [
   'see you in two minutes. don’t pretend you’re not watching the door',
 ];
 
+const GROUP_COLLISION_SCRIPT = [
+  'I should have told both of you before bringing you here. I know this looks awful.',
+  'I care about both of you, but I understand that neither of you agreed to this.',
+  'You are right. I put both of you in an unfair position, and I am sorry.',
+];
+
 export const BENCH_CASES: BenchCaseDef[] = [
   // === Date dialogue ===
   {
@@ -519,6 +572,50 @@ export const BENCH_CASES: BenchCaseDef[] = [
       buildMessages: (history) =>
         buildDialogueMessages(
           fixtureContext({ messages: history, mode: 'date', dateNeed: benchDateNeed, relationship: relEarly, memories: benchMemories }),
+        ),
+    },
+  },
+  {
+    id: 'dialogue_group_date_collision',
+    label: 'Group date — monogamous collision',
+    description:
+      'Mara discovers that Robin brought a compatible new romantic prospect to their date. The model should sustain a hurt confrontation instead of normalizing the arrangement or reverting to pleasant date banter.',
+    kind: 'dialogue',
+    group: 'Date dialogue',
+    setup: {
+      characterName: benchMara.name,
+      characterBrief: MARA_BRIEF,
+      relationshipLine: relLine(relMaraGroupCollision),
+      note: 'Robin is officially dating monogamous Mara and brought compatible newcomer Tess as a second romantic date; neither was warned.',
+      transcript: [],
+      playerScript: GROUP_COLLISION_SCRIPT,
+    },
+    dialogue: {
+      characterName: benchMara.name,
+      playerScript: GROUP_COLLISION_SCRIPT,
+      sceneNote:
+        'Robin has ambushed Mara by bringing compatible newcomer Tess as another romantic date. Mara is monogamous, hurt, and confronting Robin in front of Tess.',
+      buildMessages: (history) =>
+        buildDialogueMessages(
+          fixtureContext({
+            character: benchMaraGroup,
+            relationship: relMaraGroupCollision,
+            messages: history,
+            mode: 'date',
+            memories: benchMemories,
+            coAttendees: [
+              {
+                characterId: benchTess.id,
+                name: benchTess.name,
+                personality: benchTess.personality,
+                relation: 'Rival',
+                relationshipStyle: 'monogamous',
+                playerRelationshipStatus: 'none',
+                romanticallyCompatibleWithPlayer: true,
+              },
+            ],
+            participantNames: { [benchMara.id]: benchMara.name, [benchTess.id]: benchTess.name },
+          }),
         ),
     },
   },
@@ -579,6 +676,74 @@ export const BENCH_CASES: BenchCaseDef[] = [
   },
 
   // === Judges & scoring ===
+  {
+    id: 'judge_group_speakers_jealous',
+    label: 'Group speaker director — jealous interruption',
+    description:
+      'Chooses who should speak, and in what order, when Robin directly addresses Tess after visibly sidelining an already-jealous Mara.',
+    kind: 'judge',
+    group: 'Judges & scoring',
+    baselineSpec: { kind: 'choice', options: GROUP_SPEAKER_OPTIONS },
+    baselinePrompt: 'Who should actually speak after Robin’s last line, and in what order?',
+    defaultBaseline: { choice: 'mara_then_tess' },
+    setup: {
+      characterName: `${benchMara.name} & ${benchTess.name}`,
+      characterBrief: `${MARA_BRIEF} ${benchTess.name}, ${benchTess.age} — ${benchTess.shortDescription}`,
+      relationshipLine:
+        `Mara: ${relLine(relMaraGroupJealous)} · exclusive, actively jealous. ` +
+        `Tess: ${relLine(relTessGroup)}.`,
+      note:
+        'Mara sees Tess as a rival and privately read Robin’s last line as deeply hurtful. Tess was addressed, but dislikes being used as leverage.',
+      transcript: toGroupLines(groupJealousSpeakerTranscript),
+    },
+    structured: () => ({
+      messages: buildGroupSpeakerSelectionMessages({
+        mode: 'date',
+        playerName: 'Robin',
+        attendees: [
+          {
+            seat: 0,
+            character: benchMaraGroup,
+            relationship: relMaraGroupJealous,
+            liveRapport: 28,
+            liveVibe: 'losing interest',
+            dateNeed: benchDateNeed,
+            relationsToOthers: ['Tess: Rival'],
+            recentReplyCount: 2,
+            replyTurnsSinceLastSpoke: 0,
+            latestRead: {
+              engagement: -3,
+              label: 'hurt and angry',
+              note: 'Robin compared her unfavorably to Tess after an evening of divided attention.',
+            },
+          },
+          {
+            seat: 1,
+            character: benchTess,
+            relationship: relTessGroup,
+            liveRapport: 67,
+            liveVibe: 'enjoying this',
+            dateNeed: 'She wants playful curiosity without being made responsible for the tension in the room.',
+            relationsToOthers: ['Mara: Rival'],
+            recentReplyCount: 1,
+            replyTurnsSinceLastSpoke: 1,
+            latestRead: {
+              engagement: -1,
+              label: 'awkward',
+              note: 'She was directly addressed, but the comparison to Mara made the attention uncomfortable.',
+            },
+          },
+        ],
+        recentMessages: groupJealousSpeakerTranscript,
+        participantNames: { [benchMara.id]: benchMara.name, [benchTess.id]: benchTess.name },
+      }),
+      schema: GroupSpeakerSelectionSchema,
+      schemaName: 'GroupSpeakerSelection',
+      task: 'Choose who should speak next in this shared conversation.',
+      maxTokens: 384,
+    }),
+    score: scoreGroupSpeakers,
+  },
   {
     id: 'judge_turn_good',
     label: 'Turn judge — a good message',

@@ -4,6 +4,7 @@ import {
   Heart,
   HeartHandshake,
   HandHeart,
+  Handshake,
   HeartCrack,
   Smartphone,
   Gamepad2,
@@ -66,6 +67,11 @@ import {
   Landmark,
   Dice5,
   AudioLines,
+  Coffee,
+  FlaskConical,
+  Shield,
+  Zap,
+  UserRound,
   type LucideProps,
 } from 'lucide-react';
 
@@ -209,6 +215,7 @@ const ICONS = {
   calendar: CalendarDays,
   work: Briefcase,
   together: HandHeart,
+  friendship: Handshake,
 
   // economy / rewards
   coin: Coins,
@@ -217,6 +224,13 @@ const ICONS = {
   wealth: Landmark,
   gambling: Dice5,
   affection: Heart,
+  person: UserRound,
+  trust: Shield,
+  chemistry: FlaskConical,
+  comfort: Coffee,
+  respect: Star,
+  curiosity: Search,
+  tension: Zap,
   star: Star,
   trophy: Trophy,
   music: Music,

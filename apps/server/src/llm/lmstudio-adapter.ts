@@ -35,6 +35,9 @@ export class LmStudioAdapter extends OpenAiCompatibleAdapter {
         state?: string; // "loaded" | "not-loaded"
         quantization?: string;
         max_context_length?: number;
+        /** Context actually allocated to the loaded instance. This can be much
+         * smaller than the architecture's theoretical maximum. */
+        loaded_context_length?: number;
       }>;
     };
     return (data.data ?? [])
@@ -42,7 +45,12 @@ export class LmStudioAdapter extends OpenAiCompatibleAdapter {
       .map((m) => ({
         id: m.id,
         loaded: m.state === 'loaded',
-        contextLength: typeof m.max_context_length === 'number' ? m.max_context_length : undefined,
+        contextLength:
+          typeof m.loaded_context_length === 'number' && m.loaded_context_length > 0
+            ? m.loaded_context_length
+            : typeof m.max_context_length === 'number'
+              ? m.max_context_length
+              : undefined,
         quantization: typeof m.quantization === 'string' ? m.quantization : undefined,
         type: typeof m.type === 'string' ? m.type : undefined,
       }));

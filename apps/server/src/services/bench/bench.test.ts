@@ -85,6 +85,35 @@ describe('bench catalog', () => {
     // the sample transcript ends on the player's line (what the judge scores)
     expect(def.setup.transcript?.at(-1)?.speaker).toBe('player');
   });
+
+  it('catalogs the real context-rich group speaker director prompt', () => {
+    const def = getBenchCase('judge_group_speakers_jealous')!;
+    const spec = def.structured!();
+    const prompt = spec.messages
+      .map((message) => (typeof message.content === 'string' ? message.content : ''))
+      .join('\n');
+    expect(def.kind).toBe('judge');
+    expect(def.defaultBaseline).toEqual({ choice: 'mara_then_tess' });
+    expect(prompt).toContain('Jealous now: YES');
+    expect(prompt).toContain('tension level: 58/100');
+    expect(prompt).toContain('Latest private reaction to the player');
+    expect(prompt).toContain(
+      "Player [attempting to flirt]: Tess, you're the only person here who actually knows how to have fun.",
+    );
+  });
+
+  it('benchmarks the monogamous group-date collision as a real dialogue prompt', () => {
+    const def = getBenchCase('dialogue_group_date_collision')!;
+    const prompt = def.dialogue!.buildMessages([])
+      .map((message) => (typeof message.content === 'string' ? message.content : ''))
+      .join('\n');
+    expect(def.kind).toBe('dialogue');
+    expect(prompt).toContain('MONOGAMOUS GROUP-DATE COLLISION');
+    expect(prompt).toContain('Robin is also treating this as a romantic date with Tess');
+    expect(prompt).toContain('date role: a plausible new romantic prospect');
+    expect(prompt).toContain('relationship style: monogamous');
+    expect(prompt).toContain('This is a betrayal and an active confrontation');
+  });
 });
 
 describe('bench scoring', () => {
@@ -131,6 +160,13 @@ describe('bench scoring', () => {
     expect(dtr({ choice: 'accept' }, { decision: 'accept' }).pass).toBe(true);
     expect(dtr({ choice: 'accept' }, { decision: 'backfire' }).pass).toBe(false);
   });
+
+  it('group speaker selection scores the exact attendee set and order', () => {
+    const score = getBenchCase('judge_group_speakers_jealous')!.score!;
+    expect(score({ choice: 'mara_then_tess' }, { speakerSeats: [0, 1] }).pass).toBe(true);
+    expect(score({ choice: 'mara_then_tess' }, { speakerSeats: [1] }).pass).toBe(false);
+    expect(score({ choice: 'mara_then_tess' }, { speakerSeats: [1, 0] }).pass).toBe(false);
+  });
 });
 
 describe('bench runner', () => {
@@ -139,6 +175,23 @@ describe('bench runner', () => {
   });
   afterEach(() => {
     setAdapterOverride(null);
+  });
+
+  it('runs and scores the group speaker director case', async () => {
+    setAdapterOverride(
+      new ScriptedAdapter([
+        '{"speakerSeats":[0,1],"reason":"Mara has a strong reason to interrupt before Tess answers."}',
+      ]),
+    );
+    const res = await runBenchCase({
+      caseId: 'judge_group_speakers_jealous',
+      llmPlayer: false,
+      dialogueTurns: 4,
+    });
+    expect(res.ok).toBe(true);
+    expect(res.comparison?.human).toEqual({ choice: 'mara_then_tess' });
+    expect(res.comparison?.llm).toEqual({ choice: 'mara_then_tess' });
+    expect(res.calls).toHaveLength(1);
   });
 
   it('a saved user baseline overrides the built-in default', async () => {

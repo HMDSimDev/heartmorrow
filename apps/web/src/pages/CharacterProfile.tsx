@@ -3,9 +3,20 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Trans, useTranslation } from 'react-i18next';
 import {
   effectiveDatingStats,
+  ACTIVITIES,
+  DATING_STAT_KEYS,
+  FAVORITE_BY_STAT,
+  favoriteMinigameFor,
+  fitLabel,
   isInternalFlagKey,
   storyFlagParts,
   relationshipStage,
+  warmthBand,
+  warmthOf,
+  mutualAttraction,
+  incompatibleWarmthCap,
+  INCOMPATIBLE_MAX_BAND,
+  togetherFit,
   currentStatus,
   isBrokenUp,
   isMemorialized,
@@ -16,41 +27,102 @@ import {
   listActiveBuffs,
   type CharacterMemory,
   type ConversationSession,
+  type ActivityDef,
+  type DatingStatKey,
+  type DatingStats,
   type Relationship,
 } from '@dsim/shared';
 import { api } from '../lib/api';
 import { useAsync, errorMessage } from '../lib/hooks';
+import { loadWorldPlayer } from '../lib/world-player';
 import { useAppData } from '../state/app-context';
 import {
   characterLinkLabel,
+  datingStatDesc,
   datingStatLabel,
   genderLabel,
+  minigameTitleLabel,
+  relationshipStatLabel,
   relationshipStatusLabel,
   relationshipStyleLabel,
   relativeTime,
   sexualityLabel,
+  warmthBandLabel,
   weatherLabel,
   weekdayAbbr,
 } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
-import { Icon } from '../components/Icon';
+import { Icon, type IconName } from '../components/Icon';
+import { WarmthBridge, type WarmthBridgePath } from '../components/WarmthBridge';
 import { CrisisResources } from '../components/CrisisResources';
-import { DatingBars, RelationshipBars } from '../components/StatBars';
+import { RelationshipBars } from '../components/StatBars';
 import { Banner, Empty, Loader, ConfirmDialog } from '../components/ui';
 import { ShareExportDialog } from '../components/ShareTools';
 import './profile.page.css';
 
-type TFn = (key: string, opts?: Record<string, unknown>) => string;
+const weatherIcon = (k: string) => WEATHER_ICONS[k as keyof typeof WEATHER_ICONS] ?? '';
+const DATING_STAT_ICONS: Record<DatingStatKey, IconName> = { charm: 'sparkle', empathy: 'affection', humor: 'reactLaugh', confidence: 'trust', intellect: 'chronicle', style: 'ring' };
+const RADAR_LEVELS = [25, 50, 75, 100] as const;
+const RADAR_CENTER_X = 160;
+const RADAR_CENTER_Y = 132;
+const RADAR_RADIUS = 78;
 
-/** A friendly summary of where the relationship stands — uses the shared band
- *  labels (single source of truth in social.ts) so it never drifts. */
-function relationshipStatus(rel: Relationship, t: TFn): string {
-  const label = relationshipStage(rel).label;
-  const display = label.charAt(0).toUpperCase() + label.slice(1);
-  return rel.tension >= 60 ? `${display}${t('profile.tenseSuffix')}` : display;
+type ActivityFit = { activity: ActivityDef; fit: number; tier: ReturnType<typeof fitLabel> };
+
+function strongestDatingStat(stats: DatingStats): DatingStatKey {
+  let strongest: DatingStatKey = DATING_STAT_KEYS[0];
+  for (const key of DATING_STAT_KEYS) if (stats[key] > stats[strongest]) strongest = key;
+  return strongest;
 }
 
-const weatherIcon = (k: string) => WEATHER_ICONS[k as keyof typeof WEATHER_ICONS] ?? '';
+function radarCoordinate(index: number, distance: number): { x: number; y: number } {
+  const angle = -Math.PI / 2 + index * (Math.PI / 3);
+  return { x: RADAR_CENTER_X + Math.cos(angle) * distance, y: RADAR_CENTER_Y + Math.sin(angle) * distance };
+}
+
+function radarPolygon(values: readonly number[]): string {
+  const points: string[] = [];
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index] ?? 0;
+    const point = radarCoordinate(index, RADAR_RADIUS * (value / 100));
+    points.push(`${point.x},${point.y}`);
+  }
+  return points.join(' ');
+}
+
+function radarTextAnchor(index: number): 'start' | 'middle' | 'end' {
+  if (index === 0 || index === 3) return 'middle';
+  if (index === 1 || index === 2) return 'start';
+  return 'end';
+}
+
+function DatingRadar({ stats, ariaLabel }: { stats: DatingStats; ariaLabel: string }) {
+  const values = DATING_STAT_KEYS.map((key) => stats[key]);
+  return (
+    <svg className="prof-radar" viewBox="0 0 320 270" role="img" aria-label={ariaLabel}>
+      <g className="prof-radar-grid" aria-hidden="true">
+        {RADAR_LEVELS.map((level) => <polygon points={radarPolygon(DATING_STAT_KEYS.map(() => level))} key={level} />)}
+        {DATING_STAT_KEYS.map((key, index) => {
+          const edge = radarCoordinate(index, RADAR_RADIUS);
+          return <line x1={RADAR_CENTER_X} y1={RADAR_CENTER_Y} x2={edge.x} y2={edge.y} key={key} />;
+        })}
+      </g>
+      <polygon className="prof-radar-shape" points={radarPolygon(values)} />
+      <g className="prof-radar-points" aria-hidden="true">
+        {values.map((value, index) => {
+          const point = radarCoordinate(index, RADAR_RADIUS * (value / 100));
+          return <circle cx={point.x} cy={point.y} r="3" key={DATING_STAT_KEYS[index]} />;
+        })}
+      </g>
+      <g className="prof-radar-labels">
+        {DATING_STAT_KEYS.map((key, index) => {
+          const point = radarCoordinate(index, 112);
+          return <text x={point.x} y={point.y} textAnchor={radarTextAnchor(index)} key={key}><tspan>{datingStatLabel(key)}</tspan><tspan className="prof-radar-value" x={point.x} dy="15">{stats[key]}</tspan></text>;
+        })}
+      </g>
+    </svg>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Tabs — mirror the editor's stepped layout, read-only.
@@ -77,6 +149,7 @@ export function CharacterProfile() {
   // The character's world day, so we can tell "needs space" (still in the
   // post-breakup cooldown) from "open to reconciling" (cooldown elapsed).
   const worldId = bundle.data?.character.worldId ?? null;
+  const profileWorldPlayer = useAsync(() => loadWorldPlayer(worldId), [worldId]);
   // dayTick keeps the post-breakup cooldown ("needs space" vs "open to
   // reconciling") live as the player ends days with this profile open.
   const worldState = useAsync(
@@ -134,6 +207,31 @@ export function CharacterProfile() {
           .filter((entry): entry is readonly [string, { label: string; value: string | null }] => entry[1] !== null);
         const convoCount = (sessions.data ?? []).filter((s: ConversationSession) => s.characterId === id).length;
         const status = currentStatus(relationship);
+        let warmthPath: WarmthBridgePath = 'romance';
+        let warmthMax = 100;
+        if (profileWorldPlayer.data && profileWorldPlayer.data.worldId === character.worldId) {
+          const compatibility = mutualAttraction({ gender: profileWorldPlayer.data.profile.gender, sexuality: profileWorldPlayer.data.profile.sexuality }, { gender: character.gender, sexuality: character.sexuality });
+          if (!compatibility.mutual) {
+            warmthPath = 'friendship';
+            warmthMax = incompatibleWarmthCap();
+          }
+        }
+        const warmth = Math.max(0, Math.min(warmthMax, warmthOf(relationship)));
+        const warmthDisplay = Number(warmth.toFixed(1));
+        let warmthStageKey = warmthBand(relationship);
+        if (warmthPath === 'friendship' && warmthOf(relationship) > warmthMax) warmthStageKey = INCOMPATIBLE_MAX_BAND;
+        const warmthStage = warmthBandLabel(warmthStageKey);
+        const warmthSummary = t(`profile.warmthSummary.${warmthStageKey}`);
+        const warmthAria = t('profile.warmthAria', { value: warmthDisplay, max: warmthMax, stage: warmthStage });
+        const strongestStat = strongestDatingStat(character.datingStats);
+        const favoriteGame = favoriteMinigameFor(character);
+        const activityFits: ActivityFit[] = [];
+        for (const activity of ACTIVITIES) {
+          if (activity.kind !== 'together') continue;
+          const fit = togetherFit(activity, character.datingStats);
+          activityFits.push({ activity, fit, tier: fitLabel(fit) });
+        }
+        activityFits.sort((a, b) => b.fit - a.fit);
 
         // Endgame state: memorialized (gone), broken up, or on the rocks.
         const memorial = isMemorialized(relationship);
@@ -273,9 +371,9 @@ export function CharacterProfile() {
               <aside className="prof-rail">
                 <div className="prof-rail-plate framed">
                   <Portrait character={character} memorial={memorial} className="prof-rail-img" />
-                  <div className="prof-rail-name">{character.name}</div>
-                  <div className="prof-rail-meta">
-                    {character.age} · {character.pronouns}
+                  <div className="prof-rail-identity">
+                    <div className="prof-rail-name">{character.name}</div>
+                    <div className="prof-rail-meta">{character.age} · {character.pronouns}</div>
                   </div>
                   <div className="prof-rail-badges">
                     {memorial ? (
@@ -287,7 +385,11 @@ export function CharacterProfile() {
                       </>
                     ) : (
                       <>
-                        <span className="badge accent">{relationshipStatus(relationship, t as unknown as TFn)}</span>
+                        <div className="prof-relationship-readout">
+                          <WarmthBridge value={warmth} maxValue={warmthMax} path={warmthPath} ariaLabel={warmthAria} />
+                          <div className="prof-warmth-stage">{warmthStage}</div>
+                          <div className="prof-warmth-summary">{warmthSummary}</div>
+                        </div>
                         {status !== 'none' && (
                           <span className="badge accent">
                             <Icon name="affection" size={13} /> {relationshipStatusLabel(status)}
@@ -298,18 +400,21 @@ export function CharacterProfile() {
                     )}
                   </div>
                   <div className="prof-rail-bars">
-                    <RelationshipBars relationship={relationship} />
+                    <RelationshipBars relationship={relationship} showIcons />
                   </div>
                   <div className="prof-rail-figs">
                     <div className="prof-rail-fig">
+                      <span className="prof-rail-fig-icon"><Icon name="messages" size={16} /></span>
                       <span className="prof-rail-fig-n">{convoCount}</span>
                       <span className="prof-rail-fig-l">{t('profile.chats')}</span>
                     </div>
                     <div className="prof-rail-fig">
+                      <span className="prof-rail-fig-icon"><Icon name="calendar" size={16} /></span>
                       <span className="prof-rail-fig-n">{dates}</span>
                       <span className="prof-rail-fig-l">{t('profile.dates')}</span>
                     </div>
                     <div className="prof-rail-fig">
+                      <span className="prof-rail-fig-icon"><Icon name="moments" size={16} /></span>
                       <span className="prof-rail-fig-n">{memories.length}</span>
                       <span className="prof-rail-fig-l">{t('profile.memoriesShort')}</span>
                     </div>
@@ -335,88 +440,117 @@ export function CharacterProfile() {
 
                 {/* ---- Tab: Overview ---- */}
                 <div className={panelClass('overview')}>
-                  <div className="card">
-                    <div className="section-head">
-                      <div className="titles">
-                        <span className="kicker">{t('profile.betweenYou')}</span>
-                        <h2>{t('profile.yourRelationship')}</h2>
-                      </div>
-                      <span className="trail" />
-                    </div>
-                    <div className="prof-gaugegrid">
-                      <RelationshipBars relationship={relationship} />
-                    </div>
-                    {(buffs.length > 0 || storyFlags.length > 0) && (
-                      <div className="prof-meta-row">
-                        {buffs.length > 0 && (
-                          <div>
-                            <div className="prof-subhead">{t('profile.activeBuffs')}</div>
-                            <div className="tags">
-                              {buffs.map((b) => (
-                                <span className={`badge prof-buff${b.delta < 0 ? ' down' : ''}`} key={b.stat}>
-                                  {b.delta >= 0 ? '+' : ''}
-                                  {b.delta} {datingStatLabel(b.stat)} <span className="left">{t('profile.buffLeft', { remaining: b.remaining })}</span>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {storyFlags.length > 0 && (
-                          <div className="prof-meta-story">
-                            <div className="prof-subhead">{t('profile.yourStory')}</div>
-                            <div className="prof-story">
-                              {storyFlags.map(([k, flag]) => (
-                                <div className="prof-story-entry" key={k}>
-                                  <span className="prof-story-tick" aria-hidden="true" />
-                                  <div className="prof-story-body">
-                                    <span className="prof-story-key">{flag.label}</span>
-                                    {flag.value !== null && (
-                                      <span className={`prof-story-text${/^\d+$/.test(flag.value) ? ' is-num' : ''}`}>
-                                        {flag.value}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="card">
-                    <div className="section-head">
-                      <div className="titles">
+                  <section className="prof-overview-hero">
+                    <div className="prof-overview-heading">
+                      <div>
                         <span className="kicker">{t('profile.howTheyDate')}</span>
-                        <h2>{t('profile.datingStats')}</h2>
+                        <h2>{t('profile.datingProfile')}</h2>
                       </div>
-                      <span className="trail" />
-                      {buffs.length > 0 && <span className="muted">{t('profile.withBuffs')}</span>}
+                      <p>{t('profile.datingProfileLede', { name: character.name })}</p>
                     </div>
-                    <div className="prof-gaugegrid">
-                      <DatingBars stats={effective} />
+                    <div className="prof-dating-cards">
+                      {DATING_STAT_KEYS.map((key) => {
+                        const activeBuff = buffs.find((buff) => buff.stat === key);
+                        let buffPrefix = '';
+                        let statClass = 'prof-dating-card';
+                        if (activeBuff && activeBuff.delta >= 0) buffPrefix = '+';
+                        if (activeBuff) statClass += ' is-buffed';
+                        if (activeBuff && activeBuff.delta < 0) statClass += ' is-down';
+                        return (
+                          <article className={statClass} key={key}>
+                            <div className="prof-dating-card-head">
+                              <span className="prof-dating-icon"><Icon name={DATING_STAT_ICONS[key]} size={19} /></span>
+                              <div className="prof-dating-title">
+                                <h3>{datingStatLabel(key)}</h3>
+                                <span className="prof-dating-value">{effective[key]}</span>
+                              </div>
+                            </div>
+                            <div className="prof-dating-track" role="meter" aria-label={t('profile.datingStatAria', { stat: datingStatLabel(key), value: effective[key] })} aria-valuemin={0} aria-valuemax={100} aria-valuenow={effective[key]}>
+                              <span style={{ width: `${effective[key]}%` }} />
+                            </div>
+                            <p>{datingStatDesc(key)}</p>
+                            {activeBuff && <div className="prof-dating-buff"><span>{buffPrefix}{activeBuff.delta}</span> · {t('profile.baseValue', { value: character.datingStats[key] })} · {t('profile.sessionsLeft', { count: activeBuff.remaining })}</div>}
+                          </article>
+                        );
+                      })}
                     </div>
+                  </section>
+
+                  <div className="prof-overview-dashboard">
+                    <section className="prof-overview-panel prof-radar-panel">
+                      <div className="prof-panel-heading">
+                        <span className="kicker">{t('profile.atAGlance')}</span>
+                        <h3>{t('profile.traitProfile')}</h3>
+                      </div>
+                      <DatingRadar stats={effective} ariaLabel={t('profile.datingRadarAria', { name: character.name })} />
+                    </section>
+
+                    <section className="prof-overview-panel prof-influence-panel">
+                      <div className="prof-panel-heading">
+                        <span className="kicker">{t('profile.inPlay')}</span>
+                        <h3>{t('profile.whatStatsInfluence')}</h3>
+                      </div>
+                      <div className="prof-influence-list">
+                        <div className="prof-influence-row">
+                          <span className="prof-influence-icon"><Icon name="together" size={18} /></span>
+                          <div><strong>{t('profile.togetherFitTitle')}</strong><p>{t('profile.togetherFitBody')}</p></div>
+                        </div>
+                        <div className="prof-influence-row">
+                          <span className="prof-influence-icon"><Icon name="games" size={18} /></span>
+                          <div><strong>{t('profile.favoriteGameTitle')}</strong><p>{t('profile.favoriteGameBody', { name: character.name, stat: datingStatLabel(strongestStat), game: minigameTitleLabel(favoriteGame) })}</p></div>
+                        </div>
+                        <div className="prof-influence-row">
+                          <span className="prof-influence-icon"><Icon name="messages" size={18} /></span>
+                          <div><strong>{t('profile.dateVoiceTitle')}</strong><p>{t('profile.dateVoiceBody')}</p></div>
+                        </div>
+                      </div>
+                    </section>
                   </div>
 
-                  {connections.length > 0 && (
-                    <div className="card">
-                      <div className="section-head">
-                        <div className="titles">
-                          <span className="kicker">{t('profile.theirWeb')}</span>
-                          <h2>{t('profile.connections')}</h2>
-                        </div>
-                        <span className="trail" />
+                  <section className="prof-overview-panel prof-activity-panel">
+                    <div className="prof-panel-heading prof-panel-heading-row">
+                      <div>
+                        <span className="kicker">{t('profile.realActivityFit')}</span>
+                        <h3>{t('profile.timeTogether')}</h3>
                       </div>
-                      <div className="prof-conns">
-                        {connections.map((l, i) => (
-                          <Link className="prof-conn" to={`/characters/${l.targetId}`} key={i}>
-                            <span className="prof-conn-kind">{characterLinkLabel(l.kind)}</span>
-                            <span className="prof-conn-name flex-fill">{nameOf(l.targetId)}</span>
-                            <Icon name="chevronRight" size={15} />
-                          </Link>
-                        ))}
-                      </div>
+                      <p>{t('profile.timeTogetherLede')}</p>
+                    </div>
+                    <div className="prof-activity-grid">
+                      {activityFits.map(({ activity, fit, tier }) => {
+                        let costLabel = t('profile.free');
+                        let statLabel = relationshipStatLabel('comfort');
+                        if ((activity.cost ?? 0) > 0) costLabel = t('profile.cost', { value: activity.cost });
+                        if (activity.relationshipStat) statLabel = relationshipStatLabel(activity.relationshipStat);
+                        return (
+                          <article className="prof-activity-card" key={activity.id}>
+                            <div className="prof-activity-top">
+                              <span className="prof-activity-icon" aria-hidden="true">{activity.icon}</span>
+                              <div><h4>{activity.label}</h4><span className={`prof-fit prof-fit-${tier}`}>{t(`profile.fit.${tier}`, { value: Math.round(fit) })}</span></div>
+                            </div>
+                            <p>{activity.description}</p>
+                            <div className="prof-activity-meta"><span>{t('profile.nurtures', { stat: statLabel })}</span><span>{costLabel}</span></div>
+                            <div className="prof-activity-traits">{activity.fitStats?.map((stat) => <span key={stat}>{datingStatLabel(stat)}</span>)}</div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+
+                  {(buffs.length > 0 || storyFlags.length > 0 || connections.length > 0) && (
+                    <div className="prof-overview-details">
+                      {(buffs.length > 0 || storyFlags.length > 0) && (
+                        <section className="prof-overview-panel">
+                          <div className="prof-panel-heading"><span className="kicker">{t('profile.betweenYou')}</span><h3>{t('profile.currentContext')}</h3></div>
+                          {buffs.length > 0 && <div className="prof-overview-buffs">{buffs.map((buff) => <span className="badge prof-buff" key={buff.stat}>{datingStatLabel(buff.stat)} {buff.delta} · {t('profile.sessionsLeft', { count: buff.remaining })}</span>)}</div>}
+                          {storyFlags.length > 0 && <div className="prof-story">{storyFlags.map(([key, flag]) => <div className="prof-story-entry" key={key}><span className="prof-story-tick" aria-hidden="true" /><div className="prof-story-body"><span className="prof-story-key">{flag.label}</span>{flag.value !== null && <span className="prof-story-text">{flag.value}</span>}</div></div>)}</div>}
+                        </section>
+                      )}
+                      {connections.length > 0 && (
+                        <section className="prof-overview-panel">
+                          <div className="prof-panel-heading"><span className="kicker">{t('profile.theirWeb')}</span><h3>{t('profile.connections')}</h3></div>
+                          <div className="prof-conns">{connections.map((link, index) => <Link className="prof-conn" to={`/characters/${link.targetId}`} key={index}><span className="prof-conn-kind">{characterLinkLabel(link.kind)}</span><span className="prof-conn-name flex-fill">{nameOf(link.targetId)}</span><Icon name="chevronRight" size={15} /></Link>)}</div>
+                        </section>
+                      )}
                     </div>
                   )}
                 </div>

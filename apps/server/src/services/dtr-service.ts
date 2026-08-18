@@ -12,7 +12,7 @@ import {
   type DtrResponse,
   type RelationshipStatus,
 } from '@dsim/shared';
-import { messagesRepo, sessionsRepo } from '../db/repositories';
+import { messagesRepo, sessionParticipantsRepo, sessionsRepo } from '../db/repositories';
 import { badRequest, notFound } from '../lib/errors';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { getCharacter } from './character-service';
@@ -25,6 +25,7 @@ import { rippleSocialVouch } from './social-ripple-service';
 import { evaluateRelationshipStrain, type StrainOutcome } from './breakup-service';
 import { settleForcedDateEnd } from './conversation-service';
 import { recordEvent } from './event-service';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { getLlmSettings } from './settings-service';
 import { ensureWorldState } from './world-clock-service';
 import { callStructuredLlm } from '../llm/structured';
@@ -63,17 +64,17 @@ export function assertNoDtrInFlight(sessionId: string): void {
  * if the structured call fails. Serialized per session (in-flight lock) so a
  * double-fire across the LLM await can't double-commit.
  */
-export async function attemptDtr(sessionId: string, signal?: AbortSignal): Promise<DtrResponse> {
+export async function attemptDtr(sessionId: string, signal?: AbortSignal, characterId?: string): Promise<DtrResponse> {
   assertNoDtrInFlight(sessionId);
   dtrInFlight.add(sessionId);
   try {
-    return await attemptDtrInner(sessionId, signal);
+    return await attemptDtrInner(sessionId, signal, characterId);
   } finally {
     dtrInFlight.delete(sessionId);
   }
 }
 
-async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise<DtrResponse> {
+async function attemptDtrInner(sessionId: string, signal?: AbortSignal, characterId?: string): Promise<DtrResponse> {
   const session = sessionsRepo.get(sessionId);
   if (!session) throw notFound(`Session ${sessionId} not found.`);
   if (session.ended) throw badRequest('This date has already ended.');
@@ -89,7 +90,13 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
     throw badRequest('Say something first before defining the relationship.');
   }
 
-  const character = getCharacter(session.characterId);
+  const targetId = characterId ?? session.characterId;
+  const participant = sessionParticipantsRepo.get(sessionId, targetId);
+  if (!participant || participant.state !== 'present') {
+    throw badRequest('Choose someone who is still at this date.');
+  }
+  const groupDate = sessionParticipantsRepo.listBySession(sessionId).length > 1;
+  const character = getCharacter(targetId);
   const relationship = getRelationship(character.id);
 
   // A broken-up relationship can ONLY come back through reconciliation (which
@@ -165,8 +172,8 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
         `💞 We became ${RELATIONSHIP_STATUS_LABELS[next.rung.status].toLowerCase()}.`,
         { bumpSession: false },
       );
-    } catch {
-      /* chronicle is best-effort */
+    } catch (error) {
+      reportOperationFailure('dtr_chronicle_save_failed', 'The relationship status changed, but its history entry could not be saved.', error, { sessionId, characterId: character.id, day });
     }
     setCooldown(); // don't climb multiple rungs in a single sitting
     if (character.worldId) {
@@ -177,8 +184,8 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
     recordEvent('dtr_accepted', { characterId: character.id, status: next.rung.status, day });
     try {
       rippleSocialVouch(character.id); // their friends warm to you, their rivals cool
-    } catch {
-      /* ripple is best-effort */
+    } catch (error) {
+      reportOperationFailure('dtr_social_ripple_failed', 'The relationship status changed, but its effect on mutual connections could not be completed.', error, { sessionId, characterId: character.id, day });
     }
   } else if (decision === 'backfire') {
     applyRelationshipChange(character.id, { tension: 12, comfort: -4 }, { source: 'dtr', detail: { decision } });
@@ -192,12 +199,12 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
     if (character.worldId) {
       try {
         strain = evaluateRelationshipStrain(character.id, { day, trigger: 'date', mode: session.mode });
-      } catch {
-        /* strain is best-effort */
+      } catch (error) {
+        reportOperationFailure('dtr_strain_update_failed', 'The conversation ended, but its relationship-strain update could not be completed.', error, { sessionId, characterId: character.id, day });
       }
     }
     // A bad ask blows up a real date (only dates reach here — see the guard above).
-    ended = isDateMode(session.mode);
+    ended = isDateMode(session.mode) && !groupDate;
   } else {
     setCooldown();
     recordEvent('dtr_deflected', { characterId: character.id });
@@ -209,6 +216,7 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
       id: newId('msg'),
       sessionId,
       role: 'character',
+      characterId: character.id,
       text: line.trim(),
       metadata: { dtr: decision },
       createdAt: now,
@@ -225,6 +233,7 @@ async function attemptDtrInner(sessionId: string, signal?: AbortSignal): Promise
 
   const relAfter = getRelationship(character.id);
   return {
+    characterId: character.id,
     decision,
     attempted: next.rung.status,
     status: currentStatus(relAfter),
