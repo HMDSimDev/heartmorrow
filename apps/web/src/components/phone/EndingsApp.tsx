@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Character, CharacterEnding } from '@dsim/shared';
 import { api } from '../../lib/api';
+import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { Portrait } from '../Portrait';
-import { Empty } from '../ui';
+import { Banner, Empty, Spinner } from '../ui';
 import './phone-keepsakes.css';
 
 /** The "happy endings" gallery — keepsake epilogues of relationships you've seen through. */
@@ -15,16 +16,26 @@ export function EndingsApp() {
   const { activeWorldId, dayTick } = useAppData();
   const [endings, setEndings] = useState<CharacterEnding[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(undefined);
     void Promise.all([api.listEndings(activeWorldId ?? undefined), api.listCharacters()])
       .then(([e, c]) => {
         if (cancelled) return;
         setEndings(e);
         setCharacters(c);
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (cancelled) return;
+        setError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -36,11 +47,14 @@ export function EndingsApp() {
     <div className="phone-app">
       <PhoneAppBar title={t('endings.title')} kicker={t('endings.kicker')} icon="endings" />
       <div className="end-shell">
-        {endings.length === 0 ? (
+        {loading && <Spinner />}
+        {!loading && error && <Banner kind="error">{error}</Banner>}
+        {!loading && !error && endings.length === 0 && (
           <Empty icon={<Icon name="trophy" size={36} />} title={t('endings.emptyTitle')}>
             <p className="muted">{t('endings.emptyBody')}</p>
           </Empty>
-        ) : (
+        )}
+        {!loading && !error && endings.length > 0 && (
           <>
             <div className="end-plate">
               {/* The app bar already says "Happy Endings" — repeating it here read

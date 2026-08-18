@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { ConversationCreateSchema, GiftOnDateSchema, SendMessageSchema } from '@dsim/shared';
+import { ConversationCreateSchema, GiftOnDateSchema, RelationshipCheckRecoveryRequestSchema, SendMessageSchema, isDateMode, type Message, type RelationshipCheckKey, type RelationshipCheckRecovery } from '@dsim/shared';
 import { parseInput } from '../lib/validate';
 import {
   addPlayerMessage,
+  advanceRelationshipCheck,
+  assertNoUnresolvedRelationshipCheck,
+  beginRelationshipChecks,
   attemptPlayerBreakupIntent,
   attemptPlayerFarewell,
   attemptWalkout,
@@ -13,7 +16,6 @@ import {
   generateReply,
   getSessionWithMessages,
   judgeTurn,
-  recordTurnReaction,
   listSessions,
   markDateResultSeen,
   maybeAutoSummarize,
@@ -21,6 +23,11 @@ import {
   openConversation,
   persistStreamedReply,
   previewSessionPrompt,
+  failRelationshipCheck,
+  relationshipCheckTerminalOutcome,
+  requireRelationshipCheckRecovery,
+  resolveRelationshipChecks,
+  skipRelationshipChecks,
   streamReply,
   summarizeSession,
 } from '../services/conversation-service';
@@ -29,6 +36,110 @@ import { giveGiftOnDate } from '../services/gift-service';
 import { docSchema } from '../lib/openapi-schema';
 import { withKeyedLock } from '../lib/keyed-lock';
 import { badRequest } from '../lib/errors';
+import { reportOperationFailure } from '../lib/operation-warning';
+
+type RelationshipCheckEventSender = (event: string, data: unknown) => void;
+type RelationshipCheckRunResult = { terminal: boolean; turnRead: Awaited<ReturnType<typeof judgeTurn>> };
+
+function sendRelationshipCheckState(send: RelationshipCheckEventSender, messageId: string, state: RelationshipCheckRecovery): void {
+  send('relationship_checks', { messageId, state });
+}
+
+function sendRelationshipTerminal(send: RelationshipCheckEventSender, outcome: NonNullable<ReturnType<typeof relationshipCheckTerminalOutcome>>): void {
+  if (outcome.kind === 'walkout') send('walkout', { message: outcome.message, reason: outcome.reason });
+  if (outcome.kind === 'breakup') send('breakup_intent', { message: outcome.message, reaction: outcome.reaction });
+  if (outcome.kind === 'farewell') send('farewell', { message: outcome.message, expression: outcome.expression });
+  if (outcome.kind === 'left') send('left', { message: outcome.message, reason: outcome.reason });
+}
+
+async function runRelationshipChecks(sessionId: string, playerMessage: Message, signal: AbortSignal, send: RelationshipCheckEventSender): Promise<RelationshipCheckRunResult> {
+  let { state } = requireRelationshipCheckRecovery(sessionId, playerMessage.id);
+  let turnRead: Awaited<ReturnType<typeof judgeTurn>> = null;
+  const existingTerminal = relationshipCheckTerminalOutcome(sessionId, playerMessage.id);
+  if (existingTerminal) {
+    state = resolveRelationshipChecks(playerMessage.id);
+    sendRelationshipCheckState(send, playerMessage.id, state);
+    sendRelationshipTerminal(send, existingTerminal);
+    return { terminal: true, turnRead };
+  }
+  while (state.next !== null) {
+    const key = state.next;
+    let reportedFailure: { code: string; error: unknown } | null = null;
+    const captureFailure = (code: string, error: unknown): void => { reportedFailure = { code, error }; };
+    try {
+      if (key === 'walkout') {
+        const walkout = await attemptWalkout(sessionId, playerMessage.text, signal, captureFailure, playerMessage.id);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, reportedFailure, send, turnRead);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (walkout) {
+          state = resolveRelationshipChecks(playerMessage.id);
+          sendRelationshipCheckState(send, playerMessage.id, state);
+          send('walkout', { message: walkout.message, reason: walkout.reason });
+          return { terminal: true, turnRead };
+        }
+        continue;
+      }
+      if (key === 'breakup') {
+        const breakupIntent = await attemptPlayerBreakupIntent(sessionId, playerMessage.text, signal, captureFailure, playerMessage.id);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, reportedFailure, send, turnRead);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (breakupIntent) {
+          state = resolveRelationshipChecks(playerMessage.id);
+          sendRelationshipCheckState(send, playerMessage.id, state);
+          send('breakup_intent', { message: breakupIntent.message, reaction: breakupIntent.reaction });
+          return { terminal: true, turnRead };
+        }
+        continue;
+      }
+      if (key === 'farewell') {
+        const farewell = await attemptPlayerFarewell(sessionId, playerMessage.text, signal, captureFailure, playerMessage.id);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, reportedFailure, send, turnRead);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (farewell) {
+          state = resolveRelationshipChecks(playerMessage.id);
+          sendRelationshipCheckState(send, playerMessage.id, state);
+          send('farewell', { message: farewell.message, expression: farewell.expression });
+          return { terminal: true, turnRead };
+        }
+        continue;
+      }
+      if (key === 'rapport') {
+        const freshMessage = requireRelationshipCheckRecovery(sessionId, playerMessage.id).message;
+        if (typeof freshMessage.metadata.engagement === 'number') {
+          state = advanceRelationshipCheck(playerMessage.id, key);
+          continue;
+        }
+        turnRead = await judgeTurn(sessionId, signal, captureFailure, playerMessage.id);
+        if (reportedFailure) return failRelationshipCheckRun(sessionId, playerMessage.id, key, reportedFailure, send, turnRead);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (turnRead) send('rapport', { label: turnRead.label, expression: turnRead.expression, rapport: turnRead.rapport, delta: turnRead.delta, engagement: turnRead.engagement, messageId: playerMessage.id });
+        continue;
+      }
+      if (key === 'lostInterest') {
+        const left = await maybeLeaveForLostInterest(sessionId, signal, playerMessage.id);
+        state = advanceRelationshipCheck(playerMessage.id, key);
+        if (left) {
+          state = resolveRelationshipChecks(playerMessage.id);
+          sendRelationshipCheckState(send, playerMessage.id, state);
+          send('left', { message: left.message, reason: left.reason });
+          return { terminal: true, turnRead };
+        }
+        continue;
+      }
+    } catch (error) {
+      return failRelationshipCheckRun(sessionId, playerMessage.id, key, { code: `${key}_check_failed`, error }, send, turnRead);
+    }
+  }
+  sendRelationshipCheckState(send, playerMessage.id, state);
+  return { terminal: false, turnRead };
+}
+
+function failRelationshipCheckRun(sessionId: string, messageId: string, key: RelationshipCheckKey, failure: { code: string; error: unknown }, send: RelationshipCheckEventSender, turnRead: Awaited<ReturnType<typeof judgeTurn>>): RelationshipCheckRunResult {
+  reportOperationFailure(failure.code, 'A relationship read failed during the date turn.', failure.error, { sessionId, messageId, check: key });
+  const state = failRelationshipCheck(messageId, key, failure.code);
+  sendRelationshipCheckState(send, messageId, state);
+  return { terminal: false, turnRead };
+}
 
 export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'Create a conversation session', body: ConversationCreateSchema }) }, async (req, reply) => {
@@ -38,9 +149,12 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     // first date the character breaks the ice, on a repeat date we lay down a short
     // third-person "venue flavor" beat. The line is persisted; the client loads it
     // via GET /conversations/:id.
-    await openConversation(session.id);
+    const opening = await openConversation(session.id);
+    let openingFailed = false;
+    if (input.mode !== 'chat' && !opening) openingFailed = true;
+    if (openingFailed) req.log.warn({ sessionId: session.id, characterId: session.characterId, mode: session.mode }, 'The model failed to generate the opening scene; the player will be asked to open the conversation.');
     reply.code(201);
-    return session;
+    return { ...session, openingFailed };
   });
 
   app.get('/conversations', { schema: docSchema({ tags: ['conversations'], summary: 'List conversation sessions' }) }, async () => listSessions());
@@ -120,83 +234,34 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
         // player turn no one is listening for.
         if (ac.signal.aborted) return;
 
-        const playerMessage = addPlayerMessage(id, text, intent);
+        let playerMessage = addPlayerMessage(id, text, intent);
+        if (isDateMode(session.mode)) playerMessage = beginRelationshipChecks(playerMessage.id);
         send('player', playerMessage);
 
-        // The character may end the date themselves over egregious behavior (rare).
-        try {
-          const walkout = await attemptWalkout(id, text, ac.signal);
-          if (walkout) {
-            send('walkout', { message: walkout.message, reason: walkout.reason });
-            return;
-          }
-        } catch {
-          /* walkout check is best-effort; fall through to a normal reply */
+        let turnRead: Awaited<ReturnType<typeof judgeTurn>> = null;
+        if (isDateMode(session.mode)) {
+          const relationshipChecks = await runRelationshipChecks(id, playerMessage, ac.signal, send);
+          if (relationshipChecks.terminal) return;
+          turnRead = relationshipChecks.turnRead;
         }
 
         // The player may be trying to break up. If so, surface the character's
         // reaction and ask the client to confirm — do NOT end the relationship yet.
-        try {
-          const breakupIntent = await attemptPlayerBreakupIntent(id, text, ac.signal);
-          if (breakupIntent) {
-            send('breakup_intent', { message: breakupIntent.message, reaction: breakupIntent.reaction });
-            return;
-          }
-        } catch {
-          /* breakup-intent check is best-effort; fall through to a normal reply */
-        }
 
         // The player may be winding the date down to a natural close ("I should get
         // going"). If so, voice the character's goodbye and tell the client to run the
         // normal end-and-evaluate flow — the date is scored in full, exactly as if the
         // player had clicked "End & evaluate". Best-effort: falls through on any miss.
-        try {
-          const farewell = await attemptPlayerFarewell(id, text, ac.signal);
-          if (farewell) {
-            send('farewell', { message: farewell.message, expression: farewell.expression });
-            return;
-          }
-        } catch {
-          /* farewell check is best-effort; fall through to a normal reply */
-        }
 
         // Judge how the player's LATEST message landed BEFORE writing the reply, so the
         // character's tone can honestly reflect it (no more "judge says dismissive while
         // the character gushes"). The live 'rapport' read is emitted up front — the
         // trajectory bar + portrait react during the typing indicator, then the reply
         // lands in that register. Best-effort: a failed/skipped read = no verdict this turn.
-        let turnRead: Awaited<ReturnType<typeof judgeTurn>> = null;
-        try {
-          turnRead = await judgeTurn(id, ac.signal);
-          if (turnRead) {
-            // Stamp the read onto the player's message so a resumed date keeps
-            // its reaction chip; the SSE copy drives the live render.
-            recordTurnReaction(playerMessage.id, turnRead.engagement);
-            send('rapport', {
-              label: turnRead.label,
-              expression: turnRead.expression,
-              rapport: turnRead.rapport,
-              delta: turnRead.delta,
-              engagement: turnRead.engagement,
-              messageId: playerMessage.id,
-            });
-          }
-        } catch {
-          /* rapport judging is best-effort; never block the turn */
-        }
 
         // If rapport has cratered (now INCLUDING this turn), the character loses interest
         // and ends the evening early (a soft exit, NOT a walkout) rather than replying —
         // so a final-straw message makes them leave instead of gamely replying. Real cost.
-        try {
-          const left = await maybeLeaveForLostInterest(id, ac.signal);
-          if (left) {
-            send('left', { message: left.message, reason: left.reason });
-            return;
-          }
-        } catch {
-          /* lost-interest check is best-effort; fall through to a normal reply */
-        }
 
         const { content, finishReason } = await streamReply(
           id,
@@ -228,6 +293,47 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     } finally {
       finish();
     }
+  });
+
+  app.post('/conversations/:id/relationship-checks/retry', { schema: docSchema({ tags: ['conversations'], summary: 'Retry interrupted relationship checks', body: RelationshipCheckRecoveryRequestSchema }) }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { messageId } = parseInput(RelationshipCheckRecoveryRequestSchema, req.body);
+    reply.hijack();
+    const raw = reply.raw;
+    raw.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
+    const send = (event: string, data: unknown): void => { raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    const ac = new AbortController();
+    let finished = false;
+    const onClose = (): void => { if (!finished) ac.abort(); };
+    raw.on('close', onClose);
+    const finish = (): void => { finished = true; raw.off('close', onClose); raw.end(); };
+    try {
+      await withKeyedLock(`conv-reply:${id}`, async () => {
+        const { session } = getSessionWithMessages(id);
+        if (session.ended) {
+          send('error', { message: 'This date has already ended.' });
+          return;
+        }
+        if (ac.signal.aborted) return;
+        const { message } = requireRelationshipCheckRecovery(id, messageId);
+        await runRelationshipChecks(id, message, ac.signal, send);
+      });
+    } catch (error) {
+      if (!ac.signal.aborted) send('error', { message: (error as Error).message || 'The relationship checks could not be retried.' });
+    } finally {
+      finish();
+    }
+  });
+
+  app.post('/conversations/:id/relationship-checks/skip', { schema: docSchema({ tags: ['conversations'], summary: 'Continue without interrupted relationship checks', body: RelationshipCheckRecoveryRequestSchema }) }, async (req) => {
+    const { id } = req.params as { id: string };
+    const { messageId } = parseInput(RelationshipCheckRecoveryRequestSchema, req.body);
+    return withKeyedLock(`conv-reply:${id}`, async () => {
+      const { session } = getSessionWithMessages(id);
+      if (session.ended) throw badRequest('This date has already ended.');
+      const state = skipRelationshipChecks(id, messageId);
+      return { messageId, state };
+    });
   });
 
   // Retry the character's reply via SSE when a prior turn saved the player's
@@ -403,7 +509,10 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
     // request would wait out the first and run a full second attempt instead of
     // being rejected as an overlap (see assertNoDtrInFlight).
     assertNoDtrInFlight(id);
-    return withKeyedLock(`conv-reply:${id}`, () => attemptDtr(id));
+    return withKeyedLock(`conv-reply:${id}`, () => {
+      assertNoUnresolvedRelationshipCheck(id, 'defining the relationship');
+      return attemptDtr(id);
+    });
   });
 
   // Give a held item to your date in-session — triggers a structured gift reaction.
@@ -414,7 +523,10 @@ export async function conversationRoutes(app: FastifyInstance): Promise<void> {
   app.post('/conversations/:id/gift', { schema: docSchema({ tags: ['conversations'], summary: 'Give a held item to your date', body: GiftOnDateSchema }) }, async (req) => {
     const { id } = req.params as { id: string };
     const { inventoryItemId } = parseInput(GiftOnDateSchema, req.body);
-    return withKeyedLock(`conv-reply:${id}`, () => giveGiftOnDate(id, inventoryItemId));
+    return withKeyedLock(`conv-reply:${id}`, () => {
+      assertNoUnresolvedRelationshipCheck(id, 'giving a gift');
+      return giveGiftOnDate(id, inventoryItemId);
+    });
   });
 
   // Confirm a player-initiated breakup (the client first sees the reaction via

@@ -292,6 +292,31 @@ export const SendMessageSchema = z.object({
 });
 export type SendMessage = z.infer<typeof SendMessageSchema>;
 
+export const RelationshipCheckKeySchema = z.enum(['walkout', 'breakup', 'farewell', 'rapport', 'lostInterest']);
+export type RelationshipCheckKey = z.infer<typeof RelationshipCheckKeySchema>;
+
+/** Durable progress for the ordered relationship reads attached to one player turn. */
+export const RelationshipCheckRecoverySchema = z.object({
+  version: z.literal(1),
+  next: RelationshipCheckKeySchema.nullable(),
+  failedCheck: RelationshipCheckKeySchema.nullable(),
+  failureCode: z.string().nullable(),
+  attempts: z.number().int().min(0),
+  skipped: z.boolean(),
+});
+export type RelationshipCheckRecovery = z.infer<typeof RelationshipCheckRecoverySchema>;
+
+export const RelationshipCheckRecoveryRequestSchema = z.object({
+  messageId: z.string().min(1),
+});
+export type RelationshipCheckRecoveryRequest = z.infer<typeof RelationshipCheckRecoveryRequestSchema>;
+
+export const RelationshipCheckRecoveryResponseSchema = z.object({
+  messageId: z.string().min(1),
+  state: RelationshipCheckRecoverySchema,
+});
+export type RelationshipCheckRecoveryResponse = z.infer<typeof RelationshipCheckRecoveryResponseSchema>;
+
 /**
  * The world's single live, in-progress date — surfaced so the client can RESUME it
  * after a navigation or refresh (the date lives server-side, not just in component
@@ -850,6 +875,13 @@ export const DateBestLineSchema = z.object({
 });
 export type DateBestLine = z.infer<typeof DateBestLineSchema>;
 
+/** A non-fatal failure: the primary action completed, but a named secondary system did not. */
+export const OperationWarningSchema = z.object({
+  code: z.string().min(1),
+  message: z.string().min(1),
+});
+export type OperationWarning = z.infer<typeof OperationWarningSchema>;
+
 export const EndSessionResponseSchema = z.object({
   session: ConversationSessionSchema,
   evaluated: z.boolean(),
@@ -875,6 +907,8 @@ export const EndSessionResponseSchema = z.object({
   ending: CharacterEndingSchema.nullable().default(null),
   /** The date's most striking judged player line, for the recap keepsake. */
   bestLine: DateBestLineSchema.nullable().default(null),
+  /** Non-fatal secondary failures that occurred while concluding the date. */
+  warnings: z.array(OperationWarningSchema).default([]),
 });
 export type EndSessionResponse = z.infer<typeof EndSessionResponseSchema>;
 
@@ -1136,6 +1170,8 @@ export const SleepResponseSchema = z.object({
    * client should skip the recap popup for a no-op.
    */
   advanced: z.boolean().default(true),
+  /** Non-fatal secondary failures that occurred after the new day was committed. */
+  warnings: z.array(OperationWarningSchema).default([]),
 });
 export type SleepResponse = z.infer<typeof SleepResponseSchema>;
 

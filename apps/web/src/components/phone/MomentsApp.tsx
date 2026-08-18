@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Character, Moment } from '@dsim/shared';
 import { api } from '../../lib/api';
+import { errorMessage } from '../../lib/hooks';
 import { useAppData } from '../../state/app-context';
 import { relativeTime } from '../../i18n/labels';
 import { Icon } from '../Icon';
 import { PhoneAppBar } from './PhoneAppBar';
 import { PortraitPicker } from '../PortraitPicker';
 import { Portrait } from '../Portrait';
-import { Empty, Spinner } from '../ui';
+import { Banner, Empty, Spinner } from '../ui';
 import './phone-keepsakes.css';
 
 const KIND_ICON: Record<Moment['kind'], string> = {
@@ -49,11 +50,16 @@ export function MomentsApp() {
   const [selected, setSelected] = useState<string | null>(null);
   const [moments, setMoments] = useState<Moment[]>([]);
   const [loading, setLoading] = useState(false);
+  const [charactersLoading, setCharactersLoading] = useState(true);
+  const [charactersError, setCharactersError] = useState<string>();
+  const [momentsError, setMomentsError] = useState<string>();
 
   useEffect(() => {
     // `live` drops a superseded world's response (mirrors the moments effect below)
     // so a fast world switch can't paint the previous world's cast + default pick.
     let live = true;
+    setCharactersLoading(true);
+    setCharactersError(undefined);
     void api
       .listCharacters()
       .then((cs) => {
@@ -63,7 +69,12 @@ export function MomentsApp() {
         setCharacters(inWorld);
         setSelected((cur) => (cur && inWorld.some((c) => c.id === cur) ? cur : inWorld[0]?.id ?? null));
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setCharactersError(errorMessage(cause));
+      })
+      .finally(() => {
+        if (live) setCharactersLoading(false);
+      });
     return () => {
       live = false;
     };
@@ -73,13 +84,20 @@ export function MomentsApp() {
   // mid-fetch can't leave A's moments showing under B. Re-keyed on dayTick so a
   // new day's beats appear.
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) {
+      setMoments([]);
+      setMomentsError(undefined);
+      return;
+    }
     let live = true;
     setLoading(true);
+    setMomentsError(undefined);
     void api
       .getMoments(selected)
       .then((m) => live && setMoments(m))
-      .catch(() => live && setMoments([]))
+      .catch((cause) => {
+        if (live) setMomentsError(errorMessage(cause));
+      })
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
@@ -87,6 +105,24 @@ export function MomentsApp() {
   }, [selected, dayTick]);
 
   const character = characters.find((c) => c.id === selected) ?? null;
+
+  if (charactersLoading) {
+    return (
+      <div className="phone-app">
+        <PhoneAppBar title={t('moments.title')} kicker={t('moments.kicker')} icon="moments" />
+        <div className="mom-shell"><Spinner /></div>
+      </div>
+    );
+  }
+
+  if (charactersError) {
+    return (
+      <div className="phone-app">
+        <PhoneAppBar title={t('moments.title')} kicker={t('moments.kicker')} icon="moments" />
+        <div className="mom-shell"><Banner kind="error">{charactersError}</Banner></div>
+      </div>
+    );
+  }
 
   if (characters.length === 0) {
     return (
@@ -134,13 +170,14 @@ export function MomentsApp() {
           </div>
         )}
 
-        {loading ? (
-          <Spinner />
-        ) : moments.length === 0 ? (
+        {loading && <Spinner />}
+        {!loading && momentsError && <Banner kind="error">{momentsError}</Banner>}
+        {!loading && !momentsError && moments.length === 0 && (
           <Empty icon={<Icon name="moments" size={36} />} title={t('moments.emptyTitle')}>
             <p className="muted">{t('moments.emptyBody')}</p>
           </Empty>
-        ) : (
+        )}
+        {!loading && !momentsError && moments.length > 0 && (
           <div className="mom-reel">
             {moments.map((m) => (
               <div className={`ph-rise mom-clip kind-${m.kind}`} key={m.id}>

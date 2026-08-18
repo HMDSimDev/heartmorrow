@@ -24,6 +24,7 @@ import { getDb } from '../db/index';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { badRequest } from '../lib/errors';
 import { withKeyedLock } from '../lib/keyed-lock';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { getCharacter, listAcquaintances, currentNpcPartners } from './character-service';
 import { readAssetFile } from './asset-service';
 import { getCharacterAvailability, currentAvailabilityFor, currentAvailabilityMap } from './availability-service';
@@ -532,7 +533,8 @@ export async function retryPlayerTextReply(
       try {
         const { buffer, mimeType } = readAssetFile(last.imageAssetId);
         imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
-      } catch {
+      } catch (error) {
+        reportOperationFailure('text_retry_image_read_failed', 'A text reply was retried, but its attached image could not be read.', error, { characterId, messageId: last.id, imageAssetId: last.imageAssetId });
         imageDataUrl = null; // the asset is gone — reply to the text alone
       }
     }
@@ -590,7 +592,8 @@ export async function regenerateTextReply(
       try {
         const { buffer, mimeType } = readAssetFile(prompting.imageAssetId);
         imageDataUrl = `data:${mimeType};base64,${buffer.toString('base64')}`;
-      } catch {
+      } catch (error) {
+        reportOperationFailure('text_regenerate_image_read_failed', 'A text reply was regenerated, but its attached image could not be read.', error, { characterId, messageId: prompting.id, imageAssetId: prompting.imageAssetId });
         imageDataUrl = null; // the asset is gone — reply to the text alone
       }
     }

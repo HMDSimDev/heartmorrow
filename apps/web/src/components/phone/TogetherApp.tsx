@@ -11,7 +11,7 @@ import { PhoneAppBar } from './PhoneAppBar';
 import { OnboardingSteps, shouldAutoOpenOnboarding, type OnboardingStep } from '../OnboardingSteps';
 import { PortraitPicker } from '../PortraitPicker';
 import { ResultCard, type ResultTone } from '../ResultCard';
-import { Banner } from '../ui';
+import { Banner, Spinner } from '../ui';
 import './phone-life.css';
 
 type TFn = (key: string, opts?: Record<string, unknown>) => string;
@@ -80,6 +80,8 @@ export function TogetherApp() {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<TogetherNote>();
   const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string>();
   const [onboardingOpen, setOnboardingOpen] = useState(false);
 
   // First open: the soft-ceiling rule is the game's most bug-shaped feature —
@@ -94,8 +96,25 @@ export function TogetherApp() {
   const onDate = !!activeDate;
 
   useEffect(() => {
-    api.listActivities().then(setActivities).catch(() => undefined);
-    api.listCharacters().then(setAllCharacters).catch(() => undefined);
+    let live = true;
+    setLoading(true);
+    setLoadError(undefined);
+    const load = async (): Promise<void> => {
+      try {
+        const [nextActivities, nextCharacters] = await Promise.all([api.listActivities(), api.listCharacters()]);
+        if (!live) return;
+        setActivities(nextActivities);
+        setAllCharacters(nextCharacters);
+      } catch (cause) {
+        if (live) setLoadError(errorMessage(cause));
+      } finally {
+        if (live) setLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      live = false;
+    };
   }, [dayTick]);
 
   // Time together happens in the active world, so only offer its characters.
@@ -108,6 +127,24 @@ export function TogetherApp() {
       setTarget(characters[0]!.id);
     }
   }, [characters, target]);
+
+  if (loading) {
+    return (
+      <div className="phone-app">
+        <PhoneAppBar title={t('together.title')} kicker={t('together.kicker')} icon="together" />
+        <div className="phone-embed pl-work-embed"><Spinner /></div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="phone-app">
+        <PhoneAppBar title={t('together.title')} kicker={t('together.kicker')} icon="together" />
+        <div className="phone-embed pl-work-embed"><Banner kind="error">{loadError}</Banner></div>
+      </div>
+    );
+  }
 
   const partner = characters.find((c) => c.id === target) ?? null;
   const together = activities.filter((a) => a.kind === 'together');

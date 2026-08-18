@@ -19,6 +19,7 @@ import type {
   Intent,
   ItemCategory,
   ItemRarity,
+  MinigameId,
   Phase,
   RelationshipStatus,
   RelationshipStyle,
@@ -36,6 +37,7 @@ import i18n from './index';
 // `i18n.t` is typed against the literal key catalog; these keys are dynamic, so
 // go through a string-typed view of it.
 const t = i18n.t as unknown as (key: string, opts?: Record<string, unknown>) => string;
+const MINIGAME_TITLE_KEYS: Record<MinigameId, string> = { memory_match: 'common:minigame.memoryMatch', timing_meter: 'common:minigame.timingMeter', lore_quiz: 'common:minigame.loreQuiz', sweet_and_sour: 'common:minigame.sweetAndSour', two_truths_a_lie: 'common:minigame.readBetween', rhythm_serenade: 'common:minigame.rhythmSerenade', lumberjack: 'common:minigame.woodlot', writer: 'common:minigame.copyDesk', flip: 'common:minigame.theFlip' };
 
 export const assetTypeLabel = (type: AssetType | string): string => t(`common:assetType.${type}`);
 export const assetUsageKindLabel = (kind: AssetUsageKind | string): string => t(`common:assetUsageKind.${kind}`);
@@ -73,6 +75,7 @@ export const expressionLabel = (e: string): string => t(`common:expression.${e}`
 export const venueTierLabel = (tier: number): string => t(`common:venueTier.${tier}`);
 export const worldNoteScopeLabel = (s: string): string => t(`common:worldNoteScope.${s}`);
 export const datingStatDesc = (k: DatingStatKey | string): string => t(`common:datingStatDesc.${k}`);
+export const minigameTitleLabel = (id: MinigameId): string => t(MINIGAME_TITLE_KEYS[id]);
 
 /** Localized counterpart of shared `guardednessDescriptor` (display only — the
  *  shared English version still feeds prompts). Mirrors its bucket thresholds. */

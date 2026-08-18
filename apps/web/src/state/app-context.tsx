@@ -5,6 +5,7 @@ import type { ActiveDate, Asset, EndpointMode, OutputLanguage, PlayerProfile, Sl
 import { deriveCalendar } from '@dsim/shared';
 import { api } from '../lib/api';
 import { idbGet, idbSet, idbDel } from '../lib/idb-kv';
+import { errorMessage } from '../lib/hooks';
 
 const ACTIVE_WORLD_KEY = 'dsim.activeWorldId';
 const CREATOR_KEY = 'dsim.creatorMode';
@@ -105,7 +106,7 @@ interface AppData {
   setTheme: (t: Theme) => void;
   /** Set (or clear, with null) the phone wallpaper from an image Blob/File. The
    *  Blob is persisted to IndexedDB and exposed as a blob: URL on `theme.wallpaper`. */
-  setWallpaper: (image: Blob | null) => void;
+  setWallpaper: (image: Blob | null) => Promise<void>;
   // Phone: unread incoming TEXTS (not emails), for the sidebar badge
   unreadTexts: number;
   refreshInbox: () => Promise<void>;
@@ -122,6 +123,8 @@ interface AppData {
    *  failed). The wake loop below is already retrying — UI should read this as
    *  "the emptiness is temporary", never as an empty save. */
   serverWaking: boolean;
+  /** A nonfatal app-data refresh or browser-persistence failure that needs the player's attention. */
+  syncWarning: string | null;
   /** Live status of the main language-model endpoint. Checked automatically at
    *  launch and refreshed whenever the connection settings are saved. */
   modelConnectionStatus: ModelConnectionStatus;
@@ -157,6 +160,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [modelConnectionMessage, setModelConnectionMessage] = useState<string | null>(null);
   const [modelProviderMode, setModelProviderMode] = useState<EndpointMode>('chat_completions');
   const modelCheckRef = useRef<Promise<ModelConnectionStatus> | null>(null);
+  const [syncFailures, setSyncFailures] = useState<Record<string, string>>({});
+  const clearSyncFailure = useCallback((key: string): void => {
+    setSyncFailures((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  }, []);
+  const reportSyncFailure = useCallback((key: string, cause: unknown): void => {
+    setSyncFailures((current) => ({ ...current, [key]: errorMessage(cause) }));
+  }, []);
 
   // The world the app is CURRENTLY on, readable synchronously by async callbacks.
   // Every world-keyed refresh below captures activeWorldId at call time and drops
@@ -174,18 +189,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       // The player profile (money + persona) is per-world; fetch the active world's.
       const p = await api.getPlayer(forWorld ?? undefined);
-      if (worldRef.current === forWorld) setPlayer(p);
-    } catch {
-      /* server may not be up yet */
+      if (worldRef.current === forWorld) {
+        setPlayer(p);
+        clearSyncFailure('player');
+      }
+    } catch (cause) {
+      if (worldRef.current === forWorld) reportSyncFailure('player', cause);
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
   const reloadAssets = useCallback(async () => {
     try {
       setAssets(await api.listAssets());
-    } catch {
-      /* ignore */
+      clearSyncFailure('assets');
+    } catch (cause) {
+      reportSyncFailure('assets', cause);
     }
-  }, []);
+  }, [clearSyncFailure, reportSyncFailure]);
   const reloadWorlds = useCallback(async () => {
     try {
       setWorlds(await api.listWorlds());
@@ -202,11 +221,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const forWorld = activeWorldId;
     try {
       const inbox = await api.phoneInbox(forWorld ?? undefined);
-      if (worldRef.current === forWorld) setUnreadTexts(inbox.unreadTexts);
-    } catch {
-      /* server may not be up yet */
+      if (worldRef.current === forWorld) {
+        setUnreadTexts(inbox.unreadTexts);
+        clearSyncFailure('inbox');
+      }
+    } catch (cause) {
+      if (worldRef.current === forWorld) reportSyncFailure('inbox', cause);
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
   // The active world's in-progress date, the single source of truth for resume +
   // action-locking. Refetched on world change; the Date page also drives explicit
   // refreshes as a date starts and ends.
@@ -215,6 +237,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     if (!forWorld) {
       setActiveDate(null);
       setActiveDateLoaded(true);
+      clearSyncFailure('activeDate');
       return null;
     }
     try {
@@ -223,14 +246,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // Work/Minigames locks and the Date-tab auto-resume — drop it hard.
       if (worldRef.current !== forWorld) return null;
       setActiveDate(date);
+      clearSyncFailure('activeDate');
       return date;
-    } catch {
-      /* leave the last-known value on a transient error */
+    } catch (cause) {
+      if (worldRef.current === forWorld) reportSyncFailure('activeDate', cause);
       return null;
     } finally {
       if (worldRef.current === forWorld) setActiveDateLoaded(true);
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
 
   useEffect(() => {
     void reloadPlayer();
@@ -309,15 +333,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const forWorld = activeWorldId;
     if (!forWorld) {
       setWorldState(null);
+      clearSyncFailure('worldState');
       return;
     }
     try {
       const state = await api.getWorldState(forWorld);
-      if (worldRef.current === forWorld) setWorldState(state);
-    } catch {
-      if (worldRef.current === forWorld) setWorldState(null);
+      if (worldRef.current === forWorld) {
+        setWorldState(state);
+        clearSyncFailure('worldState');
+      }
+    } catch (cause) {
+      if (worldRef.current === forWorld) {
+        setWorldState(null);
+        reportSyncFailure('worldState', cause);
+      }
     }
-  }, [activeWorldId]);
+  }, [activeWorldId, clearSyncFailure, reportSyncFailure]);
 
   useEffect(() => {
     void refreshWorldState();
@@ -412,11 +443,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         THEME_KEY,
         JSON.stringify({ accent: t.accent, accent2: t.accent2, wallpaperFit: t.wallpaperFit }),
       );
-    } catch {
-      /* ignore */
+      clearSyncFailure('theme');
+    } catch (cause) {
+      reportSyncFailure('theme', cause);
     }
     setThemeState(t);
-  }, []);
+  }, [clearSyncFailure, reportSyncFailure]);
 
   // The live blob: object URL for the wallpaper, tracked so we revoke the old one
   // when it's replaced (object URLs leak until revoked).
@@ -429,12 +461,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setWallpaper = useCallback(
-    (image: Blob | null) => {
-      if (image) void idbSet(WALLPAPER_IDB_KEY, image).catch(() => undefined);
-      else void idbDel(WALLPAPER_IDB_KEY).catch(() => undefined);
+    async (image: Blob | null): Promise<void> => {
+      if (image) await idbSet(WALLPAPER_IDB_KEY, image);
+      else await idbDel(WALLPAPER_IDB_KEY);
+      clearSyncFailure('wallpaper');
       applyWallpaperBlob(image);
     },
-    [applyWallpaperBlob],
+    [applyWallpaperBlob, clearSyncFailure],
   );
 
   // Hydrate the wallpaper Blob from IndexedDB after mount (it's too big for the
@@ -458,8 +491,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             }),
           );
         }
-      } catch {
-        /* ignore */
+        if (!cancelled) clearSyncFailure('wallpaperMigration');
+      } catch (cause) {
+        reportSyncFailure('wallpaperMigration', cause);
       }
       try {
         let stored = await idbGet<Blob | string>(WALLPAPER_IDB_KEY);
@@ -480,14 +514,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             return { ...cur, wallpaper: url };
           });
         }
-      } catch {
-        /* ignore */
+        if (!cancelled) clearSyncFailure('wallpaper');
+      } catch (cause) {
+        reportSyncFailure('wallpaper', cause);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [clearSyncFailure, reportSyncFailure]);
 
   // Apply theme to CSS variables.
   useEffect(() => {
@@ -527,19 +562,25 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     if (!activeWorldId) {
       delete root.dataset.weather;
+      clearSyncFailure('weather');
       return;
     }
     let cancelled = false;
     void api
       .worldWeather(activeWorldId)
       .then((w) => {
-        if (!cancelled) root.dataset.weather = w.today.kind;
+        if (!cancelled) {
+          root.dataset.weather = w.today.kind;
+          clearSyncFailure('weather');
+        }
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (!cancelled) reportSyncFailure('weather', cause);
+      });
     return () => {
       cancelled = true;
     };
-  }, [activeWorldId, worldState?.day]);
+  }, [activeWorldId, worldState?.day, clearSyncFailure, reportSyncFailure]);
 
   const resetProgress = useCallback(async () => {
     await api.resetData();
@@ -557,6 +598,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   // Unreachable = the latest world-list fetch failed; the wake loop is retrying.
   const serverWaking = worldsLoaded && !worldsFetchedOk;
+  const syncWarning = Object.values(syncFailures)[0] ?? null;
 
   const value = useMemo<AppData>(
     () => ({
@@ -590,13 +632,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       activeDateLoaded,
       refreshActiveDate,
       serverWaking,
+      syncWarning,
       modelConnectionStatus,
       modelConnectionMessage,
       modelProviderMode,
       checkModelConnection,
       resetProgress,
     }),
-    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, serverWaking, modelConnectionStatus, modelConnectionMessage, modelProviderMode, checkModelConnection, resetProgress],
+    [player, assets, assetById, reloadPlayer, reloadAssets, worlds, worldsLoaded, activeWorldId, activeWorld, worldState, dayTick, setActiveWorld, reloadWorlds, refreshWorldState, sleep, creatorMode, setCreatorMode, advancedMode, setAdvancedMode, outputLanguage, setOutputLanguage, theme, setTheme, setWallpaper, unreadTexts, refreshInbox, activeDate, activeDateLoaded, refreshActiveDate, serverWaking, syncWarning, modelConnectionStatus, modelConnectionMessage, modelProviderMode, checkModelConnection, resetProgress],
   );
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

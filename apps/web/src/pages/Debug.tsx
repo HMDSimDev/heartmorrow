@@ -56,7 +56,7 @@ export function Debug() {
   };
 
   useEffect(() => {
-    void api.listCharacters().then(setCharacters).catch(() => undefined);
+    void api.listCharacters().then(setCharacters).catch((cause) => setError(errorMessage(cause)));
     void loadEvents();
   }, []);
 

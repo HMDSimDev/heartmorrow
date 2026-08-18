@@ -722,7 +722,7 @@ textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
 /* --- Stat bars — segmented HUD gauges ------------------------------------ */
 .statbar { margin-bottom: 11px; }
 .statbar .label { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 4px; }
-.statbar .label > span:first-child { color: var(--text-dim); }
+.statbar .label-text { color: var(--text-dim); }
 .statbar .label .v { color: var(--text); font-weight: 700; position: relative; font-family: var(--font-mono); }
 .statbar .track {
   height: 9px; border-radius: 3px; background: var(--ink-2); overflow: hidden;
@@ -1921,6 +1921,13 @@ select {
   border-radius: 50%;
   background: var(--moon);
   animation: server-waking-pulse 1.4s ease-in-out infinite;
+}
+.server-waking.is-error {
+  border-color: color-mix(in srgb, var(--bad) 55%, transparent);
+  color: var(--bad);
+}
+.server-waking.is-error .server-waking-dot {
+  background: var(--bad);
 }
 @keyframes server-waking-pulse {
   0%, 100% { opacity: 0.35; transform: scale(0.85); }

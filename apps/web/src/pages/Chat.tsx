@@ -3,12 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   RELATIONSHIP_STAT_KEYS,
+  RelationshipCheckRecoverySchema,
   currentStatus,
   isBrokenUp,
   isOnTheRocks,
   nextDtrRung,
   DTR_COOLDOWN_DAYS,
   warmthBand,
+  warmthOf,
+  mutualAttraction,
+  incompatibleWarmthCap,
+  INCOMPATIBLE_MAX_BAND,
   bandIndex,
   deriveCalendar,
   PHASE_ICONS,
@@ -31,19 +36,22 @@ import {
   type EndSessionResponse,
   type Message,
   type Relationship,
+  type RelationshipCheckRecovery,
   type RelationshipStatKey,
   type World,
   type PropertyView,
   type ActiveDate,
 } from '@dsim/shared';
-import { api, streamChat, streamRetry, streamRegenerate, assetUrl } from '../lib/api';
-import { errorMessage } from '../lib/hooks';
+import { api, streamChat, streamRelationshipChecks, streamRetry, streamRegenerate, assetUrl, type StreamHandlers } from '../lib/api';
+import { useAsync, errorMessage } from '../lib/hooks';
+import { loadWorldPlayer } from '../lib/world-player';
 import { useAppData } from '../state/app-context';
-import { intentLabel, intentTip, phaseLabel, relationshipStatusLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
+import { intentLabel, intentTip, phaseLabel, relationshipStatusLabel, seasonLabel, warmthBandLabel, weekdayLabel } from '../i18n/labels';
 import { Portrait } from '../components/Portrait';
 import { DateOnboarding, DATE_ONBOARDING_KEY } from '../components/DateOnboarding';
 import { shouldAutoOpenOnboarding } from '../components/OnboardingSteps';
 import { Icon } from '../components/Icon';
+import { WarmthBridge, type WarmthBridgePath } from '../components/WarmthBridge';
 import { RelationshipBars } from '../components/StatBars';
 import { RichLine } from '../components/RichText';
 import { Banner, Empty, Field, Spinner } from '../components/ui';
@@ -62,6 +70,38 @@ import './date.page.css';
  */
 /** Single-slot unsent-message draft (one live date at a time). */
 const DATE_DRAFT_KEY = 'dsim.dateDraft';
+
+type PendingRelationshipRecovery = { messageId: string; state: RelationshipCheckRecovery };
+
+function pendingRelationshipRecovery(messages: Message[]): PendingRelationshipRecovery | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]!;
+    if (message.role !== 'player') continue;
+    const parsed = RelationshipCheckRecoverySchema.safeParse(message.metadata?.relationshipChecks);
+    if (!parsed.success || parsed.data.next === null) return null;
+    return { messageId: message.id, state: parsed.data };
+  }
+  return null;
+}
+
+function replaceRelationshipCheckState(messages: Message[], messageId: string, state: RelationshipCheckRecovery): Message[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) return message;
+    return { ...message, metadata: { ...message.metadata, relationshipChecks: state } };
+  });
+}
+
+function appendMessageOnce(messages: Message[], message: Message): Message[] {
+  if (messages.some((candidate) => candidate.id === message.id)) return messages;
+  return [...messages, message];
+}
+
+function replaceMessageEngagement(messages: Message[], messageId: string, engagement: number): Message[] {
+  return messages.map((message) => {
+    if (message.id !== messageId) return message;
+    return { ...message, metadata: { ...message.metadata, engagement } };
+  });
+}
 
 /** Reaction-chip copy, indexed by judged engagement + 3 (−3 … +3). */
 const REACTION_KEYS = [
@@ -165,6 +205,7 @@ export function Chat() {
 
   const [session, setSession] = useState<ConversationSession | null>(null);
   const [character, setCharacter] = useState<Character | null>(null);
+  const dateWorldPlayer = useAsync(() => loadWorldPlayer(character?.worldId), [character?.worldId]);
   const [relationship, setRelationship] = useState<Relationship | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -203,6 +244,7 @@ export function Chat() {
   const [leftEarly, setLeftEarly] = useState(false);
   // The player typed something that read as a breakup — awaiting their confirm.
   const [breakupPending, setBreakupPending] = useState<{ reaction: 'accept' | 'hurt' | 'plead' } | null>(null);
+  const [relationshipRetrying, setRelationshipRetrying] = useState(false);
   const [brokeUp, setBrokeUp] = useState(false);
   // A resumed transcript ended on a walkout/leave/farewell line the live SSE
   // handlers never got to act on (tab closed mid-turn) — conclude the date as
@@ -272,7 +314,7 @@ export function Chat() {
       if (input.trim()) localStorage.setItem(DATE_DRAFT_KEY, JSON.stringify({ sessionId: session.id, text: input }));
       else localStorage.removeItem(DATE_DRAFT_KEY);
     } catch {
-      /* storage full — losing a draft is acceptable */
+      setNotice(t('chat.draftNotSaved'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, session?.id]);
@@ -294,7 +336,9 @@ export function Chat() {
         for (const a of list) map[a.characterId] = { available: a.available, reason: a.reason };
         setAvailability((prev) => ({ ...prev, ...map }));
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -355,8 +399,11 @@ export function Chat() {
         } else {
           setSetupMoney(null);
         }
-      } catch {
-        if (live) setSetupWorld(null);
+      } catch (cause) {
+        if (live) {
+          setSetupWorld(null);
+          setError(errorMessage(cause));
+        }
       }
     })();
     // Their private room unlocks once you're "getting close". Fetching it also
@@ -367,9 +414,13 @@ export function Chat() {
         if (!live) return;
         const unlocked = bandIndex(warmthBand(rel)) >= bandIndex('getting-close');
         setRoomUnlocked(unlocked);
-        if (unlocked) void api.getRoom(cid).catch(() => undefined);
+        if (unlocked) void api.getRoom(cid).catch((cause) => { if (live) setError(errorMessage(cause)); });
       })
-      .catch(() => live && setRoomUnlocked(false));
+      .catch((cause) => {
+        if (!live) return;
+        setRoomUnlocked(false);
+        setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -398,7 +449,9 @@ export function Chat() {
           mood: m?.mood ?? null,
         });
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -573,8 +626,8 @@ export function Chat() {
         setEvalResult(result);
         setMilestone(result.milestone ?? null);
         if (result.expression) setExpression(result.expression);
-      } catch {
-        /* replay is best-effort — the plan-a-date screen is a fine fallback */
+      } catch (cause) {
+        if (live) setError(errorMessage(cause));
       }
     })();
     return () => {
@@ -613,6 +666,7 @@ export function Chat() {
       });
       setSession(created);
       setCharacter(c);
+      if (created.openingFailed) setError(t('chat.openingSceneFailed'));
       // A date is now open server-side — engage the world's "date underway" lock
       // (Sleep / Work / Minigames) and light the Date-tab badge.
       void refreshActiveDate();
@@ -622,8 +676,10 @@ export function Chat() {
       try {
         const sm = await api.getConversation(created.id);
         setMessages(sm.messages);
-      } catch {
+        if (sm.messages.length === 0 && !created.openingFailed) setError(t('chat.openingSceneFailed'));
+      } catch (e) {
         setMessages([]);
+        setError(t('chat.openingSceneLoadFailed', { error: errorMessage(e) }));
       }
       setExpression(null);
       // Load the at-a-glance scene context (time/weather/mood) for this character's world.
@@ -649,6 +705,11 @@ export function Chat() {
     }
   };
 
+  const receiveRelationshipCheckState = (messageId: string, state: RelationshipCheckRecovery): void => {
+    setMessages((current) => replaceRelationshipCheckState(current, messageId, state));
+    if (state.failedCheck !== null) setError(t('chat.relationshipRetryFailed'));
+  };
+
   // `resend` carries a preserved payload for a retry; a normal send reads the live
   // composer. `playerPersisted` tracks whether the server saved the player turn
   // (the `player` event fired) so a failure can pick the right recovery: regenerate
@@ -656,6 +717,7 @@ export function Chat() {
   const send = async (resend?: { text: string; intent?: Intent }) => {
     const text = (resend?.text ?? input).trim();
     if (!text || !session || streaming.active || busy) return;
+    if (pendingRelationshipRecovery(messages)) return;
     const chosenIntent = resend ? resend.intent : intent ?? undefined;
     if (!resend) {
       setInput('');
@@ -705,14 +767,14 @@ export function Chat() {
             // end-and-evaluate flow so the blown-up date is scored in full (stamina,
             // deltas, memories, milestones) — same as a deliberately-ended date.
             settled = true;
-            setMessages((prev) => [...prev, m]);
+            setMessages((prev) => appendMessageOnce(prev, m));
             setStreaming({ active: false, text: '' });
             setWalkout(reason || t('chat.walkoutDefault'));
             void endDate();
           },
           onBreakupIntent: (m, reaction) => {
             settled = true;
-            setMessages((prev) => [...prev, m]);
+            setMessages((prev) => appendMessageOnce(prev, m));
             setStreaming({ active: false, text: '' });
             setBreakupPending({ reaction });
           },
@@ -733,7 +795,7 @@ export function Chat() {
             // moment, then run the normal end-and-evaluate flow so the flat date is
             // scored in full (stamina, deltas, memories) like any ended date.
             settled = true;
-            setMessages((prev) => [...prev, m]);
+            setMessages((prev) => appendMessageOnce(prev, m));
             setStreaming({ active: false, text: '' });
             setLeftEarly(true);
             setVibe(null);
@@ -744,11 +806,12 @@ export function Chat() {
             // character's send-off, then run the normal end-and-evaluate flow so the
             // date is scored in full — no need to click "End & evaluate".
             settled = true;
-            setMessages((prev) => [...prev, m]);
+            setMessages((prev) => appendMessageOnce(prev, m));
             setStreaming({ active: false, text: '' });
             if (expr) setExpression(expr);
             void endDate();
           },
+          onRelationshipChecks: receiveRelationshipCheckState,
         },
         controller.signal,
         chosenIntent,
@@ -767,6 +830,83 @@ export function Chat() {
         setFailed(recover());
       }
       setStreaming({ active: false, text: '' });
+    }
+  };
+
+  const retryRelationshipEffects = async (recovery: PendingRelationshipRecovery): Promise<void> => {
+    if (!session || streaming.active || busy || relationshipRetrying) return;
+    setRelationshipRetrying(true);
+    setError(undefined);
+    setNotice(undefined);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let completed = false;
+    let terminal = false;
+    let failedAgain = false;
+    function handleState(messageId: string, state: RelationshipCheckRecovery): void {
+      receiveRelationshipCheckState(messageId, state);
+      if (state.failedCheck !== null) failedAgain = true;
+      if (state.next === null) completed = true;
+    }
+    function handleRapport(label: string, expr: string, rap: number, delta: number, engagement?: number, messageId?: string): void {
+      setVibe(label);
+      if (expr) setExpression(expr);
+      setRapport(rap);
+      if (delta) setRapportPulse((current) => ({ delta, key: (current?.key ?? 0) + 1 }));
+      if (engagement !== undefined && messageId) setMessages((current) => replaceMessageEngagement(current, messageId, engagement));
+    }
+    function handleWalkout(message: Message, reason: string): void {
+      terminal = true;
+      setMessages((current) => appendMessageOnce(current, message));
+      setWalkout(reason || t('chat.walkoutDefault'));
+      void endDate();
+    }
+    function handleBreakup(message: Message, reaction: 'accept' | 'hurt' | 'plead'): void {
+      terminal = true;
+      setMessages((current) => appendMessageOnce(current, message));
+      setBreakupPending({ reaction });
+    }
+    function handleFarewell(message: Message, expr?: string): void {
+      terminal = true;
+      setMessages((current) => appendMessageOnce(current, message));
+      if (expr) setExpression(expr);
+      void endDate();
+    }
+    function handleLeft(message: Message): void {
+      terminal = true;
+      setMessages((current) => appendMessageOnce(current, message));
+      setLeftEarly(true);
+      setVibe(null);
+      void endDate();
+    }
+    function handleError(message: string): void {
+      failedAgain = true;
+      setError(message);
+    }
+    const handlers: StreamHandlers = { onRelationshipChecks: handleState, onRapport: handleRapport, onWalkout: handleWalkout, onBreakupIntent: handleBreakup, onFarewell: handleFarewell, onLeft: handleLeft, onError: handleError };
+    try {
+      await streamRelationshipChecks(session.id, recovery.messageId, handlers, controller.signal);
+      if (completed && !terminal && !failedAgain) setNotice(t('chat.relationshipRecovered'));
+      if (!completed && !terminal && !failedAgain && !controller.signal.aborted) setError(t('chat.relationshipRetryDropped'));
+    } catch (cause) {
+      if (!controller.signal.aborted) setError(errorMessage(cause));
+    } finally {
+      setRelationshipRetrying(false);
+    }
+  };
+
+  const continueWithoutRelationshipEffects = async (recovery: PendingRelationshipRecovery): Promise<void> => {
+    if (!session || streaming.active || busy || relationshipRetrying) return;
+    setRelationshipRetrying(true);
+    setError(undefined);
+    try {
+      const result = await api.skipRelationshipChecks(session.id, recovery.messageId);
+      receiveRelationshipCheckState(result.messageId, result.state);
+      setNotice(t('chat.relationshipSkipped'));
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setRelationshipRetrying(false);
     }
   };
 
@@ -796,8 +936,9 @@ export function Chat() {
         } else {
           action = 'send'; // genuinely not saved → resend
         }
-      } catch {
+      } catch (cause) {
         action = 'abort'; // couldn't verify — keep the retry, don't risk a dup
+        setError(t('chat.retryCheckFailed', { error: errorMessage(cause) }));
       } finally {
         setBusy(false);
       }
@@ -869,7 +1010,7 @@ export function Chat() {
         .then((sm) => {
           if (sessionIdRef.current === sid) setMessages(sm.messages);
         })
-        .catch(() => undefined); // keep the optimistic view — the retry affordance still recovers
+        .catch((cause) => setError(errorMessage(cause)));
     setError(undefined);
     setNotice(undefined);
     setFailed(null);
@@ -1093,7 +1234,7 @@ export function Chat() {
       // one arrived, and deferring the ack to a button the player may never press
       // made the recap replay on Date-tab visits for days afterwards.
       seenResultsRef.current.add(sid);
-      void api.markDateResultSeen(sid).catch(() => undefined);
+      void api.markDateResultSeen(sid).catch((cause) => setNotice(t('chat.recapAckFailed', { error: errorMessage(cause) })));
       if (result.relationship) {
         // Surface the date's net change as floating chips, then clear them so the
         // animation can replay on the next date.
@@ -1425,6 +1566,27 @@ export function Chat() {
   const hangout = session.mode === 'hangout';
   const status = relationship ? currentStatus(relationship) : 'none';
   const rung = relationship ? nextDtrRung(relationship) : null;
+  let relationshipWarmthPath: WarmthBridgePath = 'romance';
+  let relationshipWarmthMax = 100;
+  if (character && dateWorldPlayer.data && dateWorldPlayer.data.worldId === character.worldId) {
+    const compatibility = mutualAttraction({ gender: dateWorldPlayer.data.profile.gender, sexuality: dateWorldPlayer.data.profile.sexuality }, { gender: character.gender, sexuality: character.sexuality });
+    if (!compatibility.mutual) {
+      relationshipWarmthPath = 'friendship';
+      relationshipWarmthMax = incompatibleWarmthCap();
+    }
+  }
+  let relationshipWarmth = 0;
+  let relationshipWarmthDisplay = 0;
+  let relationshipWarmthStage = '';
+  let relationshipWarmthAria = '';
+  if (relationship) {
+    relationshipWarmth = Math.max(0, Math.min(100, warmthOf(relationship)));
+    relationshipWarmthDisplay = Number(Math.min(relationshipWarmth, relationshipWarmthMax).toFixed(1));
+    let relationshipWarmthStageKey = warmthBand(relationship);
+    if (relationshipWarmthPath === 'friendship' && relationshipWarmth > relationshipWarmthMax) relationshipWarmthStageKey = INCOMPATIBLE_MAX_BAND;
+    relationshipWarmthStage = warmthBandLabel(relationshipWarmthStageKey);
+    relationshipWarmthAria = t('profile.warmthAria', { value: relationshipWarmthDisplay, max: relationshipWarmthMax, stage: relationshipWarmthStage });
+  }
   const spokeThisSession = messages.some((m) => m.role === 'player');
   // The server enforces a same-day cooldown after any DTR attempt (a deflect sets
   // `dtr:lastAttemptDay`). Mirror it here so the commit button hides instead of staying
@@ -1436,6 +1598,10 @@ export function Chat() {
   // The date is over (evaluated or any terminal path) → no more composing, and the
   // actions collapse to "New date". Mirrors dateConcluded so the lock clears in step.
   const locked = !!evalResult || !!walkout || leftEarly || !!dtrOutcome?.ended || brokeUp;
+  const relationshipRecovery = pendingRelationshipRecovery(messages);
+  const relationshipRecoveryVisible = relationshipRecovery !== null && !streaming.active;
+  let relationshipRecoveryClassName = 'relationship-recovery';
+  if (relationshipRetrying) relationshipRecoveryClassName += ' is-retrying';
   // The id of the trailing character reply, when it's a plain line the player may
   // regenerate (not a consequence-bearing walkout/farewell/etc, and not mid-stream
   // or mid-recovery). Drives the small "rewrite this reply" button on that bubble.
@@ -1456,7 +1622,8 @@ export function Chat() {
     !streaming.active &&
     !busy &&
     !failed &&
-    !breakupPending
+    !breakupPending &&
+    !relationshipRecovery
       ? lastMsg.id
       : null;
   const locationName = session.locationId
@@ -1637,6 +1804,7 @@ export function Chat() {
     <div className="stack">
       {error && <Banner kind="error">{error}</Banner>}
       {notice && <Banner kind="info">{notice}</Banner>}
+      {evalResult && (evalResult.warnings?.length ?? 0) > 0 && <Banner kind="error"><strong>{t('chat.partialDateFailure')}</strong><ul>{evalResult.warnings.map((warning) => <li key={warning.code}>{warning.message}</li>)}</ul></Banner>}
       <div className="chat-wrap date-wrap">
         <aside className="chat-side date-dossier">
           {/* Compact identity plate: portrait beside name so the whole rail fits
@@ -1695,12 +1863,16 @@ export function Chat() {
                 <div className="kicker">{t('chat.whereYouStand')}</div>
                 <div className="trail" />
               </div>
+              <div className="date-warmth-readout">
+                <div className="date-warmth-meta"><span>{relationshipWarmthStage}</span><strong>{relationshipWarmthDisplay}<small>/{relationshipWarmthMax}</small></strong></div>
+                <WarmthBridge value={relationshipWarmth} maxValue={relationshipWarmthMax} path={relationshipWarmthPath} ariaLabel={relationshipWarmthAria} compact />
+              </div>
               <RelationshipBars relationship={relationship} deltas={deltas ?? undefined} />
             </div>
           )}
           <div className="card date-actions">
             {dtrReady && !locked && (
-              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active} title={t('chat.dtrTitle')}>
+              <button className="btn primary block date-dtr" onClick={defineRelationship} disabled={busy || streaming.active || relationshipRecovery !== null} title={t('chat.dtrTitle')}>
                 <Icon name="commit" size={16} /> {rung!.rung.label}
               </button>
             )}
@@ -1708,7 +1880,7 @@ export function Chat() {
               <button
                 className="btn ghost block date-gift-btn"
                 onClick={() => (giftPicker ? setGiftPicker(false) : void openGiftPicker())}
-                disabled={busy || streaming.active}
+                disabled={busy || streaming.active || relationshipRecovery !== null}
                 title={t('chat.giveSomething')}
               >
                 <Icon name="gift" size={15} /> {giftPicker ? t('chat.neverMind') : t('chat.giveGift')}
@@ -1724,7 +1896,7 @@ export function Chat() {
                       key={e.inventoryItem.id}
                       className="date-gift-item"
                       onClick={() => void giveGift(e.inventoryItem.id)}
-                      disabled={busy || streaming.active}
+                      disabled={busy || streaming.active || relationshipRecovery !== null}
                     >
                       <span className="date-gift-item-name">{e.item.name}</span>
                       <span className="date-gift-item-qty">×{e.inventoryItem.quantity}</span>
@@ -1746,7 +1918,7 @@ export function Chat() {
                 <Icon name="recap" size={14} /> {t(hangout ? 'chat.newHangout' : 'chat.newDate')}
               </button>
             ) : spokeThisSession ? (
-              <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active}>
+              <button className="btn ghost block date-end-btn" onClick={endDate} disabled={busy || streaming.active || relationshipRecovery !== null}>
                 {busy ? t('chat.evaluating') : <><Icon name="end" size={14} /> {t(hangout ? 'chat.endHangout' : 'chat.endEvaluate')}</>}
               </button>
             ) : (
@@ -1929,6 +2101,26 @@ export function Chat() {
               </div>
             </div>
           ) : (
+            <>
+            {relationshipRecoveryVisible && relationshipRecovery && (
+              <div className={relationshipRecoveryClassName} role="alert" aria-live="assertive">
+                <div className="relationship-recovery-thread" aria-hidden="true"><span /><i /><span /></div>
+                <div className="relationship-recovery-copy">
+                  <span className="relationship-recovery-kicker">{t('chat.relationshipInterruptedKicker')}</span>
+                  <strong>{t('chat.relationshipInterruptedTitle')}</strong>
+                  <p>{t('chat.relationshipInterruptedBody')}</p>
+                </div>
+                <div className="relationship-recovery-actions">
+                  <button className="btn primary" onClick={() => void retryRelationshipEffects(relationshipRecovery)} disabled={relationshipRetrying || busy}>
+                    <Icon name="refresh" size={14} />
+                    {relationshipRetrying && t('chat.relationshipRetrying')}
+                    {!relationshipRetrying && t('chat.relationshipRetry')}
+                  </button>
+                  <button className="btn ghost" onClick={() => void continueWithoutRelationshipEffects(relationshipRecovery)} disabled={relationshipRetrying || busy}>{t('chat.relationshipContinue')}</button>
+                </div>
+              </div>
+            )}
+            {!relationshipRecoveryVisible && (
             <div className="date-input-wrap">
               {/* One instrument: the message box with the intent moves docked
                   inside it. An intent is a claim over your NEXT line — the
@@ -1976,6 +2168,8 @@ export function Chat() {
                 </div>
               </div>
             </div>
+            )}
+            </>
           )}
           </div>
         </section>

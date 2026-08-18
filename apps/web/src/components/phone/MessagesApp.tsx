@@ -167,7 +167,9 @@ function ThreadList({
         const latest = res.notices[0];
         setLandlordPreview(latest ? latest.body.split('\n')[0] ?? null : null);
       })
-      .catch(() => undefined);
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      });
     return () => {
       live = false;
     };
@@ -281,12 +283,17 @@ function NewMessage({ onPick, onBack }: { onPick: (id: string) => void; onBack: 
     Array<{ id: string; name: string; portraitAssetId: string | null; available: boolean; unavailableReason: string | null }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
   useEffect(() => {
     let live = true;
+    setLoading(true);
+    setError(undefined);
     api
       .phoneContacts(activeWorldId ?? undefined)
       .then((c) => live && setContacts(c))
-      .catch(() => undefined)
+      .catch((cause) => {
+        if (live) setError(errorMessage(cause));
+      })
       .finally(() => live && setLoading(false));
     return () => {
       live = false;
@@ -303,15 +310,16 @@ function NewMessage({ onPick, onBack }: { onPick: (id: string) => void; onBack: 
           </button>
         }
       />
-      {loading ? (
-        <Spinner />
-      ) : contacts.length === 0 ? (
+      {loading && <Spinner />}
+      {!loading && error && <Banner kind="error">{error}</Banner>}
+      {!loading && !error && contacts.length === 0 && (
         <div className="pcom-empty">
           <span className="pcom-empty-icon"><Icon name="people" size={32} /></span>
           <span className="pcom-empty-title">{t('messages.new.emptyTitle')}</span>
           <p>{t('messages.new.emptyBody')}</p>
         </div>
-      ) : (
+      )}
+      {!loading && !error && contacts.length > 0 && (
         <div className="pcom-rows">
           <div className="pcom-pick-head">{t('messages.new.chooseSomeone')}</div>
           {contacts.map((c) => (

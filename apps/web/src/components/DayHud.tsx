@@ -7,7 +7,7 @@ import { errorMessage } from '../lib/hooks';
 import { phaseLabel, seasonLabel, weekdayLabel } from '../i18n/labels';
 import { EnergyPips } from './EnergyPips';
 import { Icon } from './Icon';
-import { Modal } from './ui';
+import { Banner, Modal } from './ui';
 import './recap-modal.css';
 
 /** Compact day / time-of-day / stamina indicator + Sleep control for the active world. */
@@ -182,6 +182,7 @@ function LedgerRow({ label, amount }: { label: string; amount: number }) {
 function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void }) {
   const { t } = useTranslation();
   const l = res.ledger;
+  const warnings = res.warnings ?? [];
   const hasTown = !!res.worldSim && res.worldSim.beats.length > 0;
   const hasLedger =
     !!l &&
@@ -236,6 +237,8 @@ function RecapModal({ res, onClose }: { res: SleepResponse; onClose: () => void 
             </div>
           )}
         </header>
+
+        {warnings.length > 0 && <Banner kind="error"><strong>{t('recap.partialFailure')}</strong><ul>{warnings.map((warning) => <li key={warning.code}>{warning.message}</li>)}</ul></Banner>}
 
         {tabs.length > 1 && (
           <div className="rcp-tabs" role="tablist">

@@ -23,6 +23,7 @@ import { getRelationship } from './relationship-service';
 import { applyRelationshipChange, setRelationshipFlag } from './stat-service';
 import { addMemoriesFromEvaluation } from './memory-service';
 import { appendChronicleLine } from './chronicle-service';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { despairFromBreakup } from './crisis-service';
 import { recordEvent } from './event-service';
 
@@ -179,15 +180,15 @@ export function applyBreakup(
   addMemoriesFromEvaluation(characterId, [{ text: memory, importance: 5, tags: ['breakup'] }], null);
   try {
     appendChronicleLine(characterId, day, 'date', `💔 We broke up.`, { bumpSession: false });
-  } catch {
-    /* chronicle is best-effort */
+  } catch (error) {
+    reportOperationFailure('breakup_chronicle_save_failed', 'The breakup happened, but its relationship-history entry could not be saved.', error, { characterId, day });
   }
   recordEvent('breakup', { characterId, fromStatus, day, breakupCount: priorBreakups + 1, initiator });
   // (Opt-in) repeated heartbreak feeds the despair spiral — no-op unless enabled.
   try {
     despairFromBreakup(characterId, priorBreakups, day);
-  } catch {
-    /* best-effort; never block a breakup */
+  } catch (error) {
+    reportOperationFailure('breakup_crisis_update_failed', 'The breakup happened, but a serious relationship-state update could not be completed.', error, { characterId, day });
   }
   return { fromStatus, breakupCount: priorBreakups + 1 };
 }
@@ -224,8 +225,8 @@ function maybeReconcile(characterId: string, rel: Relationship, day: number): St
   );
   try {
     appendChronicleLine(characterId, day, 'date', `💗 We got back together.`, { bumpSession: false });
-  } catch {
-    /* chronicle is best-effort */
+  } catch (error) {
+    reportOperationFailure('reconciliation_chronicle_save_failed', 'The reconciliation happened, but its relationship-history entry could not be saved.', error, { characterId, day });
   }
   recordEvent('reconciled', { characterId, day });
   return { kind: 'reconciled', line: `You and ${name} are back together.` };

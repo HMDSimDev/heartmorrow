@@ -15,6 +15,7 @@ import {
 import { inventoryRepo, messagesRepo, sessionsRepo } from '../db/repositories';
 import { getDb } from '../db/index';
 import { badRequest, notFound } from '../lib/errors';
+import { reportOperationFailure } from '../lib/operation-warning';
 import { newId, playerIdForWorldOrDefault } from '../lib/ids';
 import { getCharacter } from './character-service';
 import { getRelationship } from './relationship-service';
@@ -173,8 +174,8 @@ export async function reactToGift(args: {
         `🎁 ${reaction.memory?.text ?? `${playerName} gave me ${item.name}.`}`,
         { bumpSession: false },
       );
-    } catch {
-      /* chronicle is best-effort; never block the gift */
+    } catch (error) {
+      reportOperationFailure('gift_chronicle_save_failed', 'The gift was given, but its relationship-history entry could not be saved.', error, { characterId, itemId: item.id, day });
     }
 
     return {

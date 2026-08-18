@@ -172,12 +172,8 @@ export function runDailyWealth(
 function tryPay(amount: number, playerId: string): boolean {
   if (amount <= 0) return true;
   if (getOrCreatePlayer(playerId).money < amount) return false;
-  try {
-    spendMoney(amount, playerId);
-    return true;
-  } catch {
-    return false;
-  }
+  spendMoney(amount, playerId);
+  return true;
 }
 
 /**

@@ -909,7 +909,7 @@ export function Bench() {
   const cancel = () => {
     // Tell the server to abort the in-flight case (reliable), then abort the local
     // fetch + stop the client loop.
-    if (runIdRef.current) void api.benchCancel(runIdRef.current).catch(() => undefined);
+    if (runIdRef.current) void api.benchCancel(runIdRef.current).catch((cause) => setError(errorMessage(cause)));
     abortRef.current?.abort();
     setRunning(false);
   };

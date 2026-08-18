@@ -8,6 +8,7 @@ import { deliverCrisisTextsForDay } from './crisis-service';
 import { deliverDueTexts } from './text-message-service';
 import { simulateWorldDay } from './world-sim-service';
 import { generateMarketNews } from './market-service';
+import { reportOperationFailure } from '../lib/operation-warning';
 
 /**
  * Wire the phone subsystem to the world clock without an import cycle:
@@ -25,22 +26,22 @@ registerClockHooks({
     // the one-character-text-per-day guard, so sequencing (not racing) them is
     // what lets a remembrance take the day's slot instead of losing a coin flip.
     void generateAnniversaryTextsForDay(worldId, day)
-      .catch(() => undefined)
+      .catch((error) => { reportOperationFailure('anniversary_text_generation_failed', 'Anniversary texts could not be generated for the new day.', error, { worldId, day }); })
       .then(() => generateDailyTextsForDay(worldId, day))
-      .catch(() => undefined);
-    void generateDailyEmails(worldId, day).catch(() => undefined);
-    void generatePostcardsForDay(worldId, day).catch(() => undefined);
-    void generateGossipForDay(worldId, day).catch(() => undefined);
-    void generateKnowledgeGossipForDay(worldId, day).catch(() => undefined);
-    void generateFeedForDay(worldId, day).catch(() => undefined);
-    void deliverCrisisTextsForDay(worldId, day).catch(() => undefined);
-    void generateMarketNews(worldId, day).catch(() => undefined);
+      .catch((error) => { reportOperationFailure('daily_text_generation_failed', 'Daily texts could not be generated for the new day.', error, { worldId, day }); });
+    void generateDailyEmails(worldId, day).catch((error) => { reportOperationFailure('daily_email_generation_failed', 'Daily email could not be generated for the new day.', error, { worldId, day }); });
+    void generatePostcardsForDay(worldId, day).catch((error) => { reportOperationFailure('postcard_generation_failed', 'Postcards could not be generated for the new day.', error, { worldId, day }); });
+    void generateGossipForDay(worldId, day).catch((error) => { reportOperationFailure('gossip_generation_failed', 'Gossip could not be generated for the new day.', error, { worldId, day }); });
+    void generateKnowledgeGossipForDay(worldId, day).catch((error) => { reportOperationFailure('knowledge_gossip_generation_failed', 'Knowledge gossip could not be generated for the new day.', error, { worldId, day }); });
+    void generateFeedForDay(worldId, day).catch((error) => { reportOperationFailure('feed_generation_failed', 'Feed posts could not be generated for the new day.', error, { worldId, day }); });
+    void deliverCrisisTextsForDay(worldId, day).catch((error) => { reportOperationFailure('crisis_text_delivery_failed', 'A relationship-support message could not be delivered for the new day.', error, { worldId, day }); });
+    void generateMarketNews(worldId, day).catch((error) => { reportOperationFailure('market_news_generation_failed', 'Market news could not be generated for the new day.', error, { worldId, day }); });
   },
   onPhaseAdvanced: () => {
     try {
       deliverDueTexts();
-    } catch {
-      /* best effort */
+    } catch (error) {
+      reportOperationFailure('queued_text_delivery_failed', 'Queued phone messages could not be delivered.', error);
     }
   },
 });

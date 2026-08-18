@@ -78,6 +78,8 @@ import type {
   PlayerProfile,
   PlayerUpdate,
   Relationship,
+  RelationshipCheckRecovery,
+  RelationshipCheckRecoveryResponse,
   SessionWithMessages,
   ShopItem,
   ShopItemCreate,
@@ -272,6 +274,8 @@ export interface StreamHandlers {
   /** The player wound the date down to a natural close; the character said
    *  goodbye. The client should run the normal end-and-evaluate flow. */
   onFarewell?: (message: Message, expression?: string) => void;
+  /** Durable progress for the relationship checks attached to a saved player turn. */
+  onRelationshipChecks?: (messageId: string, state: RelationshipCheckRecovery) => void;
 }
 
 /** Stream a chat reply via SSE (POST + ReadableStream reader). */
@@ -342,6 +346,17 @@ export async function streamRegenerate(
   await pumpSse(res, handlers);
 }
 
+/** Resume the unfinished relationship checks for one already-saved player turn. */
+export async function streamRelationshipChecks(sessionId: string, messageId: string, handlers: StreamHandlers, signal?: AbortSignal): Promise<void> {
+  const res = await fetch(`${BASE}/conversations/${sessionId}/relationship-checks/retry`, withAppHeader({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messageId }), signal }));
+  if (!res.ok || !res.body) {
+    const { message } = await parseErrorBody(res, `The server couldn’t retry this turn (${res.status}).`);
+    handlers.onError?.(message);
+    return;
+  }
+  await pumpSse(res, handlers);
+}
+
 /** Read an SSE response body to completion, dispatching each event to handlers. */
 async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
   const reader = res.body!.getReader();
@@ -401,6 +416,11 @@ async function pumpSse(res: Response, handlers: StreamHandlers): Promise<void> {
       case 'farewell': {
         const p = payload as { message: Message; expression?: string };
         handlers.onFarewell?.(p.message, p.expression);
+        break;
+      }
+      case 'relationship_checks': {
+        const p = payload as RelationshipCheckRecoveryResponse;
+        handlers.onRelationshipChecks?.(p.messageId, p.state);
         break;
       }
     }
@@ -571,7 +591,7 @@ export const api = {
 
   // conversations
   listConversations: () => get<ConversationSession[]>('/conversations'),
-  createConversation: (input: ConversationCreate) => post<ConversationSession>('/conversations', input),
+  createConversation: (input: ConversationCreate) => post<ConversationSession & { openingFailed: boolean }>('/conversations', input),
   getConversation: (id: string) => get<SessionWithMessages>(`/conversations/${id}`),
   sendMessage: (id: string, text: string) =>
     post<{ playerMessage: Message; reply: Message }>(`/conversations/${id}/messages`, { text }),
@@ -582,6 +602,7 @@ export const api = {
   giftOnDate: (id: string, inventoryItemId: string) =>
     post<GiftReactionResponse>(`/conversations/${id}/gift`, { inventoryItemId }),
   confirmBreakup: (id: string) => post<PlayerBreakupResponse>(`/conversations/${id}/breakup`),
+  skipRelationshipChecks: (id: string, messageId: string) => post<RelationshipCheckRecoveryResponse>(`/conversations/${id}/relationship-checks/skip`, { messageId }),
 
   // shop + inventory
   listShopItems: () => get<ShopItem[]>('/shop/items'),

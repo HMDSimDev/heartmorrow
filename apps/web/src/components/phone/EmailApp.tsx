@@ -59,8 +59,8 @@ export function EmailApp() {
       try {
         await api.phoneReadEmail(email.id);
         setEmails((prev) => prev.map((e) => (e.id === email.id ? { ...e, read: true } : e)));
-      } catch {
-        /* ignore */
+      } catch (cause) {
+        setError(errorMessage(cause));
       }
     }
   };

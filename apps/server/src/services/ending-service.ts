@@ -7,6 +7,7 @@ import {
   type CharacterEnding,
   type ConversationMode,
   type Epilogue,
+  type OperationWarning,
 } from '@dsim/shared';
 import { parseJsonStrict } from '../lib/json';
 import { playerIdForWorldOrDefault } from '../lib/ids';
@@ -20,6 +21,7 @@ import { getLlmSettings } from './settings-service';
 import { callStructuredLlm } from '../llm/structured';
 import { buildEpilogueMessages } from '../prompt/prompt-builder';
 import { recordEvent } from './event-service';
+import { reportOperationFailure } from '../lib/operation-warning';
 
 /** Every "happy ending" the player has reached, oldest first (for the gallery, optionally scoped to one world). */
 export function listEndings(worldId?: string): CharacterEnding[] {
@@ -80,7 +82,7 @@ function salvageEpilogue(raw: string | undefined): Epilogue | null {
  */
 export async function maybeReachEnding(
   characterId: string,
-  ctx: { day: number; mode: ConversationMode },
+  ctx: { day: number; mode: ConversationMode; onWarning?: (warning: OperationWarning) => void },
   playerId: string = DEFAULT_PLAYER_ID,
 ): Promise<CharacterEnding | null> {
   if (endingsRepo.getByCharacter(characterId, playerId)) return null; // already reached, once only
@@ -114,7 +116,11 @@ export async function maybeReachEnding(
   // trimmed rather than thrown away (which would leave the player no ending).
   const data = result.ok ? result.data : salvageEpilogue(result.lastRaw);
   if (!data) {
-    recordEvent('ending_failed', { characterId, error: result.ok ? 'no epilogue data' : result.error });
+    let error = 'no epilogue data';
+    if (!result.ok) error = result.error;
+    recordEvent('ending_failed', { characterId, error });
+    const warning = reportOperationFailure('ending_generation_failed', 'The relationship qualified for a happy ending, but its epilogue could not be generated.', error, { characterId, day: ctx.day });
+    ctx.onWarning?.(warning);
     return null;
   }
   if (!result.ok) recordEvent('ending_salvaged', { characterId });
@@ -136,8 +142,9 @@ export async function maybeReachEnding(
   );
   try {
     appendChronicleLine(characterId, ctx.day, ctx.mode, `🏆 ${data.title}`, { bumpSession: false });
-  } catch {
-    /* chronicle is best-effort */
+  } catch (error) {
+    const warning = reportOperationFailure('ending_chronicle_save_failed', 'The happy ending was saved, but its relationship-history entry could not be saved.', error, { characterId, day: ctx.day });
+    ctx.onWarning?.(warning);
   }
   recordEvent('ending_reached', { characterId, day: ctx.day, title: data.title });
   return ending;

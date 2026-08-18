@@ -221,8 +221,8 @@ export function CharacterEditor() {
     });
 
   useEffect(() => {
-    void api.listWorlds().then(setWorlds).catch(() => undefined);
-    void api.listCharacters().then(setAllChars).catch(() => undefined);
+    void api.listWorlds().then(setWorlds).catch((cause) => setError(errorMessage(cause)));
+    void api.listCharacters().then(setAllChars).catch((cause) => setError(errorMessage(cause)));
     void reloadAssets();
     if (!id) {
       // A brand-new character defaults to the world you're playing, so it never

@@ -36,6 +36,23 @@ export class ScriptedAdapter implements ChatAdapter {
   }
 }
 
+/** Adapter that behaves like a model server returning an HTTP 500. */
+export class FailingAdapter implements ChatAdapter {
+  readonly name = 'failing';
+
+  async chat(_req: ChatRequest): Promise<ChatResult> {
+    throw new Error('Model server returned 500.');
+  }
+
+  async streamChat(_req: ChatRequest, _onDelta: (t: string) => void): Promise<ChatResult> {
+    throw new Error('Model server returned 500.');
+  }
+
+  async listModels(): Promise<LlmModelInfo[]> {
+    return [];
+  }
+}
+
 export function seedWorldAndCharacter() {
   const world = createWorld({ name: 'Test World' });
   const character = createCharacter({

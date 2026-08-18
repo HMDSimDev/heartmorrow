@@ -534,6 +534,11 @@ function rowToMessage(r: Row): Message {
 }
 
 export const messagesRepo = {
+  get(id: string): Message | null {
+    const row = getDb().get<Row>('SELECT * FROM messages WHERE id = ?', id);
+    if (!row) return null;
+    return rowToMessage(row);
+  },
   listBySession(sessionId: string): Message[] {
     return getDb()
       .all<Row>('SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC, rowid ASC', sessionId)
