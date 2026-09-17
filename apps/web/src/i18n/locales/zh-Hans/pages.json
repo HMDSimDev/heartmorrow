@@ -1,0 +1,2073 @@
+{
+  "chat": {
+    "trajectoryAria": "约会进展：{label}",
+    "cooling": "降温中",
+    "warming": "升温中",
+    "settlingIn": "渐入佳境",
+    "retry": "重试",
+    "retrying": "重试中…",
+    "regen": "重新生成回复",
+    "regenTitle": "重写这条回复（不影响约会评分）",
+    "sendFailed": "消息发送失败。",
+    "replyFailed": "对方没有回复——出了点问题。",
+    "replyDropped": "回复没有送达。",
+    "evalFailed": "无法评分——模型可能不可用。约会仍然开着，可以再试试结束。",
+    "tonightsPlan": "今晚的计划",
+    "todaysPlan": "今天的计划",
+    "onADateTitle": "你正在约会",
+    "onADateBody": "你和{name}的约会还在进行——进度已安全保存。",
+    "onAHangoutTitle": "你正在闲逛",
+    "onAHangoutBody": "你和{name}还在外面——进度已安全保存。",
+    "reopenFailed": "刚才没能重新打开对话。再试一次以继续。",
+    "reopening": "重新打开中…",
+    "resumeDate": "继续与{name}的约会",
+    "resumeHangout": "继续与{name}的闲逛",
+    "planADate": "计划约会",
+    "planSub": "选个人，选个见面地点，然后开始吧。",
+    "planAHangout": "计划闲逛",
+    "planSubHangout": "选个人，选个免费的地方，然后出发吧。",
+    "modeField": "哪种见面方式？",
+    "modeDate": "约会",
+    "modeDateSub": "浪漫路线。在好一点的场所要花钱，也是唯一能让关系正式化的地方。",
+    "modeHangout": "闲逛",
+    "modeHangoutSub": "轻松相处。永远免费，没有评分——适合培养信任。",
+    "noCharsTitle": "还没有可以约会的角色",
+    "noCharsBody": "请先创建一个角色。",
+    "arrangeEvening": "安排傍晚",
+    "arrangeAfternoon": "安排下午",
+    "whoWhereWhen": "谁、在哪里、什么时候",
+    "whoMeeting": "你要见谁？",
+    "unavailableToday": "今天不可用",
+    "isUnavailableToday": "今天不可用",
+    "busyToday": "今天很忙",
+    "cardTitleUnavailable": "{name}——{reason}",
+    "cardTitleMeet": "见 {name}",
+    "agePronouns": "{age} · {pronouns}",
+    "locationField": "地点/活动（可选）",
+    "hangoutLocationField": "在哪里见面？（可选）",
+    "anywhere": "随处都行",
+    "free": "免费",
+    "yourPlace": "你家",
+    "leased": "已租",
+    "freeSuffix": " · 免费",
+    "cantAffordSuffix": " · 付不起",
+    "cantAffordAny": "没有你负担得起的地方",
+    "venueCost": "{symbol} {cost}",
+    "roomName": "{name}的房间",
+    "theirRoomName": "他们的房间",
+    "stayInFree": "待在室内 · 免费",
+    "chooseLocation": "选择地点",
+    "tileTitleCantAfford": "{label}——付不起",
+    "walletNote": "钱包：{wallet} · 好一点的场所要花钱，但能给对方留下好印象。",
+    "hangoutFreeNote": "闲逛永远不会花钱，所以只列出免费的地点。",
+    "availBanner": "{name} {reason}——换个人或者明天再来。",
+    "outOfEnergy": "你今天的体力用完了——从菜单结束今天休息一下，明天再来吧。",
+    "settingScene": "正在布置场景…",
+    "begin": "开始",
+    "beginHangout": "出发",
+    "hangoutBadge": "闲逛",
+    "hangoutRibbon": "没有压力——不会有人给你打分。但这仍然会影响对方对你的感觉。",
+    "recapKicker": "今晚过得怎么样",
+    "recapKickerHangout": "进展如何",
+    "recapMemories": "{count, plural, =0 {没有保留新的记忆} one {保留了 # 条记忆} other {保留了 # 条记忆}}",
+    "evalFailedTitle": "评判未能完成",
+    "recapFailedBody": "没有数据被更改——什么也没有记录。{error}",
+    "endingKicker": "美好的结局",
+    "endingTitle": "“{title}”",
+    "endingNote": "你们之间产生了持久的羁绊。随时可以在手机的结局中重温——故事还将继续。",
+    "breakupKicker": "结束了",
+    "breakupTitle": "{name}和你分手了。",
+    "breakupNote": "给他们一些空间——继续主动联系的话，也许能挽回。",
+    "youEndedKicker": "你提了分手",
+    "youEndedTitle": "你和{name}分手了。",
+    "youEndedBody": "暂时结束了。他们需要一些空间——但如果你继续主动联系，以后也许能挽回。",
+    "walkoutKicker": "他们离场了",
+    "walkoutTitle": "{name}离开了。",
+    "walkoutNote": "约会结束了——这对你印象很差。",
+    "walkoutDefault": "他们结束了约会。",
+    "leftEarlyKicker": "提前散场",
+    "leftEarlyTitle": "{name}失去了兴趣。",
+    "leftEarlyBody": "约会没有进展，他们提前溜走了——就这样不了了之，关系退步了一点。",
+    "leftEarlyNote": "下次试着更好地理解对方。",
+    "milestoneKicker": "新的里程碑",
+    "milestoneTitle": "你们现在是{label}了！",
+    "dtrConfirmedKicker": "关系确认",
+    "dtrConfirmedTitle": "你们现在是{status}了。",
+    "dtrBackfireKicker": "效果适得其反",
+    "dtrBackfireTitle": "事情没有如你所愿。",
+    "dtrEnded": "约会结束了。",
+    "dtrNotYet": "还没到那一步——再给点时间吧。",
+    "dtrNotYetKicker": "还不是时候",
+    "howDating": "约会系统说明",
+    "lineOfNight": "今晚的高光时刻",
+    "lineThatStung": "扎心的一句话",
+    "onboarding": {
+      "kicker": "约会系统说明 · {n} / {total}",
+      "skip": "跳过",
+      "back": "返回",
+      "next": "下一步",
+      "done": "开始吧",
+      "talk": {
+        "title": "用你自己的话说",
+        "body": "约会是实时对话，没有脚本选项——想说什么就打什么。角色会实时回复，他们的头像表情也会随着气氛变化。"
+      },
+      "scene": {
+        "title": "读懂场景",
+        "body": "场景卡片显示你在哪里、是哪一天、天气如何，以及对方最初的状态——刚到时的心情。今晚的走向取决于你们两个人。"
+      },
+      "trajectory": {
+        "title": "关注温度",
+        "body": "顶部的条是约会的实时温度。中间的刻度线标记着今晚的起点——防备心重的人起点更冷——暖起来时光标往右，冷下去时往左。没有数字，只有感觉。"
+      },
+      "intents": {
+        "title": "主动出击",
+        "body": "消息框里的按钮能给你的下一句话定调——调情、打趣、道歉。这些是提示，不是魔法：角色会对你做出的举动产生反应，合时宜的举动效果更好。修复按钮只在有紧张气氛时出现。"
+      },
+      "stakes": {
+        "title": "每句话都有分量",
+        "body": "你每条消息下面的小字显示对方的感受。当你结束今晚时，整个约会会被综合评估——一个美好的夜晚确实能温暖关系，平淡或敷衍的夜晚则会让关系冷却。礼物、重要的问题、告别都有影响。"
+      }
+    },
+    "reactionTitle": "这句话对对方的影响",
+    "reaction": {
+      "m3": "扎心了",
+      "m2": "没说到点上",
+      "m1": "有点冷场",
+      "zero": "平淡地过去了",
+      "p1": "让对方暖了一点",
+      "p2": "说到心里了",
+      "p3": "让对方心动了"
+    },
+    "sceneKicker": "场景",
+    "sceneWhen": "时间",
+    "sceneWeather": "天气",
+    "sceneMood": "最初印象",
+    "sendLabel": "发送",
+    "intentTip": {
+      "flirt": "将你的下一条消息定为浪漫举动。在有真正温暖的基础时效果好——和几乎不认识的人调情会很尴尬。",
+      "tease": "将你的下一句话定为俏皮的打趣。有了默契之后很好玩；在对方还有防备时风险较大。",
+      "open_up": "将你的下一条消息标记为真诚和坦率。在合适的时机展现脆弱能建立信任。",
+      "reassure": "你的下一句话是沉稳的安慰。在对方焦虑或紧张时最好用——出现这个按钮说明有摩擦。",
+      "apologize": "用下一条消息承认失误。能修复紧张气氛——没问题时用会显得空洞。"
+    },
+    "brokenUp": "已分手",
+    "onTheRocks": "关系紧张",
+    "whereYouStand": "你的处境",
+    "dtrTitle": "这段关系走向何方？",
+    "giveSomething": "送他们点东西",
+    "neverMind": "算了",
+    "giveGift": "送礼物",
+    "giftEmpty": "手头没有礼物——先去商店买点东西。",
+    "newDate": "新约会",
+    "newDateTitle": "和别人开始新的约会",
+    "newHangout": "新闲逛",
+    "newHangoutTitle": "和别人重新开始",
+    "evaluating": "评判中…",
+    "endEvaluate": "结束并评判",
+    "endHangout": "结束闲逛",
+    "leaving": "离开中…",
+    "cancelDate": "取消约会",
+    "cancelHangout": "取消闲逛",
+    "sceneLeadTitle": "{weekday}，{season}",
+    "sceneDay": "第 {day} 天 · ",
+    "seems": "{name}看起来{mood}",
+    "openingWithMood": "{name}到了，看起来{mood}。{atLocation} {weather}",
+    "openingAtLocation": "你在{location}。",
+    "openingWeather": "外面{weather}。",
+    "openingWaitingAt": "{name}在{location}等你。",
+    "openingWaiting": "{name}到了，在等着。",
+    "sayHello": "打个招呼开始对话吧…",
+    "loc": {
+      "room": "{name}的房间",
+      "yourPlace": "你家",
+      "somewhere": "某处",
+      "anywhere": "随处都行"
+    },
+    "backTogether": "你和{name}复合了。",
+    "backTogetherNote": "别再让关系滑坡了。",
+    "rocksTitle": "关系陷入了危机。",
+    "rocksNote": "这段关系感觉很紧张——尽快扭转局面。",
+    "startOver": "重新开始",
+    "breakupConfirmTitle": "和{name}分手？",
+    "breakupConfirmBody": "你即将结束这段关系。{name}刚刚在上面回复了——确认分手就真的结束了，或者继续下去。",
+    "ending": "结束中…",
+    "confirmBreakup": "确认分手",
+    "intentComing": "你想给对方的印象",
+    "composerIntent": "{intent}——给{name}发消息…",
+    "composerPlain": "给{name}发消息…"
+  },
+  "share": {
+    "characterFile": "角色文件",
+    "worldFile": "世界文件",
+    "bundle": "资源包",
+    "cWorlds": "{count, plural, one {# 个世界} other {# 个世界}}",
+    "cCharacters": "{count, plural, one {# 个角色} other {# 个角色}}",
+    "cImages": "{count, plural, one {# 张图片} other {# 张图片}}",
+    "cPeople": "{count, plural, one {# 个人} other {# 个人}}",
+    "cProperties": "{count, plural, one {# 个房产} other {# 个房产}}",
+    "cCompanies": "{count, plural, one {# 家公司} other {# 家公司}}",
+    "locations": "{count, plural, one {# 个地点} other {# 个地点}}",
+    "importTitle": "导入分享文件",
+    "shareFallback": "Heartmorrow 分享",
+    "bundleName": "Heartmorrow 资源包",
+    "madeOn": " · 制作于 {date}",
+    "formatV": " · 格式版本 {version}",
+    "addsSummary": "将 {summary} 添加到你的年鉴中。你现有的世界和人物不受影响。",
+    "nothing": "无",
+    "peopleHead": "{count, plural, one {# 个人} other {# 个人}}",
+    "importCharsToggle": "{count, plural, one {同时导入 # 个角色} other {同时导入 # 个角色}}——{worlds, plural, one {取消勾选则只保留世界及其地点} other {取消勾选则只保留世界及其地点}}",
+    "more": "还有 {count} 个",
+    "cancel": "取消",
+    "importing": "导入中…",
+    "import": "导入",
+    "cantRead": "无法读取该文件",
+    "importFailed": "导入失败",
+    "close": "关闭",
+    "exportTitle": "导出分享文件",
+    "shareWorld": "分享一个世界",
+    "shareWorlds": "分享 {count} 个世界",
+    "shareCharacters": "{count, plural, one {分享 # 个角色} other {分享 # 个角色}}",
+    "exportSub": "保存为 {ext} 文件，可以分享给任何人——它只包含内容，不包含你的存档。",
+    "privacyNote": "角色会完整导出——包括他们的私人创作者笔记——所以打开文件的人可以完全按照原作者的设定来阅读和游玩。",
+    "exportCharsToggle": "{count, plural, one {包含每个世界的角色（取消勾选则只分享世界及其地点）} other {包含每个世界的角色（取消勾选则只分享世界及其地点）}}",
+    "title": "标题",
+    "note": "备注",
+    "noteOptional": "（可选——给打开文件的人留言）",
+    "notePlaceholder": "例如：Lumen Quarter 全角色——欢迎反馈！",
+    "preparing": "准备中…",
+    "download": "下载 {ext}",
+    "linksWarn": "{count, plural, one {# 条关联关系无法转移} other {# 条关联关系无法转移}}：{names} {count, plural, one {链接到} other {链接到}}未包含在此处的人物。将他们加入导出以保留这些关系——否则导入时关联将丢失。",
+    "linksWarnMore": "{names} +{count, plural, one {# 个} other {# 个}}"
+  },
+  "profile": {
+    "tenseSuffix": " · 紧张",
+    "inMemoriam2": "永远怀念",
+    "parted": "已离别",
+    "tabs": {
+      "overview": "概览",
+      "about": "关于",
+      "profile": "档案",
+      "history": "历史",
+      "memories": "记忆"
+    },
+    "dossier": "角色档案",
+    "date": "约会",
+    "edit": "编辑",
+    "duplicate": "复制",
+    "export": "导出…",
+    "delete": "删除",
+    "memorialBanner": "{name}已经不在了。他们在这里被铭记——你们的历史依然存在，但你无法再联系他们了。",
+    "brokeUp": "你们已经分手了。",
+    "needsSpace": "{name}需要一些空间——现在不能和他们约会，但还可以给他们发消息。",
+    "openToReconcile": "{name}愿意再次见面——继续主动联系（发消息+约会）也许能重新点燃感情。",
+    "onTheRocksBanner": "你和{name}的关系陷入了危机。尽快扭转局面——几次美好的约会——否则关系可能结束。",
+    "inMemoriamBadge": "永远怀念",
+    "brokenUpBadge": "已分手",
+    "needsSpaceBadge": "需要空间",
+    "openBadge": "愿意和解",
+    "onTheRocksBadge": "关系紧张",
+    "chats": "聊天",
+    "dates": "约会",
+    "memoriesShort": "记忆",
+    "sectionsAria": "个人资料部分",
+    "betweenYou": "你们之间",
+    "yourRelationship": "你的关系",
+    "activeBuffs": "当前增益",
+    "buffLeft": "· 剩余 {remaining}",
+    "yourStory": "你的故事",
+    "howTheyDate": "他们的约会方式",
+    "datingStats": "约会属性",
+    "withBuffs": "含增益",
+    "theirWeb": "社交关系网",
+    "connections": "关联",
+    "whoTheyAre": "他们是谁",
+    "personalityVoice": "性格与声音",
+    "speechStyle": "说话风格",
+    "whatTheyWant": "他们想要什么",
+    "tastesLimits": "喜好与底线",
+    "traitsBoundaries": "特质与边界",
+    "likes": "♥ 喜欢",
+    "dislikes": "✕ 不喜欢",
+    "goals": "目标",
+    "boundaries": "底线",
+    "nothingWritten": "暂未填写",
+    "noPersonality": "{name}还没有填写性格和特质。",
+    "presence": "形象",
+    "profilePresence": "资料与形象",
+    "appearance": "外貌",
+    "textingStyle": "聊天风格",
+    "onlinePersona": "网络人设",
+    "loveLanguage": "爱的语言",
+    "work": "工作",
+    "workLine": "{title} 在 {place} · {phase}班",
+    "littleThings": "生活小事",
+    "chemistryQuirks": "化学反应与小癖好",
+    "physicalNeeds": "身体需求",
+    "physicalDesires": "身体渴望",
+    "physicalDislikes": "身体反感",
+    "insecurities": "不安全感",
+    "quirks": "小癖好",
+    "underSkies": "在怎样的天空下",
+    "weather": "天气",
+    "whereTheyLive": "他们住在哪里",
+    "theirSpace": "他们的空间",
+    "noProfileTitle": "还没有档案",
+    "noProfileBody": "外貌、聊天风格、癖好等细节还没有添加——在编辑器中生成吧。",
+    "storySoFar": "故事至今",
+    "yourHistory": "你的历史",
+    "datesReadout": "约会",
+    "day": "第 {day} 天",
+    "noHistoryTitle": "还没有历史",
+    "noHistoryBody": "和{name}去一次约会，开始书写你们共同的故事吧。",
+    "whatTheyHold": "他们珍藏的东西",
+    "memories": "记忆",
+    "kept": "已保留",
+    "hide": "隐藏",
+    "show": "显示",
+    "noMemoriesTitle": "还没有记忆",
+    "noMemoriesBody": "去一次约会并结束它来记录记忆，或者在编辑器中手动添加。",
+    "memoriesHint": "{name}对你的记忆——手动添加或约会后自动记录。",
+    "memoriesCollapsed": "{count, plural, one {保留了 # 条记忆——点击 <0>显示</0> 查看。} other {保留了 # 条记忆——点击 <0>显示</0> 查看。}}",
+    "importanceTitle": "重要性 {n}/5",
+    "importanceAria": "重要性 {n}/5",
+    "weight": "权重",
+    "fromDate": "来自约会",
+    "fromHangout": "来自闲逛",
+    "addedManually": "手动添加",
+    "deleteMemory": "删除记忆",
+    "confirmDeleteTitle": "删除 {name}？",
+    "confirmDeleteBody": "这将同时删除他们的记忆和你们的关系。此操作不可撤销。",
+    "duplicateKicker": "复制角色",
+    "confirmDuplicateTitle": "复制 {name}？",
+    "confirmDuplicateBody": "这将立即创建 {name} 的存档副本并打开它。无论是否编辑，副本都会保留。",
+    "someone": "某人"
+  },
+  "characters": {
+    "kicker": "图鉴 · 角色列表",
+    "title": "人物",
+    "blurb": "你身边珍视的心 —— 每一张可以邀约的面孔。",
+    "selected": "已选 {count} 个",
+    "exportCount": "导出 {count}…",
+    "cancel": "取消",
+    "import": "导入",
+    "export": "导出…",
+    "new": "新建",
+    "unfinishedDrafts": "未完成的草稿",
+    "untitled": "未命名角色",
+    "newCharacter": "新建角色",
+    "unsavedChanges": "未保存的更改",
+    "resume": "继续",
+    "discard": "丢弃",
+    "emptyTitle": "你的生活中还没有人",
+    "emptyCreatorBody": "创建一个人物，开始约会吧。",
+    "createFirst": "创建你的第一个角色",
+    "emptyPlayerBody": "切换到创作者模式（手机 → 设置）来添加角色。",
+    "soulCount": "{count, plural, one {<0>#</0> 个灵魂收录在你的图鉴中} other {<0>#</0> 个灵魂收录在你的图鉴中}}",
+    "inMemoriam": "缅怀",
+    "noDescription": "暂无描述。",
+    "selectedBtn": "已选择",
+    "select": "选择",
+    "remember": "铭记",
+    "date": "约会",
+    "edit": "编辑",
+    "duplicate": "复制",
+    "delete": "删除",
+    "notInWorld": "未分配到任何世界",
+    "unassignedTitle": "未分配的角色",
+    "unassignedBody": "这些角色不属于任何世界，所以不会显示在任何花名册中。",
+    "placeInWorld": "将一个放入 {world} 以开始与他们约会。",
+    "enterWorld": "进入一个世界来放置他们。",
+    "moveTo": "移至 {world}",
+    "world": "世界",
+    "confirmDeleteTitle": "删除 {name}？",
+    "confirmDeleteBody": "这将移除他们的记忆以及你们的关系。此操作不可撤销。",
+    "duplicateKicker": "复制角色",
+    "confirmDuplicateTitle": "复制 {name}？",
+    "confirmDuplicateBody": "这将立即创建 {name} 的已保存副本并在编辑器中打开。无论你是否保存编辑，副本都会被保留。",
+    "discardKicker": "丢弃草稿",
+    "confirmDiscardTitle": "丢弃 {label}？",
+    "thisDraft": "这个草稿",
+    "confirmDiscardBody": "这将永久移除未保存的草稿。已保存的内容不受影响。",
+    "discardDraft": "丢弃草稿"
+  },
+  "minigames": {
+    "kicker": "街机图鉴",
+    "title": "小游戏",
+    "blurb": "一起玩来增进感情 —— 还能赚点小钱。",
+    "theirFavorite": "✦ {name} 的最爱 —— 玩这个会更亲密",
+    "errOnDate": "你正在和 {name} 约会 —— 请先在约会标签页完成约会。",
+    "errOnHangout": "你正在和 {name} 闲逛 —— 请先在约会标签页完成闲逛。",
+    "outOfEnergy": "你今天的体力用完了 —— 结束这一天，明天再来玩吧。",
+    "onDateBanner": "你正在和 {name} 约会 —— 请先在约会标签页完成约会再玩。",
+    "onHangoutBanner": "你正在和 {name} 闲逛 —— 请先在约会标签页完成闲逛再玩。",
+    "playingWith": "一起玩的人",
+    "noOne": "没人",
+    "moneyOnly": "仅金钱",
+    "nowPlaying": "正在游玩",
+    "quit": "退出",
+    "noGames": "没有注册的小游戏",
+    "buildsBond": "增进羁绊",
+    "builds": "增进",
+    "play": "游玩",
+    "finishDateFirst": "请先完成与 {name} 的约会。",
+    "finishHangoutFirst": "请先完成与 {name} 的闲逛。",
+    "outOfEnergyTitle": "体力耗尽 —— 结束这一天以开始新的一天。",
+    "finalScore": "最终得分",
+    "points": "分",
+    "newBest": "新纪录！",
+    "grewCloser": "你们更亲密了 —— 你们现在是 {label}！",
+    "rewards": "奖励",
+    "favoriteNote": "· 他们最爱的游戏类型",
+    "noRewards": "这次没有赚到什么 —— 但你玩得很棒。"
+  },
+  "shop": {
+    "kicker": "商人货架",
+    "title": "商店",
+    "blurb": "小饰品、礼物和小奢侈品，带上它们去约会吧。",
+    "purse": "钱包",
+    "generateItems": "生成物品",
+    "purchased": "已购买 {name}！",
+    "resultAcquired": "已获得",
+    "resultStocked": "物品已上架",
+    "genFailed": "物品生成失败：{error}",
+    "saved": "{count, plural, one {已保存 # 件物品到商店。} other {已保存 # 件物品到商店。}}",
+    "workshop": "创作者工坊",
+    "genTitle": "生成世界观内物品",
+    "close": "关闭",
+    "genHintPre": "基于以下设定生成一批符合世界观的物品：",
+    "genericSetting": "通用现代背景",
+    "genHintPost": "。在你点击保存之前不会保存任何内容 —— 请先检查和调整。",
+    "howMany": "数量（1–12）",
+    "rarityHint": "稀有度提示",
+    "any": "— 任意 —",
+    "categoryHint": "类别提示",
+    "minPrice": "最低价格（◈）",
+    "maxPrice": "最高价格（◈）",
+    "theme": "主题 / 指引",
+    "themeHint": "可选 —— 例如 “温馨秋日咖啡馆小饰品”或“旧港口的遗物”。",
+    "themePlaceholder": "描述你想要的物品类型…",
+    "generating": "生成中…",
+    "generate": "生成",
+    "saving": "保存中…",
+    "saveSelected": "保存选中的 {count} 件",
+    "reviewRefine": "检查并调整",
+    "reviewHint": "{count, plural, one {检查这 # 件生成的物品。取消勾选你不想要的，编辑其他的，然后保存。} other {检查这 # 件生成的物品。取消勾选你不想要的，编辑其他的，然后保存。}}效果在后台平衡，仅以只读方式显示。",
+    "keep": "保留",
+    "skipped": "跳过",
+    "name": "名称",
+    "price": "价格（◈）",
+    "rarity": "稀有度",
+    "category": "类别",
+    "description": "描述",
+    "emptyTitle": "货架空空如也",
+    "emptyCreator": "在上方生成一批物品来填充货架。",
+    "emptyPlayer": "稍后再来看看 —— 新货物会按时到达。",
+    "onTheShelf": "在架物品",
+    "inStock": "{count, plural, one {库存 # 件} other {库存 # 件}}",
+    "outOfStock": "售罄",
+    "stockLeft": "剩余 {count}",
+    "soldOut": "已售罄",
+    "notEnough": "◈ 不足",
+    "buying": "购买中…",
+    "buy": "购买",
+    "deleteItem": "删除物品",
+    "confirmDeleteTitle": "删除 {name}？",
+    "confirmDeleteBody": "这将从商店中移除该物品。",
+    "confirmDelete": "删除"
+  },
+  "inventory": {
+    "kicker": "随身背包",
+    "title": "背包",
+    "blurb": "你的珍藏。在约会时亲手送出礼物，或者通过短信送出。",
+    "held": "持有",
+    "emptyTitle": "你的背包是空的",
+    "emptyBody": "先去商店买点东西吧。",
+    "unknownItem": "未知物品",
+    "using": "使用中…",
+    "use": "使用",
+    "giveHint": "在约会时或通过短信赠送",
+    "used": "使用了 {name}。",
+    "resultUsed": "已使用"
+  },
+  "dashboard": {
+    "eyebrow": "灯火下的心之图鉴",
+    "welcome": "欢迎回来",
+    "fallbackLine": "选一个人，看看今晚会怎样。",
+    "greeting": {
+      "morning": "早上好",
+      "afternoon": "下午好",
+      "evening": "晚上好",
+      "night": "还没睡"
+    },
+    "greetingMark": {
+      "morning": "。",
+      "afternoon": "。",
+      "evening": "。",
+      "night": "？"
+    },
+    "line": {
+      "morning": "新的一天开始了。今天要和谁一起度过？",
+      "afternoon": "下午时光属于你——为某个人腾出一点时间吧。",
+      "evening": "灯火已亮。正是约会的好时候。",
+      "night": "夜晚静悄悄。发条消息，或者好好休息等明天。"
+    },
+    "almanacStatus": "图鉴状态",
+    "world": "世界",
+    "dayHour": "天 · 时",
+    "day": "第 {day} 天",
+    "calendar": "日历",
+    "weekendSuffix": " · 周末",
+    "energy": "体力",
+    "yourCircle": "你的圈子",
+    "peopleInLife": "你生命中的人",
+    "seeEveryone": "查看所有人",
+    "noOneTitle": "这里还没有人",
+    "createSomeone": "创建一个角色，开始你的故事。",
+    "createCharacter": "创建角色",
+    "switchToCreator": "在手机设置中切换到创作者模式来添加人物。",
+    "newCharacter": "新角色",
+    "new": "新",
+    "morePeople": "还有 {count, plural, one {# 位} other {# 位}}可约的人——前往<0>约会标签</0>查看完整列表。",
+    "quickLaunch": "快速开始",
+    "whereTonight": "今晚去哪儿？",
+    "tiles": {
+      "dateTitle": "约会",
+      "dateDesc": "和某人共度一个夜晚。",
+      "phoneTitle": "手机",
+      "phoneDesc": "短信、邮件、礼物和纪念品。",
+      "peopleTitle": "人物",
+      "peopleDesc": "你认识的所有人。",
+      "settingsTitle": "设置",
+      "settingsDesc": "你的角色设定和偏好。"
+    }
+  },
+  "worldSelector": {
+    "kicker": "灯火下的心之图鉴",
+    "title": "选择一个世界",
+    "sub": "每个世界都是一个独立的故事——有它自己的人物、自己的日历、自己的你。选择一个开始，随时可以回来切换。",
+    "importFile": "导入分享文件",
+    "openSettings": "设置",
+    "settingsKicker": "开始之前",
+    "settingsTitle": "设置",
+    "settingsSub": "设置语言、口音和 Heartmorrow 使用的模型端点。这些设置适用于所有世界。",
+    "backToWorlds": "返回世界列表",
+    "modelSetupKicker": "故事开始之前",
+    "modelSetupTitle": "连接你的模型",
+    "modelSetupSub": "Heartmorrow 使用你的语言模型来生成对话、短信和周围的世界。选择提供商、端点和模型，然后保存；连接检查会自动运行。",
+    "enterWithoutModel": "稍后设置",
+    "retestModel": "重新测试",
+    "continueToWorld": "进入世界",
+    "exportWorlds": "导出世界……",
+    "nSelected": "已选 {count} 个",
+    "exportN": "导出 {count} 个……",
+    "export": "导出……",
+    "cancel": "取消",
+    "startNew": "开始一个新世界",
+    "startNewSub": "设置一个全新的故事和角色设定",
+    "emptyNote": "你的图鉴是空的。开始你的第一个世界吧。",
+    "deleteKicker": "删除世界",
+    "deleteTitle": "删除 {name}？",
+    "deleteBody": "这将永久移除该世界及其中的所有进度——人际关系、金钱、短信和历史记录。此操作无法撤销。",
+    "deleteCharsLabel": "同时删除这个世界的角色。不勾选则保留——它们会被移到未分配（人物 → 未分配），你可以在其他世界中重新安置它们。",
+    "deleteConfirm": "永久删除",
+    "currentlyPlaying": "当前游玩",
+    "day": "天",
+    "people": "人物",
+    "inCircle": "在你的圈子中",
+    "phone": "手机",
+    "unread": "未读",
+    "selected": "已选中",
+    "selectToExport": "选择以导出",
+    "continue": "继续",
+    "enter": "进入",
+    "deleteWorld": "删除世界"
+  },
+  "worldOnboarding": {
+    "stepOf": "新世界 · 第 {step} 步，共 {total} 步",
+    "welcome": "欢迎来到 {name}",
+    "yourWorldFallback": "你的世界",
+    "nounNewWorld": "新世界",
+    "untitledWorld": "未命名世界",
+    "stepTitles": {
+      "setScene": "设定场景",
+      "whoAreYou": "你是谁？",
+      "bringPeople": "带入人物",
+      "howItWorks": "玩法说明",
+      "connectModel": "连接模型"
+    },
+    "nameRequired": "给你的世界起个名字才能继续。",
+    "chooseSource": "选择一个世界来开始。",
+    "modeFreshTitle": "全新世界",
+    "modeFreshSub": "从空白页开始",
+    "modeCloneTitle": "从存档开始",
+    "modeCloneSub": "复制一个现有世界及其角色",
+    "cloneFlavor": "选择要复制的世界。它的设定、背景故事和人物都会被复制到一个全新的存档中——你的金钱、人际关系和历史记录从零开始。",
+    "nameNewSave": "给你的新存档命名",
+    "nameNewSavePlaceholder": "例如：光辉街区——第二版",
+    "blankFlavor": "世界是故事上演的舞台——一座小镇、一个季节、一种氛围。你可以之后再丰富它的背景故事、地点和人物；现在，先给它起个名字，定个基调。",
+    "worldName": "世界名称",
+    "worldNamePlaceholder": "例如：光辉街区",
+    "summaryLabel": "一句话简介",
+    "summaryHint": "可选——这是个什么样的地方？",
+    "summaryPlaceholder": "一个温馨的文艺街区，邻里之间渐渐生出更深的情愫。",
+    "toneLabel": "基调",
+    "toneHint": "可选——故事的情感基调。",
+    "tonePlaceholder": "温暖、充满希望、以角色为驱动的浪漫故事。",
+    "conjureKicker": "或者用 AI 生成",
+    "conjureFlavor": "给一个灵感——一种氛围、一个地方、一个前提——就能生成完整的设定、背景故事和地点供你起步。不会创建人物；你之后再带入。继续之前可以编辑任何内容。",
+    "ideaLabel": "你的想法",
+    "ideaHint": "可选——给得越多，生成效果越好。",
+    "ideaPlaceholder": "例如：一个被暴风雨侵袭的灯塔小镇，每个人都藏着秘密——秋天、慢热、带一点忧伤。",
+    "generating": "生成中……",
+    "regenerate": "重新生成世界",
+    "generate": "生成世界",
+    "loreLabel": "背景故事",
+    "loreHint": "世界的背景设定——可自由编辑。",
+    "rulesLabel": "世界规则",
+    "rulesHint": "这个世界如何运作——普通设定可能为空。",
+    "globalNotesLabel": "全局笔记",
+    "globalNotesHint": "叙述者在每个场景中始终铭记的提示信息。",
+    "locationsCount": "地点 · {count}",
+    "noLocations": "暂无地点——重新生成以获取。",
+    "removeLocation": "移除地点",
+    "worldNotesCount": "世界笔记 · {count}",
+    "noNotes": "暂无笔记——重新生成以获取。",
+    "removeNote": "移除笔记",
+    "back": "返回",
+    "creating": "创建中……",
+    "continue": "继续",
+    "genFailed": "世界生成失败：{error}",
+    "personaFlavor": "这是一个全新的开始——在这个世界里，你是一个独立的自己，有自己的金钱、纪念品和历史。告诉我们你是谁。",
+    "yourName": "你的名字",
+    "yourNamePlaceholder": "别人该怎么称呼你？",
+    "pronouns": "人称代词",
+    "gender": "性别",
+    "genderHint": "与人称代词分开选择。",
+    "sexuality": "性取向",
+    "sexualityHint": "决定可以和哪些角色发展恋情。不指定则可以自由约会。",
+    "aboutYou": "关于你的一点介绍",
+    "aboutYouHint": "可选——一两句话，让你约会的人感受到你是怎样的人。",
+    "aboutYouPlaceholder": "刚搬到镇上的音效工程师。善于倾听；坐不住。",
+    "saving": "保存中……",
+    "importFlavor": "认识来自其他世界的人，想再见到他们？把他们作为新面孔导入——全新开始，不带任何历史记录。跳过此步，你的世界将保持原样。",
+    "noImport": "目前没有可导入的人物。直接跳过——进入世界后随时可以创建人物。",
+    "fromWorld": "来自 {world}",
+    "unassigned": "未分配",
+    "anotherWorld": "另一个世界",
+    "importing": "导入中……",
+    "importN": "导入 {count} 个并继续",
+    "skip": "跳过",
+    "welcomeFlavor": "灯火已亮，{persona}。{summary} 在你踏入之前，先看看这一天的轮廓：",
+    "newChapter": "新篇章由你书写。",
+    "peopleYouCouldMeet": "你可能遇到的人",
+    "blankPageCreator": "这个世界是一张白纸——还没有人居住。进入后，前往人物页面创建住在这里的角色。",
+    "blankPagePlayer": "这个世界是一张白纸——还没有人居住。在手机设置中开启创作者模式来添加可以遇到的人物。",
+    "enterWorld": "进入 {name}",
+    "enterWithoutModel": "不连接模型直接进入 {name}",
+    "howToPlay": {
+      "date": "每天去认识不同的人——约会和共同活动都需要消耗一点体力。",
+      "people": "去交谈，他们会记住。关系会随时间升温或冷却，疏于联系则会淡去。",
+      "phone": "你的手机里有短信、邮件和实时更新的社交动态，随着日子的流逝不断变化。",
+      "shop": "从商店购买礼物和纪念品——在这个世界里，你的金钱和背包只属于你自己。",
+      "recap": "体力耗尽时，结束一天来休息、推进时间，看看镇上发生了什么。",
+      "worlds": "随时从选择器切换世界——每个世界都是完全独立的故事和存档。"
+    }
+  },
+  "bench": {
+    "noData": "无数据。",
+    "hostileCruel": "敌对 / 残忍",
+    "bombed": "失败",
+    "connected": "已连接",
+    "yes": "是",
+    "no": "否",
+    "showRaw": "显示原始输出",
+    "hideRaw": "隐藏原始输出",
+    "repetitionTitle": "与该角色前一句台词的相似度",
+    "tokUnit": "令牌",
+    "inTitle": "{n} 输入",
+    "outTitle": "{n} 输出",
+    "cmpYou": "你",
+    "cmpModel": "模型",
+    "cmpDelta": "Δ",
+    "agreement": "与基线的一致度",
+    "withinTolerance": " · 在容差范围内 ✓",
+    "offBaseline": " · 偏离基线 ✗",
+    "notScored": "未评分。",
+    "statusRunning": "运行中……",
+    "statusDone": "完成",
+    "statusFailed": "失败",
+    "statusQueued": "排队中",
+    "custom": "自定义 ✓",
+    "default": "默认",
+    "baselineSavedTitle": "你保存的基线",
+    "baselineDefaultTitle": "内置默认基线（可在下方覆盖）",
+    "scriptedTurns": "预设玩家回合",
+    "yourBaseline": "你的基线",
+    "savingBl": "保存中……",
+    "updateBaseline": "更新基线",
+    "saveBaseline": "保存为我的基线",
+    "resetDefault": "重置为默认",
+    "usingDefault": "使用内置默认值——除非你保存自己的基线，否则将以此为基准进行评分。",
+    "caseFailed": "用例失败。",
+    "mPrompt": "提示词",
+    "mReply": "回复",
+    "mLatency": "延迟",
+    "mSpeed": "速度",
+    "mCalls": "调用次数",
+    "mMaxRepeat": "最大重复次数",
+    "casesPassed": "个用例通过",
+    "totalTokens": "总令牌数",
+    "totalTime": "总耗时",
+    "avgTokSec": "平均 令牌/秒",
+    "avgTokSecTitle": "跨用例的令牌加权生成速度。当你的端点报告单次响应统计时（如 LM Studio 原生 API——以 /api/v0 结尾的 base URL），该数据是准确的；否则 ≈ 数字是端到端估算值，包含了提示词处理和传输时间，因此会低于实际生成速度。如需准确数据，请在设置中配置最佳可用 API。",
+    "speedMeasuredTitle": "端点报告的真实解码速度（如 LM Studio 原生 API）——仅测量生成时间，不含提示词处理。",
+    "speedEstimatedTitle": "≈ 估算值：令牌数 ÷ 完整往返时间，因此包含提示词处理 + 网络传输，低于实际生成速度。如需准确解码速率，请使用报告单次响应统计的端点（如 LM Studio 原生 API），并在设置中进行配置。",
+    "speedFoot": "≈ 速度为端到端估算值（包含提示词处理 + 传输，低于实际生成速度）。如需真实解码速度，请将基准测试指向报告生成统计的端点——例如 LM Studio 原生 API（设置 → 以 /api/v0 结尾的 base URL）。",
+    "judgeAgreement": "评审一致度",
+    "nJudged": "{count} 个已评审",
+    "fellBack": "已回退",
+    "fellBackTitle": "有多少个用例无法使用请求的结构化输出模式而回退到更宽松的模式（json_schema → json_object → prompt_only）。这是能力信号，而非失败——用例仍然正常运行了。",
+    "fallbackBadgeTitle": "此用例因端点拒绝了请求的格式，从请求的结构化输出模式回退到更宽松的模式。并非失败——输出仍然生成并通过了验证。",
+    "nFellBack": "{count} 个已回退",
+    "perCase": "按用例",
+    "chTokens": "令牌（输入 / 输出）",
+    "chLatency": "延迟",
+    "chSpeed": "速度（令牌/秒）",
+    "humanVsModel": "人工 vs 模型",
+    "chJudge": "评审一致度",
+    "legendPrompt": "提示词",
+    "legendReply": "回复",
+    "estFoot": "* 部分令牌数为 字符数/4 估算值（你的端点未报告用量）。",
+    "noRuns": "暂无保存的运行记录。运行一次基准测试并保存，以便后续比较。",
+    "untitledRun": "未命名运行",
+    "nFailed": "{count} 个失败",
+    "passedOf": "{passed}/{cases} 个通过",
+    "judgePct": " · 评审 {pct}",
+    "comparePick": "对比（选两个）",
+    "deleteRun": "删除运行",
+    "deleteRunTitle": "删除此运行？",
+    "deleteRunBody": "此操作将永久删除保存的基准测试运行记录。",
+    "delete": "删除",
+    "csModel": "模型",
+    "csPassed": "通过",
+    "csTotalTokens": "总令牌数",
+    "csTotalTime": "总耗时",
+    "csAvgTokS": "平均 令牌/秒",
+    "csJudge": "评审一致度",
+    "sideBySide": "并排对比",
+    "compareRuns": "对比运行",
+    "runA": "A",
+    "runB": "B",
+    "proving": "诊断 · 验证基准测试",
+    "title": "Heartmorrow 基准测试",
+    "intro": "对你的模型运行游戏中使用的真实提示词——关系评审、约会评估、短信回复、世界与创作者生成器——基于 Lanternford 中的固定样本角色进行测试。目的是衡量你的模型在技术层面是否能产出所需的结构化输出，以及在主观层面能否产出有趣、不重复、不跑偏的文本。有些模型能轻松生成结构化输出，但文本非常干涩或质量低下。",
+    "currentModel": "当前模型：",
+    "tabRun": "运行",
+    "tabHistory": "历史",
+    "settings": "设置",
+    "select": "选择",
+    "selAll": "全部",
+    "selJudges": "评审",
+    "selGenerators": "生成器",
+    "selProse": "文本",
+    "selQuick": "快速",
+    "selNone": "无",
+    "dialogueTurns": "对话回合数：{n}",
+    "llmPlayerTitle": "让第二个模型扮演对话中的玩家方（动态但可比性较低）。",
+    "llmPlayer": "LLM 扮演玩家",
+    "labelPlaceholder": "运行标签（可选，如 “Llama-3 8B @ temp 0.8”）",
+    "cancel": "取消",
+    "runCases": "运行 {count, plural, one {# 个用例} other {# 个用例}}",
+    "saveRun": "保存运行",
+    "doneOf": "{done}/{total} 已完成",
+    "runSaved": "运行已保存——请在历史中查看。",
+    "nCases": "{count, plural, one {# 个用例} other {# 个用例}}",
+    "toggleGroup": "切换分组",
+    "previewing": "正在预览 {count, plural, one {# 个自定义提示词} other {# 个自定义提示词}}——下方运行使用你未保存的编辑。",
+    "previewClear": "清除预览"
+  },
+  "debug": {
+    "console": "创作者控制台",
+    "diagnostics": "诊断",
+    "title": "调试",
+    "intro": "查看已组装的提示词、近期游戏事件，以及导入/导出本地数据。",
+    "secPromptPreview": "提示词预览",
+    "character": "角色",
+    "choose": "—— 选择 ——",
+    "buildPrompt": "构建提示词",
+    "secEstimator": "提示词大小估算器",
+    "estimatorIntro": "为每种常见交互构建真实提示词并统计其令牌数，以便你查看每种交互距离模型上下文窗口的使用情况。开启实时测量后，统计的是模型精确的 usage.prompt_tokens；否则为 字符数/4 的粗略估算。",
+    "charDataSource": "角色（数据来源）",
+    "charDataSourceHint": "使用哪个角色的真实世界/关系/历史数据来组装提示词。",
+    "autoFirst": "—— 自动（第一个角色）——",
+    "contextWindow": "上下文窗口（令牌）",
+    "contextWindowHint": "你的模型加载的上下文长度。提示词 + 回复超出上限的行将被标记。",
+    "measureLive": "实时测量（精确令牌数——需要端点在线）",
+    "simulateFull": "模拟完整对话（最坏情况）",
+    "measuring": "测量中……",
+    "estimateSizes": "估算提示词大小",
+    "modelLabel": "模型",
+    "characterLabel": "角色",
+    "exactCounts": "精确令牌数",
+    "estimatedCounts": "估算令牌数",
+    "fullSim": " · 全窗口模拟",
+    "contextWindowSuffix": "上下文窗口 {tokens} 令牌",
+    "thInteraction": "交互",
+    "thMsgs": "消息数",
+    "thChars": "字符数",
+    "thPrompt": "提示词",
+    "thReply": "+ 回复",
+    "thTotal": "总计",
+    "thFits": "适配",
+    "methodExactTitle": "模型的 usage.prompt_tokens",
+    "methodEstTitle": "字符 / 4",
+    "fits": "适配",
+    "exceeds": "超出",
+    "totalNote": "总计 = 提示词令牌数 + 回复预算（你的 Max tokens 设置）。如果总计超出上下文窗口，模型将在该交互中截断最早的上下文（或报错）。",
+    "secLocalData": "本地数据",
+    "exportJson": "⬇ 导出 JSON",
+    "importJson": "⬆ 导入 JSON",
+    "importReplaces": "导入将用文件内容替换所有本地游戏数据。",
+    "importComplete": "导入完成。请重新加载应用以在各处查看更改。",
+    "secRecentEvents": "近期事件",
+    "refresh": "刷新",
+    "noEvents": "暂无事件。"
+  },
+  "worldEditor": {
+    "workbench": "世界工作台",
+    "locationsTag": "{count, plural, one {# 个地点} other {# 个地点}}",
+    "title": "世界编辑器",
+    "intro": "定义世界观。世界/背景笔记会作为参考数据发送给模型，而非指令。",
+    "newWorld": "新建世界",
+    "saving": "保存中……",
+    "saveWorld": "保存世界",
+    "export": "导出……",
+    "exportDirtyHint": "请先保存更改——导出的是已保存的世界内容，未保存的编辑不会包含在内。",
+    "worldSaved": "世界已保存！",
+    "savedKicker": "已保存",
+    "genKicker": "已生成",
+    "noun": "世界",
+    "untitledWorld": "未命名世界",
+    "worldsHeader": "世界列表",
+    "noWorlds": "暂无世界。",
+    "hasUnsaved": "有未保存的更改",
+    "noWorldSelected": "未选择世界",
+    "pickOrCreate": "从列表中选择一个世界，或新建一个。",
+    "createWorld": "创建世界",
+    "editorSectionsAria": "世界编辑区域",
+    "tabs": {
+      "setting": "设定",
+      "lore": "背景与规则",
+      "features": "系统",
+      "locations": "地点",
+      "notes": "笔记"
+    },
+    "name": "名称",
+    "summary": "简介",
+    "tone": "基调",
+    "globalNotes": "全局笔记",
+    "lore": "背景设定",
+    "rulesInFiction": "规则（故事内）",
+    "featuresNote": "世界专属系统。货币系统默认关闭，需要手动开启；邮件和动态默认开启，需要手动关闭。关闭的系统不会出现在手机中，不会生成任何内容（也不消耗模型 token），已创建的内容会保持休眠状态。",
+    "featurePropertyName": "房产",
+    "featurePropertyDesc": "租赁或购买场所，作为约会地点获得关系加成。",
+    "featureStockName": "股票市场",
+    "featureStockDesc": "投资虚构的世界内公司。",
+    "featureCasinoName": "赌场",
+    "featureCasinoDesc": "在老虎机、二十一点、轮盘和视频扑克上投注。",
+    "featureEmailName": "邮件",
+    "featureEmailDesc": "世界内的信件和旅行明信片。关闭后：没有邮件应用，不生成邮件内容。",
+    "featureFacesName": "动态",
+    "featureFacesDesc": "角色们的社交动态。关闭后：没有动态应用，不生成帖子或评论。",
+    "casinoLimits": "赌场限额",
+    "maxBet": "单次最高投注（◈）",
+    "maxBetHint": "每次投注上限 · 最高 {max}",
+    "dailyCap": "每日投注上限（◈）",
+    "dailyCapHint": "每日总投注额 · 最高 {max}",
+    "addLocation": "添加地点",
+    "generateWithAI": "用 AI 生成",
+    "genNote": "描述你想要的地点。模型会参考该世界的基调、背景设定和已有地点来创建新地点——它们会出现在下方供你审核和编辑，然后保存。",
+    "promptLabel": "提示词",
+    "promptPlaceholder": "例如：老港区附近温馨的雨夜约会场所",
+    "howMany": "数量",
+    "generating": "生成中……",
+    "generateLocations": "生成地点",
+    "noLocations": "暂无地点。",
+    "generatedAdded": "{count, plural, one {已在下方添加 # 个生成的地点——请审核后保存世界以保留。} other {已在下方添加 # 个生成的地点——请审核后保存世界以保留。}}",
+    "locGenFailed": "地点生成失败：{error}",
+    "deleteWorld": "删除世界",
+    "deleteKicker": "危险操作",
+    "deleteTitle": "删除「{name}」？",
+    "deleteBody": "该世界、其笔记和你在其中的进度将被永久删除，此操作不可撤销。",
+    "deleteCharsLabel": "同时删除该世界的角色。不勾选则保留角色——它们会被移至「未分配」（人物 → 未分配），以便你放置到其他世界。",
+    "newLocationName": "新地点",
+    "untitledLocation": "未命名地点",
+    "indoorBadge": "室内",
+    "removeLocation": "移除地点",
+    "locName": "名称",
+    "locDescription": "描述",
+    "locDescPlaceholder": "描述这个地方的氛围、景色和感受。",
+    "locTags": "标签",
+    "tagsPlaceholder": "标签……",
+    "indoorLabel": "室内（不受天气影响）",
+    "costToDate": "在此约会的费用",
+    "tierNoCost": "（免费）",
+    "tierCost": "（{symbol} {cost}）",
+    "photoOptional": "照片（可选）",
+    "photoHint": "上传这个地方的照片——它会显示在约会地点选择器和场景中。",
+    "notesCallout": "笔记是模型可以读取的参考数据——不是指令。重要性越高，显示越靠前。",
+    "noteTitle": "标题",
+    "noteScope": "范围",
+    "noteImportance": "重要性",
+    "noteBody": "正文",
+    "adding": "添加中……",
+    "addNote": "添加笔记",
+    "noNotes": "暂无笔记。",
+    "delete": "删除"
+  },
+  "characterEditor": {
+    "workbench": "角色工作台",
+    "tagNew": "新建",
+    "tagEditing": "编辑中",
+    "newTitle": "新建角色",
+    "editTitle": "编辑 {name}",
+    "editFallback": "角色",
+    "intro": "此处所有笔记都作为角色数据发送给模型——不会被当作指令。你应该尽可能详细地填写这些内容，这样模型才能赋予你的角色尽可能多的生命力。这份档案的数据会在很多地方被用到，它的效果完全取决于你输入的质量。输入垃圾，输出垃圾。唯一需要注意的是，这里的数据越多，提示词就越长。你可以点击右上角的「预览提示词」来查看完整提示词的长度。",
+    "previewPrompt": "预览提示词",
+    "saving": "保存中……",
+    "create": "创建",
+    "save": "保存",
+    "saved": "已保存！",
+    "noun": "角色",
+    "unnamed": "未命名",
+    "editorSectionsAria": "编辑器分区",
+    "tabs": {
+      "identity": "身份",
+      "personality": "性格",
+      "profile": "档案",
+      "relationships": "人际关系",
+      "world": "世界"
+    },
+    "secIdentity": "身份",
+    "name": "姓名",
+    "age": "年龄",
+    "ageHint": "必须为 {min} 岁及以上",
+    "pronouns": "代词",
+    "gender": "性别",
+    "genderHint": "与代词分开填写。",
+    "sexuality": "性取向",
+    "sexualityHint": "决定浪漫关系可以与谁发展。玩家会在游戏中逐渐发现。",
+    "world": "所属世界",
+    "worldHint": "未分配世界的角色不会出现在任何世界中，直到你为他们分配世界（在「人物 → 未分配」中恢复）。",
+    "noWorld": "—— 未分配世界 ——",
+    "relStyle": "恋爱风格",
+    "relStyleHint": "一对一交往的角色如果得知你在约会其他人，可能会吃醋。",
+    "shortDesc": "简短描述",
+    "secPortrait": "头像",
+    "generate": "生成",
+    "genKicker": "已生成",
+    "genTitle": "生成角色",
+    "genIntro": "根据头像、参考文本或两者来生成一个完整的角色——然后在保存前审核并编辑每个标签页。请至少提供一种来源。",
+    "genPortrait": "头像（可选）",
+    "genPortraitHint": "视觉模型会描述图片，该外观将决定角色的视觉形象。请在设置中指定视觉模型（会回退到主模型）。",
+    "genText": "参考文本（可选）",
+    "genTextHint": "粘贴或上传任何内容作为角色基础——维基百科条目、角色卡或几条笔记都行。文件仅读取纯文本内容。",
+    "genTextPlaceholder": "在此粘贴描述、文章或角色卡……",
+    "genUpload": "上传文本文件",
+    "genClearText": "清空文本",
+    "genOverwriteWarn": "生成操作会替换当前草稿中的姓名、身份、性格、特质、档案和约会属性。头像、表情、人际关系和职业信息会被保留——在点击「保存」之前不会保存任何内容。",
+    "genRun": "生成",
+    "genFileError": "无法将该文件作为文本读取。请尝试其他文件。",
+    "expressions": "表情",
+    "expressionsSet": "{count} 套",
+    "expressionsNote": "这些是约会评估时可用的固定表情。为想要显示的表情分配图片；留空则使用默认头像。",
+    "clear": "清除",
+    "secPersonality": "性格与说话风格",
+    "personality": "性格",
+    "speechStyle": "说话风格",
+    "relPrefs": "恋爱偏好",
+    "creatorNotes": "创作者私人笔记",
+    "creatorNotesHint": "你想给模型的任何额外指导；不会直接展示给玩家。",
+    "secTraits": "特质与边界",
+    "likes": "喜好",
+    "dislikes": "厌恶",
+    "goals": "目标",
+    "boundaries": "底线",
+    "guardedness": "防备心：{value} — {descriptor}",
+    "guardednessHint": "在约会中敞开心扉的速度。越高 = 越需要时间来建立信任和好感，约会初期会更冷淡。不会影响糟糕约会变坏的速度。",
+    "openBook": "开放坦率",
+    "walledOff": "封闭保守",
+    "secWeather": "天气偏好",
+    "weatherNote": "设定角色在特定天气下的心情，并影响户外约会倾向。♥ = 喜爱，✕ = 无法忍受。",
+    "lovesWeather": "喜爱这种天气",
+    "dislikesWeather": "不喜欢这种天气",
+    "secProfile": "档案与形象",
+    "generating": "生成中……",
+    "genFromDesc": "从描述生成",
+    "profileNote": "让 {name} 活起来的细节——他们长什么样、发什么短信、在线上是什么样子。用于世界内手机动态。",
+    "thisCharacter": "此角色",
+    "appearance": "外观",
+    "textingStyle": "发消息风格",
+    "textingStyleHint": "他们发短信和发帖的方式——与说话方式不同。",
+    "onlinePersona": "网络形象",
+    "onlinePersonaHint": "他们在社交动态上的行为方式。",
+    "loveLanguage": "爱的语言",
+    "secChemistry": "魅力与小怪癖",
+    "chemistryNote": "得体的感官/身体描写加上那些细腻的人性化细节。",
+    "physicalNeeds": "身体需求",
+    "physicalDesires": "身体渴望",
+    "physicalDislikes": "身体厌恶",
+    "insecurities": "不安全感",
+    "quirks": "小怪癖",
+    "secBaseStats": "基础约会属性",
+    "baseStatsNote": "这六项特质决定了角色的约会人设。它们影响「共同活动」带来的关系进度（每种活动偏好不同属性），选择角色最喜欢的小游戏（最高属性的那项），并影响约会时的谈话方式。未来可能还会驱动更多系统。",
+    "statLabel": "{label}：{value}",
+    "secConnections": "人际关系",
+    "connectionsNote": "{name} 与世界中其他角色的关系——驱动八卦和边界意识型嫉妒。",
+    "selectCharacter": "—— 角色 ——",
+    "addConnection": "添加人际关系",
+    "exCanonStrong": "允许前任设定为正典。",
+    "exCanonBody": "允许其他角色在约会中透露自己是 {name} 的前任，从而确立相关事实（例如：约会对象提到前任以前抽烟 → 这在设定中变为事实，如果你提起此事角色会做出反应）。默认关闭——角色的设定不可修改。可随时撤销。",
+    "secRelationship": "恋爱关系",
+    "relStatsLater": "恋爱属性将在角色创建后显示。",
+    "secMemories": "记忆",
+    "memoriesSaveFirst": "请先保存角色才能添加手动记忆。",
+    "addMemory": "添加记忆",
+    "memoryPlaceholder": "例如：玩家也喜欢雨天。",
+    "importance": "重要性",
+    "adding": "添加中……",
+    "add": "添加",
+    "noMemories": "暂无记忆。",
+    "deleting": "删除中……",
+    "delete": "删除",
+    "secEmployment": "职业",
+    "employmentNote": "{name} 的工作。同事（共享同一工作地点的角色）容易偶遇彼此——这丰富了世界模拟。如果角色无工作请留空。",
+    "employed": "已就业",
+    "jobTitle": "职位",
+    "workplace": "工作地点",
+    "workplaceHint": "共享同一工作地点的角色为同事关系。",
+    "shift": "班次",
+    "shiftMorning": "早班",
+    "shiftAfternoon": "午班",
+    "shiftEvening": "晚班",
+    "workdays": "工作日",
+    "assembledPrompt": "组装的系统提示词",
+    "close": "关闭",
+    "statsGenerated": "属性已生成——请审核并保存。",
+    "statGenFailed": "属性生成失败：{error}",
+    "profileGenerated": "档案已生成——请审核并保存。",
+    "profileGenFailed": "档案生成失败：{error}",
+    "characterGenerated": "角色已生成——请审核每个标签页并保存。",
+    "savedKicker": "已保存",
+    "characterGenFailed": "生成失败：{error}",
+    "untitledCharacter": "未命名角色"
+  },
+  "library": {
+    "kicker": "创作者工具",
+    "title": "图片库",
+    "blurb": "你上传的所有图片集中在这里——重命名、重新标记、查看使用位置，并清理不再需要的图片。",
+    "unused": "未使用",
+    "dupes": "重复",
+    "select": "选择",
+    "selectShown": "全选当前显示",
+    "selected": "{count, plural, one {已选 # 项} other {已选 # 项}}",
+    "shownCount": "{count, plural, one {# 张图片} other {# 张图片}}",
+    "usedCount": "{count, plural, one {被引用 # 次} other {被引用 # 次}}",
+    "deleteSelected": "删除",
+    "deleteTitle": "{count, plural, one {删除这张图片？} other {删除 # 张图片？}}",
+    "deleteBody": "{count, plural, one {文件将被永久删除——目前没有使用它。} other {文件将被永久删除——目前没有使用它们。}}",
+    "deleteInUseWarn": "{count, plural, one {其中有 # 张仍在使用中。引用它的内容——头像、地点、旧文本等——将丢失图片。} other {其中有 # 张仍在使用中。引用它们的内容——头像、地点、旧文本等——将丢失图片。}}",
+    "deleteConfirm": "删除",
+    "deleted": "{count, plural, one {图片已删除。} other {# 张图片已删除。}}",
+    "rebuildThumbs": "重建缩略图",
+    "rebuildDone": "缩略图重建完成：生成 {generated} 张，失败 {failed} 张。",
+    "uploaded": "已添加「{name}」。",
+    "worldFilter": "按世界筛选",
+    "allWorlds": "所有世界",
+    "replace": "替换图片……",
+    "replacing": "替换中……",
+    "replaceHint": "替换此图片在所有使用处的显示。名称、标签和链接保持不变。",
+    "replaced": "图片已替换——所有使用它的地方现在都显示新图片。",
+    "emptyTitle": "暂无图片",
+    "emptyBody": "在此上传图片，或从任何头像/地点选择器上传——它们都会汇总到这个图片库中。",
+    "detailKicker": "图片",
+    "fieldName": "名称",
+    "fieldType": "类型",
+    "fieldAlt": "替代文本",
+    "fieldAltHint": "用于搜索和无障碍访问的图片描述。",
+    "fieldTags": "标签",
+    "usageHead": "使用位置",
+    "usageNone": "没有使用此图片的内容。可以安全删除。",
+    "textsCount": "{count, plural, one {# 个图片文本} other {# 个图片文本}}",
+    "delete": "删除……",
+    "save": "保存",
+    "saving": "保存中……"
+  },
+  "settings": {
+    "head": {
+      "kicker": "控制台",
+      "title": "设置",
+      "blurb": "配置游戏使用的各项设置，包括语言、外观以及LLM端点和模型设置。"
+    },
+    "modelSetup": {
+      "languageKicker": "故事语言",
+      "languageTitle": "故事应该使用什么语言？",
+      "outputLanguageHint": "设置新对话、文本、描述和其他模型生成文本的语言。自动模式会跟随提示词和角色上下文。你可以稍后在设置中更改此选项。"
+    },
+    "groups": {
+      "difficulty": "难度",
+      "appearance": "外观",
+      "gameplay": "游戏玩法",
+      "persona": "你的角色",
+      "model": "模型与诊断"
+    },
+    "tabsAria": "设置分区",
+    "playstyle": {
+      "kicker": "游戏风格",
+      "head": "难度与约会反馈",
+      "lede": "调整约会的严苛程度以及游戏对约会的评判方式。更改会即时保存并从你的下一条消息起生效——它们不会改变角色的台词，只影响后果的力度。",
+      "sum": {
+        "gentle": "宽容——温暖更容易获得，失误代价更低，糟糕的约会也会被温柔以待。",
+        "normal": "调校过的基准——每个后果都按照游戏设计精准落地。",
+        "harsh": "严苛——温暖难以获得又容易失去，糟糕的约会会留下深刻印记。"
+      },
+      "exHead": "消息如何影响氛围",
+      "exGood": "一句真正打动人心的话",
+      "exBad": "一句敷衍、冷淡的回复",
+      "patience": {
+        "gentle": "他们几乎会容忍一切——只有极其糟糕的约会才会让他们提前离开。",
+        "normal": "如果氛围跌入谷底，他们会礼貌地结束约会。",
+        "harsh": "他们的耐心更早耗尽——氛围崩塌时约会会提前结束。"
+      },
+      "grading": {
+        "gentle": "约会结束时的评判者会稍微宽容一些，挫折的影响也会被弱化。",
+        "normal": "约会结束时的评判者会如实评分。",
+        "harsh": "约会结束时的评判者会稍微苛刻一些，挫折的影响会更重。"
+      },
+      "cadEveryTag": "最高响应",
+      "cadPeriodicTag": "更轻量——更少模型调用"
+    },
+    "toast": {
+      "saved": "设置已保存。",
+      "noModels": "已连接，但端点未返回任何模型。",
+      "loadedModels": "{count, plural, one {已加载 # 个模型——请在模型字段中选择一个。} other {已加载 # 个模型——请在模型字段中选择一个。}}"
+    },
+    "appearance": {
+      "kicker": "外观与语言",
+      "head": "外观",
+      "lede": "Heartmorrow 的外观和阅读体验——这些设置适用于整个应用，不仅限于你的手机。",
+      "language": "界面语言",
+      "languageHint": "菜单和控件的语言。这不会翻译已有的故事内容。",
+      "outputLanguage": "输出语言",
+      "outputLanguageHint": "强制所有新生成的对话、故事、消息、描述和其他文本使用此语言。已有内容和界面不受影响。自动模式会跟随提示词和角色上下文。<0>语言质量因模型而异。较小的模型在支持不够好的语言中可能会产生不通顺、不准确或有语法错误的文本。</0>如果效果不佳，可以尝试使用更大的或不同的模型。",
+      "outputLanguageSaving": "正在保存生成输出语言……",
+      "outputLanguageOptions": {
+        "auto": "自动（跟随上下文）",
+        "en": "English",
+        "zh-Hans": "Chinese (Simplified)",
+        "zh-Hant": "Chinese (Traditional)",
+        "ja": "Japanese",
+        "ko": "Korean",
+        "es": "Spanish",
+        "fr": "French",
+        "de": "German",
+        "pt-BR": "Portuguese (Brazil)",
+        "it": "Italian",
+        "ru": "Russian",
+        "pl": "Polish",
+        "nl": "Dutch",
+        "tr": "Turkish",
+        "ar": "Arabic",
+        "he": "Hebrew",
+        "fa": "Persian (Farsi)",
+        "ur": "Urdu",
+        "hi": "Hindi",
+        "id": "Indonesian",
+        "vi": "Vietnamese",
+        "th": "Thai",
+        "uk": "Ukrainian"
+      },
+      "accent": "强调色",
+      "accentHint": "为整个应用中的高亮、按钮和恋爱提示着色。",
+      "accentCustom": "自定义色调",
+      "presets": {
+        "rose": "玫瑰",
+        "brass": "黄铜",
+        "moonlight": "月光",
+        "sage": "鼠尾草",
+        "ember": "余烬",
+        "plum": "梅子"
+      }
+    },
+    "mode": {
+      "kicker": "游玩方式",
+      "head": "模式",
+      "playName": "游玩模式",
+      "playDesc": "隐藏创建/编辑工具（游戏中无法删除角色）。",
+      "creatorName": "创作者模式",
+      "creatorDesc": "显示这些工具。也可在手机 → 设置中切换。",
+      "play": "游玩模式",
+      "creator": "创作者模式"
+    },
+    "nsfw": {
+      "kicker": "内容分级",
+      "head": "成人内容（NSFW）",
+      "lede": "启用后，模型可能在约会中生成成熟/露骨的内容——但前提是与角色的关系已足够深入。向陌生人或熟人提出不当要求仍会让他们拂袖而去。",
+      "on": "成人内容已开启",
+      "off": "关闭",
+      "saving": "保存中……",
+      "disable": "禁用",
+      "enable": "启用成人内容……",
+      "modelHint": "最佳搭配经过 “去审查” 的模型使用。即使开启了此选项，经过审查或安全调优的模型仍可能拒绝生成露骨内容。"
+    },
+    "tragic": {
+      "kicker": "沉重主题",
+      "head": "悲剧结局（自残）",
+      "lede": "启用后，对深爱你的角色进行持续、严重的伤害（反复心碎、出轨、残忍对待）可能会走向极端——游戏会给出多次明确警告和挽回机会——最终导致角色选择自我了结，并被永久缅怀。游戏不会直接描绘这一行为。善待他们或给他们空间总能将他们拉回正轨。默认关闭。",
+      "on": "悲剧结局已开启",
+      "off": "关闭",
+      "saving": "保存中……",
+      "disable": "禁用",
+      "enable": "启用悲剧结局……"
+    },
+    "persona": {
+      "kicker": "你是谁",
+      "head": "你的角色",
+      "lede": "角色眼中的你——你的名字、代词和备注会与你遇到的每个人共享。",
+      "name": "你的名字",
+      "pronouns": "你的代词",
+      "gender": "你的性别",
+      "genderHint": "与代词分开设置。",
+      "sexuality": "你的性取向",
+      "sexualityHint": "决定可以与哪些角色发展恋爱关系。",
+      "notes": "角色备注",
+      "notesHint": "可选——任何你希望角色了解的关于你的信息。",
+      "saving": "保存中……",
+      "save": "保存角色",
+      "saved": "已保存 ✓"
+    },
+    "bench": {
+      "kicker": "诊断",
+      "head": "Heartmorrow 基准测试",
+      "blurb": "测试你的模型在游戏实际使用的提示词（关系评判、约会评估和生成器）上的表现——基于固定样本。用你自己的基线对比评判结果，观看约会实况，追踪令牌数、延迟和令牌/秒。保存运行记录以对比不同模型。",
+      "open": "打开"
+    },
+    "images": {
+      "kicker": "创作者工具",
+      "head": "图片库",
+      "blurb": "浏览所有已上传的图片，查看每张图片的使用位置，编辑名称和标签，删除不再需要的图片。",
+      "open": "打开"
+    },
+    "providers": {
+      "chat_completions": {
+        "name": "OpenAI 兼容",
+        "tag": "/v1 · chat",
+        "desc": "OpenAI /chat/completions——LM Studio (/v1)、Ollama、llama.cpp、vLLM 或任何兼容服务器。"
+      },
+      "lmstudio": {
+        "name": "LM Studio",
+        "tag": "原生 /api/v0",
+        "desc": "LM Studio 的原生 API——更丰富的模型列表（加载状态、上下文、量化）和每次响应的速度统计。将基础 URL 指向 …/api/v0。"
+      },
+      "ollama": {
+        "name": "Ollama",
+        "tag": "原生 /api/chat",
+        "desc": "Ollama 的原生 API——开关模型的思考功能或设置推理级别，以及模型列表（包含加载状态和量化信息）。将基础 URL 指向服务器根目录（如 http://localhost:11434）。"
+      },
+      "koboldcpp": {
+        "name": "KoboldCpp",
+        "tag": "原生 /api/v1",
+        "desc": "KoboldCpp 的原生 API——文本补全端点，请选择与你加载的模型匹配的指令模板。将基础 URL 指向服务器根目录（如 http://localhost:5001）。"
+      },
+      "anthropic": {
+        "name": "Anthropic",
+        "tag": "messages",
+        "desc": "Anthropic Messages API——api.anthropic.com 或任何兼容的代理/网关。需要 API 密钥 + anthropic-version。"
+      },
+      "responses": {
+        "name": "Responses",
+        "tag": "reserved",
+        "desc": "保留用于 OpenAI Responses API——尚未实现；会回退到 chat/completions。"
+      }
+    },
+    "console": {
+      "sub": "本地模型链接",
+      "title": "连接控制台",
+      "providerFallback": "供应商",
+      "endpointSet": "端点已设置",
+      "noEndpoint": "未设置端点",
+      "usingMain": "使用主端点",
+      "providerLabel": "供应商",
+      "endpointModeAria": "端点模式",
+      "connection": "连接",
+      "generation": "生成"
+    },
+    "roles": {
+      "on": "开启",
+      "off": "关闭",
+      "usingMain": "此角色使用主配置。开启后可为其分配独立的端点和模型。",
+      "base": {
+        "tab": "主配置"
+      },
+      "evaluator": {
+        "tab": "评判",
+        "blurb": "关系评判——约会得分、消息是否到位，以及礼物/分手/告别反应。可将它们路由到独立的模型或端点（例如小型快速本地模型），同时主模型继续生成文本。"
+      },
+      "vision": {
+        "tab": "视觉",
+        "blurb": "基于图像的生成，如根据肖像草拟角色或对图像文本做出反应。启用后可在完全独立的端点上使用支持视觉的模型；否则使用主配置中的基础视觉模型。"
+      }
+    },
+    "image": {
+      "tab": "图片",
+      "provider": "Stable Diffusion",
+      "disabledShort": "关闭",
+      "blurb": "使用 AUTOMATIC1111 / Stable Diffusion WebUI 服务器（通过其 /sdapi/v1/txt2img API 调用）生成图片。启用后将 Heartmorrow 指向你的 SD 端点；关闭则完全跳过图片生成。",
+      "disabledHint": "图片生成已关闭。开启后可配置 Stable Diffusion 端点。",
+      "connection": "端点",
+      "generation": "默认值",
+      "baseUrlHint": "AUTOMATIC1111 / SD WebUI API 根路径，如 http://127.0.0.1:7861（API 需通过 --api 启用）。",
+      "negativePrompt": "反向提示词",
+      "negativePromptHint": "随每张图片发送——需要避免的内容。",
+      "sampler": "采样器",
+      "samplerHint": "输入任意采样器名称，或从你的端点加载列表后选择。",
+      "loadSamplers": "加载采样器",
+      "pickSampler": "{count, plural, one {从 # 个采样器中选择……} other {从 # 个采样器中选择……}}",
+      "loadedSamplers": "{count, plural, one {已加载 # 个采样器——请在采样器字段中选择一个。} other {已加载 # 个采样器——请在采样器字段中选择一个。}}",
+      "noSamplers": "已连接，但端点未返回任何采样器。",
+      "width": "宽度",
+      "height": "高度",
+      "steps": "步数",
+      "stepsHint": "采样步数（1–150）。步数越多=越慢，通常效果越好。",
+      "cfgScale": "CFG 缩放",
+      "cfgScaleHint": "图片对提示词的遵循程度（通常 5–9）。"
+    },
+    "fields": {
+      "baseUrl": "基础 URL",
+      "baseUrlHintAnthropic": "如 https://api.anthropic.com/v1（或你的兼容代理）",
+      "baseUrlHintLmstudio": "如 http://localhost:1234/api/v0（LM Studio 原生 API）",
+      "baseUrlHintOllama": "如 http://localhost:11434（Ollama 服务器根目录——不是 /v1 路径）。",
+      "baseUrlHintKobold": "如 http://localhost:5001（KoboldCpp 服务器根目录——不是 /v1 路径）。",
+      "baseUrlHintDefault": "如 http://localhost:1234/v1 或 http://localhost:1234/",
+      "apiKey": "API 密钥",
+      "apiKeyHintSet": "密钥已设置。留空则保持不变。",
+      "apiKeyHintAnthropic": "Anthropic API 必需。",
+      "apiKeyHintLocal": "本地服务器可选。",
+      "apiKeyPlaceholderSet": "••••••••（未更改）",
+      "apiKeyPlaceholderRequired": "必需",
+      "apiKeyPlaceholderOptional": "可选",
+      "anthropicVersion": "Anthropic 版本",
+      "anthropicVersionHint": "作为 anthropic-version 请求头发送。除非你的端点需要更新的版本，否则请保持默认。",
+      "ollamaThink": "思考",
+      "ollamaThinkHint": "Ollama 的推理控制。“模型默认”表示不设置——对于没有思考模式的安全选择（使用该选项的模型会拒绝）。开启/关闭强制设置；低–最大为支持推理级别的模型设置追踪深度（如 gpt-oss）。推理过程不会在回复中显示。",
+      "ollamaThinkOpts": {
+        "default": "模型默认",
+        "off": "关闭",
+        "on": "开启",
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "max": "最大"
+      },
+      "koboldTemplate": "指令模板",
+      "koboldTemplateHint": "KoboldCpp 的原生 API 是原始文本补全端点，因此 Heartmorrow 会为你格式化每一轮对话。选择与你加载的模型训练格式匹配的模板——即使选错也能运行，但回复质量会下降。Alpaca 是安全的通用默认选项；使用 ChatML / Llama 3 / Mistral / Vicuna 来匹配这些系列，或使用 Plain 对应基础模型。",
+      "koboldTemplateOpts": {
+        "alpaca": "Alpaca (### Instruction)",
+        "chatml": "ChatML (<|im_start|>)",
+        "llama3": "Llama 3",
+        "vicuna": "Vicuna (USER/ASSISTANT)",
+        "mistral": "Mistral ([INST])",
+        "plain": "Plain（无标记）"
+      },
+      "model": "模型",
+      "modelHint": "输入任意模型名称，或从下方已加载列表中选择。",
+      "pickFrom": "{count, plural, one {从 # 个模型中选择……} other {从 # 个模型中选择……}}",
+      "pickModel": "选择模型……",
+      "loading": "加载中……",
+      "loadModels": "加载模型",
+      "temperature": "温度: {value}",
+      "maxTokens": "最大令牌数",
+      "advancedSampling": "高级采样",
+      "advancedSamplingHint": "可选。留空则使用端点的默认值。top_k / min_p / 重复惩罚参数受 llama.cpp、LM Studio、Ollama 和 vLLM 支持，但会被官方 OpenAI API 忽略或拒绝。",
+      "samplingDefault": "默认",
+      "topP": "Top P",
+      "topK": "Top K",
+      "minP": "Min P",
+      "frequencyPenalty": "频率惩罚",
+      "presencePenalty": "存在惩罚",
+      "repeatPenalty": "重复惩罚",
+      "structuredMode": "结构化输出模式",
+      "structuredModeHint": "json_object 适用于大多数本地服务器。",
+      "dropSchema": "从提示词中删除 schema",
+      "dropSchemaHint": "仅用于 json_schema 模式的性能测试：语法已强制约束结构，因此提示词中的重复 schema 文本是冗余的。跳过它可以缩小提示词（加快预填充）。在 json_object / prompt_only 模式下无效。",
+      "dropSchemaLabel": "跳过重复的 schema 文本（json_schema 模式）",
+      "retryLimit": "结构化输出重试限制",
+      "retryLimitHint": "在结构化响应格式错误/无效时进行重试。",
+      "rapport": "实时约会反馈",
+      "rapportHint": "约会多频繁地评估你上一条消息的效果（更新氛围和表情）。'每条消息'响应最及时；'周期性'保持回复更简洁，每轮少一次模型调用。",
+      "rapportEvery": "每条消息",
+      "rapportPeriodic": "周期性",
+      "difficulty": "约会难度",
+      "difficultyGentle": "简单",
+      "difficultyNormal": "普通",
+      "difficultyHarsh": "困难"
+    },
+    "foot": {
+      "saving": "保存中……",
+      "save": "保存设置",
+      "testing": "测试中……",
+      "test": "测试连接"
+    },
+    "health": {
+      "connected": "已连接！",
+      "failed": "连接失败。",
+      "sample": "示例回复：",
+      "models": "模型："
+    },
+    "nsfwModal": {
+      "kicker": "请确认",
+      "title": "启用成人（NSFW）内容",
+      "intro": "这是一款私密、本地、单人游戏。内容由你自己的本地模型生成，永远不会离开你的设备。要继续，请确认以下两点：",
+      "ackContent": "我理解启用成人内容后，本地模型可能会生成露骨、色情或其他不当内容，DSim 不会对输出进行过滤或保证。",
+      "ackAge": "我确认我已达到所在司法管辖区查看成人内容的法定年龄。",
+      "footnote": "最佳搭配经过 “去审查” 的模型使用——经过审查的模型即使开启此选项仍可能拒绝。成人内容仅在与角色的关系足够深入后才会生成；向陌生人或熟人提出不当要求仍会让他们拂袖而去。",
+      "cancel": "取消",
+      "enabling": "正在启用……",
+      "enable": "启用成人内容"
+    },
+    "tragicModal": {
+      "kicker": "请仔细阅读",
+      "title": "启用悲剧结局",
+      "intro": "这会添加一个沉重的可选后果：如果你反复严重伤害一个深爱你的角色——且无视不断升级的警告，包括一位担忧的朋友伸出援手——他们可能会选择自我了结并被永久缅怀。游戏不会直接描绘这一行为。善待他们、给他们空间或停止伤害总能将他们拉回正轨。",
+      "ack": "我理解此内容涉及游戏内虐待导致的自杀主题，并希望启用此功能。我可以随时将其关闭。",
+      "cancel": "取消",
+      "enabling": "正在启用……",
+      "enable": "启用悲剧结局"
+    },
+    "advanced": {
+      "kicker": "高级",
+      "head": "高级模式",
+      "lede": "显示高级用户控制——每个模型连接上的额外采样参数以及用于自定义游戏发送给模型的提示词的提示词编辑器。默认关闭；没有它一切正常运行。",
+      "on": "开启",
+      "off": "关闭"
+    },
+    "prompts": {
+      "kicker": "提示词",
+      "head": "提示词编辑器",
+      "blurb": "编辑游戏发送给模型的任何系统提示词或安全护栏。覆盖设置仅保存在此设备上——永远不会打包进你分享的世界或角色中。",
+      "open": "打开",
+      "page": {
+        "kicker": "高级",
+        "title": "提示词编辑器",
+        "blurb": "自定义游戏发送给模型的任何提示词。更改仅保存在此设备上并立即生效——永远不会成为你导出的世界或角色的一部分。"
+      },
+      "enableAdvanced": "提示词编辑器位于高级模式下。在设置中开启高级模式即可从此处访问——你在这里保存的任何覆盖设置同样生效。",
+      "categories": {
+        "roleplay": "约会与角色扮演",
+        "judge": "评判与评分",
+        "phone": "手机与短信",
+        "social": "社交动态",
+        "memory": "记忆与回顾",
+        "creator": "创作者工具",
+        "safety": "安全护栏"
+      },
+      "editedBadge": "已自定义",
+      "custom": "已自定义",
+      "default": "默认",
+      "safetyWarn": "这是一个安全护栏。编辑它可能会削弱游戏的内容限制和对提示词注入的防御。仅在你理解风险的情况下进行修改。",
+      "requiredTokens": "保留这些占位符：",
+      "charCount": "{count, plural, one {# 个字符} other {# 个字符}}",
+      "missingTokens": "保存前请添加回这些占位符：{tokens}",
+      "save": "保存覆盖设置",
+      "saving": "保存中……",
+      "saved": "已保存。游戏将从现在起使用此提示词。",
+      "discardConfirm": "放弃你对此提示词的未保存更改？",
+      "previewInBench": "在基准测试中预览",
+      "reset": "恢复默认",
+      "resetDone": "已恢复为出厂默认值。",
+      "showDefault": "显示出厂默认值",
+      "hideDefault": "隐藏出厂默认值",
+      "defaultPanelLabel": "出厂默认值（只读）",
+      "selectHint": "选择一个提示词进行编辑。",
+      "backToSettings": "返回设置"
+    },
+    "help": {
+      "kicker": "新手引导",
+      "head": "如何游玩",
+      "blurb": "约会、评分、手机、赚钱和创建世界的实战指南——Heartmorrow 所有功能的详细解释。",
+      "open": "打开"
+    }
+  },
+  "help": {
+    "head": {
+      "kicker": "游戏指南",
+      "title": "游戏玩法",
+      "blurb": "从第一次约会到打造自己的世界，你需要知道的一切。选择一个话题深入了解。"
+    },
+    "nav": {
+      "topics": "话题"
+    },
+    "topicOf": "话题 {n} / {total}",
+    "support": {
+      "kicker": "社区",
+      "title": "支持与更新",
+      "blurb": "有问题、bug 报告、建议，或者想关注动态？加入 Discord 获取支持、公告和社区互动——或在 GitHub 上浏览源码、发布和开放议题。",
+      "cta": "加入 Discord",
+      "ctaGithub": "在 GitHub 上查看"
+    },
+    "cats": {
+      "getting-started": {
+        "label": "入门指南",
+        "title": "入门指南",
+        "overview": "Heartmorrow 是一款在你自己的电脑上运行的单人约会模拟游戏。你选择一个世界，结识住在那里的角色，通过约会和用游戏内手机发短信来发展关系。在此之前，你需要在设置中连接一个语言模型，因为模型赋予每个角色生命。游戏内每天给你一小池体力来使用；体力耗尽后，你需要睡觉来开始新的一天。",
+        "sections": [
+          {
+            "heading": "先连接模型",
+            "body": [
+              "Heartmorrow 自己没有大脑。每个角色的语言来自你指向的语言模型，所以在你连接模型之前，约会和短信都不会生成。这是最先需要设置的东西。打开设置（你可以直接从世界选择器进入，甚至不需要先进入世界），找到连接面板。",
+              "你有两个大致的选择。你可以用 LM Studio 或 Ollama 之类的东西在自己电脑上本地运行模型，这免费且所有数据都留在你机器上。或者你可以选择托管服务提供商并粘贴其 API 密钥来连接。",
+              "无论你选哪个，用测试按钮确认 Heartmorrow 能连上模型。绿色结果表示你已连接并准备就绪。之后，直接进入世界开始游戏就好。"
+            ],
+            "bullets": [
+              "OpenAI 兼容：支持 LM Studio、Ollama、llama.cpp、vLLM 及类似本地服务器。将基础 URL 指向你自己的服务器。",
+              "LM Studio：原生连接，提供更丰富的模型详情和每次响应的速度统计。",
+              "Ollama：原生连接，额外提供思维控制功能——可以开关模型的推理模式，或设置推理深度（对支持层级的模型可设置低到最大）。",
+              "KoboldCpp：原生连接。由于它是纯文本引擎，请选择与你加载模型匹配的指令模板（Alpaca、ChatML、Llama 3 等）。",
+              "Anthropic：需要 API 密钥的托管服务。",
+              "本地模型通常不需要密钥；托管服务需要。",
+              "你可能还会在设置中看到一个单独的图像模型连接——游戏中暂时没有使用它，可以放心忽略。"
+            ]
+          },
+          {
+            "heading": "选择一个世界",
+            "body": [
+              "Heartmorrow 中的一切都发生在世界里，每个世界有自己的背景、角色阵容、日历和存档。世界选择器是你的主基地：每张卡片显示世界名称、当前日期和居住人数。按回车进入，或者如果是你上次在的世界则点击继续。",
+              "角色属于他们居住的世界，所以你遇到、约会和发短信的角色都是那个特定世界的阵容。切换世界实际上意味着切换存档：你在一个世界中的关系、金钱和进度与另一个世界是完全独立的。",
+              "想从头开始？用「开始新世界」进行简短的四步引导设置。你会给这个地方命名并设定基调，创建你自己的角色设定（角色们认识的你的版本），可选地从其他世界带人过来，然后在第 1 天开始前阅读简要说明。"
+            ]
+          },
+          {
+            "heading": "每日循环",
+            "body": [
+              "Heartmorrow 中的一天是精心规划的小量体力预算。约会或玩小游戏各消耗一点，你每天开始时有三点。随你怎么花：一次大型约会、几次轻松活动，或混合搭配。周末多给一点，共四点。",
+              "随着体力消耗，时钟会从早上到下午到晚上，最后体力耗尽时进入夜晚。用手机给人发短信随时可用，不消耗体力，所以你可以在大事件之间保持联系。",
+              "当你准备好继续时，按状态栏中的日期按钮。还有体力时显示「结束一天」，全部花完后变成「睡眠」；无论哪种都会带你进入第二天早上，恢复体力，并显示简短的一天回顾以及镇上发生的事。有一点要注意：你不能在进行中的约会中途结束一天，所以先完成或离开约会。"
+            ],
+            "bullets": [
+              "结识你世界中的人并开始与某人约会。",
+              "随时从手机给任何人发短信，不消耗体力。",
+              "将每日体力花在约会和活动上。",
+              "结束一天以进入第二天早上并恢复体力。"
+            ]
+          },
+          {
+            "heading": "金钱：你需要自己赚",
+            "body": [
+              "你开始时口袋空空。没有零花钱，也没有每日补贴。金钱是你通过上班打工和玩游戏赚来的，用来购买礼物、更好的约会场所以及其他额外支出。",
+              "由于没有免费收入，一开始钱包空空如也完全正常。找点工作，攒点现金，在关键的地方花掉。（如果你开始投资，股票分红是唯一一种被动收入形式，但其他一切都是挣来的。）工作和消费各有专门的帮助章节。"
+            ]
+          },
+          {
+            "heading": "阅读状态栏",
+            "body": [
+              "紧凑的状态栏始终显示关键信息：你所在的世界、当前日期和时间段、游戏内的星期和季节、剩余体力（以小点和数字显示）以及手头现金。",
+              "同一个栏还有日期按钮。还有体力时显示「结束一天」；体力归零后变成「睡眠」。按下后都会带你进入第二天早上。"
+            ]
+          }
+        ]
+      },
+      "relationships": {
+        "label": "恋爱指南",
+        "title": "恋爱指南",
+        "overview": "Heartmorrow 的核心是一段段真实的关系——从初识到亲密。以下是它的运作方式。",
+        "sections": [
+          {
+            "heading": "角色对你的感受",
+            "body": [
+              "你相处的每个人都会默默追踪五种温暖的感受：好感（他们对你的喜欢和关心程度）、信任（与你坦诚相待的安全感）、化学反应（浪漫的火花）、舒适感（在你身边有多自在）和尊重（对你的欣赏程度）。还有一种冰冷的感受——紧张感，它源自尴尬、不经意或伤人的时刻留下的摩擦。",
+              "刚开始时每个人都不太了解你，所以五种温暖感受都很低，紧张感为零。美好的约会、体贴的短信和共同的活动会提升温暖感受；粗鲁、忽视和不合时宜的请求会增加紧张感。五种温暖感受共同构成你的整体温暖度，这是决定关系走向的唯一因素。紧张感单独计算，并且会对你产生不利影响，尤其是在争吵之后。"
+            ]
+          },
+          {
+            "heading": "关系阶段与里程碑",
+            "body": [
+              "你的综合温暖度将每段关系置于一个命名阶段。随着你们越来越亲近，你们会逐级攀升："
+            ],
+            "bullets": [
+              "从几乎陌生人到相识、升温、亲近、亲密，最终成为恋人。",
+              "跨越到亲近、亲密或恋人阶段是一个里程碑，值得庆祝的时刻。",
+              "当里程碑出现时，你会在约会结束时看到一个横幅，角色通常会在第二天早上给你发短信，并记录在你的时刻中，方便你日后回顾。",
+              "里程碑只在上升过程中发生，每个里程碑只出现一次。回落再重新跨越同一条线不会重播它。"
+            ]
+          },
+          {
+            "heading": "定义关系",
+            "body": [
+              "除了不断亲近，你还可以给关系贴上标签。有一个三级承诺阶梯，每当你达到相应的温暖阶段时就会解锁：",
+              "在约会时使用“定义关系”动作来询问。如果时机合适，他们可能会答应，关系就会升一级。他们也可能温和地回避，不会有什么伤害，但他们在几天内不会再接受另一次询问。如果你问得太早，或者在关系恶化后询问，可能会适得其反：这会伤害他们，增加紧张感，而在正式约会中会直接结束约会。你也不能一次跨越两级，而且在询问之前你必须在约会中与他们实际交谈过。"
+            ],
+            "bullets": [
+              "邀请他们开始约会，当你达到亲近阶段时解锁。",
+              "成为专属关系，当你达到亲密阶段时解锁。",
+              "搬到一起住，当你达到恋人阶段时解锁。",
+              "无论是否被接受，在任何一次询问后，他们大约三天内不会重新考虑这个问题。"
+            ]
+          },
+          {
+            "heading": "纪念日",
+            "body": [
+              "在一起的时光会被铭记。在你与某人的第一次约会——或你们共同的承诺——满一个季节后，那一天就会成为一个纪念日。是角色记得：他们会在那天早上给你发短信，日历应用会在那天标记一个小爱心，让你能看到纪念日的到来。在当天带他们去约会会从这次晚间约会中获得额外的温暖度，那天会被记录在那个角色的时刻中。",
+              "纪念日根据所纪念的内容分级。在你们还未承诺时，第一次约会纪念日是一个小小的、温馨的回忆。一旦你们开始约会、成为专属或搬到一起，那次承诺的纪念日就会完全取代它——每个季节一个纪念日，只保留最重要的那个——承诺越深，庆祝的价值就越高。升一级会将庆祝日转移到新的里程碑。分手会让纪念日沉寂，而赢回某人则会重新开始计时。"
+            ]
+          },
+          {
+            "heading": "与其他人交往：嫉妒",
+            "body": [
+              "你可以同时与多个人约会。一个一夫一妻制的角色如果真心关心你（大约在亲近阶段及以上），发现你最近一直在和别人约会可能会很受伤。在你们还是随意关系时，风险相对较小，伤害也较小。一旦你们成为专属或搬到一起，被发现的可能性更大，伤害也更严重——这是真正的背叛，会大量损失信任和好感，并大幅增加紧张感。",
+              "角色还会在意他们抓到你和谁在一起：他们的前任、他们的暗恋对象或竞争对手，比陌生人造成的伤害更大。多情的角色是例外，他们公开表示爱多个人，不会像一夫一妻制角色那样嫉妒。"
+            ]
+          },
+          {
+            "heading": "冷却期、分手与挽回",
+            "body": [
+              "关系需要经营。如果你长期忽视某人，他们的温暖感受会慢慢冷却，一些紧张感也会悄然出现。你们的关系越亲密，容忍期限就越短：随意的关系可以维持大约两周才开始冷却，而同居的伴侣只几天就会感到被忽视，冷却后速度也更快。",
+              "承诺不是终点；一段承诺的关系必须保持健康。如果温暖度骤降或紧张感持续升高——因为糟糕的约会、伤人的请求或长期的忽视——关系就会“岌岌可危”。这是一个警告，你会收到一条“我们需要谈谈”的短信。你有几天时间通过一次美好的约会来扭转局面，否则关系就会结束。一次灾难性的约会可以立即结束关系，没有任何警告。",
+              "分手并不总是永久的。冷却期过后，你可以通过保持联系和重建温暖来赢回某人，他们会谨慎地再试一次，不过每次分手都会留下伤疤，使下一次关系更加脆弱。没有承诺的关系永远不会正式分手；如果你忽视它们，它们只会冷却。"
+            ]
+          },
+          {
+            "heading": "吸引力与亲密关系",
+            "body": [
+              "浪漫只在相互吸引的地方绽放。如果你设定了性取向，而角色的性取向明确排除了你，这种关系仍然可以发展成友好的相识，但不会跨越到浪漫阶段，因此不会有约会、里程碑、嫉妒或亲密关系。这是严格选择加入的：如果你不设定性取向，或者你们中任何一方是双性恋、非二元性别或未指定，就不会有任何限制。当不兼容的配对关系稳定后，角色可能会温暖而诚实地分享他们的性取向并拒绝浪漫。",
+              "如果你在设置中开启了成人内容（并且使用的是允许成人内容的模型），亲密关系仍然是需要争取的，而不是自动发生的。只有当你真正亲近——达到亲密阶段或更亲密——且你们之间关系平静时，它才成为可能，所以最近的争吵会让你暂时无法进入亲密状态，直到你们修复关系。无论发生什么，都会始终遵守角色声明的界限。"
+            ]
+          }
+        ]
+      },
+      "phone": {
+        "label": "你的手机",
+        "title": "你的手机",
+        "overview": "你的手机是底部栏的一个标签页，打开它你会看到一个应用主屏幕——就像真实的手机，包含游戏内的日期和时间、随时间变化的温馨问候语，以及一个悄悄追踪你当天剩余精力的“电池”。每个应用都是一个独立的小工具：有些让你与人保持亲密，另一些管理你的生活和财务。一些金钱应用只在你所在的世界被设置为包含它们时才会出现——世界也可以完全关闭邮件或面孔应用。",
+        "sections": [
+          {
+            "heading": "主屏幕的运作方式",
+            "body": [
+              "在顶部，手机始终显示当前游戏内的日期和时间，以及一个充满绿色时表示你精力充沛、随着一天的消耗逐渐变红的电池。时钟下方的问候语随时间变化——早晨、下午、傍晚或夜晚。",
+              "应用以网格排列，底部停靠栏有四个固定应用：短信、邮件、时刻和设置。应用上的小数字角标意味着有东西在等着你——未读短信、未读邮件或面孔应用上的新帖子。点击任何应用即可打开；屏幕下方的圆形按钮可以返回主屏幕。",
+              "三个金钱应用——房产、市场和赌场——只有在你所在的世界被设置为使用它们时才会显示。邮件和面孔应用则相反：每个世界默认开启它们，但创作者可以关闭其中一个，它就会从主屏幕消失。缺失的应用只是不属于这个世界的一部分。"
+            ]
+          },
+          {
+            "heading": "保持亲密——社交应用",
+            "body": [
+              "这些是用于维护关系的应用：短信、纪念品、城镇动态和人际关系图。短信是完全免费的，永远不会消耗你的精力，所以随时可以联系。"
+            ],
+            "bullets": [
+              "短信——随时免费给任何你约会过的人发短信；这永远不会消耗精力。你可以给消息附加照片或礼物，并接受角色送给你的礼物。如果某人当天不可用，他们名字旁边会出现一个小月亮图标，你需要改天再联系他们。",
+              "邮件——你在游戏世界中的收件箱，随着日子推移会收到公司和陌生人的来信与通知。你约会的对象永远不会给你发邮件——浪漫的事保持在短信里——只有一个例外：一个你约会过但离开了几天的人可能会寄一张明信片回家，上面会有一个小邮戳标记。点击信件即可阅读。",
+              "面孔——一个城镇动态，你和当地人可以在这里发布简短的更新。你可以写自己的帖子，用六种不同方式做出反应，并在其他角色分享的内容下留言评论。",
+              "时刻——一本关于你与某个人故事的纪念册：里程碑、约会和其他纪念品，每件都是一张小小的快照。在顶部选择一个角色来翻阅你们共同的回忆。",
+              "星座——一个展示世界中所有关系的星图，你在温暖的中心，线程延伸到你认识的每个人。线程颜色按关系类型分组（底部有一个图例）。切换到列表视图可以搜索和按关系类型筛选，点击任何人可以打开他们的完整资料——他们的圈子、最近的生活，以及他们从小道消息中听到的关于你的事情。",
+              "结局——一个展示你完整走完一段关系后的纪念性尾声的画廊。在你完成一个角色的故事之前，它会一直保持空白。",
+              "历书——一个记录你度过的每一天的日历，包含天气、发生的事情和当天的回顾。点击过去的日子可以阅读它的完整故事。你还没到达的日子会被锁定。",
+              "天气——今日天空、五天预报，以及每个角色对天气的感受。每一行都列出了那个人喜欢和避免的天气，方便你为适合他们的日子规划约会。"
+            ]
+          },
+          {
+            "heading": "管理生活——活动与金钱应用",
+            "body": [
+              "这些应用是你如何度过每一天和充实钱包的方式。“一起”和“工作”都会消耗你的每日精力，在约会期间无法使用。",
+              "三个财富应用——房产、市场和赌场——只出现在启用了它们的世界中，它们都使用你随身携带的同一种货币。"
+            ],
+            "bullets": [
+              "一起——与某人一起度过轻松的时光，比如安静的夜晚或一起跑步。选择一个人和一种休闲方式，这会微调你们之间的关系。它消耗精力，在约会期间暂停。",
+              "工作——轮班赚取报酬。有些是简单的工作（每班消耗固定量的精力，显示为负数），有些是有等级的技能轮班，你实际上需要玩一遍。你的职业技能会随着工作的增多而升级，更高级别会支付更多报酬。注意你的精力读数——没有精力时无法工作，约会期间也不行。",
+              "市场——一个对周围世界做出反应的股票市场。买卖股票，阅读市场新闻，追踪你的投资组合价值和现金。一些公司会派发股息，这是游戏中唯一真正无需动手的收入。",
+              "房产——浏览出租或购买的场所。租房意味着需要按时支付房租——如果拖欠，你会在短信中收到房东通知——而购买则直接拥有该场所。有些地方带约会对象去会给关系带来小幅提升。",
+              "赌场——命运之屋，提供老虎机、二十一点、轮盘和视频扑克。你赌的是真实的游戏内货币，每日投注限额（显示在顶部的丝带）确保每天都在可控范围内。庄家始终有优势，所以娱乐即可——大厅会列出你最近的手牌以及它们让你领先或落后多少。",
+              "商店——购买礼物和纪念品；你的金钱和背包在每个世界中都是你自己的。",
+              "游戏——可以纯粹为娱乐而玩的街机小游戏。",
+              "背包——你携带物品的库存，包括可以赠送的礼物。",
+              "设置——手机自身的设置：设置自定义壁纸、在游玩和创作者模式之间切换，以及（谨慎地）重置你的进度。"
+            ]
+          }
+        ]
+      },
+      "life-money": {
+        "label": "精力与金钱",
+        "title": "精力、金钱与活动",
+        "overview": "每个游戏内的一天给你一小池精力，用于真实的会面——约会、随意的共处时光和小游戏。发短信始终是免费的。你开始时钱包空空且没有零用钱，所以花钱只能来自工作和玩赚钱小游戏；你在商店花钱，主要是买礼物。在开启了相关功能的世界中，你还可以通过股市、房产和赌场来增长——或赌掉——你的金钱。",
+        "sections": [
+          {
+            "heading": "你的每日精力",
+            "body": [
+              "每天开始时有一小池精力：正常日子有3次行动，周末多一次，共4次。任何真实的、面对面的会面都会消耗精力。一次约会、一次与某人的共处下午和一个小游戏各消耗一次行动。更繁重的工作可能消耗更多。",
+              "用手机给人发短信始终是免费的——它永远不会消耗你的精力，所以你可以一直保持对话。当你的精力耗尽时，你无法开始另一次约会或工作轮班；点击睡眠以进入下一天，精力会完全恢复。",
+              "因为精力是你一天中真正的限制，所以要有目的地使用它。例如，一次繁重的户外工作轮班会消耗你三个工作日行动中的两个，只留下一个行动空间，然后就要睡觉了。"
+            ],
+            "bullets": [
+              "一次约会、共处时光或小游戏：各1次行动。",
+              "繁重的户外日工轮班：2次行动。",
+              "发短信：免费且无限制。",
+              "睡眠以开始新的一天并恢复精力（工作日3次，周末4次）。"
+            ]
+          },
+          {
+            "heading": "赚取金钱",
+            "body": [
+              "你开始时一无所有，也没有每日津贴——金钱来自工作。打开工作选项，选择适合你一天的轮班。你重复某种工作的次数越多，你在这方面就越熟练：你在这项工作中的技能等级会提升，并缓慢提高其报酬。没有任何单次轮班能支付过高的金额，所以稳定的工作是充实钱包的正道。",
+              "有三种工作是以快速技能小游戏形式进行的——伐木场（砍伐原木）、抄写台（抄写当天的新闻）和小贩摊（在市场上讨价还价贩卖捡来的物品）。它们纯粹根据你的表现支付报酬，最高可达一个不错的固定金额，一次好的轮班表现就是那个水平。在小贩摊，你只赚取差价：每件物品都有一个市场价，只有买家支付的超出那个价值的部分才是你的收入。买家的两个提示诚实地暗示了他们愿意支付的最高价格——定价低于那个隐藏限额他们会支付你的要价，超过他们就会走人——而且一笔成交的交易可以冒着失去整笔销售的风险来争取更丰厚的分成。",
+              "除了工作，唯一自动到账的钱是来自你持有的任何股票的股息（在有股市的世界中）。没有什么会因为你睡觉而付你钱。",
+              "当你结束一天时，晨报会将金钱账目单独放在账本标签页上——工作、赌场结果、购物、过夜房租和股息，以及市场的最大波动，逐项列出。文字回顾只记录人与人之间实际发生的事情。"
+            ],
+            "bullets": [
+              "轮班工作——稳定、可靠的报酬，没有意外；提升你的服务技能。",
+              "打零工——平均报酬相同但波动大，好的日子赚得多，差的日子赚得少；提升你的活力技能。",
+              "户外日工——最大的单次收入，但消耗两次行动，天气决定价格（暴风雨时报酬最高，晴天最低）；当你提升手工艺技能后解锁。",
+              "伐木场、抄写台和小贩摊——根据你的表现支付报酬的小游戏工作。"
+            ]
+          },
+          {
+            "heading": "花钱：商店、背包与礼物",
+            "body": [
+              "商店是你花钱的地方——礼物、纪念品、服装、书籍和偶尔的消耗品。你购买的任何东西都会以标价存入你的库存（背包）；商店里没有任何东西会让你花完钱后变得更富有。",
+              "礼物是金钱转化为好感的方式。你可以在约会时赠送礼物，也可以通过短信附送。他们会以自己的声音做出反应——一句台词、一种感受，有时是一个持久的纪念品记忆——这个举动会微调你们的关系。单次礼物只是一个小小的微调（任何一种感受最多提升几点），而且礼物不能大量赠送：你当天给某人的第一个礼物全额生效，第二个当天减半，第三个或更多当天无效。用心的时机比一堆礼物更重要。",
+              "供自己使用的物品（消耗品）留在你的背包中供你使用。只有真正的礼物、服装、书籍和纪念品才能实际赠送给人。"
+            ]
+          },
+          {
+            "heading": "增长财富：市场、房产与赌场",
+            "body": [
+              "一些世界会开启额外的财富系统。它们是可选的，关闭它们的世界不会显示这些系统。",
+              "股市让你买卖世界中虚构公司的股票。价格每天波动，可能会对世界中的重大关系时刻做出反应，所以投资组合是一种赌博，而不是保证。一些公司会对持有至少一整天的股票每天派发小额股息——这是唯一不需要你工作就能到账的钱。",
+              "房产让你租赁一处住所——房租从你的钱包中按固定时间表自动扣除，无论是每天、每周还是每月——或者直接购买一处住所。拥有或租赁一处住所让你可以带约会对象去那里，而在你自己拥有的地方约会比租赁的地方带来更温暖的提升。注意你的钱包：如果它无法支付房租日，你会收到房东警告和三天的宽限期来结清，否则你会被驱逐。出售你拥有的地方会退还你购买时支付的价格。",
+              "赌场（在开启的情况下）提供老虎机、二十一点、轮盘和视频扑克。庄家始终有优势，所以将其视为风险和趣味，而不是收入来源。每次投注有最低限额（5）和上限，并且对每日投注总额有限制，所以一次坏运气不会让你在一次游戏中倾家荡产。"
+            ]
+          }
+        ]
+      },
+      "building": {
+        "label": "创造世界",
+        "title": "创造你的世界",
+        "overview": "Heartmorrow 有两种模式。在游玩模式下，你只需生活在一个世界中：约会、发短信、工作，看着关系成长。创作者模式在游玩模式所有功能的基础上解锁建造工具，让你可以创作自己的人物、地点和整个世界。本页涵盖创建角色和世界、开启或关闭可选系统、内置的AI助手、将你的创作作为文件分享、成人内容开关，以及重置进度会（不会）清除什么。",
+        "sections": [
+          {
+            "heading": "游玩模式 vs. 创作者模式",
+            "body": [
+              "Heartmorrow 以两种模式之一运行，你可以随时在它们之间切换。游玩模式将建造和编辑工具隐藏起来，让你专注于享受世界。创作者模式在游玩模式所有功能的基础上添加了这些工具。",
+              "你在主设置页面的“模式”标题下设置模式（可通过世界列表中的“切换世界”→“设置”进入，或进入世界后通过设置标签页进入）。你也可以在手机的设置应用中，在“模式”下切换。你的选择是一个保存在设备上的个人偏好，不属于任何世界的存档。",
+              "开启创作者模式会在主导航中显示两个额外位置：一个“世界”标签（查看你的世界阵容和模拟的幕后视图）和一个“调试”诊断区域。它还在整个应用中解锁编辑控制——例如，商店中会出现“生成物品”按钮，世界列表中的每张卡片上会出现删除按钮。"
+            ],
+            "bullets": [
+              "游玩模式：在世界中约会和生活，编辑工具被隐藏。",
+              "创作者模式：游玩模式的所有功能，加上角色和世界编辑器、世界和调试标签，以及就地生成、编辑和删除控制。",
+              "在设置的“模式”下切换，或在手机的设置应用中切换。这是每个设备的偏好，不属于你的存档。"
+            ]
+          },
+          {
+            "heading": "创建和编辑角色",
+            "body": [
+              "角色工作台分为五个标签：身份、个性、资料、关系和世界。一个新角色开始时为18岁（游戏允许的最低年龄），除非你更改，否则属于你当前游玩的世界。",
+              "身份包含基本信息：姓名、年龄、代词、性别、性取向、所在世界、关系风格（一夫一妻制或多情制）和简短描述。个性是角色写作的核心——他们的性格、说话方式、在关系中寻找什么，以及喜欢、不喜欢、目标和边界的标签列表。还有一个私密的“创作者笔记”字段，角色本身看不到。",
+              "有一个值得了解的特质是“戒备程度”，一个从“完全开放”到“封闭”的0-100滑块。它控制一个人在约会时对你敞开心扉的速度：戒备的人更慢开放，更难赢得（也同样容易失去）。新角色开始时略微保留，滑块下方的标签会随着你拖动而更新。",
+              "资料标签充实他们的外观、发短信风格、在线形象、爱语和亲密化学反应细节。关系标签是连接同一世界中其他人社会关系的地方——朋友、对手、前任、家人、伴侣、暗恋对象、室友、同事、同学、邻居、导师或学生。关系永远不会跨越世界，所以先建立世界阵容，再将他们联系在一起。（他们与你的关系统计数据和他们的记忆也保存在这个标签上，一旦角色被保存后。）"
+            ],
+            "bullets": [
+              "六项约会技能——魅力、共情、幽默、自信、学识和风格——各0-100，默认50。它们影响角色的说话方式，塑造“共处”活动，并决定他们最喜欢的小游戏（最高技能决定选择）。",
+              "喜欢、不喜欢、目标和边界是你逐个添加的自由文本标签。",
+              "社会关系只能连接共享一个世界的人——所以先创建阵容，再建立联系。"
+            ]
+          },
+          {
+            "heading": "从描述或图片生成角色",
+            "body": [
+              "你不必手动填写每个字段。角色工作台有一个“生成”按钮，可以从肖像图片、参考文本块或两者组合来起草一个完整的角色。选择一个肖像，粘贴或上传一些描述性文本（最多40,000字符；上传的文件以纯文本读取），让它起草身份、个性、特质、资料和初始约会技能。",
+              "生成会填充文字字段，但保留你选择的肖像、表情图片和世界，它永远不会触碰你的私密创作者笔记。如果你已经写了真实内容，在覆盖之前会收到提示。",
+              "还有一些较小的、专注的助手。在资料部分，一个“根据描述生成”按钮根据你已有的内容填充外观、发短信和化学反应细节，约会技能部分有自己的按钮来建议技能分配。这两个功能都需要先填写姓名。所有生成的内容都以草稿形式到达，你可以在保存前审阅和编辑，所有功能都依赖于你在设置中连接的AI模型。"
+            ]
+          },
+          {
+            "heading": "管理你的图片",
+            "body": [
+              "无论你在哪里选择图片——肖像、表情、地点照片——选择器都会在对话框中打开你的共享图片库：按名称、替代文本或标签搜索，按类型筛选，通过按钮、拖拽文件或从剪贴板粘贴来上传。每次上传都进入同一个库，所以为一个角色上传的图片可以在其他任何地方重用。上传的图片会标记你为哪个角色或地点上传的，所以搜索名称可以找到他们的图片——上传或导入相同的文件永远不会创建重复项；库会静默地重用它已有的副本。",
+              "图片页面（在创作者模式的侧边栏中，或通过设置）是图片库的主页。它列出每张上传的图片及其使用位置——哪些肖像、地点、商店物品或旧文本指向它——并允许你重命名、重新打标签、更改类型和重写替代文本。你可以筛选到单个世界以查看其阵容和地点使用的图片，“未使用”筛选器收集所有未被引用的图片，方便批量选择并一次性清除。“重复”筛选器在存在字节完全相同的副本时出现（来自库重用相同上传之前），将每个集群分组，让你保留一个并删除其余的。删除仍在使用中的图片会导致这些位置变空，所以页面会先警告你。",
+              "图片的详情视图还有“替换图片”——它在保持名称、标签和所有链接不变的情况下更换图片本身，所以一个被角色、聊天线程和故事时刻使用的肖像会在所有地方同时更新。"
+            ]
+          },
+          {
+            "heading": "建造世界、地点和可选系统",
+            "body": [
+              "世界工作台有一个侧边栏列出你的世界（带“新建世界”按钮）和一个已选世界的详情面板。在这里你可以设置世界的名称、简介、基调、传说、虚构规则和全局笔记。你还可以添加世界笔记——作为背景提供给AI的范围化参考条目（全局、地点、派系、传说、规则、角色或杂项）。",
+              "地点是约会发生的场所。每个都有名称、描述、标签、室内/室外设置、可选照片和一个“约会成本”价格等级。你可以手动添加或使用“用AI生成”，它会根据你的世界传说和自由形式的提示起草一批（1到8个）。生成的地点会直接放入编辑器供你审阅和调整——只有点击“保存世界”后才会保留。",
+              "每个世界可以在“游戏功能”下独立开启或关闭五个系统。三个金钱系统——房产（租赁或购买场所）、股市和赌场——默认关闭。邮件和面孔默认开启，关闭其中一个会移除该应用并停止为该世界生成内容（信件、明信片、动态帖子——都不会被写入，也不会发生相关的模型调用）。每个设置都按世界强制执行——如果世界关闭了某个功能，该界面在那里就不可用。当你开启赌场时，你还可以设置其投注限额。",
+              "世界也是商店货物的来源：在创作者模式下打开商店，使用“生成物品”来起草主题礼物和商品（你的世界设定会自动融入），然后保留你喜欢的。"
+            ],
+            "bullets": [
+              "房产、股市和赌场是每个世界独立的开关，默认全部关闭；邮件和面孔也是每个世界独立的开关，默认开启。",
+              "你可以设置的赌场限额：最大单注（最高1,000）和每日投注上限（最高10,000），最低投注为5。",
+              "地点的价格等级决定在那里约会的成本；“免费”等级不花钱。",
+              "删除世界时可选择是否同时删除其角色——取消勾选以保留阵容。"
+            ]
+          },
+          {
+            "heading": "分享：导出与导入",
+            "body": [
+              "你的创作可以打包成分享文件交给其他玩家。有三种类型：一个或多个角色作为.hmchr文件，整个世界作为.hmwrld文件，以及世界和散装角色的混合包作为.hmpack文件。分享文件只携带定义和图片——永远不会携带你的存档。没有关系、金钱、记忆、消息或历史记录会随它们一起转移。但角色是完整的——包括他们的私密创作者笔记——所以打开文件的人可以完全按照你创作的方式来阅读和游玩。",
+              "要导出，前往世界列表，选择“导出世界”，选择要分享的内容，然后在预览对话框中设置标题和可选的备注。导出世界时，你可以选择其角色阵容是否随之导出。单个分享文件上限为256MB——图片是主要的体积来源，所以一个拥有大量全尺寸肖像的世界可能需要更小的图片才能符合限制。",
+              "要导入，使用世界列表上的“导入文件”按钮。你会在任何内容被添加之前看到一个只读的预览，显示里面的内容——世界、人物和图片数量。导入始终是添加式的：它创建新的副本，永远不会覆盖或删除你已有的内容。当文件同时包含世界和人物时，你可以选择只导入世界或同时导入阵容。"
+            ]
+          },
+          {
+            "heading": "成人内容，以及重置与保留你的创作",
+            "body": [
+              "成人内容开关在设置中，默认关闭。开启需要确认一个简短的声明，包括你已成年。开启后，一旦关系真正亲近且不太紧张，亲密场景就可以在约会中展开——游戏仍然通过关系的温暖度和稳定度来控制亲密关系，所以它不会凭空发生。关闭时，角色会保持体面，如果你太过分会设置界限。还有一个可选的“悲剧结局”子开关（仅在成人内容开启后可用），允许更黑暗的故事结局；它在你启用之前会显示支持资源。",
+              "请记住，成人内容是一个全局偏好，你实际得到的内容还取决于你连接的AI模型。",
+              "最后，手机设置应用中的“危险区域”有一个重置功能，会清除你的游戏进度——关系、记忆、对话、短信、邮件和库存——让你回到第1天，钱包空空，重新开始赚钱。关键的是，它保留了你所有的创作：你的世界、角色、世界笔记、商店物品和上传的图片都会保留。重置是游玩的新开始，而不是创作的新开始。"
+            ]
+          }
+        ]
+      },
+      "tips": {
+        "label": "提示与帮助",
+        "title": "提示与故障排除",
+        "overview": "一些习惯能让 Heartmorrow 发挥最大效果，大多数问题都有快速的解释。以下是值得了解的事情和最常见问题的答案。",
+        "sections": [
+          {
+            "heading": "充分利用AI",
+            "body": [
+              "每一句对话和每一个判断都来自你在设置中连接的语言模型，所以模型比其他任何东西都重要。一个更强大、更有能力的模型写出的角色更像他们自己，对你的约会读解更敏锐——它更擅长分辨真实的温暖和敷衍，也更擅长注意到你击中了一个喜欢、不喜欢或边界。",
+              "如果约会感觉太容易、太宽松或有点不对劲，连接一个更好的模型是最直接的修复方法。本地模型免费将一切保留在你自己的机器上；托管模型通常更可靠地读解细微差别。成人内容（如果你开启的话）也取决于模型是否愿意写它。"
+            ]
+          },
+          {
+            "heading": "值得养成的习惯",
+            "body": [],
+            "bullets": [
+              "认真对待你说的每一句话。一段升温的约会需要你一步步去争取——无聊的、漫无目的的消息无法建立关系，而平淡或不经意的消息会使其冷却。",
+              "了解对方。他们的喜欢、不喜欢和边界决定了约会的评价标准，所以迎合他们在意的事情，避开他们不在意的。",
+              "把握送礼物的时机。礼物是一个小小的、用心的推动，而不是捷径——当天第一个礼物全额生效，第二个减半，更多则无效。",
+              "经营你的承诺。你们越亲密，忽视带来的伤害就越早出现——同居的伴侣只几天就会感到被忽视。",
+              "保持联系。发短信是免费的且不消耗精力，所以在约会之间保持对话。"
+            ]
+          },
+          {
+            "heading": "常见问题",
+            "body": [],
+            "bullets": [
+              "约会感觉太容易，或者评分似乎很宽松——判断的精确度取决于读解它的模型。在设置中连接一个更有能力的模型。",
+              "没人给我发短信——你只会收到已经约会过的人的消息。你约会过但后来忽视的人可能会发一条伤感的消息；你从未见过的人永远不会发短信。",
+              "我无法睡眠或结束这一天——你有一个进行中的约会。用“结束并评估”完成它，或者离开它，日期按钮就会解锁。",
+              "我没钱了——没有零用钱。打开工作应用，去轮班；那就是你赚钱的方式。",
+              "我的手机上少了一个应用——房产、市场和赌场只出现在开启了它们的世界中，世界也可以关闭邮件或面孔（两者都是世界编辑器游戏功能中的每个世界独立设置）。",
+              "他们一直对我中途离场——离场只对敌意或残忍的行为发生，或者对还不亲近的人过于主动。放松一点，让氛围恢复。",
+              "我定义关系的请求失败了——你需要足够的温暖度和良好的时机。每次被拒绝后他们需要几天时间才会考虑再次尝试，所以在一次美好的约会后再试。",
+              "角色把一个旧计划当作仍然有效——短信会过时；游戏会标记一个计划是否是几天前的，但较小的模型偶尔会忽略它。"
+            ]
+          },
+          {
+            "heading": "重新开始",
+            "body": [
+              "想要全新的开始？手机设置应用中的危险区域可以重置你的游戏进度——关系、记忆、对话、短信、邮件和库存全部清除，你回到第1天，钱包空空，重新开始赚钱。你所有的创作都会保留：你的世界、角色、笔记、商店物品和图片都会保留。重置是游玩的新开始，而不是创作的新开始。"
+            ]
+          }
+        ]
+      },
+      "dates": {
+        "label": "约会",
+        "title": "约会",
+        "overview": "约会是与你的角色进行的实时自由形式对话。你在约会标签页设置（谁、去哪里、对方是否空闲），然后通过打字交流并阅读他们的实时回复。轨迹栏显示夜晚是在升温还是降温，而夜晚的走向决定了之后你们关系的状态。同一个标签页还提供闲逛功能——同样的对话，但没有场合压力。",
+        "sections": [
+          {
+            "heading": "安排约会",
+            "body": [
+              "打开约会标签页并点击「计划约会」。首先选择这次见面的类型——约会或闲逛——然后选择你要见的人和地点。每个人显示今天是否空闲；如果有人忙，他们的卡片会变灰并显示原因，所以改天再约或给他们发短信。",
+              "地点最简单的选择是「任何地方」——游戏会悄悄把你安排在镇上第一个空闲的公共场所，或者如果你负担得起的话去最便宜的地方。你也可以选择特定场所（有些要花钱）、你拥有或租赁的房产（免费使用），或者等你们关系近了之后去他们的私人房间。付费场所只在约会实际结束时才收费，所以提前退出不会花你一分钱。",
+              "按「开始」即可。第一次约会时角色会破冰并和你打招呼；重复约会时会有简短的场景描写来描述他们在哪，轮到你来开场。"
+            ],
+            "bullets": [
+              "免费场所始终存在，所以金钱永远不会阻止你约会。",
+              "如果某人显示为不可用，你那天不能带他们出去。",
+              "付费场所是在约会结束时收费，而非开始。"
+            ]
+          },
+          {
+            "heading": "闲逛——没有场合的相处时光",
+            "body": [
+              "闲逛是关闭了所有约会机制的相同自由形式对话。没有逐回合的评分，所以没有轨迹栏和意图按钮；没有人会拂袖而去或失去兴趣；你也不能在一次闲逛中定义关系。这是低风险的相处时光——见一个人但没有任何压力的版本。",
+              "但它仍然很重要。当你结束闲逛时，游戏会像约会后一样回顾整个对话：角色形成记忆（在个人资料中标记为「来自一次闲逛」），你的地位也会变化。好处较小，主要影响隐性属性——舒适度、信任、尊重、好奇心——因为人们是在约会中坠入爱河的，而不是一起消磨一个下午。但坏处一点也不小：冷淡、刻薄或咄咄逼人会增加紧张度，同样会损失你积累的好感。",
+              "闲逛始终免费，所以只提供免费场所，也没有什么场所可以用来给人留下印象。它们消耗一点每日行动力，并算作真正的见面——闲逛解锁发短信的功能和第一次约会一样。"
+            ],
+            "bullets": [
+              "没有轨迹、没有意图、不会被甩、不能定义关系。",
+              "始终免费——付费场所不在列表中。",
+              "消耗 1 点体力，缓慢建立信任和舒适度，并且会被记住。"
+            ]
+          },
+          {
+            "heading": "实时对话",
+            "body": [
+              "约会是一来一回的对话。在输入框中随意输入你想说的话并发送；角色会实时打字回复，思考时有打字提示，肖像也会根据他们的心情变化表情。没有预设选项——用你自己的话说任何话。",
+              "消息框下方有可选的意图按钮，用来框定一句话的意图：调情、逗弄和敞开心扉始终可用，安抚和道歉会在有紧张气氛需要缓和时出现。悬停查看它们的作用。它们从不强制使用，也不会自动推进什么——它们只是告诉角色你的信息想表达什么效果，而符合当下气氛的行动比不符合的读起来更自然。",
+              "如果回复出现乱码或重复，悬停角色最近的一行并点击小刷新按钮重新生成它。这只会重写那条回复——不会改变消息的评分方式或约会的进展，所以只是修复措辞。（短信也有相同按钮，在角色最后一条短信下方。）"
+            ]
+          },
+          {
+            "heading": "阅读氛围",
+            "body": [
+              "对话上方有一个实时轨迹栏。中间的分割线标记约会开始的位置，在你的消息之后，当一句话效果好时填充会向右滑向「升温」，当一句话没效果时向左滑向「降温」，带有 +N 或 −N 的小标记和一个词的描述如「对你升温」或「有点尴尬」。轨迹栏从不显示数字——只有当下的感觉。你的每条消息下面还有一个小注释——「效果不错」、「有点平淡」——所以你可以回顾每句话的接收情况。",
+              "有两个偏差值得了解。温暖比降温更难建立，而且你不能靠敷衍来升温：一条平淡无奇、毫无意义的消息不会让氛围升温（对防备的人甚至会稍微降温），所以保持约会升温需要真正用心。内敛、防备的人开场也更冷——他们的轨迹栏从中间偏左开始——升温也更慢，所以需要真正用心去赢得他们。",
+              "夜晚的结局如何决定了后续影响。一次真正美好的约会会增进你们的羁绊；平淡或糟糕的约会会损失好感并增加紧张度——而反复的糟糕夜晚可能会动摇一段承诺中的关系。"
+            ]
+          },
+          {
+            "heading": "当约会提前结束时",
+            "body": [
+              "逼得太紧，约会可能在你准备好之前结束。如果你态度敌意或刻薄——或者对一个还不亲近的人粗鲁冒犯——角色可能会拂袖而去，让夜晚在不愉快中结束（而且他们会记住）。这很少发生，只在真正越界的行为时才会。",
+              "另外，如果氛围一路暴跌到谷底，角色会悄悄失去兴趣并礼貌地找借口结束今晚。这不是爆炸——只是一次不了了之的约会。无论哪种，夜晚仍然会被完整评分，所以提前退出仍然会影响你的地位并消耗体力。",
+              "你也可以通过在对话中说出来主动结束约会（「我该走了」「晚安」）——角色会自然地道别，约会结束并被评分，不需要按钮。"
+            ]
+          },
+          {
+            "heading": "定义关系",
+            "body": [
+              "当你们足够亲近后，约会侧边栏会出现一个定义关系的按钮——标注着你解锁的下一步：「邀请交往」，然后「成为专属」，然后「同居」。它只在你确实在约会中说过话且对那一步足够亲近时才会出现。",
+              "邀请是一个真实的时刻：他们可能答应（一个里程碑），委婉拒绝，或者——如果时机不好——感到被冒犯，这会大幅增加紧张度甚至可能结束约会。每次尝试后他们都需要几天才能接受你再次提起，所以选好时机。"
+            ]
+          },
+          {
+            "heading": "结束、体力和恢复",
+            "body": [
+              "当你准备好了，用侧边栏的「结束并评估」。游戏会回顾整个对话并结算今晚：你的关系发生变化，角色形成记忆，你会看到进展回顾。",
+              "约会只有你确实在对话中说过话才算数。如果你开始约会但一条消息都没发就离开了，可以用「取消约会」退出——它会免费丢弃，不消耗体力，不记住任何事。一个真正完成的约会消耗一点每日行动力（你的体力）。你通常每天有 3 次行动力，周末多一次，约会与工作和小游戏共享这个池子；睡觉可以恢复。",
+              "同时只能进行一个约会，它会为你保留。如果你导航离开或刷新，约会不会丢失——回到约会标签页就会从你离开的地方继续，氛围也一样。约会进行期间，推进日期的操作如睡眠会锁定，直到你完成约会。"
+            ],
+            "bullets": [
+              "开始约会但什么都没说 →「取消约会」免费丢弃。",
+              "完成一次真正的约会 → 消耗 1 点体力并被完整评分。",
+              "约会中途离开标签页是安全的；回来时会继续。"
+            ]
+          }
+        ]
+      },
+      "evaluation": {
+        "label": "评分机制",
+        "title": "约会如何被评判",
+        "overview": "每次约会都从两个独立层面来评判。你说话时，对话的实时读数会根据每条消息的投入度和善意逐回合地升温或降温。然后约会结束时，第二个完全独立的评判者会回顾整个夜晚，并为真正重要的时刻调整你们的关系——你建立的真实连接或你越过的界限。好的约会提升关系，平淡的约会基本保持原状，真正糟糕的约会会让你倒退。闲逛完全跳过了实时层面——没有逐回合的读数——但仍然会在结束时被评判者回顾，权重偏向隐性属性。",
+        "sections": [
+          {
+            "heading": "实时读数：每条消息都影响氛围",
+            "body": [
+              "在约会期间，你发送的每条消息都会根据对这个人当下的效果来独立评判——多投入、温暖、体贴和真诚。一条真正连接的消息会让氛围升温，一条平淡或自我中心、没什么回馈的消息会降温，而一条刻薄或敌意的消息会大幅降温。一条仅仅是平淡无害的回合本身不会有任何影响。",
+              "你不能靠敷衍来升温。一条平淡、乏味的回合，一句俏皮话，一个耸肩，一句快速的「哈哈不错」，不会让氛围升温；它大致保持原位（对防备的人会稍微降温）。用心是标准：要保持约会升温，你必须在每句话中真正展现自我，而真正差劲或冷淡的回合会把它拉下去。",
+              "温暖比降温更难建立。一个好时刻会让氛围微微上升，但一个坏时刻会拉下去更多，所以一条冷淡或不小心的消息可以抵消好几条好的。你总能从约会屏幕上的实时读数感受到你的位置，它显示类似「对你升温」、「有点尴尬」或「在降温」的心情，而不是数字。"
+            ]
+          },
+          {
+            "heading": "让氛围冷到极点他们会离开",
+            "body": [
+              "氛围从约会开始的地方起跳——对随和的人是中性，对防备的人偏冷，他们的轨迹栏从中间偏左开始。约会是从那里向上攀升，而不是一个慢慢消耗的满格能量条。之后，每条消息都会移动它。",
+              "如果你让它暴跌到谷底，约会就结束了。一旦氛围触底，读数显示他们「失去兴趣」，你的下一条消息时他们起身离开。被这样甩掉对关系是真正的打击，所以值得在事情恶化到那个地步之前观察一下气氛。"
+            ]
+          },
+          {
+            "heading": "防备的角色：升温慢，降温也一样快",
+            "body": [
+              "有些人很防备，内敛且不容易打开心扉，他们会让你用行动赢得他们的温暖。防备的角色约会开场比通常稍微冷一些，你的好表现让他们升温更慢。你必须真正打动他们才能攀升。",
+              "慢只在上升的路上。防备的人和任何人一样快速降温，所以一个不小心的回合损失一样大。这让他们容易失去而难以赢得，这意味着耐心、体贴和不急躁在他们身上最为重要。你看不到数字，但一个内敛的人本来就更难被取悦。"
+            ]
+          },
+          {
+            "heading": "约会结束评判：那些留下的时刻",
+            "body": [
+              "当约会结束时，一个独立的评判者回顾整个夜晚，并为那些具体的、令人难忘的时刻——这个人真正会记住的事——调整你的关系。这是真正推动或倒退关系的部分。报告还会引用你的「今晚金句」——你那条效果最好的消息（或者在一个糟糕的夜晚，那条最伤人的），用你自己的话。",
+              "它奖励真实的连接：一个诚实或脆弱的时刻，真正了解这个角色是谁，或者读懂他们那晚默默期待的东西。这些会让你之间的温暖上升。它惩罚真正伤害或排斥他们的事：触犯已知的讨厌点、越过明说的界限、冷淡、咄咄逼人或刻薄。这些会冷却关系并增加紧张度。保持礼貌措辞但做了伤害的事不会被原谅，评判者看到的是伤害，不是礼貌。",
+              "有一点很重要：结束评判不会仅仅因为约会无聊就惩罚你。无聊已经在约会期间被实时读数处理了。所以一个仅仅平淡、无奇的夜晚基本不会让指针移动，而一个温暖、体贴的夜晚会得到积极奖励。单次约会很少会让关系的任何一部分波动超过几个点。"
+            ]
+          },
+          {
+            "heading": "约会可能让你倒退，所以要用心",
+            "body": [
+              "两个层面都计数，而且都可能是负面的。一个平淡或敌意的夜晚会冷却实时氛围，也可能从结束评判中带来打击，所以关系确实可能倒退。你不能靠刷约会轻松把好感刷满，用心是进步的代价，而一次粗心或刻薄的约会会让你付出代价。",
+              "另一方面是奖励：一次温暖、体贴、用心解读的约会会得到双重回报。温暖的氛围和积极的结束评判都会推动关系前进。追求真正的用心，你就能感受到它的移动。"
+            ]
+          },
+          {
+            "heading": "你连接的模型决定了评判的敏锐度",
+            "body": [
+              "两个评判者都由你在设置中连接的 AI 模型驱动。更强大、更有能力的模型能更可靠地解读细微差别。它更擅长区分真正的温暖和客套话，注意到你触犯了讨厌点或悄悄击中了某人的期待，并在两个方向上诚实评分。",
+              "较弱的模型可能更迟钝或不一致。如果评判感觉不对或太容易，连接一个更好的模型是让约会如设计般敏锐的最直接方式。"
+            ]
+          },
+          {
+            "heading": "约会难度：后果的严厉程度",
+            "body": [
+              "设置中的「约会难度」决定了这一切的严厉程度。它不会改变角色说什么、评判者如何解读你的消息，或约会氛围的起点——每次约会仍然从正常模式的起始位置开始。它改变的是后果：氛围在每条消息上的移动幅度、约会暴跌时他们多快失去兴趣、约会最终氛围的评分标准，以及结束评判的读数权重。",
+              "在温和模式下，好时刻效果更大，失误损失更小——角色在约会搞砸时会给予更多耐心，打击也会减轻。在严苛模式下，温暖更难获得也更容易失去：失误打击更大，耐心耗尽更快，同样的约会评分也会稍微苛刻。正常是游戏设计的调校基准线。",
+              "难度适用于约会和闲逛（结束评判对闲逛的读数按同样方式缩放）；发短信不受影响。你随时可以更改，从下一条消息起生效。"
+            ]
+          }
+        ]
+      },
+      "getting-started": {
+        "label": "Getting started",
+        "title": "Getting started",
+        "overview": "Heartmorrow is a single-player dating sim you run on your own machine. You pick a world, meet the people who live there, and grow relationships by going on dates and texting them on an in-game phone. Before any of that works you connect a language model in Settings, because the model is what brings every character to life. Each in-game day gives you a small pool of energy to spend; when it runs out, you sleep to begin the next day.",
+        "sections": [
+          {
+            "heading": "Connect a model first",
+            "body": [
+              "Heartmorrow has no brain of its own. Every character's words come from a language model that you point it at, so until you connect one, dates and texts won't generate. This is the very first thing to set up. Open Settings (you can reach it straight from the world picker, before you even enter a world) and find the connection panel.",
+              "You have two broad choices. You can run a model locally on your own computer with something like LM Studio or Ollama, which is free and keeps everything on your machine. Or you can connect to a hosted service by choosing that provider and pasting in its API key.",
+              "Whichever you pick, use the Test button to confirm Heartmorrow can reach the model. A green result means you're connected and ready. From there, just enter a world and start playing."
+            ],
+            "bullets": [
+              "OpenAI-compatible: works with LM Studio, Ollama, llama.cpp, vLLM, and similar local servers. Point the Base URL at your own server.",
+              "LM Studio: its own native connection, with richer model details and per-response speed stats.",
+              "Ollama: its own native connection, which adds a Thinking control — turn a model's reasoning on or off, or set its depth (Low–Max for models that support levels).",
+              "KoboldCpp: its own native connection. Because it's a raw text engine, pick the Instruction template that matches your loaded model (Alpaca, ChatML, Llama 3, and so on).",
+              "Anthropic: a hosted service that needs an API key.",
+              "Local models usually need no key; hosted services do.",
+              "You may also spot a separate image-model connection in Settings — nothing in the game uses it yet, so it's safe to ignore."
+            ]
+          },
+          {
+            "heading": "Pick a world",
+            "body": [
+              "Everything in Heartmorrow happens inside a world, each with its own setting, its own cast, its own calendar, and its own save. The world picker is your home base: every card shows the world's name, what day it's on, and how many people live there. Press Enter to step inside, or Continue if it's the world you were last in.",
+              "People belong to the world they live in, so the characters you meet, date, and text are the cast of that particular world. Switching worlds really means switching saves: your relationships, money, and progress in one world stay separate from the next.",
+              "Starting fresh? Use \"Start a new world\" for a short, four-step guided setup. You'll name the place and set its tone, create your own persona (the version of you the characters get to know), optionally bring people over from your other worlds, and read a quick how-to before you begin on Day 1."
+            ]
+          },
+          {
+            "heading": "The daily loop",
+            "body": [
+              "A day in Heartmorrow is a small, deliberate budget of energy. Going on a date or playing a minigame each spends one point, and you start each day with three. Spend them however you like: one big date, a few lighter activities, or a mix. Weekend days give you one extra point, for four.",
+              "As you spend energy, the clock visibly moves through the day, from morning to afternoon to evening, and finally to night once your energy is gone. Texting people on your phone is always available, with no energy cost, so you can keep in touch between the bigger moments.",
+              "When you're ready to move on, press the day button in the status bar. It reads \"End day\" while you still have energy and \"Sleep\" once you've spent it all; either way it carries you into the next morning, refills your energy, and shows a short recap of how the day went and what happened around town. One catch: you can't end the day in the middle of an active date, so wrap up or leave the date first."
+            ],
+            "bullets": [
+              "Meet the people in your world and start a date with someone.",
+              "Text anyone, anytime, from the phone, at no energy cost.",
+              "Spend your daily energy on dates and activities.",
+              "End the day to advance to the next morning and refresh your energy."
+            ]
+          },
+          {
+            "heading": "Money: you earn it",
+            "body": [
+              "You begin with nothing in your pocket. There's no allowance and no daily handout. Money is something you earn by working shifts and playing for it, and it funds gifts, nicer date venues, and other extras down the line.",
+              "Because there's no free income, an empty wallet at the start is completely normal. Pick up some work, build a little cash, and spend it where it counts. (If you take up investing, stock dividends are the one form of passive income, but everything else is earned.) Jobs and spending get their own Help section."
+            ]
+          },
+          {
+            "heading": "Reading the status bar",
+            "body": [
+              "A compact status bar keeps the essentials in view at all times: which world you're in, the current day and time of day, the in-world weekday and season, your remaining energy (shown as little pips alongside a count), and your cash on hand.",
+              "The same bar holds the day button. While you still have energy it reads \"End day\"; once your energy reaches zero it becomes \"Sleep.\" Pressing it either way carries you into the next morning."
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

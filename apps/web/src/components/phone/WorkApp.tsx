@@ -216,7 +216,7 @@ export function WorkApp() {
 
   /** Jobs that feed a trade, for the trade card's "earned at" line. */
   const jobsFor = (s: string): string[] => [
-    ...work.filter((a) => a.skill === s).map((a) => a.label),
+    ...work.filter((a) => a.skill === s).map((a) => t(`work.activities.${a.id}.label` as never)),
     ...jobGames.filter((g) => g.skill === s).map((g) => g.title),
   ];
 
@@ -344,8 +344,8 @@ export function WorkApp() {
                     {a.icon ? <span className="pl-tile-glyph">{a.icon}</span> : <Icon name="work" size={18} />}
                   </div>
                   <div className="pl-tile-body">
-                    <div className="pl-tile-label">{a.label}</div>
-                    <div className="pl-tile-desc">{a.description}</div>
+                    <div className="pl-tile-label">{t(`work.activities.${a.id}.label` as never)}</div>
+                    <div className="pl-tile-desc">{t(`work.activities.${a.id}.description` as never)}</div>
                     <div className="pl-work-tags">
                       {isCareerSkill(a.skill) && <span className="pl-work-tag">{skillName(a.skill)}</span>}
                       {v > 0 && <span className="pl-work-tag">{t('work.payVaries')}</span>}

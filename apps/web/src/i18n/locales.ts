@@ -25,7 +25,7 @@ export const PSEUDO_LOCALE = 'en-XA';
 
 export const SUPPORTED_LOCALES: LocaleMeta[] = [
   { code: 'en', label: 'English', dir: 'ltr' },
-  // Add real locales here, e.g. { code: 'es', label: 'Español', dir: 'ltr' }.
+  { code: 'zh-Hans', label: '简体中文', dir: 'ltr' },
   ...(import.meta.env.DEV ? [{ code: PSEUDO_LOCALE, label: 'Pseudo (QA)', dir: 'ltr' as const }] : []),
 ];
 
