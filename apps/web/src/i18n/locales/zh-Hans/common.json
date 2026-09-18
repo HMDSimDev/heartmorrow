@@ -1,0 +1,561 @@
+{
+  "chooseImage": "选择图片",
+  "remove": "移除",
+  "back": "返回",
+  "confirm": "确认",
+  "cancel": "取消",
+  "pleaseConfirm": "请确认",
+  "tagPlaceholder": "输入后按回车…",
+  "removeTag": "移除 {tag}",
+  "unsupportedImage": "不支持的图片类型。请选择 {label} 格式的图片。",
+  "asset": {
+    "noImages": "暂无上传图片",
+    "noPortrait": "暂无头像",
+    "none": "无",
+    "uploading": "上传中…",
+    "uploadImage": "上传图片",
+    "choose": "选择图片…",
+    "change": "更换图片…",
+    "clear": "清除",
+    "close": "关闭",
+    "dialogTitle": "图片库",
+    "searchPlaceholder": "按名称、描述或标签搜索…",
+    "all": "全部",
+    "noMatches": "无匹配图片。",
+    "dropHint": "…或拖放/粘贴图片"
+  },
+  "assetType": {
+    "portrait": "头像",
+    "expression": "表情",
+    "background": "背景",
+    "location": "场景",
+    "item": "物品",
+    "voice": "语音片段",
+    "other": "其他"
+  },
+  "draft": {
+    "notSavedTitle": "无法自动保存草稿（存储已满）。点击保存以保留你的内容。",
+    "notSaved": "草稿未保存",
+    "autoKeptTitle": "你的更改已自动保存为草稿，直到你点击保存。",
+    "unsaved": "未保存的草稿",
+    "restoreAria": "恢复未保存的草稿",
+    "unsavedNounDraft": "未保存的 {noun} 草稿",
+    "unsavedChanges": "未保存的更改",
+    "startedNamed": "你在 {when} 开始了 {titled}，但从未保存。",
+    "startedNew": "你在 {when} 开始了新的 {noun}，但从未保存。",
+    "wereEditing": "你在 {when} 编辑了 {titled}——这些更改从未保存。",
+    "restore": "恢复",
+    "discardDraft": "丢弃草稿",
+    "dismiss": "忽略",
+    "thisNoun": "这个 {noun}"
+  },
+  "relTime": {
+    "justNow": "刚刚",
+    "minutes": "{m}分钟前",
+    "hours": "{h}小时前",
+    "days": "{d}天前"
+  },
+  "casinoGame": {
+    "slots": "幸运七",
+    "blackjack": "二十一点",
+    "roulette": "轮盘赌",
+    "videoPoker": "视频扑克"
+  },
+  "relationshipStatus": {
+    "none": "单身",
+    "dating": "约会中",
+    "exclusive": "专属关系",
+    "cohabiting": "同居中"
+  },
+  "intent": {
+    "flirt": "调情",
+    "tease": "调侃",
+    "reassure": "安慰",
+    "open_up": "敞开心扉",
+    "apologize": "道歉"
+  },
+  "relationshipStyle": {
+    "monogamous": "一夫一妻",
+    "polyamorous": "多元恋爱"
+  },
+  "characterLink": {
+    "friend": "朋友",
+    "rival": "对手",
+    "ex": "前任",
+    "family": "家人",
+    "partner": "伴侣",
+    "crush": "暗恋对象",
+    "roommate": "室友",
+    "coworker": "同事",
+    "classmate": "同学",
+    "neighbor": "邻居",
+    "mentor": "导师",
+    "mentee": "学生",
+    "acquaintance": "熟人"
+  },
+  "warmthBand": {
+    "near-strangers": "近乎陌生人",
+    "acquaintances": "熟人",
+    "warming-up": "逐渐熟悉",
+    "getting-close": "日益亲近",
+    "close": "亲密",
+    "sweethearts": "恋人"
+  },
+  "itemRarity": {
+    "common": "普通",
+    "uncommon": "稀有",
+    "rare": "珍贵",
+    "legendary": "传说"
+  },
+  "itemCategory": {
+    "gift": "礼物",
+    "consumable": "消耗品",
+    "apparel": "服饰",
+    "book": "书籍",
+    "special": "特殊"
+  },
+  "careerSkill": {
+    "service": "服务",
+    "hustle": "推销",
+    "craft": "手艺",
+    "knowledge": "知识"
+  },
+  "careerSkillBlurb": {
+    "service": "稳定班次和柜台工作",
+    "hustle": "零工、杂活和兼职",
+    "craft": "交易和体力劳动",
+    "knowledge": "写作、记录和专业知识"
+  },
+  "videoPokerRank": {
+    "none": "无赔付",
+    "jacksOrBetter": "一对J或更好",
+    "twoPair": "两对",
+    "threeKind": "三条",
+    "straight": "顺子",
+    "flush": "同花",
+    "fullHouse": "葫芦",
+    "fourKind": "四条",
+    "straightFlush": "同花顺",
+    "royalFlush": "皇家同花顺"
+  },
+  "casinoBlurb": {
+    "slots": "三个转轮。匹配连线，灯光亮起。",
+    "blackjack": "击败庄家到21点。要牌、停牌或加倍。",
+    "roulette": "一个绿色零。下注，看轮盘转动。",
+    "videoPoker": "一对J或更好赔付。保留好牌，换掉其余。"
+  },
+  "shell": {
+    "serverWaking": "正在连接服务器——你的世界即将呈现…"
+  },
+  "onboarding": {
+    "back": "返回",
+    "skip": "跳过",
+    "next": "下一步"
+  },
+  "gift": {
+    "second": "一天内送第二份礼物效果会减弱。",
+    "dry": "今天送他们的礼物额度已用完——明天重新开始。"
+  },
+  "dayOnb": {
+    "kicker": "每日机制 · {n}/{total}",
+    "actions": {
+      "title": "一天只有几小时好时光",
+      "body": "每天早上你有一小池精力——工作日3次行动，周末4次。约会、共度下午、工作班次或小游戏各消耗1次；重活消耗2次。好好规划。"
+    },
+    "talk": {
+      "title": "发消息永远免费",
+      "body": "用手机发消息不消耗精力。想聊就聊一整天——只有亲自出现才花你的时间。"
+    },
+    "sleep": {
+      "title": "睡觉翻开新篇章",
+      "body": "当精力耗尽，结束这一天。世界会独自运转一阵——人们相遇交谈——早晨会带来一切的回顾、新鲜的精力和崭新的天空。"
+    },
+    "done": "开始新的一天"
+  },
+  "nav": {
+    "home": "首页",
+    "people": "人物",
+    "world": "世界",
+    "date": "约会",
+    "phone": "手机",
+    "settings": "设置",
+    "help": "帮助",
+    "images": "图片",
+    "switchWorld": "切换世界",
+    "worldsShort": "世界",
+    "debug": "调试"
+  },
+  "assetUsageKind": {
+    "portrait": "头像",
+    "expression": "表情",
+    "location": "场景",
+    "item": "商店物品",
+    "property": "房产",
+    "company": "公司",
+    "texts": "短信"
+  },
+  "support": {
+    "discord": "加入 Discord",
+    "discordHint": "支持、更新和社区",
+    "github": "GitHub 源码",
+    "githubHint": "代码、发布和问题",
+    "modelStatus": {
+      "notConfigured": "模型未配置",
+      "checking": "正在检查 {provider}…",
+      "connected": "{provider} 已连接",
+      "disconnected": "{provider} 已断开",
+      "providers": {
+        "lmstudio": "LM Studio",
+        "ollama": "Ollama",
+        "koboldcpp": "KoboldCpp",
+        "generic": "LLM 提供商"
+      }
+    },
+    "versionTitle": "Heartmorrow {version} · 构建 {commit}"
+  },
+  "phase": {
+    "morning": "早晨",
+    "afternoon": "下午",
+    "evening": "傍晚",
+    "night": "夜晚"
+  },
+  "season": {
+    "Spring": "春天",
+    "Summer": "夏天",
+    "Autumn": "秋天",
+    "Winter": "冬天"
+  },
+  "seasonAbbr": {
+    "Spring": "春",
+    "Summer": "夏",
+    "Autumn": "秋",
+    "Winter": "冬"
+  },
+  "weekday": {
+    "Monday": "星期一",
+    "Tuesday": "星期二",
+    "Wednesday": "星期三",
+    "Thursday": "星期四",
+    "Friday": "星期五",
+    "Saturday": "星期六",
+    "Sunday": "星期日"
+  },
+  "weekdayAbbr": {
+    "Monday": "周一",
+    "Tuesday": "周二",
+    "Wednesday": "周三",
+    "Thursday": "周四",
+    "Friday": "周五",
+    "Saturday": "周六",
+    "Sunday": "周日"
+  },
+  "weekday2": {
+    "Monday": "一",
+    "Tuesday": "二",
+    "Wednesday": "三",
+    "Thursday": "四",
+    "Friday": "五",
+    "Saturday": "六",
+    "Sunday": "日"
+  },
+  "weekend": "周末",
+  "minigame": {
+    "progressAria": "{current}/{total}",
+    "howSure": "有多大把握？",
+    "conf": {
+      "low": "直觉",
+      "medium": "比较确定",
+      "high": "稳了"
+    },
+    "memoryMatch": "记忆配对",
+    "moves": "步数",
+    "youRemembered": "你记住了——{match}",
+    "timingMeter": "节奏计时",
+    "lastHit": "上次命中",
+    "done": "完成！",
+    "stopInZone": "停在目标区域！",
+    "loreQuiz": "知识问答",
+    "loreLead": "{name} 凑近，眼睛闪着光。「让我看看你有多了解我…」",
+    "sweetAndSour": "甜蜜与辛辣",
+    "readBetween": "字里行间",
+    "twoTruthsLead": "他们凑近。「其中两个是真的。一个是假的…」",
+    "callIt": "就这样",
+    "pickBluff": "找出假话",
+    "copyDesk": "抄写台",
+    "copyPlaceholder": "把上面的文本照抄一遍…",
+    "transcribeAria": "抄写快讯",
+    "accuracy": "准确度",
+    "set": "组",
+    "sendToPress": "送印",
+    "fileEarly": "提前归档",
+    "woodlot": "伐木场",
+    "cleanCombo": "🔥 {n}× 干净",
+    "clean": "干净",
+    "graze": "擦过",
+    "miss": "失误",
+    "lastSwing": "上次挥斧",
+    "timber": "倒树！",
+    "swing": "🪓 挥斧！",
+    "rest": "休息！",
+    "perfect": "完美",
+    "great": "很棒",
+    "good": "不错",
+    "go": "开始！",
+    "combo": "连击",
+    "tapToBeat": "跟着节奏点击",
+    "pressSpace": "（或按空格键）",
+    "theFlip": "摆摊",
+    "flipWorth": "价值约 ◈{value}",
+    "flipLower": "降价 {n}",
+    "flipRaise": "涨价 {n}",
+    "flipOffer": "开价 ◈{q}",
+    "flipMargin": "高出价值 ◈{m}——成交就是你的",
+    "flipNoMargin": "刚好成本价——卖了但没赚",
+    "flipBite": "他们动心了——◈{q} 在桌上。",
+    "flipShake": "握手成交",
+    "flipPress": "加价到 ◈{p}",
+    "flipSold": "以 ◈{n} 成交——赚了 ◈{m}。",
+    "flipPressWin": "他们皱眉、嘟囔——但还是付了 ◈{n}。赚了 ◈{m}。",
+    "flipPressLose": "太贪了。交易黄了。",
+    "flipWalked": "他们对价格嗤之以鼻，转身离开。",
+    "flipNext": "下一位买家",
+    "flipPack": "收摊",
+    "flipPouch": "赚了 ◈{n}",
+    "flipHowTo": "摆摊说明",
+    "flipOnb": {
+      "kicker": "摆摊说明 · {n}/{total}",
+      "margin": {
+        "title": "你赚差价",
+        "body": "桌上每件东西都有市场价——它的真实价值。按这个价卖你一分不赚。买家多付的部分就是你的，这个差价就是你这班的报酬。"
+      },
+      "read": {
+        "title": "看穿买家",
+        "body": "每次有两个信号：第一个说他们多想要这东西，第二个说他们钱包有多深。两者合起来暗示他们最多愿意付多少。开价低于那个隐藏上限，他们就付你的价——超过上限，他们空手走人。"
+      },
+      "press": {
+        "title": "知道何时加价",
+        "body": "买家动心后，你可以握手成交稳拿这笔——或者加价五成。如果他们的上限承受得住，他们嘟囔着付钱。承受不住，整笔交易就黄了。贪婪有回报，直到没有。"
+      },
+      "done": "开张"
+    }
+  },
+  "weather": {
+    "sunny": "晴朗",
+    "clear": "晴朗宜人",
+    "cloudy": "阴天",
+    "rainy": "雨天",
+    "windy": "微风",
+    "foggy": "雾天",
+    "snowy": "下雪",
+    "stormy": "暴风雨"
+  },
+  "gender": {
+    "unspecified": "不愿透露",
+    "male": "男",
+    "female": "女",
+    "nonbinary": "非二元"
+  },
+  "sexuality": {
+    "unspecified": "未指定/保密",
+    "straight": "异性恋",
+    "gay": "同性恋",
+    "bisexual": "双性恋"
+  },
+  "propertyCategory": {
+    "residence": "住所",
+    "retreat": "度假屋",
+    "social": "社交场所",
+    "estate": "庄园",
+    "land": "土地"
+  },
+  "rentCadence": {
+    "daily": "每日",
+    "weekly": "每周",
+    "monthly": "每月"
+  },
+  "rentCadencePer": {
+    "daily": "天",
+    "weekly": "周",
+    "monthly": "月"
+  },
+  "datingStat": {
+    "charm": "魅力",
+    "empathy": "共情",
+    "humor": "幽默",
+    "confidence": "自信",
+    "intellect": "智慧",
+    "style": "品味"
+  },
+  "datingStatDesc": {
+    "charm": "吸引力和社交魅力。有利于节奏计时小游戏。",
+    "empathy": "情感共鸣。提升安静/谈心的共度活动；有利于甜蜜与辛辣小游戏。",
+    "humor": "机智和俏皮。提升搞怪的共度活动；有利于字里行间小游戏。",
+    "confidence": "自信和大胆。提升主动出游；有利于节奏即兴小游戏。",
+    "intellect": "深度和好奇心。提升深度对话和文化共度活动；有利于知识问答小游戏。",
+    "style": "审美和品味。提升出游和文化活动；有利于记忆配对小游戏。"
+  },
+  "expression": {
+    "neutral": "平静",
+    "happy": "开心",
+    "smiling": "微笑",
+    "laughing": "大笑",
+    "flirty": "调情",
+    "tender": "温柔",
+    "shy": "害羞",
+    "blushing": "脸红",
+    "thoughtful": "若有所思",
+    "surprised": "惊讶",
+    "excited": "兴奋",
+    "bored": "无聊",
+    "uncomfortable": "不自在",
+    "worried": "担忧",
+    "annoyed": "烦躁",
+    "sad": "难过",
+    "hurt": "受伤",
+    "angry": "生气"
+  },
+  "guardedness": {
+    "veryGuarded": "非常防备",
+    "guarded": "有所防备",
+    "reserved": "有些保留",
+    "fairlyOpen": "比较开放",
+    "openBook": "完全敞开"
+  },
+  "venueTier": {
+    "0": "免费",
+    "1": "普通",
+    "2": "不错",
+    "3": "奢华"
+  },
+  "worldNoteScope": {
+    "global": "全局",
+    "location": "地点",
+    "faction": "势力",
+    "lore": "设定",
+    "rule": "规则",
+    "character": "角色",
+    "misc": "杂项"
+  },
+  "relationshipStat": {
+    "affection": "好感",
+    "trust": "信任",
+    "chemistry": "化学反应",
+    "comfort": "舒适度",
+    "respect": "尊重",
+    "curiosity": "好奇心",
+    "tension": "紧张度"
+  },
+  "stockSector": {
+    "tech": "科技",
+    "finance": "金融",
+    "industry": "工业",
+    "consumer": "消费",
+    "energy": "能源",
+    "media": "媒体",
+    "health": "医疗",
+    "realty": "房地产"
+  },
+  "hud": {
+    "activeWorld": "当前世界",
+    "clockTitle": "{phase} · {weekday} · {season}",
+    "dayPhase": "第 {day} 天 · {phase}",
+    "dayNum": "第 {day} 天",
+    "weekendSuffix": " · 周末",
+    "energy": "精力",
+    "purse": "钱包",
+    "worth": "资产",
+    "energyTitle": "今天剩余 {stamina}/{max} 次行动",
+    "energyAria": "精力：{stamina}/{max}",
+    "cashOnHand": "手持现金",
+    "netWorth": "净资产 — 现金 ◈{cash} · 房产 ◈{property} · 股票 ◈{stocks}",
+    "sleep": "睡觉",
+    "endDay": "结束这一天",
+    "onDateWith": "正在和 {name} 约会",
+    "onHangoutWith": "正在和 {name} 闲逛",
+    "dateInProgress": "与 {name} 的约会进行中",
+    "hangoutInProgress": "与 {name} 的闲逛进行中",
+    "endDayDateBlock": "你正在和 {name} 约会——请在约会页面完成后再结束这一天。",
+    "endDayHangoutBlock": "你正在和 {name} 闲逛——请在约会页面完成后再结束这一天。",
+    "onDateNote": "正在约会——完成后才能结束这一天。",
+    "onHangoutNote": "正在闲逛——完成后才能结束这一天。"
+  },
+  "recap": {
+    "newDay": "新的一天开始了",
+    "recapError": "（无法生成回顾：{error}）",
+    "rested": "你休息后精神焕发。",
+    "weekendBadgeSuffix": " · 周末 ⚡",
+    "mastEyebrow": "日历 · 第 {day} 天早晨",
+    "ledgerNet": "净额",
+    "decayed": "你有一阵子没见过 {names} 了——他们开始觉得被忽视了。",
+    "decayedItem": "{name}（{days}天）",
+    "goodMorning": "早上好，第 {day} 天",
+    "tabDay": "今日",
+    "tabTown": "镇上见闻",
+    "tabLedger": "账本",
+    "ledgerWork": "上了 {count, plural, one {# 个班} other {# 个班}}",
+    "ledgerCasino": "玩了 {count, plural, one {# 轮赌场} other {# 轮赌场}}",
+    "ledgerSpent": "购物花费",
+    "ledgerDividends": "{count, plural, one {# 笔持仓分红} other {# 笔持仓分红}}",
+    "ledgerRent": "夜间房租已付",
+    "ledgerOverdue": "⚠ 房租逾期：{names}——在宽限期内支付，否则将被驱逐。",
+    "ledgerEvicted": "你因欠租被从 {names} 驱逐。",
+    "ledgerMarket": "夜间市场变动"
+  },
+  "phone": {
+    "home": "主屏幕",
+    "almanac": "日历",
+    "day": "第 {day} 天",
+    "twilight": "黄昏",
+    "energyPct": "精力 {pct}%",
+    "greeting": {
+      "morning": "早上好",
+      "afternoon": "下午好",
+      "evening": "晚上好",
+      "night": "还没睡？",
+      "welcome": "欢迎回来"
+    },
+    "waiting": {
+      "texts": "{count, plural, one {# 条消息} other {# 条消息}}",
+      "letters": "{count, plural, one {# 封信} other {# 封信}}",
+      "posts": "{count, plural, one {# 条新动态} other {# 条新动态}}"
+    },
+    "hintLowEnergy": "灯光渐暗——结束这一天休息吧。",
+    "hintAmbient": "消息和邮件会在日子里送达。",
+    "app": {
+      "messages": "消息",
+      "email": "邮件",
+      "faces": "动态",
+      "moments": "瞬间",
+      "calendar": "日历",
+      "constellation": "星座",
+      "weather": "天气",
+      "endings": "结局",
+      "work": "工作",
+      "together": "共度",
+      "property": "房产",
+      "market": "股市",
+      "gambling": "赌场",
+      "shop": "商店",
+      "games": "游戏",
+      "bag": "背包",
+      "settings": "设置"
+    }
+  },
+  "crisis": {
+    "blurb": "如果你或你认识的人正在挣扎，你并不孤单——随时都有免费、保密的帮助。",
+    "resources": [
+      {
+        "label": "988 自杀与危机热线（美国）",
+        "detail": "随时致电或发送短信至 988，白天或夜晚均可。"
+      },
+      {
+        "label": "危机短信热线",
+        "detail": "发送 HOME 至 741741（美国和加拿大），或 85258（英国）。"
+      },
+      {
+        "label": "查找任何地方的帮助热线",
+        "detail": "findahelpline.com 列出全球免费保密热线。"
+      }
+    ]
+  }
+}

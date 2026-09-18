@@ -540,5 +540,22 @@
       "bag": "Bag",
       "settings": "Settings"
     }
+  },
+  "crisis": {
+    "blurb": "If you or someone you know is struggling, you are not alone — free, confidential help is available any time.",
+    "resources": [
+      {
+        "label": "988 Suicide & Crisis Lifeline (US)",
+        "detail": "Call or text 988, any time, day or night."
+      },
+      {
+        "label": "Crisis Text Line",
+        "detail": "Text HOME to 741741 (US & Canada), or 85258 (UK)."
+      },
+      {
+        "label": "Find a helpline anywhere",
+        "detail": "findahelpline.com lists free, confidential lines worldwide."
+      }
+    ]
   }
 }

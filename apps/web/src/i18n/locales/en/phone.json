@@ -10,6 +10,16 @@
     "unavailableToday": "Unavailable today",
     "isUnavailableToday": "is unavailable today",
     "they": "They",
+    "unavailableReasons": {
+      "0": "is buried in work today",
+      "1": "is out of town until tomorrow",
+      "2": "needs some time alone to recharge",
+      "3": "is tied up with family business",
+      "4": "is feeling under the weather",
+      "5": "has a packed schedule today",
+      "6": "is off the grid, dealing with something personal",
+      "7": "asked for a quiet day to themselves"
+    },
     "landlord": {
       "title": "Property Management",
       "notices": "Notices",
@@ -494,6 +504,11 @@
   "work": {
     "title": "Work",
     "onShift": "on shift",
+    "activities": {
+      "work_shift": { "label": "Work a shift", "description": "Steady hours for steady pay. No surprises — and you get a little better at the work each time." },
+      "odd_jobs": { "label": "Hustle odd jobs", "description": "Grittier work, an uneven cut — clean up on a good day, scrape by on a bad one." },
+      "job_weatherwork": { "label": "Day-labor outdoors", "description": "Hard graft the almanac prices by the sky — storms pay best, fair days least. Costs two actions." }
+    },
     "daysShifts": "the day's shifts",
     "errWorld": "Pick an active world first.",
     "errOnDate": "You're on a date with {name} — wrap it up on the Date tab first.",
@@ -581,6 +596,13 @@
   "together": {
     "title": "Together",
     "kicker": "time, shared",
+    "activities": {
+      "tg_in": { "label": "A quiet one in", "description": "Cook, talk, let the hours go slow. The safe, easy kind of closeness." },
+      "tg_talk": { "label": "A long heart-to-heart", "description": "Open up and really listen — the kind of talk that earns trust, or asks for too much too soon." },
+      "tg_out": { "label": "Out for a run together", "description": "Sweat, banter, a little chemistry on the move." },
+      "tg_play": { "label": "Mess around, no agenda", "description": "An afternoon of games and nonsense. Costs a little; almost always lands light." },
+      "tg_culture": { "label": "Wander a gallery", "description": "Trade quiet opinions among the frames. Earns respect from the right sort of person." }
+    },
     "errWorld": "Pick an active world first.",
     "errOnDate": "You're on a date with {name} — wrap it up on the Date tab first.",
     "errOnHangout": "You're hanging out with {name} — wrap it up on the Date tab first.",

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { ActivityDef, Character, TogetherResult } from '@dsim/shared';
 import { fitLabel, togetherFit } from '@dsim/shared';
 import { api } from '../../lib/api';
@@ -14,14 +15,12 @@ import { ResultCard, type ResultTone } from '../ResultCard';
 import { Banner } from '../ui';
 import './phone-life.css';
 
-type TFn = (key: string, opts?: Record<string, unknown>) => string;
-
 type TogetherNote = { tone: ResultTone; seal: string; summary: string };
 
 /** How an outing landed, as a keepsake card: a tone + seal + the descriptive line.
  *  Warmth (spark/warm) reads rose; a flat/crowded afternoon reads moonlit; a
  *  misfire reads ember. */
-function togetherNote(res: TogetherResult, name: string, t: TFn): TogetherNote {
+function togetherNote(res: TogetherResult, name: string, t: TFunction<'phone'>): TogetherNote {
   const stat = relationshipStatLabel(res.stat).toLowerCase();
   const tension = res.tensionDelta > 0 ? t('together.tensionSuffix', { n: res.tensionDelta }) : '';
   switch (res.outcome) {
@@ -137,7 +136,7 @@ export function TogetherApp() {
       const res = await api.performActivity({ activityId: a.id, worldId: activeWorldId, characterId: target });
       await Promise.all([reloadPlayer(), refreshWorldState()]);
       const name = partner?.name.split(' ')[0] ?? t('together.they');
-      if (res.together) setNote(togetherNote(res.together, name, t as unknown as TFn));
+      if (res.together) setNote(togetherNote(res.together, name, t));
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -202,8 +201,8 @@ export function TogetherApp() {
                 <div className="pl-tile pl-together" key={a.id}>
                   <div className="pl-tile-icon" aria-hidden="true">{a.icon ?? '☕'}</div>
                   <div className="pl-tile-body">
-                    <div className="pl-tile-label">{a.label}</div>
-                    <div className="pl-tile-desc">{a.description}</div>
+                    <div className="pl-tile-label">{t(`together.activities.${a.id}.label` as never)}</div>
+                    <div className="pl-tile-desc">{t(`together.activities.${a.id}.description` as never)}</div>
                     <div className="pl-meta">
                       {tier && <span className={`pl-fit ${FIT_CLS[tier]}`}>{t(`together.fit.${tier}`)}</span>}
                       {bold && <span className="pl-bold">{t('together.bolder')}</span>}
